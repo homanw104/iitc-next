@@ -11,6 +11,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/cesium": "^1.67.14",
     "@typescript-eslint/eslint-plugin": "^8.59.4",
     "@typescript-eslint/parser": "^8.59.4",
     "eslint": "^10.4.0",
@@ -22,5 +23,8 @@
     "vite-plugin-monkey": "^8.0.5"
   },
   "private": true,
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "cesium": "^1.141.0"
+  }
 }
