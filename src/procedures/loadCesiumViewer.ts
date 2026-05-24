@@ -6,8 +6,9 @@ import "cesium/Build/Cesium/Widgets/widgets.css";
 import * as Cesium from "cesium";
 import { Viewer, Cartesian3 } from "cesium";
 import { getCookie, getURLParam, setCookie } from "../utils/browser";
-import { EntityManager } from "../utils/entity_manager";
 import { generateTileId, getMapZoomTileParameters, latToTileIndex, lngToTileIndex, TileRequestManager } from "../utils/tiles";
+import { EntityManager } from "../utils/entity_manager";
+import { MapPosition } from "../types/map";
 
 // Tell Cesium where to find its assets (Images, Workers, etc.)
 // Since we use the CDN for the main library, we should also use it for assets.
@@ -122,15 +123,6 @@ export default function loadCesiumViewer(): Viewer {
   });
 
   return viewer;
-}
-
-/**
- * Map position data including latitude, longitude, and zoom level.
- */
-interface MapPosition {
-  lat: number;
-  lng: number;
-  zoom: number;
 }
 
 /**

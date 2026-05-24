@@ -47,7 +47,5 @@ export async function apiRequest(action: string, data: Record<string, unknown>):
     throw new Error(`HTTP error! status: ${response.status}`);
   }
 
-  const json = await response.json();
-
-  return json;
+  return await response.json();
 }
