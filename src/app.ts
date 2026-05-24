@@ -2,12 +2,14 @@
  * Entry point for the application.
  */
 
-import unloadOriginalIntelMap from "./intel";
-import loadCesium from "./cesium";
+import loadCesiumViewer from "./procedures/loadCesiumViewer";
+import loadVersionString from "./procedures/loadVersionString";
+import unloadOriginalIntelMap from "./procedures/unloadOriginalIntelMap";
 
 const init = async () => {
+  loadVersionString();
   unloadOriginalIntelMap();
-  loadCesium();
+  loadCesiumViewer();
 };
 
 // Wait for the page to load

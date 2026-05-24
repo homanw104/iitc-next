@@ -17,6 +17,6 @@ export default defineConfig(
     }
   },
   {
-    ignores: ["dist/"]
+    ignores: ["dist/", "old/"]
   }
 );
