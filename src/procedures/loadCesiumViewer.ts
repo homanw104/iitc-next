@@ -4,11 +4,12 @@
 
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import * as Cesium from "cesium";
-import { Viewer, Cartesian3 } from "cesium";
+import { Cartesian3 } from "cesium";
 import { getCookie, getURLParam, setCookie } from "../utils/browser";
-import { generateTileId, getMapZoomTileParameters, latToTileIndex, lngToTileIndex, TileRequestManager } from "../utils/tiles";
-import { EntityManager } from "../utils/entity_manager";
+import { generateTileKey, getMapZoomTileParameters, latToTileIndex, lngToTileIndex, TileManager } from "../utils/tile";
+import { EntityManager } from "../utils/entity";
 import { MapPosition } from "../types/map";
+import { logger } from "../utils/logger";
 
 // Tell Cesium where to find its assets (Images, Workers, etc.)
 // Since we use the CDN for the main library, we should also use it for assets.
@@ -22,9 +23,16 @@ Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOi
 const DEFAULT_ZOOM = 15;
 
 /**
- * Load the Cesium library and initialize a Viewer.
+ * Loads and initializes a Cesium viewer with specific configurations.
+ * The viewer is placed in a container that covers the entire viewport,
+ * and various UI elements are disabled for a cleaner interface. Initial view
+ * settings are set based on a position, and entity and tile managers are initialized.
+ * Additionally, an event listener is added to update cookies and fetch new data when
+ * the camera moves.
+ *
+ * @return {void}
  */
-export default function loadCesiumViewer(): Viewer {
+export default function loadCesiumViewer(): void {
   // Create container div where the viewer will be placed
   const container = document.createElement("div");
   container.id = "cesium-container";
@@ -71,10 +79,9 @@ export default function loadCesiumViewer(): Viewer {
 
   // Initialize Entity and Request Managers
   const entityManager = new EntityManager(viewer);
-  const requestManager = new TileRequestManager(entityManager);
+  const tileManager = new TileManager(entityManager);
 
-  // Update cookies and fetch new data when the camera moves
-  viewer.camera.moveEnd.addEventListener(() => {
+  const triggerDataLoad = () => {
     const camera = viewer.camera;
     const cartographic = camera.positionCartographic;
     const lat = Cesium.Math.toDegrees(cartographic.latitude);
@@ -82,9 +89,6 @@ export default function loadCesiumViewer(): Viewer {
     const height = cartographic.height;
 
     // Convert height back to zoom level
-    // height = 40000000 / Math.pow(2, zoom)
-    // Math.pow(2, zoom) = 40000000 / height
-    // zoom = log2(40000000 / height)
     const zoom = Math.round(Math.log2(40000000 / height));
 
     // Update cookies with current position
@@ -93,7 +97,7 @@ export default function loadCesiumViewer(): Viewer {
     setCookie("ingress.intelmap.zoom", zoom.toString());
 
     // Get tile parameters for current map zoom level
-    const params = getMapZoomTileParameters(zoom);
+    const tileParams = getMapZoomTileParameters(zoom);
 
     // Calculate visible tile range
     const viewRect = camera.computeViewRectangle();
@@ -104,25 +108,32 @@ export default function loadCesiumViewer(): Viewer {
       const east = Cesium.Math.toDegrees(viewRect.east);
       const north = Cesium.Math.toDegrees(viewRect.north);
 
-      const minX = lngToTileIndex(west, params);
-      const maxX = lngToTileIndex(east, params);
-      const minY = latToTileIndex(north, params);
-      const maxY = latToTileIndex(south, params);
+      const minX = lngToTileIndex(west, tileParams);
+      const maxX = lngToTileIndex(east, tileParams);
+      const minY = latToTileIndex(north, tileParams);
+      const maxY = latToTileIndex(south, tileParams);
+
+      logger.info("CesiumViewer", `Camera move end. Zoom: ${zoom}, View: [W:${west}, S:${south}, E:${east}, N:${north}]`);
+      logger.info("CesiumViewer", `Tile range: X[${minX}-${maxX}], Y[${minY}-${maxY}]`);
 
       const tileKeys: string[] = [];
       for (let x = minX; x <= maxX; x++) {
         for (let y = minY; y <= maxY; y++) {
-          tileKeys.push(generateTileId(params, x, y));
+          tileKeys.push(generateTileKey(tileParams, x, y));
         }
       }
 
       if (tileKeys.length > 0) {
-        requestManager.addTiles(tileKeys);
+        tileManager.addTiles(tileKeys);
       }
     }
-  });
+  };
 
-  return viewer;
+  // Update cookies and fetch new data when the camera moves
+  viewer.camera.moveEnd.addEventListener(triggerDataLoad);
+
+  // Trigger initial load
+  triggerDataLoad();
 }
 
 /**

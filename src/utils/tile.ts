@@ -4,8 +4,8 @@
 
 import { apiRequest } from "./network";
 import { TileResponse } from "../types/ingress";
-import { parseTileEntities } from "./data_parser";
-import { EntityManager } from "./entity_manager";
+import { parseTileEntities, EntityManager } from "./entity";
+import { logger } from "./logger";
 
 /**
  * Defines the number of tiles per edge to zoom into at each level of detail.
@@ -94,7 +94,7 @@ export class TileRequest {
 /**
  * TileRequestManager class for managing multiple TileRequests.
  */
-export class TileRequestManager {
+export class TileManager {
   private activeRequestCount: number = 0;
   private maxRequests: number = 5;
   private tilesPerRequest: number = 25;
@@ -112,6 +112,7 @@ export class TileRequestManager {
    * @param tileKeys - An array of string keys representing the tiles to be added.
    */
   public addTiles(tileKeys: string[]): void {
+    logger.debug("TileManager", `Adding ${tileKeys.length} tiles to queue.`);
     tileKeys.forEach((key) => {
       if (!this.requestedTiles.has(key)) {
         this.queuedTiles.add(key);
@@ -141,11 +142,13 @@ export class TileRequestManager {
 
     const request = new TileRequest(tilesToRequest);
     this.activeRequestCount++;
+    logger.info("TileManager", `Sending request for ${tilesToRequest.length} tiles. Active requests: ${this.activeRequestCount}`);
     try {
       const response = await request.send();
+      logger.info("TileManager", `Received response for ${tilesToRequest.length} tiles.`);
       this.handleResponse(response, tilesToRequest);
     } catch (error) {
-      console.error("Tile request failed:", error);
+      logger.error("TileManager", "Tile request failed:", error);
       // Re-queue or handle error
     } finally {
       this.activeRequestCount--;
@@ -153,12 +156,22 @@ export class TileRequestManager {
     }
   }
 
+  /**
+   * Handles the response from a tile request.
+   *
+   * @param response - The unknown response object to be processed.
+   * @param tileKeys - An array of tile keys used to access specific data within the response.
+   */
   private handleResponse(response: unknown, tileKeys: string[]): void {
     const data = response as TileResponse;
-    if (!data || !data.result) return;
+    if (!data || !data.result) {
+      logger.warn("TileManager", "Invalid response data:", data);
+      return;
+    }
 
-    for (const tileId of tileKeys) {
-      const tileData = data.result[tileId];
+    let entitiesFound = 0;
+    for (const tileKey of tileKeys) {
+      const tileData = data.result[tileKey];
       if (!tileData) continue;
 
       if (tileData.deletedGameEntityGuids) {
@@ -166,12 +179,14 @@ export class TileRequestManager {
       }
 
       if (tileData.gameEntities) {
+        entitiesFound += tileData.gameEntities.length;
         const { portals, links, fields } = parseTileEntities(tileData.gameEntities);
         portals.forEach((p) => this.entityManager.addOrUpdatePortal(p));
         links.forEach((l) => this.entityManager.addOrUpdateLink(l));
         fields.forEach((f) => this.entityManager.addOrUpdateField(f));
       }
     }
+    logger.info("TileManager", `Processed ${entitiesFound} entities from ${tileKeys.length} tiles.`);
   }
 }
 
@@ -200,24 +215,50 @@ export function getMapZoomTileParameters(zoom: number): TileParams {
  * @param params - An object containing parameters required for the conversion:
  *   tilesPerEdge - The total number of tiles along one edge of the map.
  *
- * @return The tile index corresponding to the provided longitude and map parameters.
+ * @return The tile X index corresponding to the provided longitude and map parameters.
  */
 export function lngToTileIndex(lng: number, params: TileParams): number {
   return Math.floor(((lng + 180) / 360) * params.tilesPerEdge);
 }
 
 /**
- * Converts a latitude to a tile index.
+ * Converts a latitude to a tile index (Y coordinate) using the Web Mercator projection.
  *
- * @param lat - The latitude value to convert. Must be within the range of -90 to 90 degrees.
+ * This implementation follows the Slippy Map tiling system rules used by Ingress Intel.
+ * At latitude 0, it returns tilesPerEdge / 2.
+ *
+ * @param lat - The latitude value to convert. Must be within the range of approximately -85.05 to 85.05 degrees for Web Mercator.
  * @param params - An object containing parameters required for the conversion:
  *   tilesPerEdge - The total number of tiles along one edge of the map.
  *
- * @return The tile number corresponding to the given latitude, based on the provided parameters.
+ * @return The tile Y index corresponding to the given latitude.
  */
 export function latToTileIndex(lat: number, params: TileParams): number {
-  return Math.floor(
-    ((1 - Math.log(Math.tan((lat * Math.PI) / 180) + 1 / Math.cos((lat * Math.PI) / 180)) / Math.PI) / 2) * params.tilesPerEdge);
+  const latRad = (lat * Math.PI) / 180;
+  return Math.floor(((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * params.tilesPerEdge);
+}
+
+/**
+ * Converts a tile Y index back to latitude.
+ *
+ * @param y - The tile Y index.
+ * @param params - Tile parameters including tilesPerEdge.
+ * @returns The latitude in degrees.
+ */
+export function tileToLat(y: number, params: TileParams): number {
+  const n = Math.PI - (2 * Math.PI * y) / params.tilesPerEdge;
+  return (180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
+}
+
+/**
+ * Converts a tile X index back to longitude.
+ *
+ * @param x - The tile X index.
+ * @param params - Tile parameters including tilesPerEdge.
+ * @returns The longitude in degrees.
+ */
+export function tileToLng(x: number, params: TileParams): number {
+  return (x / params.tilesPerEdge) * 360 - 180;
 }
 
 /**
@@ -228,6 +269,6 @@ export function latToTileIndex(lat: number, params: TileParams): number {
  * @param y - The Y index of the tile.
  * @returns A string representing the unique tile ID.
  */
-export function generateTileId(params: TileParams, x: number, y: number): string {
+export function generateTileKey(params: TileParams, x: number, y: number): string {
   return `${params.zoom}_${x}_${y}_${params.level}_8_100`;
 }
