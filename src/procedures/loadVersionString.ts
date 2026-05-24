@@ -11,6 +11,7 @@ export default function loadVersionString(): void {
   const version = extractVersionFromScript();
   if (version) {
     setApiVersion(version);
+    console.info(`Niantic API version: ${version}`);
   } else {
     console.warn("Could not extract Niantic version. Requests may fail.");
   }

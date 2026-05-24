@@ -9,6 +9,7 @@ export default defineConfig({
         name: "iitc-next",
         namespace: "npm/vite-plugin-monkey",
         match: ["https://intel.ingress.com/*"],
+        "run-at": "document-start",
       },
       build: {
         externalGlobals: {
