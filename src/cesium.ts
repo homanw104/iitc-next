@@ -1,5 +1,5 @@
 /**
- * Load the Cesium library and initialize a Viewer
+ * Load the Cesium library and initialize a Viewer.
  */
 
 import "cesium/Build/Cesium/Widgets/widgets.css";
@@ -22,7 +22,7 @@ Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOi
 export default function loadCesium(): Viewer {
   // Create container div where the viewer will be placed
   const container = document.createElement("div");
-  container.id = "cesiumContainer";
+  container.id = "cesium-container";
   Object.assign(container.style, {
     position: "fixed",
     top: "0",
@@ -35,7 +35,7 @@ export default function loadCesium(): Viewer {
   document.body.appendChild(container);
 
   // Initialize Cesium Viewer
-  const viewer = new Cesium.Viewer("cesiumContainer", {
+  const viewer = new Cesium.Viewer(container.id, {
     animation: false,             // Disable the clock/animation widget
     timeline: false,              // Disable timeline
     homeButton: false,            // Disable home button

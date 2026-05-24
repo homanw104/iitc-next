@@ -2,9 +2,11 @@
  * Entry point for the application.
  */
 
+import unloadOriginalIntelMap from "./intel";
 import loadCesium from "./cesium";
 
 const init = async () => {
+  unloadOriginalIntelMap();
   loadCesium();
 };
 
