@@ -56,7 +56,24 @@ export default function loadCesiumViewer(): void {
     homeButton: false,            // Disable home button
     navigationHelpButton: false,  // Disable navigation help button
     fullscreenButton: false,      // Disable full-screen button
+    contextOptions: {
+      allowTextureFilterAnisotropic: true,
+    },
+    requestRenderMode: true,            // Performance: Only render when something changes
+    maximumRenderTimeChange: Infinity,  // Ensure render only triggers on explicit changes or camera movement
   });
+
+  // Performance & Quality Tweaks
+  viewer.scene.logarithmicDepthBuffer = true; // Prevents Z-fighting at large distances
+  viewer.scene.globe.showGroundAtmosphere = true; // Better visuals for the globe
+  viewer.scene.globe.baseColor = Cesium.Color.BLACK; // Match our dark theme
+  viewer.scene.highDynamicRange = true; // Better color reproduction
+
+  // Enable Anti-aliasing
+  // 4 samples is a good balance between quality and performance.
+  viewer.scene.msaaSamples = 4;
+  // FXAA is a post-processing antialiasing that works even on older hardware
+  viewer.scene.postProcessStages.fxaa.enabled = true;
 
   // Hide credit text at bottom of map
   const credits = document.querySelector(".cesium-widget-credits") as HTMLElement;

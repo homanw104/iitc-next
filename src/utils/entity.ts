@@ -115,6 +115,7 @@ export class EntityManager {
         ]),
         width: 2,
         material: this.getTeamColor(data.team).withAlpha(0.7),
+        arcType: Cesium.ArcType.GEODESIC,
       },
     });
 
