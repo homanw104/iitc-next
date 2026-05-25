@@ -23,7 +23,6 @@ export class EntityManager {
   private updatePortalEntity(entity: Cesium.Entity, data: PortalData): void {
     if (entity.point) {
       entity.point.color = new Cesium.ConstantProperty(this.getTeamColor(data.team));
-      entity.point.pixelSize = new Cesium.ConstantProperty(data.placeholder ? 4 : 8);
     }
     if (entity.label) {
       entity.label.text = new Cesium.ConstantProperty(data.title || "");
@@ -76,7 +75,8 @@ export class EntityManager {
       id: `portal-${data.guid}`,
       position: Cesium.Cartesian3.fromDegrees(data.lngE6 / 1e6, data.latE6 / 1e6),
       point: {
-        pixelSize: data.placeholder ? 4 : 8,
+        pixelSize: 16,
+        scaleByDistance: new Cesium.NearFarScalar(1e2, 1.0, 1e4, 0.25),
         color: this.getTeamColor(data.team),
         outlineColor: Cesium.Color.BLACK,
         outlineWidth: 1,
@@ -86,7 +86,12 @@ export class EntityManager {
         font: "12px sans-serif",
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
         pixelOffset: new Cesium.Cartesian2(0, -10),
-        disableDepthTestDistance: Number.POSITIVE_INFINITY, // Ensure label is visible
+        eyeOffset: new Cesium.Cartesian3(0, 0, -15),
+        horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+        outlineWidth: 4,
+        outlineColor: Cesium.Color.BLACK,
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        translucencyByDistance: new Cesium.NearFarScalar(1e3, 1.0, 1.5e3, 0.0),
       },
     });
     logger.debug("EntityManager", `Added portal: ${data.title || data.guid} at ${data.latE6 / 1e6}, ${data.lngE6 / 1e6}`);
@@ -164,11 +169,11 @@ export class EntityManager {
 
   private getTeamColor(team: Team): Cesium.Color {
     switch (team) {
-      case "ENLIGHTENED": return Cesium.Color.LIME;
-      case "RESISTANCE": return Cesium.Color.BLUE;
-      case "MACHINA": return Cesium.Color.RED;
+      case "ENLIGHTENED": return new Cesium.Color(5/255, 217/255, 3/255, 1.0);
+      case "RESISTANCE": return new Cesium.Color(3/255, 139/255, 255/255, 1.0);
+      case "MACHINA": return new Cesium.Color(255/255, 0/255, 41/255, 1.0);
       case "NEUTRAL": return Cesium.Color.LIGHTGRAY;
-      default: return Cesium.Color.WHITE;
+      default: return Cesium.Color.WHITE;   // Should never happen
     }
   }
 }

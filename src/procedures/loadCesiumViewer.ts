@@ -133,6 +133,7 @@ export default function loadCesiumViewer(): void {
       const maxY = latToTileIndex(south, tileParams);
 
       logger.debug("CesiumViewer", `Zoom: ${zoom}`);
+      logger.debug("CesiumViewer", `Height: ${height.toFixed(0)}m`);
       logger.debug("CesiumViewer", `View: [W:${west}, S:${south}, E:${east}, N:${north}]`);
       logger.debug("CesiumViewer", `Tile range: X[${minX}-${maxX}], Y[${minY}-${maxY}]`);
 
