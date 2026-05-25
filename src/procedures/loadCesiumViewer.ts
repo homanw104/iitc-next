@@ -100,6 +100,9 @@ export default function loadCesiumViewer(): void {
   const entityManager = new EntityManager(viewer);
   const tileManager = new TileManager(entityManager);
 
+  // Add Layer Chooser UI
+  addLayerChooser(container, entityManager);
+
   const triggerDataLoad = () => {
     const camera = viewer.camera;
     const cartographic = camera.positionCartographic;
@@ -155,6 +158,93 @@ export default function loadCesiumViewer(): void {
 
   // Initial data load
   triggerDataLoad();
+}
+
+/**
+ * Adds a layer chooser button and dropdown to the specified container.
+ *
+ * @param container - The HTML element where the layer chooser will be appended.
+ * @param entityManager - An instance of EntityManager that manages layer visibility.
+ */
+function addLayerChooser(container: HTMLElement, entityManager: EntityManager): void {
+  const wrapper = document.createElement("div");
+  Object.assign(wrapper.style, {
+    position: "absolute",
+    bottom: "5px",
+    right: "5px",
+    padding: "2px",
+    zIndex: "10010",
+    display: "flex",
+    flexDirection: "column-reverse",
+    alignItems: "flex-end"
+  });
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "cesium-button cesium-toolbar-button";
+  button.title = "Layer Chooser";
+  button.innerHTML = `
+    <svg class="cesium-svgPath-svg" viewBox="0 -960 960 960" width="30" height="30" fill="currentColor">
+      <path d="M480-118 120-398l66-50 294 228 294-228 66 50-360 280Zm0-202L120-600l360-280 360 280-360 280Zm0-280Zm0 178 230-178-230-178-230 178 230 178Z" />
+    </svg>
+  `;
+
+  const chooser = document.createElement("div");
+  Object.assign(chooser.style, {
+    backgroundColor: "rgba(42, 42, 42, 0.9)",
+    padding: "10px",
+    borderRadius: "4px",
+    color: "white",
+    fontFamily: "sans-serif",
+    fontSize: "13px",
+    boxShadow: "0 0 10px rgba(0,0,0,0.5)",
+    border: "1px solid #555",
+    display: "none",
+    minWidth: "100px"
+  });
+
+  button.onclick = () => {
+    chooser.style.display = chooser.style.display === "none" ? "block" : "none";
+  };
+
+  const title = document.createElement("div");
+  title.innerText = "Layers";
+  title.style.fontWeight = "bold";
+  title.style.marginBottom = "8px";
+  title.style.borderBottom = "1px solid #555";
+  title.style.paddingBottom = "4px";
+  chooser.appendChild(title);
+
+  const layers: Array<{ id: "portals" | "links" | "fields"; label: string }> = [
+    { id: "fields", label: "Fields" },
+    { id: "links", label: "Links" },
+    { id: "portals", label: "Portals" },
+  ];
+
+  layers.forEach(layer => {
+    const label = document.createElement("label");
+    label.style.display = "block";
+    label.style.marginBottom = "4px";
+    label.style.cursor = "pointer";
+    label.style.whiteSpace = "nowrap";
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = entityManager.isLayerVisible(layer.id);
+    checkbox.style.marginRight = "8px";
+    checkbox.style.verticalAlign = "middle";
+    checkbox.addEventListener("change", (e) => {
+      entityManager.setLayerVisible(layer.id, (e.target as HTMLInputElement).checked);
+    });
+
+    label.appendChild(checkbox);
+    label.appendChild(document.createTextNode(layer.label));
+    chooser.appendChild(label);
+  });
+
+  wrapper.appendChild(button);
+  wrapper.appendChild(chooser);
+  container.appendChild(wrapper);
 }
 
 /**

@@ -12,12 +12,19 @@ import { logger } from "./logger";
  */
 export class EntityManager {
   private viewer: Cesium.Viewer;
+  private portalsSource = new Cesium.CustomDataSource("portals");
+  private linksSource = new Cesium.CustomDataSource("links");
+  private fieldsSource = new Cesium.CustomDataSource("fields");
+
   private portals: Map<string, { data: PortalData; entity: Cesium.Entity }> = new Map();
   private links: Map<string, { data: LinkData; entity: Cesium.Entity }> = new Map();
   private fields: Map<string, { data: FieldData; entity: Cesium.Entity }> = new Map();
 
   constructor(viewer: Cesium.Viewer) {
     this.viewer = viewer;
+    this.viewer.dataSources.add(this.portalsSource).then();
+    this.viewer.dataSources.add(this.linksSource).then();
+    this.viewer.dataSources.add(this.fieldsSource).then();
   }
 
   public requestRender(): void {
@@ -75,7 +82,7 @@ export class EntityManager {
       return;
     }
 
-    const portalEntity = this.viewer.entities.add({
+    const portalEntity = this.portalsSource.entities.add({
       id: `portal-${data.guid}`,
       position: Cesium.Cartesian3.fromDegrees(data.lngE6 / 1e6, data.latE6 / 1e6),
       point: {
@@ -115,7 +122,7 @@ export class EntityManager {
       return;
     }
 
-    const entity = this.viewer.entities.add({
+    const entity = this.linksSource.entities.add({
       id: `link-${data.guid}`,
       polyline: {
         positions: Cesium.Cartesian3.fromDegreesArray([
@@ -146,7 +153,7 @@ export class EntityManager {
     }
 
     const points = data.points.flatMap(p => [p.lngE6 / 1e6, p.latE6 / 1e6]);
-    const entity = this.viewer.entities.add({
+    const entity = this.fieldsSource.entities.add({
       id: `field-${data.guid}`,
       polygon: {
         hierarchy: new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray(points)),
@@ -160,14 +167,40 @@ export class EntityManager {
 
   public removeEntity(guid: string): void {
     if (this.portals.has(guid)) {
-      this.viewer.entities.remove(this.portals.get(guid)!.entity);
+      this.portalsSource.entities.remove(this.portals.get(guid)!.entity);
       this.portals.delete(guid);
     } else if (this.links.has(guid)) {
-      this.viewer.entities.remove(this.links.get(guid)!.entity);
+      this.linksSource.entities.remove(this.links.get(guid)!.entity);
       this.links.delete(guid);
     } else if (this.fields.has(guid)) {
-      this.viewer.entities.remove(this.fields.get(guid)!.entity);
+      this.fieldsSource.entities.remove(this.fields.get(guid)!.entity);
       this.fields.delete(guid);
+    }
+  }
+
+  public setLayerVisible(type: "portals" | "links" | "fields", visible: boolean): void {
+    switch (type) {
+      case "portals":
+        this.portalsSource.show = visible;
+        break;
+      case "links":
+        this.linksSource.show = visible;
+        break;
+      case "fields":
+        this.fieldsSource.show = visible;
+        break;
+    }
+    this.requestRender();
+  }
+
+  public isLayerVisible(type: "portals" | "links" | "fields"): boolean {
+    switch (type) {
+      case "portals":
+        return this.portalsSource.show;
+      case "links":
+        return this.linksSource.show;
+      case "fields":
+        return this.fieldsSource.show;
     }
   }
 
