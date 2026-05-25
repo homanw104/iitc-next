@@ -47,4 +47,4 @@ class LogManager {
   }
 }
 
-export const logManager = new LogManager();
+export const logger = new LogManager();

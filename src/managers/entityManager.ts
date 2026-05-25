@@ -4,7 +4,7 @@
 
 import * as Cesium from "cesium";
 import { PortalData, LinkData, FieldData, Team } from "../types/ingress";
-import { logManager } from "./logManager";
+import { logger } from "../utils/logger";
 import { LayerManager } from "./layerManager";
 
 /**
@@ -47,7 +47,7 @@ export class EntityManager {
     }
 
     const portalEntity = this.createPortalEntity(data);
-    logManager.debug("EntityManager", `Added portal: ${data.title || data.guid} at ${data.latE6 / 1e6}, ${data.lngE6 / 1e6}`);
+    logger.debug("EntityManager", `Added portal: ${data.title || data.guid} at ${data.latE6 / 1e6}, ${data.lngE6 / 1e6}`);
     this.portals.set(data.guid, { data, entity: portalEntity });
   }
 

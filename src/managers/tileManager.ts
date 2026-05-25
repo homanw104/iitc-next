@@ -6,7 +6,7 @@ import { apiRequest } from "../utils/network";
 import { FieldData, LinkData, PortalData, RawEntity, TileResponse } from "../types/ingress";
 import { ParsedEntities } from "../types/map";
 import { EntityManager } from "./entityManager";
-import { logManager } from "./logManager";
+import { logger } from "../utils/logger";
 
 /**
  * Defines the number of tiles per edge to zoom into at each level of detail.
@@ -113,7 +113,7 @@ export class TileManager {
    * @param tileKeys - An array of string keys representing the tiles to be added.
    */
   public addTiles(tileKeys: string[]): void {
-    logManager.debug("TileManager", `Adding ${tileKeys.length} tiles to queue.`);
+    logger.debug("TileManager", `Adding ${tileKeys.length} tiles to queue.`);
     tileKeys.forEach((key) => {
       if (!this.requestedTiles.has(key)) {
         this.queuedTiles.add(key);
@@ -144,15 +144,15 @@ export class TileManager {
     const request = new TileRequest(tilesToRequest);
     this.activeRequestCount++;
 
-    logManager.info("TileManager", `Sending request for ${tilesToRequest.length} tiles.`);
-    logManager.info("TileManager", `Active requests: ${this.activeRequestCount}.`);
+    logger.info("TileManager", `Sending request for ${tilesToRequest.length} tiles.`);
+    logger.info("TileManager", `Active requests: ${this.activeRequestCount}.`);
 
     try {
       const response = await request.send();
-      logManager.info("TileManager", `Received response for ${tilesToRequest.length} tiles.`);
+      logger.info("TileManager", `Received response for ${tilesToRequest.length} tiles.`);
       this.handleResponse(response, tilesToRequest);
     } catch (error) {
-      logManager.error("TileManager", "Tile request failed:", error);
+      logger.error("TileManager", "Tile request failed:", error);
     } finally {
       this.activeRequestCount--;
       this.processQueue().then();
@@ -168,7 +168,7 @@ export class TileManager {
   private handleResponse(response: unknown, tileKeys: string[]): void {
     const data = response as TileResponse;
     if (!data || !data.result) {
-      logManager.warn("TileManager", "Invalid response data:", data);
+      logger.warn("TileManager", "Invalid response data:", data);
       return;
     }
 
@@ -191,7 +191,7 @@ export class TileManager {
         fields.forEach((f) => this.entityManager.addOrUpdateField(f));
       }
     }
-    logManager.info("TileManager", `Processed ${entitiesFound} entities added/updated and ${entitiesRemoved} removed from ${tileKeys.length} tiles.`);
+    logger.info("TileManager", `Processed ${entitiesFound} entities added/updated and ${entitiesRemoved} removed from ${tileKeys.length} tiles.`);
 
     if (entitiesFound > 0 || entitiesRemoved > 0) {
       this.entityManager.requestRender();

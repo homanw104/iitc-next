@@ -9,7 +9,7 @@ import { getCookie, getURLParam, setCookie } from "../utils/browser";
 import { generateTileKey, getMapZoomTileParameters, latToTileIndex, lngToTileIndex, TileManager } from "../managers/tileManager";
 import { EntityManager } from "../managers/entityManager";
 import { MapPosition } from "../types/map";
-import { logManager } from "../managers/logManager";
+import { logger } from "../utils/logger";
 
 // Tell Cesium where to find its assets (Images, Workers, etc.)
 // Since we use the CDN for the main library, we should also use it for assets.
@@ -33,7 +33,7 @@ const DEFAULT_ZOOM = 15;
  * @return {void}
  */
 export default function loadCesiumViewer(): void {
-  logManager.debug("CesiumViewer", "Loading...");
+  logger.debug("CesiumViewer", "Loading...");
 
   // Create container div where the viewer will be placed
   const container = document.createElement("div");
@@ -135,10 +135,10 @@ export default function loadCesiumViewer(): void {
       const minY = latToTileIndex(north, tileParams);
       const maxY = latToTileIndex(south, tileParams);
 
-      logManager.debug("CesiumViewer", `Zoom: ${zoom}`);
-      logManager.debug("CesiumViewer", `Height: ${height.toFixed(0)}m`);
-      logManager.debug("CesiumViewer", `View: [W:${west}, S:${south}, E:${east}, N:${north}]`);
-      logManager.debug("CesiumViewer", `Tile range: X[${minX}-${maxX}], Y[${minY}-${maxY}]`);
+      logger.debug("CesiumViewer", `Zoom: ${zoom}`);
+      logger.debug("CesiumViewer", `Height: ${height.toFixed(0)}m`);
+      logger.debug("CesiumViewer", `View: [W:${west}, S:${south}, E:${east}, N:${north}]`);
+      logger.debug("CesiumViewer", `Tile range: X[${minX}-${maxX}], Y[${minY}-${maxY}]`);
 
       const tileKeys: string[] = [];
       for (let x = minX; x <= maxX; x++) {
