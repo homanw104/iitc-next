@@ -6,10 +6,10 @@ import "cesium/Build/Cesium/Widgets/widgets.css";
 import * as Cesium from "cesium";
 import { Cartesian3 } from "cesium";
 import { getCookie, getURLParam, setCookie } from "../utils/browser";
-import { generateTileKey, getMapZoomTileParameters, latToTileIndex, lngToTileIndex, TileManager } from "../utils/tile";
-import { EntityManager } from "../utils/entity";
+import { generateTileKey, getMapZoomTileParameters, latToTileIndex, lngToTileIndex, TileManager } from "../managers/tileManager";
+import { EntityManager } from "../managers/entityManager";
 import { MapPosition } from "../types/map";
-import { logger } from "../utils/logger";
+import { logManager } from "../managers/logManager";
 
 // Tell Cesium where to find its assets (Images, Workers, etc.)
 // Since we use the CDN for the main library, we should also use it for assets.
@@ -33,7 +33,7 @@ const DEFAULT_ZOOM = 15;
  * @return {void}
  */
 export default function loadCesiumViewer(): void {
-  logger.debug("CesiumViewer", "Loading...");
+  logManager.debug("CesiumViewer", "Loading...");
 
   // Create container div where the viewer will be placed
   const container = document.createElement("div");
@@ -135,10 +135,10 @@ export default function loadCesiumViewer(): void {
       const minY = latToTileIndex(north, tileParams);
       const maxY = latToTileIndex(south, tileParams);
 
-      logger.debug("CesiumViewer", `Zoom: ${zoom}`);
-      logger.debug("CesiumViewer", `Height: ${height.toFixed(0)}m`);
-      logger.debug("CesiumViewer", `View: [W:${west}, S:${south}, E:${east}, N:${north}]`);
-      logger.debug("CesiumViewer", `Tile range: X[${minX}-${maxX}], Y[${minY}-${maxY}]`);
+      logManager.debug("CesiumViewer", `Zoom: ${zoom}`);
+      logManager.debug("CesiumViewer", `Height: ${height.toFixed(0)}m`);
+      logManager.debug("CesiumViewer", `View: [W:${west}, S:${south}, E:${east}, N:${north}]`);
+      logManager.debug("CesiumViewer", `Tile range: X[${minX}-${maxX}], Y[${minY}-${maxY}]`);
 
       const tileKeys: string[] = [];
       for (let x = minX; x <= maxX; x++) {
@@ -215,11 +215,28 @@ function addLayerChooser(container: HTMLElement, entityManager: EntityManager): 
   title.style.paddingBottom = "4px";
   chooser.appendChild(title);
 
-  const layers: Array<{ id: "portals" | "links" | "fields"; label: string }> = [
-    { id: "fields", label: "Fields" },
-    { id: "links", label: "Links" },
-    { id: "portals", label: "Portals" },
+  const portalLevels = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+  const teams = ["ENLIGHTENED", "RESISTANCE", "MACHINA", "NEUTRAL"];
+
+  const layers: Array<{ id: string; label: string }> = [
+    { id: "portals-placeholder", label: "Portals (Uncharged)" },
   ];
+
+  teams.forEach(team => {
+    const teamLabel = team.charAt(0).toUpperCase() + team.slice(1).toLowerCase();
+    layers.push({ id: `fields-${team.toLowerCase()}`, label: `${teamLabel} Fields` });
+    layers.push({ id: `links-${team.toLowerCase()}`, label: `${teamLabel} Links` });
+  });
+
+  portalLevels.forEach(level => {
+    teams.forEach(team => {
+      const teamLabel = team.charAt(0).toUpperCase() + team.slice(1).toLowerCase();
+      layers.push({
+        id: `portals-l${level}-${team.toLowerCase()}`,
+        label: `L${level} ${teamLabel} Portal`
+      });
+    });
+  });
 
   layers.forEach(layer => {
     const label = document.createElement("label");

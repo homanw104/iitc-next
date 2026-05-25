@@ -2,10 +2,11 @@
  * Utility functions and classes for getting data tiles.
  */
 
-import { apiRequest } from "./network";
-import { TileResponse } from "../types/ingress";
-import { parseTileEntities, EntityManager } from "./entity";
-import { logger } from "./logger";
+import { apiRequest } from "../utils/network";
+import { FieldData, LinkData, PortalData, RawEntity, TileResponse } from "../types/ingress";
+import { ParsedEntities } from "../types/map";
+import { EntityManager } from "./entityManager";
+import { logManager } from "./logManager";
 
 /**
  * Defines the number of tiles per edge to zoom into at each level of detail.
@@ -112,7 +113,7 @@ export class TileManager {
    * @param tileKeys - An array of string keys representing the tiles to be added.
    */
   public addTiles(tileKeys: string[]): void {
-    logger.debug("TileManager", `Adding ${tileKeys.length} tiles to queue.`);
+    logManager.debug("TileManager", `Adding ${tileKeys.length} tiles to queue.`);
     tileKeys.forEach((key) => {
       if (!this.requestedTiles.has(key)) {
         this.queuedTiles.add(key);
@@ -143,15 +144,15 @@ export class TileManager {
     const request = new TileRequest(tilesToRequest);
     this.activeRequestCount++;
 
-    logger.info("TileManager", `Sending request for ${tilesToRequest.length} tiles.`);
-    logger.info("TileManager", `Active requests: ${this.activeRequestCount}.`);
+    logManager.info("TileManager", `Sending request for ${tilesToRequest.length} tiles.`);
+    logManager.info("TileManager", `Active requests: ${this.activeRequestCount}.`);
 
     try {
       const response = await request.send();
-      logger.info("TileManager", `Received response for ${tilesToRequest.length} tiles.`);
+      logManager.info("TileManager", `Received response for ${tilesToRequest.length} tiles.`);
       this.handleResponse(response, tilesToRequest);
     } catch (error) {
-      logger.error("TileManager", "Tile request failed:", error);
+      logManager.error("TileManager", "Tile request failed:", error);
     } finally {
       this.activeRequestCount--;
       this.processQueue().then();
@@ -167,7 +168,7 @@ export class TileManager {
   private handleResponse(response: unknown, tileKeys: string[]): void {
     const data = response as TileResponse;
     if (!data || !data.result) {
-      logger.warn("TileManager", "Invalid response data:", data);
+      logManager.warn("TileManager", "Invalid response data:", data);
       return;
     }
 
@@ -190,7 +191,7 @@ export class TileManager {
         fields.forEach((f) => this.entityManager.addOrUpdateField(f));
       }
     }
-    logger.info("TileManager", `Processed ${entitiesFound} entities added/updated and ${entitiesRemoved} removed from ${tileKeys.length} tiles.`);
+    logManager.info("TileManager", `Processed ${entitiesFound} entities added/updated and ${entitiesRemoved} removed from ${tileKeys.length} tiles.`);
 
     if (entitiesFound > 0 || entitiesRemoved > 0) {
       this.entityManager.requestRender();
@@ -282,4 +283,121 @@ export function tileToLng(x: number, params: TileParams): number {
  */
 export function generateTileKey(params: TileParams, x: number, y: number): string {
   return `${params.zoom}_${x}_${y}_${params.level}_8_100`;
+}
+
+/**
+ * Parses a raw entity into a PortalData object.
+ *
+ * @param ent - An array representing the raw entity, where the first element is the GUID,
+ *              the second is the timestamp, and the third is an array of additional data.
+ * @return A PortalData object containing the parsed information from the raw entity.
+ */
+export function parsePortal(ent: RawEntity): PortalData {
+  const [guid, timestamp, data] = ent;
+  const teamCode = data[1] as string;
+  const team = teamCode === "E" ? "ENLIGHTENED" :
+    teamCode === "R" ? "RESISTANCE" :
+      teamCode === "M" ? "MACHINA" : "NEUTRAL";
+  const latE6 = data[2] as number;
+  const lngE6 = data[3] as number;
+
+  const portal: PortalData = {
+    guid,
+    timestamp,
+    team,
+    latE6,
+    lngE6,
+  };
+
+  if (data.length >= 14) {
+    portal.level = data[4] as number;
+    portal.health = data[5] as number;
+    portal.resCount = data[6] as number;
+    portal.image = data[7] as string;
+    portal.title = data[8] as string;
+  }
+
+  return portal;
+}
+
+/**
+ * Parses a raw entity into a structured LinkData object.
+ *
+ * @param ent - An array representing the raw entity with structured information.
+ * @returns A LinkData object containing parsed information from the raw entity.
+ */
+export function parseLink(ent: RawEntity): LinkData {
+  const [guid, timestamp, data] = ent;
+  const teamCode = data[1] as string;
+  return {
+    guid,
+    timestamp,
+    team: teamCode === "E" ? "ENLIGHTENED" :
+      teamCode === "R" ? "RESISTANCE" :
+        teamCode === "M" ? "MACHINA" : "NEUTRAL",
+    oGuid: data[2] as string,
+    oLatE6: data[3] as number,
+    oLngE6: data[4] as number,
+    dGuid: data[5] as string,
+    dLatE6: data[6] as number,
+    dLngE6: data[7] as number,
+  };
+}
+
+/**
+ * Parses a raw entity into structured FieldData.
+ *
+ * @param ent - The raw entity to be parsed, expected to be an array where the first element is a GUID (string),
+ *              the second element is a timestamp (number), and the third element is an array containing team data
+ *              and point data.
+ *
+ * @return A structured FieldData object with properties for guid, timestamp, team, and points.
+ */
+export function parseField(ent: RawEntity): FieldData {
+  const [guid, timestamp, data] = ent;
+  const teamCode = data[1] as string;
+  const team = teamCode === "E" ? "ENLIGHTENED" :
+    teamCode === "R" ? "RESISTANCE" :
+      teamCode === "M" ? "MACHINA" : "NEUTRAL";
+  const points = (data[2] as unknown[][]).map((p) => ({
+    guid: p[0] as string,
+    latE6: p[1] as number,
+    lngE6: p[2] as number,
+  }));
+
+  return {
+    guid,
+    timestamp,
+    team,
+    points,
+  };
+}
+
+/**
+ * Parses an array of raw entities into categorized data structures.
+ *
+ * @param entities - An array of raw entity objects to be parsed.
+ * @returns An object containing arrays of parsed portal, link, and field data.
+ */
+export function parseTileEntities(entities: RawEntity[]): ParsedEntities {
+  const portals: PortalData[] = [];
+  const links: LinkData[] = [];
+  const fields: FieldData[] = [];
+
+  for (const ent of entities) {
+    const type = ent[2][0];
+    switch (type) {
+      case "p":
+        portals.push(parsePortal(ent));
+        break;
+      case "e":
+        links.push(parseLink(ent));
+        break;
+      case "r":
+        fields.push(parseField(ent));
+        break;
+    }
+  }
+
+  return { portals, links, fields };
 }
