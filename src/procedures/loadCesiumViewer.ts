@@ -152,6 +152,9 @@ export default function loadCesiumViewer(): void {
 
   // Update cookies and fetch new data when the camera moves
   viewer.camera.moveEnd.addEventListener(triggerDataLoad);
+
+  // Initial data load
+  triggerDataLoad();
 }
 
 /**

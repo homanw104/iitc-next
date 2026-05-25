@@ -20,6 +20,10 @@ export class EntityManager {
     this.viewer = viewer;
   }
 
+  public requestRender(): void {
+    this.viewer.scene.requestRender();
+  }
+
   private updatePortalEntity(entity: Cesium.Entity, data: PortalData): void {
     if (entity.point) {
       entity.point.color = new Cesium.ConstantProperty(this.getTeamColor(data.team));

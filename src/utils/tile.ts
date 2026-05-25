@@ -172,11 +172,13 @@ export class TileManager {
     }
 
     let entitiesFound = 0;
+    let entitiesRemoved = 0;
     for (const tileKey of tileKeys) {
       const tileData = data.result.map[tileKey];
       if (!tileData) continue;
 
       if (tileData.deletedGameEntityGuids) {
+        entitiesRemoved += tileData.deletedGameEntityGuids.length;
         tileData.deletedGameEntityGuids.forEach((guid) => this.entityManager.removeEntity(guid));
       }
 
@@ -188,7 +190,11 @@ export class TileManager {
         fields.forEach((f) => this.entityManager.addOrUpdateField(f));
       }
     }
-    logger.info("TileManager", `Processed ${entitiesFound} entities from ${tileKeys.length} tiles.`);
+    logger.info("TileManager", `Processed ${entitiesFound} entities added/updated and ${entitiesRemoved} removed from ${tileKeys.length} tiles.`);
+
+    if (entitiesFound > 0 || entitiesRemoved > 0) {
+      this.entityManager.requestRender();
+    }
   }
 }
 
