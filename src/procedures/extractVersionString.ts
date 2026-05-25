@@ -3,17 +3,19 @@
  */
 
 import { setApiVersion } from "../utils/network";
+import { logger } from "../utils/logger";
 
 /**
  * Extracts and sets the Niantic API version from the page.
  */
-export default function loadVersionString(): void {
+export default function extractVersionString(): void {
+  logger.debug("Version", "Extracting version string...");
   const version = extractVersionFromScript();
   if (version) {
     setApiVersion(version);
-    console.info(`Niantic API version: ${version}`);
+    logger.info("Version", version);
   } else {
-    console.warn("Could not extract Niantic version. Requests may fail.");
+    logger.warn("Version", "Could not extract version. Requests may fail.");
   }
 }
 

@@ -33,6 +33,8 @@ const DEFAULT_ZOOM = 15;
  * @return {void}
  */
 export default function loadCesiumViewer(): void {
+  logger.debug("CesiumViewer", "Loading...");
+
   // Create container div where the viewer will be placed
   const container = document.createElement("div");
   container.id = "cesium-container";
@@ -113,8 +115,9 @@ export default function loadCesiumViewer(): void {
       const minY = latToTileIndex(north, tileParams);
       const maxY = latToTileIndex(south, tileParams);
 
-      logger.info("CesiumViewer", `Camera move end. Zoom: ${zoom}, View: [W:${west}, S:${south}, E:${east}, N:${north}]`);
-      logger.info("CesiumViewer", `Tile range: X[${minX}-${maxX}], Y[${minY}-${maxY}]`);
+      logger.debug("CesiumViewer", `Zoom: ${zoom}`);
+      logger.debug("CesiumViewer", `View: [W:${west}, S:${south}, E:${east}, N:${north}]`);
+      logger.debug("CesiumViewer", `Tile range: X[${minX}-${maxX}], Y[${minY}-${maxY}]`);
 
       const tileKeys: string[] = [];
       for (let x = minX; x <= maxX; x++) {
@@ -131,9 +134,6 @@ export default function loadCesiumViewer(): void {
 
   // Update cookies and fetch new data when the camera moves
   viewer.camera.moveEnd.addEventListener(triggerDataLoad);
-
-  // Trigger initial load
-  triggerDataLoad();
 }
 
 /**

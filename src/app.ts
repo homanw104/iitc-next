@@ -3,19 +3,21 @@
  */
 
 import loadCesiumViewer from "./procedures/loadCesiumViewer";
-import loadVersionString from "./procedures/loadVersionString";
+import extractVersionString from "./procedures/extractVersionString";
 import unloadOriginalIntelMap from "./procedures/unloadOriginalIntelMap";
 import { logger, LogLevel } from "./utils/logger";
 
 // @ts-expect-error - exposing logger to window for easier debugging
 window.logger = logger;
+// @ts-expect-error - also expose as iitcLogger
+window.iitcLogger = logger;
 // @ts-expect-error - exposing LogLevel to window
 window.LogLevel = LogLevel;
 
 const init = () => {
   logger.setLevel(LogLevel.DEBUG);
   logger.info("Initializing IITC");
-  loadVersionString();
+  extractVersionString();
   unloadOriginalIntelMap();
   loadCesiumViewer();
 };

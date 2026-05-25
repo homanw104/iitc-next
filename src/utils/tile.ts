@@ -142,14 +142,16 @@ export class TileManager {
 
     const request = new TileRequest(tilesToRequest);
     this.activeRequestCount++;
-    logger.info("TileManager", `Sending request for ${tilesToRequest.length} tiles. Active requests: ${this.activeRequestCount}`);
+
+    logger.info("TileManager", `Sending request for ${tilesToRequest.length} tiles.`);
+    logger.info("TileManager", `Active requests: ${this.activeRequestCount}.`);
+
     try {
       const response = await request.send();
       logger.info("TileManager", `Received response for ${tilesToRequest.length} tiles.`);
       this.handleResponse(response, tilesToRequest);
     } catch (error) {
       logger.error("TileManager", "Tile request failed:", error);
-      // Re-queue or handle error
     } finally {
       this.activeRequestCount--;
       this.processQueue().then();

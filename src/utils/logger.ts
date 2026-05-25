@@ -24,25 +24,25 @@ class LogManager {
 
   debug(tag: string, ...args: unknown[]) {
     if (this.level <= LogLevel.DEBUG) {
-      console.debug(`[${tag}]`, ...args);
+      console.log(`[DEBUG][${tag}]`, ...args);
     }
   }
 
   info(tag: string, ...args: unknown[]) {
     if (this.level <= LogLevel.INFO) {
-      console.log(`[${tag}]`, ...args);
+      console.log(`[INFO][${tag}]`, ...args);
     }
   }
 
   warn(tag: string, ...args: unknown[]) {
     if (this.level <= LogLevel.WARN) {
-      console.warn(`[${tag}]`, ...args);
+      console.warn(`[WARN][${tag}]`, ...args);
     }
   }
 
   error(tag: string, ...args: unknown[]) {
     if (this.level <= LogLevel.ERROR) {
-      console.error(`[${tag}]`, ...args);
+      console.error(`[ERROR][${tag}]`, ...args);
     }
   }
 }
