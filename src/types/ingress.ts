@@ -50,10 +50,12 @@ export type RawEntity = [
 
 export interface TileResponse {
   result: {
-    [tileId: string]: {
-      gameEntities?: RawEntity[];
-      deletedGameEntityGuids?: string[];
-      error?: string;
+    map: {
+      [tileId: string]: {
+        gameEntities?: RawEntity[];
+        deletedGameEntityGuids?: string[];
+        error?: string;
+      };
     };
   };
 }

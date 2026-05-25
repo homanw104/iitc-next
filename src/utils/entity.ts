@@ -141,7 +141,7 @@ export class EntityManager {
  */
 export function parsePortal(ent: RawEntity): PortalData {
   const [guid, timestamp, data] = ent;
-  const team = data[1] as Team;
+  const team = data[1] === "E" ? "ENLIGHTENED" : data[1] === "R" ? "RESISTANCE" : "NEUTRAL";
   const latE6 = data[2] as number;
   const lngE6 = data[3] as number;
 
@@ -164,12 +164,18 @@ export function parsePortal(ent: RawEntity): PortalData {
   return portal;
 }
 
+/**
+ * Parses a raw entity into a structured LinkData object.
+ *
+ * @param ent - An array representing the raw entity with structured information.
+ * @returns A LinkData object containing parsed information from the raw entity.
+ */
 export function parseLink(ent: RawEntity): LinkData {
   const [guid, timestamp, data] = ent;
   return {
     guid,
     timestamp,
-    team: data[1] as Team,
+    team: data[1] === "E" ? "ENLIGHTENED" : data[1] === "R" ? "RESISTANCE" : "NEUTRAL",
     oGuid: data[2] as string,
     oLatE6: data[3] as number,
     oLngE6: data[4] as number,
@@ -179,9 +185,18 @@ export function parseLink(ent: RawEntity): LinkData {
   };
 }
 
+/**
+ * Parses a raw entity into structured FieldData.
+ *
+ * @param ent - The raw entity to be parsed, expected to be an array where the first element is a GUID (string),
+ *              the second element is a timestamp (number), and the third element is an array containing team data
+ *              and point data.
+ *
+ * @return A structured FieldData object with properties for guid, timestamp, team, and points.
+ */
 export function parseField(ent: RawEntity): FieldData {
   const [guid, timestamp, data] = ent;
-  const team = data[1] as Team;
+  const team = data[1] === "E" ? "ENLIGHTENED" : data[1] === "R" ? "RESISTANCE" : "NEUTRAL";
   const points = (data[2] as unknown[][]).map((p) => ({
     guid: p[0] as string,
     latE6: p[1] as number,
@@ -196,6 +211,12 @@ export function parseField(ent: RawEntity): FieldData {
   };
 }
 
+/**
+ * Parses an array of raw entities into categorized data structures.
+ *
+ * @param entities - An array of raw entity objects to be parsed.
+ * @returns An object containing arrays of parsed portal, link, and field data.
+ */
 export function parseTileEntities(entities: RawEntity[]): ParsedEntities {
   const portals: PortalData[] = [];
   const links: LinkData[] = [];

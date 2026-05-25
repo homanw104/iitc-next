@@ -173,7 +173,7 @@ export class TileManager {
 
     let entitiesFound = 0;
     for (const tileKey of tileKeys) {
-      const tileData = data.result[tileKey];
+      const tileData = data.result.map[tileKey];
       if (!tileData) continue;
 
       if (tileData.deletedGameEntityGuids) {
@@ -229,15 +229,18 @@ export function lngToTileIndex(lng: number, params: TileParams): number {
  * This implementation follows the Slippy Map tiling system rules used by Ingress Intel.
  * At latitude 0, it returns tilesPerEdge / 2.
  *
- * @param lat - The latitude value to convert. Must be within the range of approximately -85.05 to 85.05 degrees for Web Mercator.
+ * @param lat - The latitude value to convert. Clamped to approximately -85.05 to 85.05 degrees.
  * @param params - An object containing parameters required for the conversion:
  *   tilesPerEdge - The total number of tiles along one edge of the map.
  *
  * @return The tile Y index corresponding to the given latitude.
  */
 export function latToTileIndex(lat: number, params: TileParams): number {
-  const latRad = (lat * Math.PI) / 180;
-  return Math.floor(((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * params.tilesPerEdge);
+  // Clamp latitude to the range supported by Web Mercator to avoid math errors at the poles.
+  const clampedLat = Math.max(-85.05112878, Math.min(85.05112878, lat));
+  const latRad = (clampedLat * Math.PI) / 180;
+  const y = Math.floor(((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * params.tilesPerEdge);
+  return Math.max(0, Math.min(params.tilesPerEdge - 1, y));
 }
 
 /**

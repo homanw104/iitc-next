@@ -16,7 +16,7 @@ window.LogLevel = LogLevel;
 
 const init = () => {
   logger.setLevel(LogLevel.DEBUG);
-  logger.info("Initializing IITC");
+  logger.info("Initializing IITC Next");
   extractVersionString();
   unloadOriginalIntelMap();
   loadCesiumViewer();
