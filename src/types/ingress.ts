@@ -2,7 +2,7 @@
  * Type definitions for Ingress entities.
  */
 
-export type Team = "ENLIGHTENED" | "RESISTANCE" | "NEUTRAL";
+export type Team = "ENLIGHTENED" | "RESISTANCE" | "MACHINA" | "NEUTRAL";
 
 export interface PortalData {
   guid: string;
@@ -15,6 +15,7 @@ export interface PortalData {
   image?: string;
   title?: string;
   timestamp: number;
+  placeholder?: boolean;
 }
 
 export interface LinkData {
@@ -40,11 +41,9 @@ export interface FieldData {
   timestamp: number;
 }
 
-export type EntityType = "p" | "e" | "r"; // Portal, Link (Edge), Region (Field)
-
 export type RawEntity = [
-  string, // GUID
-  number, // Timestamp
+  string,   // GUID
+  number,   // Timestamp
   unknown[] // Data array
 ];
 

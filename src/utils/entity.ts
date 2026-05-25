@@ -7,7 +7,6 @@ import { PortalData, LinkData, FieldData, Team, RawEntity } from "../types/ingre
 import { ParsedEntities } from "../types/map";
 import { logger } from "./logger";
 
-
 /**
  * Manages game entities and their Cesium representations.
  */
@@ -21,10 +20,52 @@ export class EntityManager {
     this.viewer = viewer;
   }
 
+  private updatePortalEntity(entity: Cesium.Entity, data: PortalData): void {
+    if (entity.point) {
+      entity.point.color = new Cesium.ConstantProperty(this.getTeamColor(data.team));
+      entity.point.pixelSize = new Cesium.ConstantProperty(data.placeholder ? 4 : 8);
+    }
+    if (entity.label) {
+      entity.label.text = new Cesium.ConstantProperty(data.title || "");
+    }
+  }
+
+  private updateLinkEntity(entity: Cesium.Entity, data: LinkData): void {
+    if (entity.polyline) {
+      entity.polyline.positions = new Cesium.ConstantProperty(Cesium.Cartesian3.fromDegreesArray([
+        data.oLngE6 / 1e6, data.oLatE6 / 1e6,
+        data.dLngE6 / 1e6, data.dLatE6 / 1e6
+      ]));
+      entity.polyline.material = new Cesium.ColorMaterialProperty(this.getTeamColor(data.team).withAlpha(0.7));
+    }
+  }
+
+  private updateFieldEntity(entity: Cesium.Entity, data: FieldData): void {
+    if (entity.polygon) {
+      const points = data.points.flatMap(p => [p.lngE6 / 1e6, p.latE6 / 1e6]);
+      entity.polygon.hierarchy = new Cesium.ConstantProperty(new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray(points)));
+      entity.polygon.material = new Cesium.ColorMaterialProperty(this.getTeamColor(data.team).withAlpha(0.2));
+    }
+  }
+
+  private ensurePortalPlaceholder(guid: string, team: Team, latE6: number, lngE6: number): void {
+    if (this.portals.has(guid)) return;
+
+    this.addOrUpdatePortal({
+      guid,
+      team,
+      latE6,
+      lngE6,
+      timestamp: 0,
+      placeholder: true,
+    });
+  }
+
   public addOrUpdatePortal(data: PortalData): void {
     const existing = this.portals.get(data.guid);
     if (existing) {
-      if (data.timestamp > existing.data.timestamp) {
+      if (data.placeholder) return; // Don't downgrade full portal to placeholder
+      if (existing.data.placeholder || data.timestamp > existing.data.timestamp) {
         this.updatePortalEntity(existing.entity, data);
         existing.data = data;
       }
@@ -35,7 +76,7 @@ export class EntityManager {
       id: `portal-${data.guid}`,
       position: Cesium.Cartesian3.fromDegrees(data.lngE6 / 1e6, data.latE6 / 1e6),
       point: {
-        pixelSize: 8,
+        pixelSize: data.placeholder ? 4 : 8,
         color: this.getTeamColor(data.team),
         outlineColor: Cesium.Color.BLACK,
         outlineWidth: 1,
@@ -51,23 +92,16 @@ export class EntityManager {
     logger.debug("EntityManager", `Added portal: ${data.title || data.guid} at ${data.latE6 / 1e6}, ${data.lngE6 / 1e6}`);
     this.portals.set(data.guid, { data, entity: portalEntity });
   }
-
-  private updatePortalEntity(entity: Cesium.Entity, data: PortalData): void {
-    if (entity.point) {
-      entity.point.color = new Cesium.ConstantProperty(this.getTeamColor(data.team));
-    }
-    if (entity.label) {
-      entity.label.text = new Cesium.ConstantProperty(data.title || "");
-    }
-  }
-
+  
   public addOrUpdateLink(data: LinkData): void {
+    this.ensurePortalPlaceholder(data.oGuid, data.team, data.oLatE6, data.oLngE6);
+    this.ensurePortalPlaceholder(data.dGuid, data.team, data.dLatE6, data.dLngE6);
+
     const existing = this.links.get(data.guid);
     if (existing) {
       if (data.timestamp > existing.data.timestamp) {
+        this.updateLinkEntity(existing.entity, data);
         existing.data = data;
-        // Polylines are updated via their positions property if needed,
-        // but link positions rarely change for same GUID.
       }
       return;
     }
@@ -88,9 +122,14 @@ export class EntityManager {
   }
 
   public addOrUpdateField(data: FieldData): void {
+    data.points.forEach((p) => {
+      this.ensurePortalPlaceholder(p.guid, data.team, p.latE6, p.lngE6);
+    });
+
     const existing = this.fields.get(data.guid);
     if (existing) {
       if (data.timestamp > existing.data.timestamp) {
+        this.updateFieldEntity(existing.entity, data);
         existing.data = data;
       }
       return;
@@ -126,6 +165,7 @@ export class EntityManager {
     switch (team) {
       case "ENLIGHTENED": return Cesium.Color.LIME;
       case "RESISTANCE": return Cesium.Color.BLUE;
+      case "MACHINA": return Cesium.Color.RED;
       case "NEUTRAL": return Cesium.Color.LIGHTGRAY;
       default: return Cesium.Color.WHITE;
     }
@@ -141,7 +181,10 @@ export class EntityManager {
  */
 export function parsePortal(ent: RawEntity): PortalData {
   const [guid, timestamp, data] = ent;
-  const team = data[1] === "E" ? "ENLIGHTENED" : data[1] === "R" ? "RESISTANCE" : "NEUTRAL";
+  const teamCode = data[1] as string;
+  const team = teamCode === "E" ? "ENLIGHTENED" :
+               teamCode === "R" ? "RESISTANCE" :
+               teamCode === "M" ? "MACHINA" : "NEUTRAL";
   const latE6 = data[2] as number;
   const lngE6 = data[3] as number;
 
@@ -172,10 +215,13 @@ export function parsePortal(ent: RawEntity): PortalData {
  */
 export function parseLink(ent: RawEntity): LinkData {
   const [guid, timestamp, data] = ent;
+  const teamCode = data[1] as string;
   return {
     guid,
     timestamp,
-    team: data[1] === "E" ? "ENLIGHTENED" : data[1] === "R" ? "RESISTANCE" : "NEUTRAL",
+    team: teamCode === "E" ? "ENLIGHTENED" :
+          teamCode === "R" ? "RESISTANCE" :
+          teamCode === "M" ? "MACHINA" : "NEUTRAL",
     oGuid: data[2] as string,
     oLatE6: data[3] as number,
     oLngE6: data[4] as number,
@@ -196,7 +242,10 @@ export function parseLink(ent: RawEntity): LinkData {
  */
 export function parseField(ent: RawEntity): FieldData {
   const [guid, timestamp, data] = ent;
-  const team = data[1] === "E" ? "ENLIGHTENED" : data[1] === "R" ? "RESISTANCE" : "NEUTRAL";
+  const teamCode = data[1] as string;
+  const team = teamCode === "E" ? "ENLIGHTENED" :
+               teamCode === "R" ? "RESISTANCE" :
+               teamCode === "M" ? "MACHINA" : "NEUTRAL";
   const points = (data[2] as unknown[][]).map((p) => ({
     guid: p[0] as string,
     latE6: p[1] as number,
