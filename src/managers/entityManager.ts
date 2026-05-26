@@ -18,9 +18,22 @@ export class EntityManager {
   private links: Map<string, { data: LinkData; entity: Cesium.Entity }> = new Map();
   private fields: Map<string, { data: FieldData; entity: Cesium.Entity }> = new Map();
 
+  private filterState: Map<string, boolean> = new Map();
+
   constructor(viewer: Cesium.Viewer) {
     this.viewer = viewer;
     this.layerManager = new LayerManager(viewer);
+    this.initFilters();
+  }
+
+  private initFilters(): void {
+    TEAMS.forEach(t => this.filterState.set(`team-${t.toLowerCase()}`, true));
+    this.filterState.set("portals", true);
+    this.filterState.set("portals-placeholder", true);
+    PORTAL_LEVELS.forEach(l => this.filterState.set(`level-${l}`, true));
+    this.filterState.set("links", true);
+    this.filterState.set("fields", true);
+    this.applyFilters();
   }
 
   public requestRender(): void {
@@ -238,65 +251,60 @@ export class EntityManager {
     return `fields-${team}`;
   }
 
-  private getSubLayerIds(type: string): string[] {
-    const teams = TEAMS.map(t => t.toLowerCase());
-    const levels = PORTAL_LEVELS;
-
-    if (type === "portals") {
-      const ids: string[] = [];
-      levels.forEach(l => teams.forEach(t => ids.push(`portals-l${l}-${t}`)));
-      teams.forEach(t => ids.push(`portals-placeholder-${t}`));
-      return ids;
-    }
-    if (type === "portals-placeholder") {
-      return teams.map(t => `portals-placeholder-${t}`);
-    }
-    if (type === "links") {
-      return teams.map(t => `links-${t}`);
-    }
-    if (type === "fields") {
-      return teams.map(t => `fields-${t}`);
-    }
-    if (type.startsWith("team-")) {
-      const team = type.replace("team-", "");
-      const ids: string[] = [];
-      levels.forEach(l => ids.push(`portals-l${l}-${team}`));
-      ids.push(`links-${team}`);
-      ids.push(`fields-${team}`);
-      ids.push(`portals-placeholder-${team}`);
-      return ids;
-    }
-    if (type.startsWith("level-")) {
-      const level = type.replace("level-", "");
-      return teams.map(t => `portals-l${level}-${t}`);
-    }
-    return [];
-  }
-
   public setLayerVisible(type: string, visible: boolean): void {
-    const subLayers = this.getSubLayerIds(type);
-    if (subLayers.length > 0) {
-      subLayers.forEach(id => this.layerManager.setLayerVisible(id, visible));
-      return;
+    if (type === "portals") {
+      PORTAL_LEVELS.forEach(l => this.filterState.set(`level-${l}`, visible));
+      this.filterState.set("portals-placeholder", visible);
     }
-
-    this.layerManager.setLayerVisible(type, visible);
+    this.filterState.set(type, visible);
+    this.applyFilters();
   }
 
   public isLayerVisible(type: string): boolean {
-    const subLayers = this.getSubLayerIds(type);
-    if (subLayers.length === 0) {
-      return this.layerManager.isLayerVisible(type);
+    if (type === "portals") {
+      const allLevels = PORTAL_LEVELS.every(l => this.filterState.get(`level-${l}`) !== false);
+      const placeholder = this.filterState.get("portals-placeholder") !== false;
+      return allLevels && placeholder;
     }
-    return subLayers.every(id => this.layerManager.isLayerVisible(id));
+    return this.filterState.get(type) !== false;
   }
 
   public isLayerIndeterminate(type: string): boolean {
-    const subLayers = this.getSubLayerIds(type);
-    if (subLayers.length === 0) return false;
-    
-    const visibleCount = subLayers.filter(id => this.layerManager.isLayerVisible(id)).length;
-    return visibleCount > 0 && visibleCount < subLayers.length;
+    if (type === "portals") {
+      const states = PORTAL_LEVELS.map(l => this.filterState.get(`level-${l}`) !== false);
+      states.push(this.filterState.get("portals-placeholder") !== false);
+      const visibleCount = states.filter(v => v).length;
+      return visibleCount > 0 && visibleCount < states.length;
+    }
+    return false;
+  }
+
+  private applyFilters(): void {
+    const teams = TEAMS.map(t => t.toLowerCase());
+
+    teams.forEach(t => {
+      const teamVisible = this.filterState.get(`team-${t}`) !== false;
+
+      // Portals
+      PORTAL_LEVELS.forEach(l => {
+        const levelVisible = this.filterState.get(`level-${l}`) !== false;
+        this.layerManager.setLayerVisible(`portals-l${l}-${t}`, teamVisible && levelVisible);
+      });
+
+      // Placeholders
+      const placeholdersVisible = this.filterState.get("portals-placeholder") !== false;
+      this.layerManager.setLayerVisible(`portals-placeholder-${t}`, teamVisible && placeholdersVisible);
+
+      // Links
+      const linksVisible = this.filterState.get("links") !== false;
+      this.layerManager.setLayerVisible(`links-${t}`, teamVisible && linksVisible);
+
+      // Fields
+      const fieldsVisible = this.filterState.get("fields") !== false;
+      this.layerManager.setLayerVisible(`fields-${t}`, teamVisible && fieldsVisible);
+    });
+
+    this.viewer.scene.requestRender();
   }
 
   private getTeamColor(team: Team): Cesium.Color {
