@@ -55,6 +55,10 @@ export class EntityManager {
     this.fieldManager.addOrUpdateField(data);
   }
 
+  public getPortalData(guid: string): PortalData | undefined {
+    return this.portalManager.getPortalData(guid);
+  }
+
   public removeGameEntity(guid: string): void {
     if (this.portalManager.removePortal(guid)) return;
     if (this.linkManager.removeLink(guid)) return;

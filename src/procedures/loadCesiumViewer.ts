@@ -19,6 +19,7 @@ import { EntityManager } from "../managers/entityManager";
 import { DebugTileManager } from "../managers/debugTileManager";
 import { MapPosition } from "../types/map";
 import { logger } from "../utils/logger";
+import { hidePortalDetail, showPortalDetail } from "../interface/portalDetail";
 
 // Tell Cesium where to find its assets (Images, Workers, etc.)
 // Since we use the CDN for the main library, we should also use it for assets.
@@ -71,9 +72,7 @@ export default function loadCesiumViewer(): void {
     homeButton: false,            // Disable home button
     navigationHelpButton: false,  // Disable navigation help button
     fullscreenButton: false,      // Disable full-screen button
-    contextOptions: {
-      allowTextureFilterAnisotropic: true,
-    },
+    infoBox: false,               // Disable info box
     requestRenderMode: true,            // Performance: Only render when something changes
     maximumRenderTimeChange: Infinity,  // Ensure render only triggers on explicit changes or camera movement
   });
@@ -134,6 +133,38 @@ export default function loadCesiumViewer(): void {
 
   // Add Layer Chooser UI
   addLayerChooser(container, entityManager);
+
+  // Handle clicks on entities
+  const handler = viewer.screenSpaceEventHandler;
+  handler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_CLICK);
+  handler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
+
+  handler.setInputAction((click: { position: Cesium.Cartesian2 }) => {
+    const pickedObjects = viewer.scene.drillPick(click.position);
+    // Find the first entity that is selectable (default true)
+    const entity = pickedObjects.find(
+      (p) => p.id instanceof Cesium.Entity && (p.id as any).selectable !== false
+    )?.id as Cesium.Entity | undefined;
+
+    if (entity && entity.id.startsWith("portal-")) {
+      const guid = entity.id.substring(7);
+      const portalData = entityManager.getPortalData(guid);
+      if (portalData) {
+        viewer.selectedEntity = entity;
+        showPortalDetail(portalData, container);
+      }
+    } else {
+      viewer.selectedEntity = undefined;
+      hidePortalDetail();
+    }
+  }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+  // Failsafe: ensure no non-selectable entity is ever selected
+  viewer.selectedEntityChanged.addEventListener((entity) => {
+    if (entity && (entity as any).selectable === false) {
+      viewer.selectedEntity = undefined;
+    }
+  });
 
   // Remember last position and dataZoom for performance optimization
   let lastDataZoom: number | undefined;

@@ -51,6 +51,13 @@ export function h(tag: string | Function, props: any, ...children: any[]): JSX.E
         el.indeterminate = !!value;
       } else if (key === "checked" && el instanceof HTMLInputElement) {
         el.checked = !!value;
+      } else if (key === "unselectable" && value) {
+        Object.assign((el as HTMLElement).style, {
+          userSelect: "none",
+          WebkitUserSelect: "none",
+          MozUserSelect: "none",
+          msUserSelect: "none",
+        });
       } else {
         el.setAttribute(key, value as string);
       }

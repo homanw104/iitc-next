@@ -47,7 +47,7 @@ export class LinkManager {
 
   private createLinkEntity(data: LinkData): Cesium.Entity {
     const layerId = this.getLinkLayerId(data);
-    return this.layerManager.getOrCreateSource(layerId).entities.add({
+    const entity = this.layerManager.getOrCreateSource(layerId).entities.add({
       id: `link-${data.guid}`,
       polyline: {
         positions: Cesium.Cartesian3.fromDegreesArray([
@@ -59,6 +59,8 @@ export class LinkManager {
         arcType: Cesium.ArcType.GEODESIC,
       },
     });
+    (entity as any).selectable = false;
+    return entity;
   }
 
   private updateLinkEntity(entity: Cesium.Entity, data: LinkData): void {

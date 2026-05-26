@@ -55,6 +55,10 @@ export class PortalManager {
     return false;
   }
 
+  public getPortalData(guid: string): PortalData | undefined {
+    return this.portals.get(guid)?.data;
+  }
+
   private createPortalEntity(data: PortalData): Cesium.Entity {
     const layerId = this.getPortalLayerId(data);
     return this.layerManager.getOrCreateSource(layerId).entities.add({

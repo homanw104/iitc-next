@@ -49,7 +49,7 @@ export class FieldManager {
   private createFieldEntity(data: FieldData): Cesium.Entity {
     const layerId = this.getFieldLayerId(data);
     const points = data.points.flatMap(p => [p.lngE6 / 1e6, p.latE6 / 1e6]);
-    return this.layerManager.getOrCreateSource(layerId).entities.add({
+    const entity = this.layerManager.getOrCreateSource(layerId).entities.add({
       id: `field-${data.guid}`,
       polygon: {
         hierarchy: new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray(points)),
@@ -57,6 +57,8 @@ export class FieldManager {
         outline: false,
       },
     });
+    (entity as any).selectable = false;
+    return entity;
   }
 
   private updateFieldEntity(entity: Cesium.Entity, data: FieldData): void {
