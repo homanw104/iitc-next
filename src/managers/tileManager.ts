@@ -3,10 +3,13 @@
  */
 
 import { apiRequest } from "../utils/network";
-import { FieldData, LinkData, PortalData, PortalLevel, RawEntity, TileResponse } from "../types/ingress";
+import { FieldData, LinkData, PortalData, RawEntity, TileResponse } from "../types/ingress";
 import { ParsedEntities } from "../types/map";
 import { EntityManager } from "./entityManager";
 import { logger } from "../utils/logger";
+import { parsePortal } from "./portalManager";
+import { parseLink } from "./linkManager";
+import { parseField } from "./fieldManager";
 
 /**
  * Defines the number of tiles per edge to zoom into at each level of detail.
@@ -50,7 +53,7 @@ const DEFAULT_ZOOM_TO_LINK_LENGTH: number[] = [200000, 200000, 200000, 200000, 2
  *
  * @type {number}
  */
-const TILES_PER_REQUEST: number = 10;
+const TILES_PER_REQUEST: number = 25;
 
 /**
  * Represents parameters for configuring a tile in a grid or map system.
@@ -388,94 +391,6 @@ export function tileToLng(x: number, params: TileParams): number {
  */
 export function generateTileKey(params: TileParams, x: number, y: number): string {
   return `${params.zoom}_${x}_${y}_${params.level}_8_100`;
-}
-
-/**
- * Parses a raw entity into a PortalData object.
- *
- * @param ent - An array representing the raw entity, where the first element is the GUID,
- *              the second is the timestamp, and the third is an array of additional data.
- * @return A PortalData object containing the parsed information from the raw entity.
- */
-export function parsePortal(ent: RawEntity): PortalData {
-  const [guid, timestamp, data] = ent;
-  const teamCode = data[1] as string;
-  const team = teamCode === "E" ? "ENLIGHTENED" :
-    teamCode === "R" ? "RESISTANCE" :
-      teamCode === "M" ? "MACHINA" : "NEUTRAL";
-  const latE6 = data[2] as number;
-  const lngE6 = data[3] as number;
-
-  const portal: PortalData = {
-    guid,
-    timestamp,
-    team,
-    latE6,
-    lngE6,
-  };
-
-  if (data.length >= 14) {
-    portal.level = data[4] as PortalLevel;
-    portal.health = data[5] as number;
-    portal.resCount = data[6] as number;
-    portal.image = data[7] as string;
-    portal.title = data[8] as string;
-  }
-
-  return portal;
-}
-
-/**
- * Parses a raw entity into a structured LinkData object.
- *
- * @param ent - An array representing the raw entity with structured information.
- * @returns A LinkData object containing parsed information from the raw entity.
- */
-export function parseLink(ent: RawEntity): LinkData {
-  const [guid, timestamp, data] = ent;
-  const teamCode = data[1] as string;
-  return {
-    guid,
-    timestamp,
-    team: teamCode === "E" ? "ENLIGHTENED" :
-      teamCode === "R" ? "RESISTANCE" :
-        teamCode === "M" ? "MACHINA" : "NEUTRAL",
-    oGuid: data[2] as string,
-    oLatE6: data[3] as number,
-    oLngE6: data[4] as number,
-    dGuid: data[5] as string,
-    dLatE6: data[6] as number,
-    dLngE6: data[7] as number,
-  };
-}
-
-/**
- * Parses a raw entity into structured FieldData.
- *
- * @param ent - The raw entity to be parsed, expected to be an array where the first element is a GUID (string),
- *              the second element is a timestamp (number), and the third element is an array containing team data
- *              and point data.
- *
- * @return A structured FieldData object with properties for guid, timestamp, team, and points.
- */
-export function parseField(ent: RawEntity): FieldData {
-  const [guid, timestamp, data] = ent;
-  const teamCode = data[1] as string;
-  const team = teamCode === "E" ? "ENLIGHTENED" :
-    teamCode === "R" ? "RESISTANCE" :
-      teamCode === "M" ? "MACHINA" : "NEUTRAL";
-  const points = (data[2] as unknown[][]).map((p) => ({
-    guid: p[0] as string,
-    latE6: p[1] as number,
-    lngE6: p[2] as number,
-  }));
-
-  return {
-    guid,
-    timestamp,
-    team,
-    points,
-  };
 }
 
 /**

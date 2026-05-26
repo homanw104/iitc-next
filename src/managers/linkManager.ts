@@ -1,5 +1,5 @@
 import * as Cesium from "cesium";
-import { LinkData } from "../types/ingress";
+import { LinkData, RawEntity } from "../types/ingress";
 import { getTeamColor } from "../utils/color";
 import { LayerManager } from "./layerManager";
 import { PortalManager } from "./portalManager";
@@ -77,4 +77,28 @@ export class LinkManager {
     const team = data.team.toLowerCase();
     return `links-${team}`;
   }
+}
+
+/**
+ * Parses a raw entity into a structured LinkData object.
+ *
+ * @param ent - An array representing the raw entity with structured information.
+ * @returns A LinkData object containing parsed information from the raw entity.
+ */
+export function parseLink(ent: RawEntity): LinkData {
+  const [guid, timestamp, data] = ent;
+  const teamCode = data[1] as string;
+  return {
+    guid,
+    timestamp,
+    team: teamCode === "E" ? "ENLIGHTENED" :
+      teamCode === "R" ? "RESISTANCE" :
+        teamCode === "M" ? "MACHINA" : "NEUTRAL",
+    oGuid: data[2] as string,
+    oLatE6: data[3] as number,
+    oLngE6: data[4] as number,
+    dGuid: data[5] as string,
+    dLatE6: data[6] as number,
+    dLngE6: data[7] as number,
+  };
 }

@@ -1,5 +1,5 @@
 import * as Cesium from "cesium";
-import { PortalData, PortalLevel, PortalMod, PortalResonator, Team } from "../types/ingress";
+import { PortalData, PortalLevel, PortalMod, PortalResonator, RawEntity, Team } from "../types/ingress";
 import { getTeamColor } from "../utils/color";
 import { LayerManager } from "./layerManager";
 import { apiRequest } from "../utils/network";
@@ -9,58 +9,8 @@ export class PortalRequest {
 
   public async send(guid: string): Promise<PortalData> {
     const response = (await apiRequest("getPortalDetails", { guid })) as { result: any[] };
-    const data = this.decodePortalDetails(guid, response.result);
+    const data = parsePortal([guid, response.result[13], response.result]);
     this.portalManager.addOrUpdatePortal(data);
-    return data;
-  }
-
-  private decodePortalDetails(guid: string, a: any[]): PortalData {
-    const data: PortalData = {
-      guid,
-      team: a[1] as Team,
-      latE6: a[2],
-      lngE6: a[3],
-      level: a[4] as PortalLevel,
-      health: a[5],
-      resCount: a[6],
-      image: a[7],
-      title: a[8],
-      timestamp: a[13],
-    };
-
-    if (a.length >= 18) {
-      if (a[14]) {
-        data.mods = a[14].map((m: any): PortalMod | null => {
-          if (!m) return null;
-          return {
-            owner: m[0],
-            name: m[1],
-            rarity: m[2],
-            stats: m[3],
-          };
-        });
-        data.resonators = a[15].map((r: any): PortalResonator | null => {
-          if (!r) return null;
-          return {
-            owner: r[0],
-            level: r[1],
-            energy: r[2],
-          };
-        });
-        data.owner = a[16];
-      }
-
-      if (a.length >= 19) {
-        const historyBitArray = a[18] || 0;
-        data.history = {
-          _raw: historyBitArray,
-          visited: !!(historyBitArray & 1),
-          captured: !!(historyBitArray & 2),
-          scoutControlled: !!(historyBitArray & 4),
-        };
-      }
-    }
-
     return data;
   }
 }
@@ -172,4 +122,68 @@ export class PortalManager {
     }
     return `portals-l${level}-${team}`;
   }
+}
+
+/**
+ * Parses a raw entity into a PortalData object.
+ *
+ * @param ent - An array representing the raw entity, where the first element is the GUID,
+ *              the second is the timestamp, and the third is an array of additional data.
+ * @return A PortalData object containing the parsed information from the raw entity.
+ */
+export function parsePortal(ent: RawEntity): PortalData {
+  const [guid, timestamp, data] = ent;
+  const teamCode = data[1] as string;
+  const portal: PortalData = {
+    guid,
+    timestamp,
+    team: teamCode === "E" ? "ENLIGHTENED" :
+      teamCode === "R" ? "RESISTANCE" :
+        teamCode === "M" ? "MACHINA" : "NEUTRAL",
+    latE6: data[2] as number,
+    lngE6: data[3] as number,
+  };
+
+  if (data.length >= 14) {
+    portal.level = data[4] as PortalLevel;
+    portal.health = data[5] as number;
+    portal.resCount = data[6] as number;
+    portal.image = data[7] as string;
+    portal.title = data[8] as string;
+  }
+
+  if (data.length >= 18) {
+    if (data[14]) {
+      portal.mods = (data[14] as any[]).map((m: any): PortalMod | null => {
+        if (!m) return null;
+        return {
+          owner: m[0],
+          name: m[1],
+          rarity: m[2],
+          stats: m[3],
+        };
+      });
+      portal.resonators = (data[15] as any[]).map((r: any): PortalResonator | null => {
+        if (!r) return null;
+        return {
+          owner: r[0],
+          level: r[1],
+          energy: r[2],
+        };
+      });
+      portal.owner = data[16] as string | undefined;
+    }
+
+    if (data.length >= 19) {
+      const historyBitArray = (data[18] as number) || 0;
+      portal.history = {
+        _raw: historyBitArray,
+        visited: !!(historyBitArray & 1),
+        captured: !!(historyBitArray & 2),
+        scoutControlled: !!(historyBitArray & 4),
+      };
+    }
+  }
+
+  return portal;
 }

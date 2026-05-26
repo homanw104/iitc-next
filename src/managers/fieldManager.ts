@@ -1,5 +1,5 @@
 import * as Cesium from "cesium";
-import { FieldData } from "../types/ingress";
+import { FieldData, RawEntity } from "../types/ingress";
 import { getTeamColor } from "../utils/color";
 import { LayerManager } from "./layerManager";
 import { PortalManager } from "./portalManager";
@@ -73,4 +73,33 @@ export class FieldManager {
     const team = data.team.toLowerCase();
     return `fields-${team}`;
   }
+}
+
+/**
+ * Parses a raw entity into structured FieldData.
+ *
+ * @param ent - The raw entity to be parsed, expected to be an array where the first element is a GUID (string),
+ *              the second element is a timestamp (number), and the third element is an array containing team data
+ *              and point data.
+ *
+ * @return A structured FieldData object with properties for guid, timestamp, team, and points.
+ */
+export function parseField(ent: RawEntity): FieldData {
+  const [guid, timestamp, data] = ent;
+  const teamCode = data[1] as string;
+  const team = teamCode === "E" ? "ENLIGHTENED" :
+    teamCode === "R" ? "RESISTANCE" :
+      teamCode === "M" ? "MACHINA" : "NEUTRAL";
+  const points = (data[2] as unknown[][]).map((p) => ({
+    guid: p[0] as string,
+    latE6: p[1] as number,
+    lngE6: p[2] as number,
+  }));
+
+  return {
+    guid,
+    timestamp,
+    team,
+    points,
+  };
 }
