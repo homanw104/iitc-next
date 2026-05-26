@@ -1,12 +1,81 @@
 import * as Cesium from "cesium";
-import { PortalData, Team } from "../types/ingress";
+import { PortalData, PortalLevel, PortalMod, PortalResonator, Team } from "../types/ingress";
 import { getTeamColor } from "../utils/color";
 import { LayerManager } from "./layerManager";
+import { apiRequest } from "../utils/network";
+
+export class PortalRequest {
+  constructor(private portalManager: PortalManager) {}
+
+  public async send(guid: string): Promise<PortalData> {
+    const response = (await apiRequest("getPortalDetails", { guid })) as { result: any[] };
+    const data = this.decodePortalDetails(guid, response.result);
+    this.portalManager.addOrUpdatePortal(data);
+    return data;
+  }
+
+  private decodePortalDetails(guid: string, a: any[]): PortalData {
+    const data: PortalData = {
+      guid,
+      team: a[1] as Team,
+      latE6: a[2],
+      lngE6: a[3],
+      level: a[4] as PortalLevel,
+      health: a[5],
+      resCount: a[6],
+      image: a[7],
+      title: a[8],
+      timestamp: a[13],
+    };
+
+    if (a.length >= 18) {
+      if (a[14]) {
+        data.mods = a[14].map((m: any): PortalMod | null => {
+          if (!m) return null;
+          return {
+            owner: m[0],
+            name: m[1],
+            rarity: m[2],
+            stats: m[3],
+          };
+        });
+        data.resonators = a[15].map((r: any): PortalResonator | null => {
+          if (!r) return null;
+          return {
+            owner: r[0],
+            level: r[1],
+            energy: r[2],
+          };
+        });
+        data.owner = a[16];
+      }
+
+      if (a.length >= 19) {
+        const historyBitArray = a[18] || 0;
+        data.history = {
+          _raw: historyBitArray,
+          visited: !!(historyBitArray & 1),
+          captured: !!(historyBitArray & 2),
+          scoutControlled: !!(historyBitArray & 4),
+        };
+      }
+    }
+
+    return data;
+  }
+}
 
 export class PortalManager {
   private portals: Map<string, { data: PortalData; entity: Cesium.Entity }> = new Map();
+  private portalRequest: PortalRequest;
 
-  constructor(private layerManager: LayerManager) {}
+  constructor(private layerManager: LayerManager) {
+    this.portalRequest = new PortalRequest(this);
+  }
+
+  public async requestPortalDetails(guid: string): Promise<PortalData> {
+    return this.portalRequest.send(guid);
+  }
 
   public addOrUpdatePortal(data: PortalData): void {
     const existing = this.portals.get(data.guid);

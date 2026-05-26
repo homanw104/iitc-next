@@ -3,6 +3,11 @@
  */
 
 /**
+ * Default zoom level when getting the initial map position from query params.
+ */
+const DEFAULT_ZOOM = 15;
+
+/**
  * Retrieves a parameter from the URL query string.
  *
  * @param {string} param - The name of the parameter to retrieve.
@@ -48,4 +53,55 @@ export function setCookie(name: string, value: string, days: number = 3650): voi
  */
 export function deleteCookie(name: string): void {
   document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+}
+
+/**
+ * Retrieves the last known map position from the URL parameters or cookies.
+ * Prioritizes URL parameters over cookies. Return an object containing
+ * the map's position and zoom level, or undefined if not found.
+ *
+ * @return {MapPosition?} - Position of the map or undefined if it cannot be found.
+ */
+import { MapPosition } from "../types/map";
+
+export function getMapPosition(): MapPosition | undefined {
+  let lat: number, lng: number, zoom: number;
+
+  const latE6 = getURLParam("latE6");
+  const lngE6 = getURLParam("lngE6");
+  const ll = getURLParam("ll") || getURLParam("pll");
+  const z = getURLParam("z");
+  const latCookie = getCookie("ingress.intelmap.lat");
+  const lngCookie = getCookie("ingress.intelmap.lng");
+  const zoomCookie = getCookie("ingress.intelmap.zoom");
+
+  // Email URL params
+  if (latE6 && lngE6) {
+    lat = parseInt(latE6) / 1e6;
+    lng = parseInt(lngE6) / 1e6;
+    zoom = parseInt(z || DEFAULT_ZOOM.toString());
+    if (isNaN(lat) || isNaN(lng) || isNaN(zoom)) return undefined;
+    return { lat, lng, zoom };
+  }
+
+  // Stock Intel URL params
+  if (ll) {
+    const parts = ll.split(",");
+    lat = parseFloat(parts[0]);
+    lng = parseFloat(parts[1]);
+    zoom = parseInt(z || DEFAULT_ZOOM.toString());
+    if (isNaN(lat) || isNaN(lng) || isNaN(zoom)) return undefined;
+    return { lat, lng, zoom };
+  }
+
+  // Read from cookies
+  if (latCookie && lngCookie) {
+    lat = parseFloat(latCookie);
+    lng = parseFloat(lngCookie);
+    zoom = parseInt(zoomCookie || DEFAULT_ZOOM.toString());
+    if (isNaN(lat) || isNaN(lng) || isNaN(zoom)) return undefined;
+    return { lat, lng, zoom };
+  }
+
+  return undefined;
 }

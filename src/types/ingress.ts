@@ -27,6 +27,30 @@ export interface PortalData {
   title?: string;
   timestamp: number;
   placeholder?: boolean;
+  mods?: (PortalMod | null)[];
+  resonators?: (PortalResonator | null)[];
+  owner?: string;
+  history?: PortalHistory;
+}
+
+export interface PortalMod {
+  owner: string;
+  name: string;
+  rarity: string;
+  stats: Record<string, string>;
+}
+
+export interface PortalResonator {
+  owner: string;
+  level: number;
+  energy: number;
+}
+
+export interface PortalHistory {
+  _raw: number;
+  visited: boolean;
+  captured: boolean;
+  scoutControlled: boolean;
 }
 
 export interface LinkData {

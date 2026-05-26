@@ -59,6 +59,10 @@ export class EntityManager {
     return this.portalManager.getPortalData(guid);
   }
 
+  public async requestPortalDetails(guid: string): Promise<PortalData> {
+    return this.portalManager.requestPortalDetails(guid);
+  }
+
   public removeGameEntity(guid: string): void {
     if (this.portalManager.removePortal(guid)) return;
     if (this.linkManager.removeLink(guid)) return;
