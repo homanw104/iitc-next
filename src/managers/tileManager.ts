@@ -139,12 +139,16 @@ export class TileManager {
    */
   public addTiles(tileKeys: string[]): void {
     logger.debug("TileManager", `Adding ${tileKeys.length} tiles to queue.`);
+    let skippedCount = 0;
     tileKeys.forEach((key) => {
       if (!this.requestedTiles.has(key) && !this.queuedTiles.has(key)) {
         this.queuedTiles.add(key);
         this.setTileStatus(key, "queued");
+      } else {
+        skippedCount += 1;
       }
     });
+    logger.debug("TileManager", `Skipped ${skippedCount} tiles already in queue or loaded.`);
     this.processQueue().then();
   }
 
@@ -235,15 +239,38 @@ export class TileManager {
  * @return {TileParams} An object containing the tile parameters for the specified zoom level.
  */
 export function getMapZoomTileParameters(zoom: number): TileParams {
-  const maxTilesPerEdge = DEFAULT_ZOOM_TO_TILES_PER_EDGE[DEFAULT_ZOOM_TO_TILES_PER_EDGE.length - 1];
+  // Clamp zoom to [0, max supported zoom]
+  const maxZoom = DEFAULT_ZOOM_TO_TILES_PER_EDGE.length - 1;
+  const clampedZoom = Math.max(0, Math.min(maxZoom, zoom));
 
   return {
-    level: DEFAULT_ZOOM_TO_LEVEL[zoom] || 0,
-    tilesPerEdge: DEFAULT_ZOOM_TO_TILES_PER_EDGE[zoom] || maxTilesPerEdge,
-    minLinkLength: DEFAULT_ZOOM_TO_LINK_LENGTH[zoom] || 0,
-    hasPortals: zoom >= DEFAULT_ZOOM_TO_LINK_LENGTH.length,
-    zoom: zoom,
+    zoom: clampedZoom,
+    level: DEFAULT_ZOOM_TO_LEVEL[clampedZoom] ?? 0,
+    tilesPerEdge: DEFAULT_ZOOM_TO_TILES_PER_EDGE[clampedZoom] ?? 32000,
+    minLinkLength: DEFAULT_ZOOM_TO_LINK_LENGTH[clampedZoom] ?? 0,
+    hasPortals: clampedZoom >= DEFAULT_ZOOM_TO_LINK_LENGTH.length || DEFAULT_ZOOM_TO_LINK_LENGTH[clampedZoom] === 0,
   };
+}
+
+/**
+ * Determines the data zoom level for a given map zoom level. This function adjusts the zoom level for
+ * data requests based on various factors to optimize caching performance and server load.
+ *
+ * @param zoom - The current map zoom level.
+ * @returns The adjusted zoom level for data requests.
+ */
+export function getDataZoomForMapZoom(zoom: number): number {
+  // Handle invalid or too small zoom levels
+  if (isNaN(zoom) || zoom < 3) {
+    zoom = 3;
+  }
+
+  // Limit zoom level (stock site max zoom may vary, but 21 is common)
+  if (zoom > 21) {
+    zoom = 21;
+  }
+
+  return zoom;
 }
 
 /**
@@ -256,7 +283,8 @@ export function getMapZoomTileParameters(zoom: number): TileParams {
  * @return The tile X index corresponding to the provided longitude and map parameters.
  */
 export function lngToTileIndex(lng: number, params: TileParams): number {
-  return Math.floor(((lng + 180) / 360) * params.tilesPerEdge);
+  const x = Math.floor(((lng + 180) / 360) * params.tilesPerEdge);
+  return Math.max(0, Math.min(params.tilesPerEdge - 1, x));
 }
 
 /**

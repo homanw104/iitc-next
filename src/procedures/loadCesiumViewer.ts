@@ -7,7 +7,14 @@ import * as Cesium from "cesium";
 import { Cartesian3 } from "cesium";
 import { addLayerChooser } from "../interface/layerChooser";
 import { getCookie, getURLParam, setCookie } from "../utils/browser";
-import { generateTileKey, getMapZoomTileParameters, latToTileIndex, lngToTileIndex, TileManager } from "../managers/tileManager";
+import {
+  generateTileKey,
+  getDataZoomForMapZoom,
+  getMapZoomTileParameters,
+  latToTileIndex,
+  lngToTileIndex,
+  TileManager
+} from "../managers/tileManager";
 import { EntityManager } from "../managers/entityManager";
 import { DebugTileManager } from "../managers/debugTileManager";
 import { MapPosition } from "../types/map";
@@ -23,6 +30,12 @@ Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOi
 
 // Default zoom level
 const DEFAULT_ZOOM = 15;
+
+// Height at zoom level 0, shows more tiles if higher
+const HEIGHT_AT_ZOOM_ZERO = 96000000;
+
+// Default tile limit to load
+const MAX_TILES_TO_LOAD = 2000;
 
 /**
  * Loads and initializes a Cesium viewer with specific configurations.
@@ -88,10 +101,9 @@ export default function loadCesiumViewer(): void {
   // Set initial view based on Intel map position
   const pos = getPosition();
   if (pos) {
-    // Basic conversion from zoom level to height in meters
-    // At zoom 0, the earth is roughly 20,000,000 meters wide.
+    // Basic conversion from zoom level to height in meters.
     // Each zoom level halves the view distance.
-    const height = 40000000 / Math.pow(2, pos.zoom);
+    const height = HEIGHT_AT_ZOOM_ZERO / Math.pow(2, pos.zoom);
 
     viewer.camera.setView({
       destination: Cartesian3.fromDegrees(pos.lng, pos.lat, height),
@@ -106,6 +118,10 @@ export default function loadCesiumViewer(): void {
   // Add Layer Chooser UI
   addLayerChooser(container, entityManager);
 
+  // Remember last position and dataZoom for performance optimization
+  let lastDataZoom: number | undefined;
+  let lastTileKeysCount: number | undefined;
+
   // Trigger data load on move, zoom and at initial load
   const triggerDataLoad = () => {
     const camera = viewer.camera;
@@ -115,15 +131,17 @@ export default function loadCesiumViewer(): void {
     const height = cartographic.height;
 
     // Convert height back to zoom level
-    const zoom = Math.round(Math.log2(40000000 / height));
+    const calculatedZoom = Math.round(Math.log2(HEIGHT_AT_ZOOM_ZERO / height));
+    const mapZoom = isNaN(calculatedZoom) ? 0 : calculatedZoom;
+    const dataZoom = getDataZoomForMapZoom(mapZoom);
 
     // Update cookies with current position
     setCookie("ingress.intelmap.lat", lat.toFixed(6));
     setCookie("ingress.intelmap.lng", lng.toFixed(6));
-    setCookie("ingress.intelmap.zoom", zoom.toString());
+    setCookie("ingress.intelmap.zoom", mapZoom.toString());
 
     // Get tile parameters for current map zoom level
-    const tileParams = getMapZoomTileParameters(zoom);
+    const tileParams = getMapZoomTileParameters(dataZoom);
 
     // Calculate visible tile range
     const viewRect = camera.computeViewRectangle();
@@ -139,17 +157,35 @@ export default function loadCesiumViewer(): void {
       const minY = latToTileIndex(north, tileParams);
       const maxY = latToTileIndex(south, tileParams);
 
-      logger.debug("CesiumViewer", `Zoom: ${zoom}`);
+      logger.debug("CesiumViewer", `Zoom: map ${mapZoom}, data ${dataZoom}`);
       logger.debug("CesiumViewer", `Height: ${height.toFixed(0)}m`);
-      logger.debug("CesiumViewer", `View: [W:${west}, S:${south}, E:${east}, N:${north}]`);
       logger.debug("CesiumViewer", `Tile range: X[${minX}-${maxX}], Y[${minY}-${maxY}]`);
 
       const tileKeys: string[] = [];
-      for (let x = minX; x <= maxX; x++) {
+      const tilesPerEdge = tileParams.tilesPerEdge;
+      for (let x = minX; ; x = (x + 1) % tilesPerEdge) {
         for (let y = minY; y <= maxY; y++) {
           tileKeys.push(generateTileKey(tileParams, x, y));
+          if (tileKeys.length >= MAX_TILES_TO_LOAD) {
+            logger.warn("CesiumViewer", "Too many tiles to load, truncating.");
+            break;
+          }
+        }
+        if (x === maxX || tileKeys.length >= MAX_TILES_TO_LOAD) break;
+      }
+
+      // Optimization: If dataZoom <= 3 and we've already tried to load all tiles for this zoom, skip.
+      // At zoom <= 3, tilesPerEdge is typically 40, so 1600 tiles total.
+      const totalTilesForZoom = tilesPerEdge * tilesPerEdge;
+      if (dataZoom <= 3 && lastDataZoom === dataZoom && tileKeys.length === lastTileKeysCount) {
+        if (tileKeys.length >= totalTilesForZoom || tileKeys.length >= MAX_TILES_TO_LOAD) {
+          logger.debug("CesiumViewer", `Skipping redundant load for dataZoom ${dataZoom} (${tileKeys.length} tiles).`);
+          return;
         }
       }
+
+      lastDataZoom = dataZoom;
+      lastTileKeysCount = tileKeys.length;
 
       if (tileKeys.length > 0) {
         tileManager.addTiles(tileKeys);
@@ -159,9 +195,6 @@ export default function loadCesiumViewer(): void {
 
   // Update cookies and fetch new data when the camera moves
   viewer.camera.moveEnd.addEventListener(triggerDataLoad);
-
-  // Initial data load
-  triggerDataLoad();
 }
 
 /**
@@ -187,14 +220,17 @@ function getPosition(): MapPosition | undefined {
     lat = parseInt(latE6) / 1e6;
     lng = parseInt(lngE6) / 1e6;
     zoom = parseInt(z);
+    if (isNaN(lat) || isNaN(lng) || isNaN(zoom)) return undefined;
     return { lat, lng, zoom };
   }
 
   // Stock Intel URL params
   if (ll && z) {
-    lat = parseFloat(ll.split(",")[0]);
-    lng = parseFloat(ll.split(",")[1]);
+    const parts = ll.split(",");
+    lat = parseFloat(parts[0]);
+    lng = parseFloat(parts[1]);
     zoom = parseInt(z);
+    if (isNaN(lat) || isNaN(lng) || isNaN(zoom)) return undefined;
     return { lat, lng, zoom };
   }
 
@@ -202,7 +238,9 @@ function getPosition(): MapPosition | undefined {
   if (latCookie && lngCookie) {
     lat = parseFloat(latCookie);
     lng = parseFloat(lngCookie);
-    zoom = parseInt(zoomCookie || DEFAULT_ZOOM.toString());
+    const parsedZoom = parseInt(zoomCookie || DEFAULT_ZOOM.toString());
+    zoom = isNaN(parsedZoom) ? DEFAULT_ZOOM : parsedZoom;
+    if (isNaN(lat) || isNaN(lng)) return undefined;
     return { lat, lng, zoom };
   }
 

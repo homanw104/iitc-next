@@ -148,9 +148,9 @@ export class DebugTileManager {
       case "queued":
         return Cesium.Color.LIGHTGRAY;
       case "requested":
-        return Cesium.Color.YELLOW;
+        return Cesium.Color.DARKSALMON;
       case "loaded":
-        return Cesium.Color.GREEN;
+        return Cesium.Color.GREENYELLOW;
       case "error":
         return Cesium.Color.RED;
       default:

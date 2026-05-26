@@ -29,7 +29,6 @@ export class PortalManager {
     }
 
     const portalEntity = this.createPortalEntity(data);
-    logger.debug("PortalManager", `Added portal: ${data.title || data.guid} at ${data.latE6 / 1e6}, ${data.lngE6 / 1e6}`);
     this.portals.set(data.guid, { data, entity: portalEntity });
   }
 
@@ -68,7 +67,7 @@ export class PortalManager {
       position: Cesium.Cartesian3.fromDegrees(data.lngE6 / 1e6, data.latE6 / 1e6),
       point: {
         pixelSize: 16,
-        scaleByDistance: new Cesium.NearFarScalar(1e2, 1.0, 1e4, 0.25),
+        scaleByDistance: new Cesium.NearFarScalar(1e2, 1.0, 1e5, 0),
         color: getTeamColor(data.team),
         outlineColor: Cesium.Color.BLACK,
         outlineWidth: 1,
