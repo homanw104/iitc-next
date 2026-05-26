@@ -9,6 +9,7 @@ import { addLayerChooser } from "../interface/layerChooser";
 import { getCookie, getURLParam, setCookie } from "../utils/browser";
 import { generateTileKey, getMapZoomTileParameters, latToTileIndex, lngToTileIndex, TileManager } from "../managers/tileManager";
 import { EntityManager } from "../managers/entityManager";
+import { DebugTileManager } from "../managers/debugTileManager";
 import { MapPosition } from "../types/map";
 import { logger } from "../utils/logger";
 
@@ -100,6 +101,7 @@ export default function loadCesiumViewer(): void {
   // Initialize Entity and Request Managers
   const entityManager = new EntityManager(viewer);
   const tileManager = new TileManager(entityManager);
+  new DebugTileManager(tileManager, entityManager);
 
   // Add Layer Chooser UI
   addLayerChooser(container, entityManager);

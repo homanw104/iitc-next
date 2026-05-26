@@ -37,14 +37,6 @@ export class LayerManager {
   }
 
   /**
-   * Returns all sources.
-   * @returns All sources in a Map.
-   */
-  public getSources(): Map<string, Cesium.CustomDataSource> {
-    return this.sources;
-  }
-
-  /**
    * Sets the visibility of a layer.
    * @param name The name of the layer.
    * @param visible Whether the layer should be visible.

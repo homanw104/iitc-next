@@ -12,7 +12,8 @@ import { LayerManager } from "./layerManager";
  */
 export class EntityManager {
   private viewer: Cesium.Viewer;
-  private layerManager: LayerManager;
+
+  public readonly layerManager: LayerManager;
 
   private portals: Map<string, { data: PortalData; entity: Cesium.Entity }> = new Map();
   private links: Map<string, { data: LinkData; entity: Cesium.Entity }> = new Map();
@@ -33,6 +34,7 @@ export class EntityManager {
     PORTAL_LEVELS.forEach(l => this.filterState.set(`level-${l}`, true));
     this.filterState.set("links", true);
     this.filterState.set("fields", true);
+    this.filterState.set("debug-tiles", true);
     this.applyFilters();
   }
 
@@ -303,6 +305,10 @@ export class EntityManager {
       const fieldsVisible = this.filterState.get("fields") !== false;
       this.layerManager.setLayerVisible(`fields-${t}`, teamVisible && fieldsVisible);
     });
+
+    // Debug
+    const debugTilesVisible = this.filterState.get("debug-tiles") !== false;
+    this.layerManager.setLayerVisible("debug-tiles", debugTilesVisible);
 
     this.viewer.scene.requestRender();
   }

@@ -3,7 +3,7 @@
  */
 
 import { apiRequest } from "../utils/network";
-import { FieldData, LinkData, PortalData, RawEntity, TileResponse } from "../types/ingress";
+import { FieldData, LinkData, PortalData, PortalLevel, RawEntity, TileResponse } from "../types/ingress";
 import { ParsedEntities } from "../types/map";
 import { EntityManager } from "./entityManager";
 import { logger } from "../utils/logger";
@@ -62,6 +62,9 @@ export interface TileParams {
   zoom: number;
 }
 
+export type TileStatus = "queued" | "requested" | "loaded" | "error";
+export type TileStatusCallback = (key: string, status: TileStatus) => void;
+
 /**
  * TileRequest class for managing a single request for a group of tiles.
  */
@@ -101,10 +104,32 @@ export class TileManager {
   private tilesPerRequest: number = 25;
   private queuedTiles: Set<string> = new Set();
   private requestedTiles: Set<string> = new Set();
+  private tileStatuses: Map<string, TileStatus> = new Map();
+  private tileStatusListeners: TileStatusCallback[] = [];
   private entityManager: EntityManager;
 
   constructor(entityManager: EntityManager) {
     this.entityManager = entityManager;
+  }
+
+  /**
+   * Registers a callback to be notified when a tile's status changes.
+   *
+   * @param callback - The function to call with the tile key and new status.
+   */
+  public onTileStatusChange(callback: TileStatusCallback): void {
+    this.tileStatusListeners.push(callback);
+  }
+
+  /**
+   * Sets the status of a tile identified by a given key and runs callbacks.
+   *
+   * @param key - The unique identifier for the tile whose status is to be set.
+   * @param status - The new status to assign to the tile.
+   */
+  private setTileStatus(key: string, status: TileStatus): void {
+    this.tileStatuses.set(key, status);
+    this.tileStatusListeners.forEach((cb) => cb(key, status));
   }
 
   /**
@@ -115,8 +140,9 @@ export class TileManager {
   public addTiles(tileKeys: string[]): void {
     logger.debug("TileManager", `Adding ${tileKeys.length} tiles to queue.`);
     tileKeys.forEach((key) => {
-      if (!this.requestedTiles.has(key)) {
+      if (!this.requestedTiles.has(key) && !this.queuedTiles.has(key)) {
         this.queuedTiles.add(key);
+        this.setTileStatus(key, "queued");
       }
     });
     this.processQueue().then();
@@ -139,6 +165,7 @@ export class TileManager {
     tilesToRequest.forEach((key) => {
       this.queuedTiles.delete(key);
       this.requestedTiles.add(key);
+      this.setTileStatus(key, "requested");
     });
 
     const request = new TileRequest(tilesToRequest);
@@ -151,8 +178,10 @@ export class TileManager {
       const response = await request.send();
       logger.info("TileManager", `Received response for ${tilesToRequest.length} tiles.`);
       this.handleResponse(response, tilesToRequest);
+      tilesToRequest.forEach((key) => this.setTileStatus(key, "loaded"));
     } catch (error) {
       logger.error("TileManager", "Tile request failed:", error);
+      tilesToRequest.forEach((key) => this.setTileStatus(key, "error"));
     } finally {
       this.activeRequestCount--;
       this.processQueue().then();
@@ -310,7 +339,7 @@ export function parsePortal(ent: RawEntity): PortalData {
   };
 
   if (data.length >= 14) {
-    portal.level = data[4] as number;
+    portal.level = data[4] as PortalLevel;
     portal.health = data[5] as number;
     portal.resCount = data[6] as number;
     portal.image = data[7] as string;

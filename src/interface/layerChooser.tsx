@@ -133,6 +133,9 @@ export function addLayerChooser(container: HTMLElement, entityManager: EntityMan
           createCheckbox(`Level ${i + 1}`, `level-${i + 1}`, 1))}
         {createCheckbox("Links", "links")}
         {createCheckbox("Fields", "fields")}
+
+        {createSection("Debug")}
+        {createCheckbox("Debug Tiles", "debug-tiles")}
       </div>
     </div>
   ) as HTMLElement;
