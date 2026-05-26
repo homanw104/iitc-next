@@ -209,7 +209,7 @@ export class TileManager {
 
       if (tileData.deletedGameEntityGuids) {
         entitiesRemoved += tileData.deletedGameEntityGuids.length;
-        tileData.deletedGameEntityGuids.forEach((guid) => this.entityManager.removeEntity(guid));
+        tileData.deletedGameEntityGuids.forEach((guid) => this.entityManager.removeGameEntity(guid));
       }
 
       if (tileData.gameEntities) {
