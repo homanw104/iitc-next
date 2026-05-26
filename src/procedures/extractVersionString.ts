@@ -13,7 +13,7 @@ export default function extractVersionString(): void {
   const version = extractVersionFromScript();
   if (version) {
     setApiVersion(version);
-    logger.info("Version", version);
+    logger.debug("Version", version);
   } else {
     logger.warn("Version", "Could not extract version. Requests may fail.");
   }

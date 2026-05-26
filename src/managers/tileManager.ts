@@ -113,6 +113,26 @@ export class TileManager {
   }
 
   /**
+   * Adds a list of tile keys to the queue for processing.
+   *
+   * @param tileKeys - An array of string keys representing the tiles to be added.
+   */
+  public addTiles(tileKeys: string[]): void {
+    logger.debug("TileManager", `Adding ${tileKeys.length} tiles to queue`);
+    let skippedCount = 0;
+    tileKeys.forEach((key) => {
+      if (!this.requestedTiles.has(key) && !this.queuedTiles.has(key)) {
+        this.queuedTiles.add(key);
+        this.setTileStatus(key, "queued");
+      } else {
+        skippedCount += 1;
+      }
+    });
+    logger.debug("TileManager", `Skipped ${skippedCount} tiles already in queue or loaded`);
+    this.processQueue().then();
+  }
+
+  /**
    * Registers a callback to be notified when a tile's status changes.
    *
    * @param callback - The function to call with the tile key and new status.
@@ -133,26 +153,6 @@ export class TileManager {
   }
 
   /**
-   * Adds a list of tile keys to the queue for processing.
-   *
-   * @param tileKeys - An array of string keys representing the tiles to be added.
-   */
-  public addTiles(tileKeys: string[]): void {
-    logger.debug("TileManager", `Adding ${tileKeys.length} tiles to queue.`);
-    let skippedCount = 0;
-    tileKeys.forEach((key) => {
-      if (!this.requestedTiles.has(key) && !this.queuedTiles.has(key)) {
-        this.queuedTiles.add(key);
-        this.setTileStatus(key, "queued");
-      } else {
-        skippedCount += 1;
-      }
-    });
-    logger.debug("TileManager", `Skipped ${skippedCount} tiles already in queue or loaded.`);
-    this.processQueue().then();
-  }
-
-  /**
    * Processes the tile queue by sending requests for tiles up to the maximum allowed concurrent requests.
    * If the active request count has reached the limit or there are no tiles in the queue, it returns immediately.
    * Otherwise, it dequeues a batch of tiles, sends them as a request, and handles the response or error accordingly.
@@ -161,7 +161,13 @@ export class TileManager {
    * @return {Promise<void>} - A promise that resolves when the tile processing is complete or no more tiles are available to process.
    */
   private async processQueue(): Promise<void> {
-    if (this.activeRequestCount >= this.maxRequests || this.queuedTiles.size === 0) {
+    if (this.activeRequestCount >= this.maxRequests) {
+      logger.info("TileManager", `Max request count (${this.maxRequests}) reached`);
+      return;
+    }
+
+    if (this.queuedTiles.size === 0) {
+      logger.info("TileManager", "Loaded");
       return;
     }
 
@@ -175,12 +181,12 @@ export class TileManager {
     const request = new TileRequest(tilesToRequest);
     this.activeRequestCount++;
 
-    logger.info("TileManager", `Sending request for ${tilesToRequest.length} tiles.`);
-    logger.info("TileManager", `Active requests: ${this.activeRequestCount}.`);
+    logger.debug("TileManager", `Sending request for ${tilesToRequest.length} tiles`);
+    logger.info("TileManager", `Loading ${this.activeRequestCount} requests`);
 
     try {
       const response = await request.send();
-      logger.info("TileManager", `Received response for ${tilesToRequest.length} tiles.`);
+      logger.debug("TileManager", `Received response for ${tilesToRequest.length} tiles`);
       this.handleResponse(response, tilesToRequest);
       tilesToRequest.forEach((key) => this.setTileStatus(key, "loaded"));
     } catch (error) {
@@ -224,7 +230,7 @@ export class TileManager {
         fields.forEach((f) => this.entityManager.addOrUpdateField(f));
       }
     }
-    logger.info("TileManager", `Processed ${entitiesFound} entities added/updated and ${entitiesRemoved} removed from ${tileKeys.length} tiles.`);
+    logger.debug("TileManager", `Processed ${entitiesFound} entities and removed ${entitiesRemoved} from ${tileKeys.length} tiles.`);
 
     if (entitiesFound > 0 || entitiesRemoved > 0) {
       this.entityManager.requestRender();

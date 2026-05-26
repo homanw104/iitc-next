@@ -15,7 +15,7 @@ window.iitcLogger = logger;
 window.LogLevel = LogLevel;
 
 const init = () => {
-  logger.setLevel(LogLevel.DEBUG);
+  logger.setLevel(LogLevel.INFO);
   logger.info("Initializing IITC Next");
   extractVersionString();
   unloadOriginalIntelMap();

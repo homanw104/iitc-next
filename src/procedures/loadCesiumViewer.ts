@@ -78,6 +78,9 @@ export default function loadCesiumViewer(): void {
     maximumRenderTimeChange: Infinity,  // Ensure render only triggers on explicit changes or camera movement
   });
 
+  // Limit pitch to avoid loading too many tiles at the horizon
+  viewer.scene.screenSpaceCameraController.maximumTiltAngle = Cesium.Math.toRadians(25);
+
   // Performance & Quality Tweaks
   viewer.scene.logarithmicDepthBuffer = true; // Prevents Z-fighting at large distances
   viewer.scene.globe.showGroundAtmosphere = true; // Better visuals for the globe
