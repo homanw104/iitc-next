@@ -79,7 +79,21 @@ export default function loadCesiumViewer(): void {
   });
 
   // Limit pitch to avoid loading too many tiles at the horizon
-  viewer.scene.screenSpaceCameraController.maximumTiltAngle = Cesium.Math.toRadians(25);
+  const controller = viewer.scene.screenSpaceCameraController;
+  controller.maximumTiltAngle = Cesium.Math.toRadians(30);
+  controller.enableLook = false; // "Look" bypasses tilt limits and is not recommended for map view
+  controller.tiltEventTypes = [
+    Cesium.CameraEventType.MIDDLE_DRAG,
+    Cesium.CameraEventType.RIGHT_DRAG,
+    {
+      eventType: Cesium.CameraEventType.LEFT_DRAG,
+      modifier: Cesium.KeyboardEventModifier.CTRL,
+    },
+    {
+      eventType: Cesium.CameraEventType.LEFT_DRAG,
+      modifier: Cesium.KeyboardEventModifier.SHIFT,
+    },
+  ];
 
   // Performance & Quality Tweaks
   viewer.scene.logarithmicDepthBuffer = true; // Prevents Z-fighting at large distances

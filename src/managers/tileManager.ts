@@ -46,6 +46,13 @@ const DEFAULT_ZOOM_TO_LEVEL: number[] = [8, 8, 8, 8, 7, 7, 7, 6, 6, 5, 4, 4, 3, 
 const DEFAULT_ZOOM_TO_LINK_LENGTH: number[] = [200000, 200000, 200000, 200000, 200000, 60000, 60000, 10000, 5000, 2500, 2500, 800, 300, 0, 0];
 
 /**
+ * The number of tiles requested in a single batch.
+ *
+ * @type {number}
+ */
+const TILES_PER_REQUEST: number = 10;
+
+/**
  * Represents parameters for configuring a tile in a grid or map system.
  *
  * @property {number} level - The zoom level of the tile, where higher numbers indicate more detailed tiles.
@@ -101,7 +108,7 @@ export class TileRequest {
 export class TileManager {
   private activeRequestCount: number = 0;
   private maxRequests: number = 5;
-  private tilesPerRequest: number = 25;
+  private tilesPerRequest: number = TILES_PER_REQUEST;
   private queuedTiles: Set<string> = new Set();
   private requestedTiles: Set<string> = new Set();
   private tileStatuses: Map<string, TileStatus> = new Map();
@@ -188,10 +195,12 @@ export class TileManager {
       const response = await request.send();
       logger.debug("TileManager", `Received response for ${tilesToRequest.length} tiles`);
       this.handleResponse(response, tilesToRequest);
-      tilesToRequest.forEach((key) => this.setTileStatus(key, "loaded"));
     } catch (error) {
       logger.error("TileManager", "Tile request failed:", error);
-      tilesToRequest.forEach((key) => this.setTileStatus(key, "error"));
+      tilesToRequest.forEach((key) => {
+        this.requestedTiles.delete(key);
+        this.setTileStatus(key, "error");
+      });
     } finally {
       this.activeRequestCount--;
       this.processQueue().then();
@@ -208,6 +217,10 @@ export class TileManager {
     const data = response as TileResponse;
     if (!data || !data.result) {
       logger.warn("TileManager", "Invalid response data:", data);
+      tileKeys.forEach((key) => {
+        this.requestedTiles.delete(key);
+        this.setTileStatus(key, "error");
+      });
       return;
     }
 
@@ -215,7 +228,21 @@ export class TileManager {
     let entitiesRemoved = 0;
     for (const tileKey of tileKeys) {
       const tileData = data.result.map[tileKey];
-      if (!tileData) continue;
+      if (!tileData) {
+        this.requestedTiles.delete(tileKey);
+        this.setTileStatus(tileKey, "error");
+        continue;
+      }
+
+      // Ignore TIMEOUT errors from Niantic's internal server
+      if (tileData.error && tileData.error !== "TIMEOUT") {
+        logger.warn("TileManager", `Tile ${tileKey} failed: ${tileData.error}`);
+        this.requestedTiles.delete(tileKey);
+        this.setTileStatus(tileKey, "error");
+        continue;
+      }
+
+      this.setTileStatus(tileKey, "loaded");
 
       if (tileData.deletedGameEntityGuids) {
         entitiesRemoved += tileData.deletedGameEntityGuids.length;
@@ -268,12 +295,27 @@ export function getMapZoomTileParameters(zoom: number): TileParams {
 export function getDataZoomForMapZoom(zoom: number): number {
   // Handle invalid or too small zoom levels
   if (isNaN(zoom) || zoom < 3) {
-    zoom = 3;
+    return 3;
   }
 
   // Limit zoom level (stock site max zoom may vary, but 21 is common)
   if (zoom > 21) {
     zoom = 21;
+  }
+
+  // To improve caching performance, we use the same zoom level for data requests
+  // if the tile parameters (tilesPerEdge, level, hasPortals) are identical.
+  const origParams = getMapZoomTileParameters(zoom);
+  while (zoom > 3) {
+    const nextParams = getMapZoomTileParameters(zoom - 1);
+    if (
+      nextParams.tilesPerEdge !== origParams.tilesPerEdge ||
+      nextParams.hasPortals !== origParams.hasPortals ||
+      nextParams.level * (nextParams.hasPortals ? 1 : 0) !== origParams.level * (origParams.hasPortals ? 1 : 0)
+    ) {
+      break;
+    }
+    zoom--;
   }
 
   return zoom;
