@@ -3,7 +3,7 @@
  */
 
 import * as Cesium from "cesium";
-import { PortalData, LinkData, FieldData, Team } from "../types/ingress";
+import { PortalData, LinkData, FieldData, Team, TEAMS, PORTAL_LEVELS } from "../types/ingress";
 import { logger } from "../utils/logger";
 import { LayerManager } from "./layerManager";
 
@@ -220,11 +220,11 @@ export class EntityManager {
   }
 
   private getPortalLayerId(data: PortalData): string {
-    if (data.placeholder) {
-      return "portals-placeholder";
-    }
-    const level = data.level ?? 0;
     const team = data.team.toLowerCase();
+    const level = data.level ?? 0;
+    if (data.placeholder || level === 0) {
+      return `portals-placeholder-${team}`;
+    }
     return `portals-l${level}-${team}`;
   }
 
@@ -238,56 +238,65 @@ export class EntityManager {
     return `fields-${team}`;
   }
 
-  public setLayerVisible(type: string, visible: boolean): void {
+  private getSubLayerIds(type: string): string[] {
+    const teams = TEAMS.map(t => t.toLowerCase());
+    const levels = PORTAL_LEVELS;
+
     if (type === "portals") {
-      // For legacy/convenience, toggle all portal layers
-      for (const name of this.layerManager.getSources().keys()) {
-        if (name.startsWith("portals-")) {
-          this.layerManager.setLayerVisible(name, visible);
-        }
-      }
-      return;
+      const ids: string[] = [];
+      levels.forEach(l => teams.forEach(t => ids.push(`portals-l${l}-${t}`)));
+      teams.forEach(t => ids.push(`portals-placeholder-${t}`));
+      return ids;
+    }
+    if (type === "portals-placeholder") {
+      return teams.map(t => `portals-placeholder-${t}`);
     }
     if (type === "links") {
-      for (const name of this.layerManager.getSources().keys()) {
-        if (name.startsWith("links-")) {
-          this.layerManager.setLayerVisible(name, visible);
-        }
-      }
-      return;
+      return teams.map(t => `links-${t}`);
     }
     if (type === "fields") {
-      for (const name of this.layerManager.getSources().keys()) {
-        if (name.startsWith("fields-")) {
-          this.layerManager.setLayerVisible(name, visible);
-        }
-      }
+      return teams.map(t => `fields-${t}`);
+    }
+    if (type.startsWith("team-")) {
+      const team = type.replace("team-", "");
+      const ids: string[] = [];
+      levels.forEach(l => ids.push(`portals-l${l}-${team}`));
+      ids.push(`links-${team}`);
+      ids.push(`fields-${team}`);
+      ids.push(`portals-placeholder-${team}`);
+      return ids;
+    }
+    if (type.startsWith("level-")) {
+      const level = type.replace("level-", "");
+      return teams.map(t => `portals-l${level}-${t}`);
+    }
+    return [];
+  }
+
+  public setLayerVisible(type: string, visible: boolean): void {
+    const subLayers = this.getSubLayerIds(type);
+    if (subLayers.length > 0) {
+      subLayers.forEach(id => this.layerManager.setLayerVisible(id, visible));
       return;
     }
+
     this.layerManager.setLayerVisible(type, visible);
   }
 
   public isLayerVisible(type: string): boolean {
-    if (type === "portals") {
-      // For legacy/convenience, "portals" returns true if any portal layer is visible
-      for (const [name, source] of this.layerManager.getSources()) {
-        if (name.startsWith("portals-") && source.show) return true;
-      }
-      return false;
+    const subLayers = this.getSubLayerIds(type);
+    if (subLayers.length === 0) {
+      return this.layerManager.isLayerVisible(type);
     }
-    if (type === "links") {
-      for (const [name, source] of this.layerManager.getSources()) {
-        if (name.startsWith("links-") && source.show) return true;
-      }
-      return false;
-    }
-    if (type === "fields") {
-      for (const [name, source] of this.layerManager.getSources()) {
-        if (name.startsWith("fields-") && source.show) return true;
-      }
-      return false;
-    }
-    return this.layerManager.isLayerVisible(type);
+    return subLayers.every(id => this.layerManager.isLayerVisible(id));
+  }
+
+  public isLayerIndeterminate(type: string): boolean {
+    const subLayers = this.getSubLayerIds(type);
+    if (subLayers.length === 0) return false;
+    
+    const visibleCount = subLayers.filter(id => this.layerManager.isLayerVisible(id)).length;
+    return visibleCount > 0 && visibleCount < subLayers.length;
   }
 
   private getTeamColor(team: Team): Cesium.Color {

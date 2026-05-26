@@ -9,6 +9,9 @@
     "strict": true,
     "skipLibCheck": true,
     "isolatedModules": true,
+    "jsx": "react",
+    "jsxFactory": "h",
+    "jsxFragmentFactory": "Fragment",
     "noEmit": true
   },
   "include": ["src"]

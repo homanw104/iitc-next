@@ -2,14 +2,25 @@
  * Type definitions for Ingress entities.
  */
 
-export type Team = "ENLIGHTENED" | "RESISTANCE" | "MACHINA" | "NEUTRAL";
+export const PORTAL_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
+
+export type PortalLevel = typeof PORTAL_LEVELS[number];
+
+export const TEAMS = [
+  "ENLIGHTENED",
+  "RESISTANCE",
+  "MACHINA",
+  "NEUTRAL",
+] as const;
+
+export type Team = typeof TEAMS[number];
 
 export interface PortalData {
   guid: string;
   team: Team;
   latE6: number;
   lngE6: number;
-  level?: number;
+  level?: PortalLevel;
   health?: number;
   resCount?: number;
   image?: string;

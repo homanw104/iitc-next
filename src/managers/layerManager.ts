@@ -10,6 +10,7 @@ import * as Cesium from "cesium";
 export class LayerManager {
   private viewer: Cesium.Viewer;
   private sources: Map<string, Cesium.CustomDataSource> = new Map();
+  private visibilitySettings: Map<string, boolean> = new Map();
 
   constructor(viewer: Cesium.Viewer) {
     this.viewer = viewer;
@@ -24,6 +25,11 @@ export class LayerManager {
     let source = this.sources.get(name);
     if (!source) {
       source = new Cesium.CustomDataSource(name);
+      // Apply saved visibility or default to true
+      source.show = this.visibilitySettings.has(name) 
+        ? this.visibilitySettings.get(name)! 
+        : true;
+      
       this.sources.set(name, source);
       this.viewer.dataSources.add(source).then();
     }
@@ -44,6 +50,7 @@ export class LayerManager {
    * @param visible Whether the layer should be visible.
    */
   public setLayerVisible(name: string, visible: boolean): void {
+    this.visibilitySettings.set(name, visible);
     const source = this.sources.get(name);
     if (source) {
       source.show = visible;
@@ -57,7 +64,10 @@ export class LayerManager {
    * @returns True if the layer is visible, false otherwise.
    */
   public isLayerVisible(name: string): boolean {
+    if (this.visibilitySettings.has(name)) {
+      return this.visibilitySettings.get(name)!;
+    }
     const source = this.sources.get(name);
-    return source ? source.show : false;
+    return source ? source.show : true; // Default to true if not set
   }
 }

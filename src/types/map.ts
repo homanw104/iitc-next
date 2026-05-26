@@ -1,8 +1,9 @@
+/**
+ * Type definitions for the map.
+ */
+
 import { FieldData, LinkData, PortalData } from "./ingress";
 
-/**
- * Map position data including latitude, longitude, and zoom level.
- */
 export interface MapPosition {
   lat: number;
   lng: number;
