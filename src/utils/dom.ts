@@ -4,7 +4,7 @@
 
 declare global {
   namespace JSX {
-    interface Element extends globalThis.Element {}
+    type Element = globalThis.Element | any[];
     interface IntrinsicElements {
       [elemName: string]: any;
     }
@@ -64,15 +64,20 @@ export function h(tag: string | Function, props: any, ...children: any[]): JSX.E
     }
   }
 
-  for (const child of children.flat()) {
-    if (child === null || child === undefined || child === false) continue;
-    if (child instanceof Node) {
-      el.appendChild(child);
-    } else {
-      el.appendChild(document.createTextNode(String(child)));
+  const appendChildren = (parent: Node, children: any[]) => {
+    for (const child of children) {
+      if (child === null || child === undefined || child === false) continue;
+      if (Array.isArray(child)) {
+        appendChildren(parent, child);
+      } else if (child instanceof Node) {
+        parent.appendChild(child);
+      } else {
+        parent.appendChild(document.createTextNode(String(child)));
+      }
     }
-  }
+  };
 
+  appendChildren(el, children);
   return el;
 }
 
@@ -80,6 +85,6 @@ export function h(tag: string | Function, props: any, ...children: any[]): JSX.E
  * A simple Fragment component for JSX.
  * Usage: return <Fragment>{...}</Fragment> or return <>{...}</>.
  */
-export function Fragment(_props: any, ...children: any[]): any[] {
-  return children.flat();
+export function Fragment(props: any): any[] {
+  return Array.isArray(props.children) ? props.children.flat() : [props.children];
 }
