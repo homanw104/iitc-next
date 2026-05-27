@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">iitc-next</string>
     <string name="title_activity_main">iitc-next</string>
-    <string name="package_name">com.homan.iitcnext</string>
-    <string name="custom_url_scheme">com.homan.iitcnext</string>
+    <string name="package_name">world.homans.iitcnext</string>
+    <string name="custom_url_scheme">world.homans.iitcnext</string>
 </resources>
