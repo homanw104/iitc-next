@@ -54,6 +54,10 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void injectLoader(WebView view) {
+        String url = view.getUrl();
+        if (url != null && (url.contains("/signinhandler") || url.contains("/login"))) {
+            return;
+        }
         view.evaluateJavascript(getLoaderJs(), null);
     }
 
@@ -146,12 +150,17 @@ public class MainActivity extends BridgeActivity {
                                 "    var style = document.createElement('style'); " +
                                 "    style.type = 'text/css'; " +
                                 "    style.innerHTML = css; " +
-                                "    document.head.appendChild(style); " +
+                                "    var target = document.head || document.documentElement; " +
+                                "    if (target) target.appendChild(style); " +
                                 "    return style; " +
                                 "  }; " +
                                 "} " +
                                 "function start() { " +
                                 "  try { " +
+                                "    if (!document.body) { " +
+                                "      setTimeout(start, 100); " +
+                                "      return; " +
+                                "    } " +
                                 "    if (typeof Cesium === 'undefined') { " +
                                 "      setTimeout(start, 100); " +
                                 "      return; " +
@@ -169,6 +178,10 @@ public class MainActivity extends BridgeActivity {
                     }
 
                     if (urlStr.contains("intel.ingress.com") && request.isForMainFrame() && userScript != null) {
+                        // Skip injection on non-map pages (like login handler) to avoid errors
+                        if (urlStr.contains("/signinhandler") || urlStr.contains("/login")) {
+                            return null;
+                        }
                         try {
                             URL url = new URL(urlStr);
                             HttpURLConnection conn = (HttpURLConnection) url.openConnection();

@@ -71,6 +71,17 @@ export interface FieldData {
   timestamp: number;
 }
 
+export interface Player {
+  ap: string;
+  available_invites: number;
+  energy: number;
+  min_ap_for_current_level: number;
+  min_ap_for_next_level: number;
+  nickname: string;
+  team: Team;
+  verified_level: number;
+}
+
 export type RawEntity = [
   string,   // GUID
   number,   // Timestamp
