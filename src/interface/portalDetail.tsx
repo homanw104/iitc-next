@@ -48,12 +48,14 @@ export function showPortalDetail(data: PortalData, container: HTMLElement): void
       <div
         ref={(el: HTMLElement) => (currentPane = el)}
         unselectable={true}
+        no-scroll-bar={true}
         style={{
+          marginTop: "8px",
           padding: "12px",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          justifyContent: "center",
+          justifyContent: "flex-start",
           gap: "12px",
           zIndex: "10020",
           backgroundColor: "rgba(42, 42, 42, 0.9)",
@@ -62,10 +64,11 @@ export function showPortalDetail(data: PortalData, container: HTMLElement): void
           borderRadius: "4.2px",
           boxShadow: "0 0 10px rgba(0, 0, 0, 0.5)",
           border: `1px solid ${teamColorHex}`,
-          width: "350px",
+          width: "400px",
           maxWidth: "calc(100% - 24px)",
           maxHeight: "100%",
           pointerEvents: "auto",
+          overflow: "scroll",
         }}
       >
         {/* Title */}
@@ -223,21 +226,19 @@ export function showPortalDetail(data: PortalData, container: HTMLElement): void
 
         {/* History */}
         <div style={{ alignSelf: "stretch" }}>
-          {data.history && (
-            <div style={{ paddingTop: "8px", paddingBottom: "8px", fontSize: "12px", color: "#ccc" }}>
-              <div style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "stretch" }}>
-                <div style={{ marginRight: "8px" }}>
-                  <strong>Visited:</strong> {data.history.visited ? "✅" : "❌"}
-                </div>
-                <div style={{ marginRight: "8px" }}>
-                  <strong>Captured:</strong> {data.history.captured ? "✅" : "❌"}
-                </div>
-                <div style={{ marginRight: "8px" }}>
-                  <strong>Scout Controlled:</strong> {data.history.scoutControlled ? "✅" : "❌"}
-                </div>
+          <div style={{ paddingTop: "8px", paddingBottom: "8px", fontSize: "12px", color: "#ccc" }}>
+            <div style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "stretch" }}>
+              <div style={{ marginRight: "8px" }}>
+                <strong>Visited:</strong> {data.history?.visited ? "✅" : "❌"}
+              </div>
+              <div style={{ marginRight: "8px" }}>
+                <strong>Captured:</strong> {data.history?.captured ? "✅" : "❌"}
+              </div>
+              <div style={{ marginRight: "8px" }}>
+                <strong>Scout Controlled:</strong> {data.history?.scoutControlled ? "✅" : "❌"}
               </div>
             </div>
-          )}
+          </div>
         </div>
 
         {/* Link */}

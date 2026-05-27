@@ -39,10 +39,12 @@ export class EntityManager {
     PORTAL_LEVELS.forEach(l => this.filterState.set(`level-${l}`, true));
     this.filterState.set("portals-placeholder", true);
     this.filterState.set("portals", true);
-    this.filterState.set("history", false);
-    this.filterState.set("scout-control", false);
     this.filterState.set("links", true);
     this.filterState.set("fields", true);
+    this.filterState.set("history", false);
+    this.filterState.set("scout-control", false);
+    this.filterState.set("history-reverse", false);
+    this.filterState.set("scout-control-reverse", false);
     this.filterState.set("debug-tiles", true);
     this.applyFilters();
   }
@@ -59,7 +61,7 @@ export class EntityManager {
     }
 
     // Update history and scout control if portal was updated and has history data
-    if (data.history) {
+    if (entity) {
       this.historyManager.addOrUpdateHistoryHalo(entity, data);
       this.scoutControlHistoryManager.addOrUpdateScoutControlHalo(entity, data);
     }
@@ -86,7 +88,7 @@ export class EntityManager {
     const portalData = await this.portalManager.requestPortalDetails(guid);
     const entity = this.portalManager.getPortalEntity(guid);
 
-    if (portalData.history && entity) {
+    if (entity) {
       this.historyManager.addOrUpdateHistoryHalo(entity, portalData);
       this.scoutControlHistoryManager.addOrUpdateScoutControlHalo(entity, portalData);
     }
@@ -163,9 +165,14 @@ export class EntityManager {
     // History
     const historyVisible = this.filterState.get("history") !== false;
     this.layerManager.setLayerVisible("history-visited-captured", historyVisible);
+    const historyReverseVisible = this.filterState.get("history-reverse") !== false;
+    this.layerManager.setLayerVisible("history-visited-captured-reverse", historyReverseVisible);
 
+    // Scout Control History
     const scoutControlVisible = this.filterState.get("scout-control") !== false;
     this.layerManager.setLayerVisible("history-scout-control", scoutControlVisible);
+    const scoutControlReverseVisible = this.filterState.get("scout-control-reverse") !== false;
+    this.layerManager.setLayerVisible("history-scout-control-reverse", scoutControlReverseVisible);
 
     // Debug
     const debugTilesVisible = this.filterState.get("debug-tiles") !== false;

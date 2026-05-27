@@ -58,6 +58,18 @@ export function h(tag: string | Function, props: any, ...children: any[]): JSX.E
           MozUserSelect: "none",
           msUserSelect: "none",
         });
+      } else if (key === "no-scroll-bar" && value) {
+        Object.assign((el as HTMLElement).style, {
+          scrollbarWidth: "none",
+          msOverflowStyle: "none",
+        });
+        const style = document.createElement("style");
+        style.textContent = `
+          #${el.id || (el.id = "id" + Math.random().toString(36).substring(2, 9))}::-webkit-scrollbar {
+            display: none !important;
+          }
+        `;
+        el.appendChild(style);
       } else {
         el.setAttribute(key, value as string);
       }

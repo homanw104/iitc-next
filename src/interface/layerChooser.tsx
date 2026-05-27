@@ -135,8 +135,10 @@ export function addLayerChooser(container: HTMLElement, entityManager: EntityMan
         {createCheckbox("Fields", "fields")}
 
         {createSection("History")}
-        {createCheckbox("History", "history")}
-        {createCheckbox("Scout Control", "scout-control")}
+        {createCheckbox("Visited/Captured", "history")}
+        {createCheckbox("Scout Controlled", "scout-control")}
+        {createCheckbox("Not Visited/Captured", "history-reverse")}
+        {createCheckbox("Not Scout Controlled", "scout-control-reverse")}
 
         {createSection("Debug")}
         {createCheckbox("Debug Tiles", "debug-tiles")}
