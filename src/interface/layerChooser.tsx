@@ -134,6 +134,10 @@ export function addLayerChooser(container: HTMLElement, entityManager: EntityMan
         {createCheckbox("Links", "links")}
         {createCheckbox("Fields", "fields")}
 
+        {createSection("History")}
+        {createCheckbox("History", "history")}
+        {createCheckbox("Scout Control", "scout-control")}
+
         {createSection("Debug")}
         {createCheckbox("Debug Tiles", "debug-tiles")}
       </div>
