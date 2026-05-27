@@ -9,7 +9,7 @@ export class FieldManager {
 
   constructor(private layerManager: LayerManager, private portalManager: PortalManager) {}
 
-  public addOrUpdateField(data: FieldData): void {
+  public addOrUpdateField(data: FieldData): Cesium.Entity {
     data.points.forEach((p) => {
       this.portalManager.createPortalPlaceholderEntity(p.guid, data.team, p.latE6, p.lngE6);
     });
@@ -19,20 +19,19 @@ export class FieldManager {
       if (data.timestamp > existing.data.timestamp) {
         const oldLayerId = this.getFieldLayerId(existing.data);
         const newLayerId = this.getFieldLayerId(data);
-
         if (oldLayerId !== newLayerId) {
           this.layerManager.getOrCreateSource(oldLayerId).entities.remove(existing.entity);
-          existing.entity = this.createFieldEntity(data);
-        } else {
-          this.updateFieldEntity(existing.entity, data);
+          this.layerManager.getOrCreateSource(newLayerId).entities.add(existing.entity);
         }
+        this.updateFieldEntity(existing.entity, data);
         existing.data = data;
       }
-      return;
+      return existing.entity;
     }
 
     const entity = this.createFieldEntity(data);
     this.fields.set(data.guid, { data, entity });
+    return entity;
   }
 
   public removeField(guid: string): boolean {

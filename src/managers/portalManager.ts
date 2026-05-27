@@ -5,49 +5,66 @@ import { LayerManager } from "./layerManager";
 import { apiRequest } from "../utils/network";
 
 export class PortalRequest {
-  constructor(private portalManager: PortalManager) {}
+  public portalGuid: string;
+  public active: boolean = false;
+  public retryCount: number = 0;
+  private maxRetries: number = 3;
 
-  public async send(guid: string): Promise<PortalData> {
-    const response = (await apiRequest("getPortalDetails", { guid })) as { result: any[] };
-    const data = parsePortal([guid, response.result[13], response.result]);
-    this.portalManager.addOrUpdatePortal(data);
-    return data;
+  public constructor(portalGuid: string) {
+    this.portalGuid = portalGuid;
+  }
+
+  public async send(): Promise<unknown> {
+    this.active = true;
+    try {
+      const response = await apiRequest("getPortalDetails", { guid: this.portalGuid });
+      this.active = false;
+      return response;
+    } catch (error) {
+      this.active = false;
+      if (this.retryCount < this.maxRetries) {
+        this.retryCount++;
+        return this.send();
+      }
+      throw error
+    }
   }
 }
 
 export class PortalManager {
   private portals: Map<string, { data: PortalData; entity: Cesium.Entity }> = new Map();
-  private portalRequest: PortalRequest;
 
-  constructor(private layerManager: LayerManager) {
-    this.portalRequest = new PortalRequest(this);
-  }
+  constructor(private layerManager: LayerManager) {}
 
   public async requestPortalDetails(guid: string): Promise<PortalData> {
-    return this.portalRequest.send(guid);
+    const request = new PortalRequest(guid);
+    const response = await request.send();
+    const data = response as any;
+    const portalData = parsePortal([guid, data.result[13], data.result]);
+    this.addOrUpdatePortal(portalData);
+    return portalData;
   }
 
-  public addOrUpdatePortal(data: PortalData): void {
+  public addOrUpdatePortal(data: PortalData): Cesium.Entity {
     const existing = this.portals.get(data.guid);
     if (existing) {
-      if (data.placeholder) return; // Don't downgrade full portal to placeholder
+      if (data.placeholder) return existing.entity; // Don't downgrade full portal to placeholder
       if (existing.data.placeholder || data.timestamp > existing.data.timestamp) {
         const oldLayerId = this.getPortalLayerId(existing.data);
         const newLayerId = this.getPortalLayerId(data);
-
         if (oldLayerId !== newLayerId) {
           this.layerManager.getOrCreateSource(oldLayerId).entities.remove(existing.entity);
-          existing.entity = this.createPortalEntity(data);
-        } else {
-          this.updatePortalEntity(existing.entity, data);
+          this.layerManager.getOrCreateSource(newLayerId).entities.add(existing.entity);
         }
+        this.updatePortalEntity(existing.entity, data);
         existing.data = data;
       }
-      return;
+      return existing.entity;
     }
 
     const portalEntity = this.createPortalEntity(data);
     this.portals.set(data.guid, { data, entity: portalEntity });
+    return portalEntity;
   }
 
   public createPortalPlaceholderEntity(guid: string, team: Team, latE6: number, lngE6: number): void {
@@ -78,6 +95,10 @@ export class PortalManager {
     return this.portals.get(guid)?.data;
   }
 
+  public getPortalEntity(guid: string): Cesium.Entity | undefined {
+    return this.portals.get(guid)?.entity;
+  }
+
   private createPortalEntity(data: PortalData): Cesium.Entity {
     const layerId = this.getPortalLayerId(data);
     return this.layerManager.getOrCreateSource(layerId).entities.add({
@@ -85,7 +106,7 @@ export class PortalManager {
       position: Cesium.Cartesian3.fromDegrees(data.lngE6 / 1e6, data.latE6 / 1e6),
       point: {
         pixelSize: 16,
-        scaleByDistance: new Cesium.NearFarScalar(1e1, 1.0, 1e5, 0),
+        scaleByDistance: new Cesium.NearFarScalar(1e1, 1.0, 2e4, 0.125),
         color: getTeamColor(data.team),
         outlineColor: Cesium.Color.BLACK,
         outlineWidth: 1,

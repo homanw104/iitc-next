@@ -143,7 +143,7 @@ function setupClickHandler(viewer: Cesium.Viewer, entityManager: EntityManager, 
         viewer.selectedEntity = entity;
         showPortalDetail(portalData, container);
         entityManager.requestPortalDetails(guid).then((freshData) => {
-          if (viewer.selectedEntity === entity) {
+          if (viewer.selectedEntity?.id === `portal-${guid}`) {
             showPortalDetail(freshData, container);
           }
         });
@@ -153,12 +153,6 @@ function setupClickHandler(viewer: Cesium.Viewer, entityManager: EntityManager, 
       hidePortalDetail();
     }
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
-
-  viewer.selectedEntityChanged.addEventListener((entity) => {
-    if (entity && (entity as any).selectable === false) {
-      viewer.selectedEntity = undefined;
-    }
-  });
 }
 
 /**

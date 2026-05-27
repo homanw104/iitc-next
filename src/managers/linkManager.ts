@@ -9,7 +9,7 @@ export class LinkManager {
 
   constructor(private layerManager: LayerManager, private portalManager: PortalManager) {}
 
-  public addOrUpdateLink(data: LinkData): void {
+  public addOrUpdateLink(data: LinkData): Cesium.Entity {
     this.portalManager.createPortalPlaceholderEntity(data.oGuid, data.team, data.oLatE6, data.oLngE6);
     this.portalManager.createPortalPlaceholderEntity(data.dGuid, data.team, data.dLatE6, data.dLngE6);
 
@@ -18,20 +18,19 @@ export class LinkManager {
       if (data.timestamp > existing.data.timestamp) {
         const oldLayerId = this.getLinkLayerId(existing.data);
         const newLayerId = this.getLinkLayerId(data);
-
         if (oldLayerId !== newLayerId) {
           this.layerManager.getOrCreateSource(oldLayerId).entities.remove(existing.entity);
-          existing.entity = this.createLinkEntity(data);
-        } else {
-          this.updateLinkEntity(existing.entity, data);
+          this.layerManager.getOrCreateSource(newLayerId).entities.add(existing.entity);
         }
+        this.updateLinkEntity(existing.entity, data);
         existing.data = data;
       }
-      return;
+      return existing.entity;
     }
 
     const entity = this.createLinkEntity(data);
     this.links.set(data.guid, { data, entity });
+    return entity;
   }
 
   public removeLink(guid: string): boolean {

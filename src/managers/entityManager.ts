@@ -44,23 +44,41 @@ export class EntityManager {
   }
 
   public addOrUpdatePortal(data: PortalData): void {
-    this.portalManager.addOrUpdatePortal(data);
+    const isSelected = this.viewer.selectedEntity?.id === `portal-${data.guid}`;
+    const entity = this.portalManager.addOrUpdatePortal(data);
+    if (isSelected && this.viewer.selectedEntity !== entity) {
+      this.viewer.selectedEntity = entity;
+    }
   }
 
   public addOrUpdateLink(data: LinkData): void {
-    this.linkManager.addOrUpdateLink(data);
+    const isSelected = this.viewer.selectedEntity?.id === `link-${data.guid}`;
+    const entity = this.linkManager.addOrUpdateLink(data);
+    if (isSelected && this.viewer.selectedEntity !== entity) {
+      this.viewer.selectedEntity = entity;
+    }
   }
 
   public addOrUpdateField(data: FieldData): void {
-    this.fieldManager.addOrUpdateField(data);
+    const isSelected = this.viewer.selectedEntity?.id === `field-${data.guid}`;
+    const entity = this.fieldManager.addOrUpdateField(data);
+    if (isSelected && this.viewer.selectedEntity !== entity) {
+      this.viewer.selectedEntity = entity;
+    }
+  }
+
+  public async requestPortalDetails(guid: string): Promise<PortalData> {
+    const isSelected = this.viewer.selectedEntity?.id === `portal-${guid}`;
+    const portalData = await this.portalManager.requestPortalDetails(guid);
+    const entity = this.portalManager.getPortalEntity(guid);
+    if (isSelected && this.viewer.selectedEntity !== entity) {
+      this.viewer.selectedEntity = this.portalManager.getPortalEntity(guid);
+    }
+    return portalData;
   }
 
   public getPortalData(guid: string): PortalData | undefined {
     return this.portalManager.getPortalData(guid);
-  }
-
-  public async requestPortalDetails(guid: string): Promise<PortalData> {
-    return this.portalManager.requestPortalDetails(guid);
   }
 
   public removeGameEntity(guid: string): void {

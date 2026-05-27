@@ -82,7 +82,7 @@ export class TileRequest {
   public tileKeys: string[];
   public active: boolean = false;
   public retryCount: number = 0;
-  private maxRetries: number = 5;
+  private maxRetries: number = 3;
 
   constructor(tileKeys: string[]) {
     this.tileKeys = tileKeys;
@@ -192,7 +192,7 @@ export class TileManager {
     this.activeRequestCount++;
 
     logger.debug("TileManager", `Sending request for ${tilesToRequest.length} tiles`);
-    logger.info("TileManager", `Loading ${this.activeRequestCount} requests`);
+    logger.info("TileManager", `Loading ${this.activeRequestCount} request` + ((this.activeRequestCount === 1) ? "" : "s"));
 
     try {
       const response = await request.send();
@@ -237,11 +237,16 @@ export class TileManager {
         continue;
       }
 
-      // Ignore TIMEOUT errors from Niantic's internal server
-      if (tileData.error && tileData.error !== "TIMEOUT") {
-        logger.warn("TileManager", `Tile ${tileKey} failed: ${tileData.error}`);
+      if (tileData.error) {
+        // Ignore TIMEOUT errors from Niantic's internal server (which seems like intended)
+        // but still delete them from the requestedTiles for further retrying
+        if (tileData.error == "TIMEOUT") {
+          this.setTileStatus(tileKey, "loaded");
+        } else {
+          logger.warn("TileManager", `Tile ${tileKey} failed: ${tileData.error}`);
+          this.setTileStatus(tileKey, "error");
+        }
         this.requestedTiles.delete(tileKey);
-        this.setTileStatus(tileKey, "error");
         continue;
       }
 
