@@ -116,6 +116,7 @@ export class PortalManager {
         font: "12px sans-serif",
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
         pixelOffset: new Cesium.Cartesian2(0, -10),
+        eyeOffset: new Cesium.Cartesian3(0, 0, -1),
         horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
         outlineWidth: 4,
         outlineColor: Cesium.Color.BLACK,

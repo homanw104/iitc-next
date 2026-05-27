@@ -102,7 +102,7 @@ export class DebugTileManager {
         material: color.withAlpha(0.1),
         outline: true,
         outlineColor: color,
-        outlineWidth: 8,
+        outlineWidth: 2,
         height: 10,   // Slightly above ground to prevent z-fighting
       },
     });

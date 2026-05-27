@@ -73,8 +73,10 @@ function initCesiumViewer(containerId: string): Cesium.Viewer {
   });
 
   const controller = viewer.scene.screenSpaceCameraController;
-  controller.maximumTiltAngle = Cesium.Math.toRadians(30);
+  controller.maximumTiltAngle = Cesium.Math.toRadians(35);
   controller.enableLook = false;
+  // Note: we set up custom double-finger tilt in setupGoogleMapsGestures, 
+  // so we keep the standard mouse/keyboard tilt here.
   controller.tiltEventTypes = [
     Cesium.CameraEventType.MIDDLE_DRAG,
     Cesium.CameraEventType.RIGHT_DRAG,
@@ -153,6 +155,149 @@ function setupClickHandler(viewer: Cesium.Viewer, entityManager: EntityManager, 
       hidePortalDetail();
     }
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+  setupGoogleMapsGestures(viewer);
+}
+
+/**
+ * Sets up Google Maps-like gestures:
+ * Double-tap and drag to zoom.
+ *
+ * @param viewer - The Cesium.Viewer instance.
+ */
+function setupGoogleMapsGestures(viewer: Cesium.Viewer): void {
+  const scene = viewer.scene;
+  const handler = viewer.screenSpaceEventHandler;
+  const controller = scene.screenSpaceCameraController;
+  const doubleTapThreshold = 300; // ms
+  let isDoubleTapping = false;
+  let hasMovedDuringDoubleTap = false;
+  let lastTapTime = 0;
+  let lastMoveTime = 0;
+  let zoomVelocity = 0;
+  let momentumRequestId: number | null = null;
+  let inertiaResetTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  const stopMomentum = () => {
+    if (momentumRequestId !== null) {
+      cancelAnimationFrame(momentumRequestId);
+      momentumRequestId = null;
+    }
+    if (inertiaResetTimeoutId !== null) {
+      clearTimeout(inertiaResetTimeoutId);
+      inertiaResetTimeoutId = null;
+    }
+  };
+
+  // Simple touch callback
+  handler.setInputAction(() => {
+    stopMomentum();
+    const now = Date.now();
+    if (now - lastTapTime < doubleTapThreshold) {
+      isDoubleTapping = true;
+      hasMovedDuringDoubleTap = false;  // Reset hasMoved status
+      controller.enableInputs = false;  // Disable default interactions
+      lastTapTime = 0;  // Reset to avoid triple tap triggering it again
+    } else {
+      isDoubleTapping = false;
+      hasMovedDuringDoubleTap = false;
+      controller.enableInputs = true;
+      lastTapTime = now;
+    }
+  }, Cesium.ScreenSpaceEventType.LEFT_DOWN);
+
+  // Drag callbacks
+  handler.setInputAction((movement: { startPosition: Cesium.Cartesian2; endPosition: Cesium.Cartesian2 }) => {
+    if (isDoubleTapping) {
+      const now = Date.now();
+      const dt = now - lastMoveTime;
+      const dx = movement.endPosition.x - movement.startPosition.x;
+      const dy = movement.endPosition.y - movement.startPosition.y;
+
+      if (Math.sqrt(dx * dx + dy * dy) > 5) hasMovedDuringDoubleTap = true;
+
+      // Disable momentum from default camera controller temporarily
+      viewer.scene.screenSpaceCameraController.inertiaSpin = 0.0;
+      viewer.scene.screenSpaceCameraController.inertiaTranslate = 0.0;
+
+      if (dt > 0) {
+        // Calculate velocity (pixels per ms)
+        const currentVelocity = dy / dt;
+        // Smoothing velocity
+        zoomVelocity = zoomVelocity * 0.4 + currentVelocity * 0.6;
+      }
+      lastMoveTime = now;
+
+      const height = viewer.camera.positionCartographic.height;
+      const zoomFactor = height * 0.003;
+      viewer.camera.zoomIn(dy * zoomFactor);
+    }
+  }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+
+  // Touch end callback
+  handler.setInputAction(() => {
+    if (isDoubleTapping) {
+      isDoubleTapping = false;
+
+      if (!hasMovedDuringDoubleTap) {
+        // Double tap without dragging: animated zoom in
+        const camera = viewer.camera;
+        const height = camera.positionCartographic.height;
+        const targetHeight = height * 0.5;
+        const destination = Cesium.Cartesian3.fromRadians(
+          camera.positionCartographic.longitude,
+          camera.positionCartographic.latitude,
+          targetHeight
+        );
+
+        camera.flyTo({
+          destination,
+          duration: 0.5,
+          complete: () => {
+            controller.enableInputs = true;
+          }
+        });
+      } else if (Math.abs(zoomVelocity) > 0.1) {
+        // Apply momentum if velocity is significant
+        let lastFrameTime = Date.now();
+        const animateMomentum = () => {
+          const now = Date.now();
+          const dt = now - lastFrameTime;
+          lastFrameTime = now;
+
+          if (Math.abs(zoomVelocity) < 0.01) {
+            controller.enableInputs = true;
+            momentumRequestId = null;
+
+            inertiaResetTimeoutId = setTimeout(() => {
+              viewer.scene.screenSpaceCameraController.inertiaSpin = 0.9;
+              viewer.scene.screenSpaceCameraController.inertiaTranslate = 0.9;
+              inertiaResetTimeoutId = null;
+            }, 500);
+            return;
+          }
+
+          const dy = zoomVelocity * dt;
+          const camera = viewer.camera;
+          const height = camera.positionCartographic.height;
+          const zoomFactor = height * 0.003;
+          camera.zoomIn(dy * zoomFactor);
+
+          // Decelerate
+          zoomVelocity *= 0.92;
+
+          momentumRequestId = requestAnimationFrame(animateMomentum);
+        };
+        momentumRequestId = requestAnimationFrame(animateMomentum);
+      } else {
+        // Dragged but no significant momentum
+        controller.enableInputs = true;
+      }
+    } else {
+      isDoubleTapping = false;
+      controller.enableInputs = true;
+    }
+  }, Cesium.ScreenSpaceEventType.LEFT_UP);
 }
 
 /**
