@@ -19,6 +19,7 @@ import { EntityManager } from "../managers/entityManager";
 import { DebugTileManager } from "../managers/debugTileManager";
 import { logManager } from "../managers/logManager";
 import { showOrUpdateDetailBar } from "../interface/portalDetail";
+import { addRefreshButton } from "../interface/refreshButton";
 
 // Tell Cesium where to find its assets (Images, Workers, etc.)
 // Since we use the CDN for the main library, we should also use it for assets.
@@ -33,6 +34,9 @@ const HEIGHT_AT_ZOOM_ZERO = 96000000;
 
 // Default tile limit to load
 const MAX_TILES_TO_LOAD = 2000;
+
+let lastDataZoom: number | undefined;
+let lastTileKeysCount: number | undefined;
 
 /**
  * Creates a Cesium container as an HTMLDivElement and appends it to the body.
@@ -303,74 +307,104 @@ function setupGoogleMapsGestures(viewer: Cesium.Viewer): void {
 }
 
 /**
+ * Calculate the tile keys based on the current view.
+ *
+ * @param viewer - Viewer to calculaate.
+ */
+function calculateTileKeys(viewer: Cesium.Viewer): string[] {
+  const camera = viewer.camera;
+  const cartographic = camera.positionCartographic;
+  const lat = Cesium.Math.toDegrees(cartographic.latitude);
+  const lng = Cesium.Math.toDegrees(cartographic.longitude);
+  const height = cartographic.height;
+
+  const calculatedZoom = Math.round(Math.log2(HEIGHT_AT_ZOOM_ZERO / height));
+  const mapZoom = isNaN(calculatedZoom) ? 0 : calculatedZoom;
+  const dataZoom = getDataZoomForMapZoom(mapZoom);
+
+  setCookie("ingress.intelmap.lat", lat.toFixed(6));
+  setCookie("ingress.intelmap.lng", lng.toFixed(6));
+  setCookie("ingress.intelmap.zoom", mapZoom.toString());
+
+  const tileParams = getMapZoomTileParameters(dataZoom);
+  const viewRect = camera.computeViewRectangle();
+
+  if (viewRect) {
+    const west = Cesium.Math.toDegrees(viewRect.west);
+    const south = Cesium.Math.toDegrees(viewRect.south);
+    const east = Cesium.Math.toDegrees(viewRect.east);
+    const north = Cesium.Math.toDegrees(viewRect.north);
+
+    const minX = lngToTileIndex(west, tileParams);
+    const maxX = lngToTileIndex(east, tileParams);
+    const minY = latToTileIndex(north, tileParams);
+    const maxY = latToTileIndex(south, tileParams);
+
+    const tileKeys: string[] = [];
+    const tilesPerEdge = tileParams.tilesPerEdge;
+    for (let x = minX; ; x = (x + 1) % tilesPerEdge) {
+      for (let y = minY; y <= maxY; y++) {
+        tileKeys.push(generateTileKey(tileParams, x, y));
+        if (tileKeys.length >= MAX_TILES_TO_LOAD) {
+          logManager.warn("CesiumViewer", "Too many tiles to load, truncating.");
+          break;
+        }
+      }
+      if (x === maxX || tileKeys.length >= MAX_TILES_TO_LOAD) break;
+    }
+    const totalTilesForZoom = tilesPerEdge * tilesPerEdge;
+    if (dataZoom <= 3 && lastDataZoom === dataZoom && tileKeys.length === lastTileKeysCount) {
+      if (tileKeys.length >= totalTilesForZoom || tileKeys.length >= MAX_TILES_TO_LOAD) {
+        return [];
+      }
+    }
+
+    lastDataZoom = dataZoom;
+    lastTileKeysCount = tileKeys.length;
+
+    return tileKeys;
+  }
+
+  return [];
+}
+
+/**
+ * Trigger reloading of tiles.
+ *
+ * @param viewer - Cesium viewer to calculate view range.
+ * @param tileManager - Tile manager to add and process tiles.
+ */
+function triggerDataReload(viewer: Cesium.Viewer, tileManager: TileManager): void {
+  const tileKeys = calculateTileKeys(viewer);
+
+  if (tileKeys.length > 0) {
+    tileManager.removeTiles(tileKeys);
+    tileManager.addTiles(tileKeys);
+  }
+}
+
+/**
+ * Trigger loading of tiles.
+ *
+ * @param viewer - Cesium viewer to calculate view range.
+ * @param tileManager - Tile manager to add and process tiles.
+ */
+const triggerDataLoad = (viewer: Cesium.Viewer, tileManager: TileManager) => {
+  const tileKeys = calculateTileKeys(viewer);
+
+  if (tileKeys.length > 0) {
+    tileManager.addTiles(tileKeys);
+  }
+};
+
+/**
  * Sets up data loading for the tile manager.
  *
  * @param viewer - The Cesium.Viewer instance to listen for camera changes.
  * @param tileManager - The TileManager instance to add tiles to.
  */
 function setupDataLoading(viewer: Cesium.Viewer, tileManager: TileManager): void {
-  let lastDataZoom: number | undefined;
-  let lastTileKeysCount: number | undefined;
-
-  const triggerDataLoad = () => {
-    const camera = viewer.camera;
-    const cartographic = camera.positionCartographic;
-    const lat = Cesium.Math.toDegrees(cartographic.latitude);
-    const lng = Cesium.Math.toDegrees(cartographic.longitude);
-    const height = cartographic.height;
-
-    const calculatedZoom = Math.round(Math.log2(HEIGHT_AT_ZOOM_ZERO / height));
-    const mapZoom = isNaN(calculatedZoom) ? 0 : calculatedZoom;
-    const dataZoom = getDataZoomForMapZoom(mapZoom);
-
-    setCookie("ingress.intelmap.lat", lat.toFixed(6));
-    setCookie("ingress.intelmap.lng", lng.toFixed(6));
-    setCookie("ingress.intelmap.zoom", mapZoom.toString());
-
-    const tileParams = getMapZoomTileParameters(dataZoom);
-    const viewRect = camera.computeViewRectangle();
-
-    if (viewRect) {
-      const west = Cesium.Math.toDegrees(viewRect.west);
-      const south = Cesium.Math.toDegrees(viewRect.south);
-      const east = Cesium.Math.toDegrees(viewRect.east);
-      const north = Cesium.Math.toDegrees(viewRect.north);
-
-      const minX = lngToTileIndex(west, tileParams);
-      const maxX = lngToTileIndex(east, tileParams);
-      const minY = latToTileIndex(north, tileParams);
-      const maxY = latToTileIndex(south, tileParams);
-
-      const tileKeys: string[] = [];
-      const tilesPerEdge = tileParams.tilesPerEdge;
-      for (let x = minX; ; x = (x + 1) % tilesPerEdge) {
-        for (let y = minY; y <= maxY; y++) {
-          tileKeys.push(generateTileKey(tileParams, x, y));
-          if (tileKeys.length >= MAX_TILES_TO_LOAD) {
-            logManager.warn("CesiumViewer", "Too many tiles to load, truncating.");
-            break;
-          }
-        }
-        if (x === maxX || tileKeys.length >= MAX_TILES_TO_LOAD) break;
-      }
-
-      const totalTilesForZoom = tilesPerEdge * tilesPerEdge;
-      if (dataZoom <= 3 && lastDataZoom === dataZoom && tileKeys.length === lastTileKeysCount) {
-        if (tileKeys.length >= totalTilesForZoom || tileKeys.length >= MAX_TILES_TO_LOAD) {
-          return;
-        }
-      }
-
-      lastDataZoom = dataZoom;
-      lastTileKeysCount = tileKeys.length;
-
-      if (tileKeys.length > 0) {
-        tileManager.addTiles(tileKeys);
-      }
-    }
-  };
-
-  viewer.camera.moveEnd.addEventListener(triggerDataLoad);
+  viewer.camera.moveEnd.addEventListener(() => triggerDataLoad(viewer, tileManager));
 }
 
 /**
@@ -393,9 +427,10 @@ export default function loadCesiumViewer(): void {
   const tileManager = new TileManager(entityManager);
   new DebugTileManager(tileManager, entityManager);
 
+  addRefreshButton(container, () => triggerDataReload(viewer, tileManager));
   addLayerChooser(container, entityManager);
   showOrUpdateDetailBar(container);
-  logManager.setCallback((msg: string) => showOrUpdateDetailBar(container, msg))
+  logManager.setCallback((msg: string) => showOrUpdateDetailBar(container, msg));
   setupClickHandler(viewer, entityManager, container);
   setupDataLoading(viewer, tileManager);
 }

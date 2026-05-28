@@ -142,6 +142,18 @@ export class TileManager {
     this.processQueue().then();
   }
 
+  public removeTiles(tileKeys: string[]): void {
+    logManager.debug("TileManager", `Removing ${tileKeys.length} tiles from registry`);
+    tileKeys.forEach((key) => {
+      if (this.queuedTiles.has(key)) {
+        this.queuedTiles.delete(key);
+      }
+      if (this.requestedTiles.has(key)) {
+        this.requestedTiles.delete(key);
+      }
+    });
+    this.processQueue().then();
+  }
   /**
    * Registers a callback to be notified when a tile's status changes.
    *
