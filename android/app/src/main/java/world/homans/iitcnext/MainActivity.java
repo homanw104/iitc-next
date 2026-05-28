@@ -1,5 +1,6 @@
 package world.homans.iitcnext;
 
+import android.annotation.SuppressLint;
 import android.app.Dialog;
 import android.content.Intent;
 import android.net.Uri;
@@ -107,6 +108,7 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
+    @SuppressLint("SetJavaScriptEnabled")
     @Override
     protected void load() {
         super.load();
@@ -121,9 +123,10 @@ public class MainActivity extends BridgeActivity {
         android.webkit.CookieManager cookieManager = android.webkit.CookieManager.getInstance();
         cookieManager.setAcceptThirdPartyCookies(webView, true);
 
-        // Set User Agent for the main WebView as well
-        String userAgent = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36";
-        settings.setUserAgentString(userAgent);
+        // Dynamically set User Agent by removing WebView identifiers to bypass Google's block
+        String defaultUA = WebSettings.getDefaultUserAgent(this);
+        String cleanedUA = defaultUA.replaceAll("Version/\\d+\\.\\d+\\s?", "").replaceAll(";\\s?wv", "");
+        settings.setUserAgentString(cleanedUA);
 
         addIITCInterface(webView);
 
@@ -310,6 +313,7 @@ public class MainActivity extends BridgeActivity {
                 }
             }
 
+            @SuppressLint("SetJavaScriptEnabled")
             @Override
             public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, Message resultMsg) {
                 final WebView newWebView = new WebView(MainActivity.this);
@@ -319,9 +323,10 @@ public class MainActivity extends BridgeActivity {
                 settings.setJavaScriptCanOpenWindowsAutomatically(true);
                 settings.setDomStorageEnabled(true);
 
-                // Set a clean User Agent to bypass Google's "secure browser" check
-                String userAgent = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36";
-                settings.setUserAgentString(userAgent);
+                // Dynamically set User Agent for the popup as well
+                String defaultUA = WebSettings.getDefaultUserAgent(MainActivity.this);
+                String cleanedUA = defaultUA.replaceAll("Version/\\d+\\.\\d+\\s?", "").replaceAll(";\\s?wv", "");
+                settings.setUserAgentString(cleanedUA);
 
                 if (popupDialog != null && popupDialog.isShowing()) {
                     popupDialog.dismiss();
@@ -337,7 +342,8 @@ public class MainActivity extends BridgeActivity {
 
                 newWebView.setWebViewClient(new WebViewClient() {
                     @Override
-                    public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                    public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                        String url = request.getUrl().toString();
                         if (url.contains("google.com") || url.contains("nianticspatial.com") || url.contains("ingress.com")) {
                             return false; // Let the new WebView handle it
                         }
