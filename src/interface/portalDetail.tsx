@@ -169,7 +169,6 @@ export function showOrUpdateDetailPane(container: HTMLElement, data: PortalData)
         unselectable={true}
         no-scroll-bar={true}
         style={{
-          marginTop: "8px",
           padding: "12px",
           display: "flex",
           flexDirection: "column",
@@ -185,7 +184,7 @@ export function showOrUpdateDetailPane(container: HTMLElement, data: PortalData)
           border: `1px solid ${teamColorHex}`,
           width: "400px",
           maxWidth: "calc(100% - 24px)",
-          maxHeight: "100%",
+          maxHeight: "calc(100% - 24px - 43px)",
           pointerEvents: "auto",
           overflow: "scroll",
         }}

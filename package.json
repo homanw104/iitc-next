@@ -13,7 +13,6 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/cesium": "^1.67.14",
     "@typescript-eslint/eslint-plugin": "^8.59.4",
     "@typescript-eslint/parser": "^8.59.4",
     "eslint": "^10.4.0",

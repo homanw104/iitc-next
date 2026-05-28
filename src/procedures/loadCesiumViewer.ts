@@ -20,6 +20,7 @@ import { DebugTileManager } from "../managers/debugTileManager";
 import { logManager } from "../managers/logManager";
 import { showOrUpdateDetailBar } from "../interface/portalDetail";
 import { addRefreshButton } from "../interface/refreshButton";
+import { AmapMercatorTilingScheme } from "../utils/map";
 
 // Tell Cesium where to find its assets (Images, Workers, etc.)
 // Since we use the CDN for the main library, we should also use it for assets.
@@ -65,6 +66,38 @@ function createCesiumContainer(): HTMLDivElement {
  * @param containerId - The id of the DOM element to hold the viewer.
  */
 function initCesiumViewer(containerId: string): Cesium.Viewer {
+  const gaodeSatelliteViewModel = new Cesium.ProviderViewModel({
+    name: "Gaode Satellite",
+    iconUrl: Cesium.buildModuleUrl("Widgets/Images/ImageryProviders/bingAerial.png"),
+    tooltip: "Gaode Satellite Imagery",
+    category: "Gaode",
+    creationFunction: function() {
+      return new Cesium.UrlTemplateImageryProvider({
+        url: "https://webst02.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}",
+        tilingScheme: new AmapMercatorTilingScheme({}),
+        minimumLevel: 1,
+        maximumLevel: 20,
+        credit: new Cesium.Credit("Gaode", true)
+      });
+    }
+  });
+
+  const gaodeRoadViewModel = new Cesium.ProviderViewModel({
+    name: "Gaode Road",
+    iconUrl: Cesium.buildModuleUrl("Widgets/Images/ImageryProviders/bingRoads.png"),
+    tooltip: "Gaode Road Map",
+    category: "Gaode",
+    creationFunction: function() {
+      return new Cesium.UrlTemplateImageryProvider({
+        url: "https://webst02.is.autonavi.com/appmaptile?style=7&x={x}&y={y}&z={z}",
+        tilingScheme: new AmapMercatorTilingScheme({}),
+        minimumLevel: 1,
+        maximumLevel: 20,
+        credit: new Cesium.Credit("Gaode", true)
+      });
+    }
+  });
+
   const viewer = new Cesium.Viewer(containerId, {
     animation: false,
     timeline: false,
@@ -75,6 +108,21 @@ function initCesiumViewer(containerId: string): Cesium.Viewer {
     requestRenderMode: true,
     maximumRenderTimeChange: Infinity,
   });
+
+  // Remove some of the imagery layer options
+  let models = viewer.baseLayerPicker.viewModel.imageryProviderViewModels;
+  viewer.baseLayerPicker.viewModel.imageryProviderViewModels = models.filter((model) => {
+    return model.name !== "Sentinel-2" &&
+      model.name !== "Blue Marble" &&
+      model.name !== "Earth at night" &&
+      model.name !== "Azure Maps Aerial" &&
+      model.name !== "Azure Maps Roads" &&
+      model.name !== "Esri World Ocean" &&
+      !model.name.startsWith("Stadia");
+  });
+
+  // Add Gaode imagery options to the base layer picker
+  viewer.baseLayerPicker.viewModel.imageryProviderViewModels.unshift(gaodeSatelliteViewModel, gaodeRoadViewModel);
 
   const controller = viewer.scene.screenSpaceCameraController;
   controller.maximumTiltAngle = Cesium.Math.toRadians(35);
@@ -101,6 +149,7 @@ function initCesiumViewer(containerId: string): Cesium.Viewer {
   viewer.scene.globe.baseColor = Cesium.Color.BLACK;
   viewer.scene.highDynamicRange = true;
   viewer.scene.msaaSamples = 4;
+  viewer.resolutionScale = 2.0;
   viewer.scene.postProcessStages.fxaa.enabled = true;
 
   const credits = document.querySelector(".cesium-widget-credits") as HTMLElement;
