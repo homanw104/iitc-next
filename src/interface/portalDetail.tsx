@@ -88,7 +88,7 @@ export function showOrUpdateDetailBar(container: HTMLElement, display?: PortalDa
           paddingRight: "12px",
           fontSize: "14px",
           zIndex: "10018",
-          backgroundColor: "rgba(42, 42, 42, 0.9)",
+          backgroundColor: "rgb(48, 51, 54)",
           color: "white",
           fontFamily: "sans-serif",
           borderRadius: "4.2px",

@@ -13,7 +13,7 @@ export enum LogLevel {
 export class LogManager {
   private level: LogLevel = LogLevel.INFO;
   private latestMsg = "";
-  private cb = (msg: string) => {};
+  private cb = (_: string) => {};
 
   constructor() {
     // Default to INFO level

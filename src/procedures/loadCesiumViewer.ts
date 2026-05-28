@@ -185,13 +185,9 @@ function setupGoogleMapsGestures(viewer: Cesium.Viewer): void {
       cancelAnimationFrame(momentumRequestId);
       momentumRequestId = null;
     }
-    if (inertiaResetTimeoutId !== null) {
-      clearTimeout(inertiaResetTimeoutId);
-      inertiaResetTimeoutId = null;
-    }
   };
 
-  // Simple touch callback
+  // Touch start callback
   handler.setInputAction(() => {
     stopMomentum();
     const now = Date.now();
@@ -205,6 +201,10 @@ function setupGoogleMapsGestures(viewer: Cesium.Viewer): void {
       hasMovedDuringDoubleTap = false;
       controller.enableInputs = true;
       lastTapTime = now;
+    }
+    if (inertiaResetTimeoutId !== null) {
+      clearTimeout(inertiaResetTimeoutId);
+      inertiaResetTimeoutId = null;
     }
   }, Cesium.ScreenSpaceEventType.LEFT_DOWN);
 
@@ -270,12 +270,6 @@ function setupGoogleMapsGestures(viewer: Cesium.Viewer): void {
           if (Math.abs(zoomVelocity) < 0.01) {
             controller.enableInputs = true;
             momentumRequestId = null;
-
-            inertiaResetTimeoutId = setTimeout(() => {
-              viewer.scene.screenSpaceCameraController.inertiaSpin = 0.9;
-              viewer.scene.screenSpaceCameraController.inertiaTranslate = 0.9;
-              inertiaResetTimeoutId = null;
-            }, 500);
             return;
           }
 
@@ -296,9 +290,15 @@ function setupGoogleMapsGestures(viewer: Cesium.Viewer): void {
         controller.enableInputs = true;
       }
     } else {
-      isDoubleTapping = false;
       controller.enableInputs = true;
     }
+
+    // Restore move momentum after a while
+    inertiaResetTimeoutId = setTimeout(() => {
+      viewer.scene.screenSpaceCameraController.inertiaSpin = 0.9;
+      viewer.scene.screenSpaceCameraController.inertiaTranslate = 0.9;
+      inertiaResetTimeoutId = null;
+    }, 1000);
   }, Cesium.ScreenSpaceEventType.LEFT_UP);
 }
 
