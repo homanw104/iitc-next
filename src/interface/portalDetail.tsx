@@ -10,22 +10,29 @@ let currentDetailBar: HTMLElement | null = null;
 let currentDetailPane: HTMLElement | null = null;
 let previousPortalData: PortalData | null = null;
 let previousMsg: string | null = null;
+let copyTextInfoTimeout: ReturnType<typeof setTimeout>;
 
-/**
- * Remove the portal detail bar if it exists.
- */
-export function removeDetailBar(): void {
+async function copyIntelLink(link: string) {
+  const linkButton = document.getElementById("intel-link");
+
+  if (linkButton) {
+    if (copyTextInfoTimeout) clearTimeout(copyTextInfoTimeout);
+    await navigator.clipboard.writeText(link);
+    linkButton.innerText = "Copied intel map link";
+    linkButton.style.color = "white";
+    copyTextInfoTimeout = setTimeout(() => {
+      linkButton.innerText = "Copy intel map link";
+      linkButton.style.color = "#5091ff";
+    }, 2000);
+  }
+}
+
+export function showOrUpdateDetailBar(container: HTMLElement, display?: PortalData | string): void {
+  // Clear existing detail bar
   if (currentDetailBar) {
     currentDetailBar.remove();
     currentDetailBar = null;
   }
-}
-
-/**
- * Add the portal detail bar to a specified element.
- */
-export function showOrUpdateDetailBar(container: HTMLElement, display?: PortalData | string): void {
-  removeDetailBar();
 
   // Clear previous portal data if no display object is presented
   if (!display) {
@@ -50,7 +57,7 @@ export function showOrUpdateDetailBar(container: HTMLElement, display?: PortalDa
   const msg = typeof display === "string" ? display : undefined;
 
   // Refresh detail pane as well if displayed
-  if (currentDetailPane && data){
+  if (currentDetailPane && data) {
     showOrUpdateDetailPane(container, data);
   } else {
     removeDetailPane();
@@ -114,9 +121,6 @@ export function showOrUpdateDetailBar(container: HTMLElement, display?: PortalDa
   container.appendChild(ui);
 }
 
-/**
- * Toggle the portal detail pane.
- */
 export function toggleDetailPane(container: HTMLElement): void {
   if (currentDetailPane) {
     currentDetailPane.remove();
@@ -126,9 +130,6 @@ export function toggleDetailPane(container: HTMLElement): void {
   }
 }
 
-/**
- * Hides the current portal detail pane if it exists.
- */
 export function removeDetailPane(): void {
   if (currentDetailPane) {
     currentDetailPane.remove();
@@ -136,12 +137,6 @@ export function removeDetailPane(): void {
   }
 }
 
-/**
- * Shows the portal detail pane with information about the specified portal.
- *
- * @param data - The data of the portal to display.
- * @param container - The HTML element where the detail pane will be appended.
- */
 export function showOrUpdateDetailPane(container: HTMLElement, data: PortalData): void {
   // Hide any existing portal detail pane before showing the new one
   removeDetailPane();
@@ -314,8 +309,10 @@ export function showOrUpdateDetailPane(container: HTMLElement, data: PortalData)
         <div style={{ alignSelf: "stretch" }}>
           <div style={{
             display: "grid",
-            gridTemplateColumns: "30% 20% 20% 30%",
-            fontSize: "12px"
+            gridTemplateColumns: "1.4fr 1fr 0.3fr 1fr 1.4fr",
+            gridColumnGap: "4px",
+            gridRowGap: "4px",
+            fontSize: "12px",
           }}>
             {(() => {
               const items = [];
@@ -324,16 +321,78 @@ export function showOrUpdateDetailPane(container: HTMLElement, data: PortalData)
                 const r2 = data.resonators?.[i + 1];
                 items.push(
                   <>
-                    <div style={{ textAlign: "left", alignContent: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: teamColorHex }}>{r1?.owner || ""}</div>
-                    <div style={{ padding: "4px", height: "14px", display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{
+                      textAlign: "left",
+                      alignContent: "center",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      color: r2 ? teamColorHex : "#555"
+                    }}>
+                      {r1?.owner || "empty slot"}
+                    </div>
+                    <div style={{
+                      padding: "8px 6px",
+                      height: "16px",
+                      display: "flex",
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      backgroundColor: "#333",
+                      border: r1 ? "1px solid #555" : "1px dashed #444",
+                      borderRadius: "4.2px",
+                    }}>
                       <div style={{ textAlign: "right" }}>{r1 ? "L" + r1.level : ""}</div>
                       <div style={{ textAlign: "right" }}>{r1 ? Math.round(r1.energy / RESO_LEVEL_ENERGY[r1.level] * 100) + "%" : ""}</div>
                     </div>
-                    <div style={{ padding: "4px", height: "14px", display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                  </>
+                );
+                if (i === 0) {
+                  items.push(
+                    <div style={{
+                      padding: "3px",
+                      gridRow: "1 / span 4",
+                      gridColumn: "3",
+                      display: "flex",
+                      flexDirection: "column-reverse",
+                      backgroundColor: "#333",
+                      border: "1px solid #555",
+                      borderRadius: "4.2px",
+                    }}>
+                      <div style={{
+                        height: data.health ? Math.round(data.health / 100 * 100) + "%" : "0%",
+                        backgroundColor: teamColorHex,
+                      }}>
+                      </div>
+                    </div>
+                  )
+                }
+                items.push(
+                  <>
+                    <div style={{
+                      padding: "8px 6px",
+                      height: "16px",
+                      display: "flex",
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      backgroundColor: "#333",
+                      border: r2 ? "1px solid #555" : "1px dashed #444",
+                      borderRadius: "4.2px",
+                    }}>
                       <div style={{ textAlign: "left" }}>{r2 ? Math.round(r2.energy / RESO_LEVEL_ENERGY[r2.level] * 100) + "%" : ""}</div>
                       <div style={{ textAlgin: "left" }}>{r2 ? "L" + r2.level : ""}</div>
                     </div>
-                    <div style={{ textAlign: "right", alignContent: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: teamColorHex }}>{r2?.owner || ""}</div>
+                    <div style={{
+                      textAlign: "right",
+                      alignContent: "center",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      color: r2 ? teamColorHex : "#555"
+                    }}>
+                      {r2?.owner || "empty slot"}
+                    </div>
                   </>
                 );
               }
@@ -362,26 +421,19 @@ export function showOrUpdateDetailPane(container: HTMLElement, data: PortalData)
         {/* Link */}
         <div style={{ alignSelf: "stretch" }}>
           <div style={{
-            borderTop: "1px solid #555",
-            paddingTop: "8px",
+            padding: "8px 0px",
             display: "flex",
             flexDirection: "row",
             alignItems: "center",
             justifyContent: "space-between",
           }}>
-            <a
-              href={`https://intel.ingress.com/?pll=${data.latE6 / 1e6},${data.lngE6 / 1e6}`}
-              target="_blank"
-              style={{ color: "#5091ff", fontSize: "12px", textDecoration: "none" }}
+            <div
+              id="intel-link"
+              onclick={() => copyIntelLink(`https://intel.ingress.com/?pll=${data.latE6 / 1e6},${data.lngE6 / 1e6}`)}
+              style={{ color: "#5091ff", fontSize: "12px", textDecoration: "none", cursor: "pointer" }}
             >
-              Intel Map Link
-            </a>
-            <a
-              onclick={() => removeDetailPane()}
-              style={{ color: "#5091ff", fontSize: "12px", textDecoration: "none", cursor:"pointer" }}
-            >
-              Back
-            </a>
+              Copy intel map link
+            </div>
           </div>
         </div>
       </div>

@@ -210,8 +210,6 @@ function setupClickHandler(viewer: Cesium.Viewer, entityManager: EntityManager, 
       showOrUpdateDetailBar(container);
     }
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
-
-  setupGoogleMapsGestures(viewer);
 }
 
 /**
@@ -480,6 +478,8 @@ export default function loadCesiumViewer(): void {
   addLayerChooser(container, entityManager);
   showOrUpdateDetailBar(container);
   logManager.setCallback((msg: string) => showOrUpdateDetailBar(container, msg));
+
+  setupGoogleMapsGestures(viewer);
   setupClickHandler(viewer, entityManager, container);
   setupDataLoading(viewer, tileManager);
 }
