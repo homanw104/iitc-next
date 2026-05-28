@@ -10,8 +10,10 @@ export enum LogLevel {
   NONE = 4,
 }
 
-class LogManager {
+export class LogManager {
   private level: LogLevel = LogLevel.INFO;
+  private latestMsg = "";
+  private cb = (msg: string) => {};
 
   constructor() {
     // Default to INFO level
@@ -22,29 +24,41 @@ class LogManager {
     this.level = level;
   }
 
+  setCallback(cb: (msg: string) => void) {
+    this.cb = cb;
+  }
+
   debug(tag: string, ...args: unknown[]) {
     if (this.level <= LogLevel.DEBUG) {
       console.log(`[DEBUG][${tag}]`, ...args);
+      this.latestMsg = args[0] as string;
+      this.cb(this.latestMsg);
     }
   }
 
   info(tag: string, ...args: unknown[]) {
     if (this.level <= LogLevel.INFO) {
       console.log(`[INFO][${tag}]`, ...args);
+      this.latestMsg = args[0] as string;
+      this.cb(this.latestMsg);
     }
   }
 
   warn(tag: string, ...args: unknown[]) {
     if (this.level <= LogLevel.WARN) {
       console.warn(`[WARN][${tag}]`, ...args);
+      this.latestMsg = args[0] as string;
+      this.cb(this.latestMsg);
     }
   }
 
   error(tag: string, ...args: unknown[]) {
     if (this.level <= LogLevel.ERROR) {
       console.error(`[ERROR][${tag}]`, ...args);
+      this.latestMsg = args[0] as string;
+      this.cb(this.latestMsg);
     }
   }
 }
 
-export const logger = new LogManager();
+export const logManager = new LogManager();

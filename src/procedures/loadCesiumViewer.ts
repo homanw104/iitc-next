@@ -17,8 +17,8 @@ import {
 } from "../managers/tileManager";
 import { EntityManager } from "../managers/entityManager";
 import { DebugTileManager } from "../managers/debugTileManager";
-import { logger } from "../utils/logger";
-import { hidePortalDetail, showPortalDetail } from "../interface/portalDetail";
+import { logManager } from "../managers/logManager";
+import { showOrUpdateDetailBar } from "../interface/portalDetail";
 
 // Tell Cesium where to find its assets (Images, Workers, etc.)
 // Since we use the CDN for the main library, we should also use it for assets.
@@ -74,9 +74,7 @@ function initCesiumViewer(containerId: string): Cesium.Viewer {
 
   const controller = viewer.scene.screenSpaceCameraController;
   controller.maximumTiltAngle = Cesium.Math.toRadians(35);
-  controller.enableLook = false;
-  // Note: we set up custom double-finger tilt in setupGoogleMapsGestures, 
-  // so we keep the standard mouse/keyboard tilt here.
+
   controller.tiltEventTypes = [
     Cesium.CameraEventType.MIDDLE_DRAG,
     Cesium.CameraEventType.RIGHT_DRAG,
@@ -89,6 +87,10 @@ function initCesiumViewer(containerId: string): Cesium.Viewer {
       modifier: Cesium.KeyboardEventModifier.SHIFT,
     },
   ];
+
+  // Force Cesium to load higher resolution tiles sooner,
+  // which can bypass broken intermediate KTX2 levels on mobile
+  viewer.scene.globe.maximumScreenSpaceError = 1.5;
 
   viewer.scene.logarithmicDepthBuffer = true;
   viewer.scene.globe.showGroundAtmosphere = true;
@@ -143,16 +145,16 @@ function setupClickHandler(viewer: Cesium.Viewer, entityManager: EntityManager, 
       const portalData = entityManager.getPortalData(guid);
       if (portalData) {
         viewer.selectedEntity = entity;
-        showPortalDetail(portalData, container);
+        showOrUpdateDetailBar(container, portalData);
         entityManager.requestPortalDetails(guid).then((freshData) => {
           if (viewer.selectedEntity?.id === `portal-${guid}`) {
-            showPortalDetail(freshData, container);
+            showOrUpdateDetailBar(container, freshData);
           }
         });
       }
     } else {
       viewer.selectedEntity = undefined;
-      hidePortalDetail();
+      showOrUpdateDetailBar(container);
     }
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
@@ -345,7 +347,7 @@ function setupDataLoading(viewer: Cesium.Viewer, tileManager: TileManager): void
         for (let y = minY; y <= maxY; y++) {
           tileKeys.push(generateTileKey(tileParams, x, y));
           if (tileKeys.length >= MAX_TILES_TO_LOAD) {
-            logger.warn("CesiumViewer", "Too many tiles to load, truncating.");
+            logManager.warn("CesiumViewer", "Too many tiles to load, truncating.");
             break;
           }
         }
@@ -380,7 +382,7 @@ function setupDataLoading(viewer: Cesium.Viewer, tileManager: TileManager): void
  * setting up data loading.
  */
 export default function loadCesiumViewer(): void {
-  logger.debug("CesiumViewer", "Loading...");
+  logManager.debug("CesiumViewer", "Loading...");
 
   const container = createCesiumContainer();
   const viewer = initCesiumViewer(container.id);
@@ -392,6 +394,8 @@ export default function loadCesiumViewer(): void {
   new DebugTileManager(tileManager, entityManager);
 
   addLayerChooser(container, entityManager);
+  showOrUpdateDetailBar(container);
+  logManager.setCallback((msg: string) => showOrUpdateDetailBar(container, msg))
   setupClickHandler(viewer, entityManager, container);
   setupDataLoading(viewer, tileManager);
 }

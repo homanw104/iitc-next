@@ -6,7 +6,7 @@ import { apiRequest } from "../utils/network";
 import { FieldData, LinkData, PortalData, RawEntity, TileResponse } from "../types/ingress";
 import { ParsedEntities } from "../types/map";
 import { EntityManager } from "./entityManager";
-import { logger } from "../utils/logger";
+import { logManager } from "./logManager";
 import { parsePortal } from "./portalManager";
 import { parseLink } from "./linkManager";
 import { parseField } from "./fieldManager";
@@ -128,7 +128,7 @@ export class TileManager {
    * @param tileKeys - An array of string keys representing the tiles to be added.
    */
   public addTiles(tileKeys: string[]): void {
-    logger.debug("TileManager", `Adding ${tileKeys.length} tiles to queue`);
+    logManager.debug("TileManager", `Adding ${tileKeys.length} tiles to queue`);
     let skippedCount = 0;
     tileKeys.forEach((key) => {
       if (!this.requestedTiles.has(key) && !this.queuedTiles.has(key)) {
@@ -138,7 +138,7 @@ export class TileManager {
         skippedCount += 1;
       }
     });
-    logger.debug("TileManager", `Skipped ${skippedCount} tiles already in queue or loaded`);
+    logManager.debug("TileManager", `Skipped ${skippedCount} tiles already in queue or loaded`);
     this.processQueue().then();
   }
 
@@ -172,12 +172,12 @@ export class TileManager {
    */
   private async processQueue(): Promise<void> {
     if (this.activeRequestCount >= this.maxRequests) {
-      logger.info("TileManager", `Max request count (${this.maxRequests}) reached`);
+      logManager.info("TileManager", `Max request count (${this.maxRequests}) reached`);
       return;
     }
 
     if (this.queuedTiles.size === 0) {
-      logger.info("TileManager", "Loaded");
+      logManager.info("TileManager", "Loaded");
       return;
     }
 
@@ -191,15 +191,15 @@ export class TileManager {
     const request = new TileRequest(tilesToRequest);
     this.activeRequestCount++;
 
-    logger.debug("TileManager", `Sending request for ${tilesToRequest.length} tiles`);
-    logger.info("TileManager", `Loading ${this.activeRequestCount} request` + ((this.activeRequestCount === 1) ? "" : "s"));
+    logManager.debug("TileManager", `Sending request for ${tilesToRequest.length} tiles`);
+    logManager.info("TileManager", `Loading ${this.activeRequestCount} request` + ((this.activeRequestCount === 1) ? "" : "s"));
 
     try {
       const response = await request.send();
-      logger.debug("TileManager", `Received response for ${tilesToRequest.length} tiles`);
+      logManager.debug("TileManager", `Received response for ${tilesToRequest.length} tiles`);
       this.handleResponse(response, tilesToRequest);
     } catch (error) {
-      logger.error("TileManager", "Tile request failed:", error);
+      logManager.error("TileManager", "Tile request failed:", error);
       tilesToRequest.forEach((key) => {
         this.requestedTiles.delete(key);
         this.setTileStatus(key, "error");
@@ -219,7 +219,7 @@ export class TileManager {
   private handleResponse(response: unknown, tileKeys: string[]): void {
     const data = response as TileResponse;
     if (!data || !data.result) {
-      logger.warn("TileManager", "Invalid response data:", data);
+      logManager.warn("TileManager", "Invalid response data:", data);
       tileKeys.forEach((key) => {
         this.requestedTiles.delete(key);
         this.setTileStatus(key, "error");
@@ -243,7 +243,7 @@ export class TileManager {
         if (tileData.error == "TIMEOUT") {
           this.setTileStatus(tileKey, "loaded");
         } else {
-          logger.warn("TileManager", `Tile ${tileKey} failed: ${tileData.error}`);
+          logManager.warn("TileManager", `Tile ${tileKey} failed: ${tileData.error}`);
           this.setTileStatus(tileKey, "error");
         }
         this.requestedTiles.delete(tileKey);
@@ -265,7 +265,7 @@ export class TileManager {
         fields.forEach((f) => this.entityManager.addOrUpdateField(f));
       }
     }
-    logger.debug("TileManager", `Processed ${entitiesFound} entities and removed ${entitiesRemoved} from ${tileKeys.length} tiles.`);
+    logManager.debug("TileManager", `Processed ${entitiesFound} entities and removed ${entitiesRemoved} from ${tileKeys.length} tiles.`);
 
     if (entitiesFound > 0 || entitiesRemoved > 0) {
       this.entityManager.requestRender();

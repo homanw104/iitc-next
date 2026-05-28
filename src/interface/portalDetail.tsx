@@ -6,15 +6,133 @@ import { RESO_LEVEL_ENERGY, PortalData } from "../types/ingress";
 import { h, Fragment } from "../utils/dom";
 import { getTeamColor } from "../utils/color";
 
-let currentPane: HTMLElement | null = null;
+let currentDetailBar: HTMLElement | null = null;
+let currentDetailPane: HTMLElement | null = null;
+let previousPortalData: PortalData | null = null;
+let previousMsg: string | null = null;
+
+/**
+ * Remove the portal detail bar if it exists.
+ */
+export function removeDetailBar(): void {
+  if (currentDetailBar) {
+    currentDetailBar.remove();
+    currentDetailBar = null;
+  }
+}
+
+/**
+ * Add the portal detail bar to a specified element.
+ */
+export function showOrUpdateDetailBar(container: HTMLElement, display?: PortalData | string): void {
+  removeDetailBar();
+
+  // Clear previous portal data if no display object is presented
+  if (!display) {
+    previousPortalData = null;
+    display = previousMsg || "Loading...";
+  }
+
+  // Previous portal data takes precedence of the current message
+  if (typeof display === "string" && previousPortalData) {
+    display = previousPortalData;
+  }
+
+  // Update previous data
+  if (typeof display === "string") {
+    previousMsg = display;
+  } else {
+    previousPortalData = display;
+  }
+
+  // Parse display
+  const data = typeof display !== "string" ? display : undefined;
+  const msg = typeof display === "string" ? display : undefined;
+
+  // Refresh detail pane as well if displayed
+  if (currentDetailPane && data){
+    showOrUpdateDetailPane(container, data);
+  } else {
+    removeDetailPane();
+  }
+
+  // Get team color
+  let teamColorHex = "rgb(68, 68, 68)";
+  if (data) teamColorHex = getTeamColor(data.team).toCssColorString();
+
+  const ui = (
+    <div
+      ref={(el: HTMLElement) => (currentDetailBar = el)}
+      style={{
+      position: "absolute",
+      left: "5px",
+      top: "5px",
+      bottom: "5px",
+      right: "5px",
+      margin: "3px",
+      display: "flex",
+      flexDirection: "column-reverse",
+      alignItems: "flex-start",
+      justifyContent: "flex-start",
+      pointerEvents: "none",
+    }}>
+      <div
+        onclick={() => {
+          if (data) toggleDetailPane(container);
+        }}
+        style={{
+          height: "30px",
+          width: "400px",
+          maxWidth: "calc(100% - 24px - 48px)",
+          paddingLeft: "12px",
+          paddingRight: "12px",
+          fontSize: "14px",
+          zIndex: "10018",
+          backgroundColor: "rgba(42, 42, 42, 0.9)",
+          color: "white",
+          fontFamily: "sans-serif",
+          borderRadius: "4.2px",
+          border: `1px solid ${teamColorHex}`,
+          display: "flex",
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          pointerEvents: "auto",
+          cursor: "pointer",
+        }}
+      >
+        <div>
+          {data && data.title || msg || "Loading portal..." }
+        </div>
+        <div>
+          {data && data.level && "L" + data.level || ""}
+        </div>
+      </div>
+    </div>
+  ) as HTMLElement;
+
+  container.appendChild(ui);
+}
+
+/**
+ * Toggle the portal detail pane.
+ */
+export function toggleDetailPane(container: HTMLElement): void {
+  if (currentDetailPane) {
+    currentDetailPane.remove();
+    currentDetailPane = null;
+  } else if (previousPortalData) {
+    showOrUpdateDetailPane(container, previousPortalData);
+  }
+}
 
 /**
  * Hides the current portal detail pane if it exists.
  */
-export function hidePortalDetail(): void {
-  if (currentPane) {
-    currentPane.remove();
-    currentPane = null;
+export function removeDetailPane(): void {
+  if (currentDetailPane) {
+    currentDetailPane.remove();
+    currentDetailPane = null;
   }
 }
 
@@ -24,15 +142,17 @@ export function hidePortalDetail(): void {
  * @param data - The data of the portal to display.
  * @param container - The HTML element where the detail pane will be appended.
  */
-export function showPortalDetail(data: PortalData, container: HTMLElement): void {
+export function showOrUpdateDetailPane(container: HTMLElement, data: PortalData): void {
   // Hide any existing portal detail pane before showing the new one
-  hidePortalDetail();
+  removeDetailPane();
 
   const teamColor = getTeamColor(data.team);
   const teamColorHex = teamColor.toCssColorString();
 
   const ui = (
-    <div style={{
+    <div
+      ref={(el: HTMLElement) => (currentDetailPane = el)}
+      style={{
       position: "absolute",
       left: "5px",
       top: "5px",
@@ -46,7 +166,6 @@ export function showPortalDetail(data: PortalData, container: HTMLElement): void
       pointerEvents: "none",
     }}>
       <div
-        ref={(el: HTMLElement) => (currentPane = el)}
         unselectable={true}
         no-scroll-bar={true}
         style={{
@@ -259,7 +378,7 @@ export function showPortalDetail(data: PortalData, container: HTMLElement): void
               Intel Map Link
             </a>
             <a
-              onclick={() => hidePortalDetail()}
+              onclick={() => removeDetailPane()}
               style={{ color: "#5091ff", fontSize: "12px", textDecoration: "none", cursor:"pointer" }}
             >
               Back
