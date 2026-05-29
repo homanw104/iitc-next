@@ -9,7 +9,7 @@ export function addRefreshButton(container: HTMLElement, onclick: () => void): v
       style={{
         position: "absolute",
         bottom: "5px",
-        right: "44px",
+        right: "81px",
         zIndex: "10012",
         display: "flex",
         flexDirection: "column-reverse",

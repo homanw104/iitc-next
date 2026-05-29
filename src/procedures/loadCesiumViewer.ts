@@ -15,13 +15,15 @@ import {
   lngToTileIndex,
   TileManager
 } from "../managers/tileManager";
+import { logManager } from "../managers/logManager";
 import { EntityManager } from "../managers/entityManager";
 import { DebugTileEntityManager } from "../managers/debugTileEntityManager";
-import { logManager } from "../managers/logManager";
 import { showOrUpdateDetailBar } from "../interface/portalDetail";
 import { addRefreshButton } from "../interface/refreshButton";
 import { addGameDetailButton } from "../interface/gameDetail";
+import { addCommDetailButton } from "../interface/commDetail";
 import { AmapMercatorTilingScheme } from "../utils/map";
+import { CommManager } from "../managers/commManager";
 import { ScoreManager } from "../managers/scoreManager";
 import { RedeemManager } from "../managers/redeemManager";
 
@@ -479,9 +481,12 @@ export default function loadCesiumViewer(): void {
 
   const scoreManager = new ScoreManager();
   const redeemManager = new RedeemManager();
+  const commManager = new CommManager(viewer);
 
   addRefreshButton(container, () => triggerDataReload(viewer, tileManager));
   addGameDetailButton(container, scoreManager, redeemManager);
+  addCommDetailButton(viewer, container, commManager);
+
   addLayerChooser(container, entityManager);
   showOrUpdateDetailBar(container);
   logManager.setCallback((msg: string) => showOrUpdateDetailBar(container, msg));

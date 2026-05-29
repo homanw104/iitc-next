@@ -129,7 +129,7 @@ function showGameDetailPane(container: HTMLElement, scoreManager: ScoreManager, 
         </div>
 
         {/* Redeem */}
-        <div style={{ marginTop: "10px" }}>Redeem Code</div>
+        <div style={{ marginTop: "20px" }}>Redeem Code</div>
         <div style={{ display: "flex", gap: "5px" }}>
           <input
             id="redeem-input"

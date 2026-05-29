@@ -80,7 +80,7 @@ export function showOrUpdateDetailBar(container: HTMLElement, display?: PortalDa
         margin: "2px 3px",
         height: "30px",
         width: "400px",
-        maxWidth: "calc(100% - 16px - 24px - 80px)",
+        maxWidth: "calc(100% - 18px - 24px - 114px)",
         paddingLeft: "12px",
         paddingRight: "12px",
         fontSize: "14px",

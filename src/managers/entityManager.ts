@@ -8,8 +8,8 @@ import { LayerManager } from "./layerManager";
 import { PortalEntityManager } from "./portalEntityManager";
 import { LinkEntityManager } from "./linkEntityManager";
 import { FieldEntityManager } from "./fieldEntityManager";
-import { PortalHistoryManager } from "./portalHistoryManager";
-import { ScoutControlHistoryManager } from "./scoutControlHistoryManager";
+import { PortalHistoryEntityManager } from "./portalHistoryEntityManager";
+import { ScoutHistoryEntityManager } from "./scoutHistoryEntityManager";
 
 /**
  * Manages game entities and their Cesium representations.
@@ -21,8 +21,8 @@ export class EntityManager {
   public readonly portalManager: PortalEntityManager;
   public readonly linkManager: LinkEntityManager;
   public readonly fieldManager: FieldEntityManager;
-  public readonly historyManager: PortalHistoryManager;
-  public readonly scoutControlHistoryManager: ScoutControlHistoryManager;
+  public readonly historyManager: PortalHistoryEntityManager;
+  public readonly scoutControlHistoryManager: ScoutHistoryEntityManager;
 
   private filterState: Map<string, boolean> = new Map();
 
@@ -32,8 +32,8 @@ export class EntityManager {
     this.portalManager = new PortalEntityManager(this.layerManager);
     this.linkManager = new LinkEntityManager(this.layerManager, this.portalManager);
     this.fieldManager = new FieldEntityManager(this.layerManager, this.portalManager);
-    this.historyManager = new PortalHistoryManager(this.layerManager);
-    this.scoutControlHistoryManager = new ScoutControlHistoryManager(this.layerManager);
+    this.historyManager = new PortalHistoryEntityManager(this.layerManager);
+    this.scoutControlHistoryManager = new ScoutHistoryEntityManager(this.layerManager);
 
     TEAMS.forEach(t => this.filterState.set(`team-${t.toLowerCase()}`, true));
     PORTAL_LEVELS.forEach(l => this.filterState.set(`level-${l}`, true));

@@ -6,7 +6,7 @@ import * as Cesium from "cesium";
 import { PortalData } from "../types/ingress";
 import { LayerManager } from "./layerManager";
 
-export class ScoutControlHistoryManager {
+export class ScoutHistoryEntityManager {
 
   constructor(private layerManager: LayerManager) {}
 
