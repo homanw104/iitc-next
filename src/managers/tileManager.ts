@@ -7,9 +7,9 @@ import { FieldData, LinkData, PortalData, RawEntity, TileResponse } from "../typ
 import { ParsedEntities } from "../types/map";
 import { EntityManager } from "./entityManager";
 import { logManager } from "./logManager";
-import { parsePortal } from "./portalManager";
-import { parseLink } from "./linkManager";
-import { parseField } from "./fieldManager";
+import { parsePortal } from "./portalEntityManager";
+import { parseLink } from "./linkEntityManager";
+import { parseField } from "./fieldEntityManager";
 
 /**
  * Defines the number of tiles per edge to zoom into at each level of detail.
@@ -154,6 +154,7 @@ export class TileManager {
     });
     this.processQueue().then();
   }
+
   /**
    * Registers a callback to be notified when a tile's status changes.
    *
@@ -204,7 +205,11 @@ export class TileManager {
     this.activeRequestCount++;
 
     logManager.debug("TileManager", `Sending request for ${tilesToRequest.length} tiles`);
-    logManager.info("TileManager", `Loading ${this.activeRequestCount} request` + ((this.activeRequestCount === 1) ? "" : "s"));
+    const size = this.queuedTiles.size + tilesToRequest.length;
+    logManager.info(
+      "TileManager",
+      `Loading ${size} tile${size === 1 ? "" : "s"}`
+    );
 
     try {
       const response = await request.send();

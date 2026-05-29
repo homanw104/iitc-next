@@ -11,7 +11,7 @@ import { EntityManager } from "./entityManager";
  * Manages the visualization of tiles for debugging purposes.
  * It shows rectangles on the map representing the tiles being loaded.
  */
-export class DebugTileManager {
+export class DebugTileEntityManager {
   private tileManager: TileManager;
   private entityManager: EntityManager;
   private tileEntities: Map<string, Cesium.Entity> = new Map();

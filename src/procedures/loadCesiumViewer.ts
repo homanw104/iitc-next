@@ -16,11 +16,14 @@ import {
   TileManager
 } from "../managers/tileManager";
 import { EntityManager } from "../managers/entityManager";
-import { DebugTileManager } from "../managers/debugTileManager";
+import { DebugTileEntityManager } from "../managers/debugTileEntityManager";
 import { logManager } from "../managers/logManager";
 import { showOrUpdateDetailBar } from "../interface/portalDetail";
 import { addRefreshButton } from "../interface/refreshButton";
+import { addGameDetailButton } from "../interface/gameDetail";
 import { AmapMercatorTilingScheme } from "../utils/map";
+import { ScoreManager } from "../managers/scoreManager";
+import { RedeemManager } from "../managers/redeemManager";
 
 // Tell Cesium where to find its assets (Images, Workers, etc.)
 // Since we use the CDN for the main library, we should also use it for assets.
@@ -472,9 +475,13 @@ export default function loadCesiumViewer(): void {
 
   const entityManager = new EntityManager(viewer);
   const tileManager = new TileManager(entityManager);
-  new DebugTileManager(tileManager, entityManager);
+  new DebugTileEntityManager(tileManager, entityManager);
+
+  const scoreManager = new ScoreManager();
+  const redeemManager = new RedeemManager();
 
   addRefreshButton(container, () => triggerDataReload(viewer, tileManager));
+  addGameDetailButton(container, scoreManager, redeemManager);
   addLayerChooser(container, entityManager);
   showOrUpdateDetailBar(container);
   logManager.setCallback((msg: string) => showOrUpdateDetailBar(container, msg));

@@ -2,12 +2,12 @@ import * as Cesium from "cesium";
 import { FieldData, RawEntity } from "../types/ingress";
 import { getTeamColor } from "../utils/color";
 import { LayerManager } from "./layerManager";
-import { PortalManager } from "./portalManager";
+import { PortalEntityManager } from "./portalEntityManager";
 
-export class FieldManager {
+export class FieldEntityManager {
   private fields: Map<string, { data: FieldData; entity: Cesium.Entity }> = new Map();
 
-  constructor(private layerManager: LayerManager, private portalManager: PortalManager) {}
+  constructor(private layerManager: LayerManager, private portalManager: PortalEntityManager) {}
 
   public addOrUpdateField(data: FieldData): Cesium.Entity {
     data.points.forEach((p) => {

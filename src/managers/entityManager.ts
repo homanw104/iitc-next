@@ -5,10 +5,10 @@
 import * as Cesium from "cesium";
 import { PortalData, LinkData, FieldData, TEAMS, PORTAL_LEVELS } from "../types/ingress";
 import { LayerManager } from "./layerManager";
-import { PortalManager } from "./portalManager";
-import { LinkManager } from "./linkManager";
-import { FieldManager } from "./fieldManager";
-import { HistoryManager } from "./historyManager";
+import { PortalEntityManager } from "./portalEntityManager";
+import { LinkEntityManager } from "./linkEntityManager";
+import { FieldEntityManager } from "./fieldEntityManager";
+import { PortalHistoryManager } from "./portalHistoryManager";
 import { ScoutControlHistoryManager } from "./scoutControlHistoryManager";
 
 /**
@@ -18,10 +18,10 @@ export class EntityManager {
   private viewer: Cesium.Viewer;
 
   public readonly layerManager: LayerManager;
-  public readonly portalManager: PortalManager;
-  public readonly linkManager: LinkManager;
-  public readonly fieldManager: FieldManager;
-  public readonly historyManager: HistoryManager;
+  public readonly portalManager: PortalEntityManager;
+  public readonly linkManager: LinkEntityManager;
+  public readonly fieldManager: FieldEntityManager;
+  public readonly historyManager: PortalHistoryManager;
   public readonly scoutControlHistoryManager: ScoutControlHistoryManager;
 
   private filterState: Map<string, boolean> = new Map();
@@ -29,10 +29,10 @@ export class EntityManager {
   constructor(viewer: Cesium.Viewer) {
     this.viewer = viewer;
     this.layerManager = new LayerManager(viewer);
-    this.portalManager = new PortalManager(this.layerManager);
-    this.linkManager = new LinkManager(this.layerManager, this.portalManager);
-    this.fieldManager = new FieldManager(this.layerManager, this.portalManager);
-    this.historyManager = new HistoryManager(this.layerManager);
+    this.portalManager = new PortalEntityManager(this.layerManager);
+    this.linkManager = new LinkEntityManager(this.layerManager, this.portalManager);
+    this.fieldManager = new FieldEntityManager(this.layerManager, this.portalManager);
+    this.historyManager = new PortalHistoryManager(this.layerManager);
     this.scoutControlHistoryManager = new ScoutControlHistoryManager(this.layerManager);
 
     TEAMS.forEach(t => this.filterState.set(`team-${t.toLowerCase()}`, true));

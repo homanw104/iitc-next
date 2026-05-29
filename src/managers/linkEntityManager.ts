@@ -2,12 +2,12 @@ import * as Cesium from "cesium";
 import { LinkData, RawEntity } from "../types/ingress";
 import { getTeamColor } from "../utils/color";
 import { LayerManager } from "./layerManager";
-import { PortalManager } from "./portalManager";
+import { PortalEntityManager } from "./portalEntityManager";
 
-export class LinkManager {
+export class LinkEntityManager {
   private links: Map<string, { data: LinkData; entity: Cesium.Entity }> = new Map();
 
-  constructor(private layerManager: LayerManager, private portalManager: PortalManager) {}
+  constructor(private layerManager: LayerManager, private portalManager: PortalEntityManager) {}
 
   public addOrUpdateLink(data: LinkData): Cesium.Entity {
     this.portalManager.createPortalPlaceholderEntity(data.oGuid, data.team, data.oLatE6, data.oLngE6);

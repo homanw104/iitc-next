@@ -73,13 +73,14 @@ export interface FieldData {
 
 export interface Player {
   ap: string;
-  available_invites: number;
+  availableInvites: number;
   energy: number;
-  min_ap_for_current_level: number;
-  min_ap_for_next_level: number;
+  minApForCurrentLevel: number;
+  minApForNextLevel: number;
   nickname: string;
   team: Team;
-  verified_level: number;
+  verifiedLevel: number;
+  xmCapacity: string;
 }
 
 export type RawEntity = [

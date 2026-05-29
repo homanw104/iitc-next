@@ -31,7 +31,7 @@ export class PortalRequest {
   }
 }
 
-export class PortalManager {
+export class PortalEntityManager {
   private portals: Map<string, { data: PortalData; entity: Cesium.Entity }> = new Map();
 
   constructor(private layerManager: LayerManager) {}
