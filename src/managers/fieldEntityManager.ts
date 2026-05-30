@@ -51,6 +51,10 @@ export class FieldEntityManager {
     return false;
   }
 
+  public removeFieldInView(viewRect: Cesium.Rectangle): void {
+    this.removeFieldEntityInView(viewRect);
+  }
+
   private createFieldEntity(data: FieldData): Cesium.Entity {
     const layerId = getFieldLayerId(data);
     const points = data.points.flatMap(p => [p.lngE6 / 1e6, p.latE6 / 1e6]);
@@ -64,6 +68,24 @@ export class FieldEntityManager {
     });
     (entity as any).selectable = false;
     return entity;
+  }
+
+  private removeFieldEntityInView(viewRect: Cesium.Rectangle): void {
+    const toRemove: string[] = [];
+    this.fields.forEach((info, guid) => {
+      if (info.entity.polygon && info.entity.polygon.hierarchy) {
+        const hierarchy = info.entity.polygon.hierarchy.getValue(Cesium.JulianDate.now()) as Cesium.PolygonHierarchy;
+        if (hierarchy && hierarchy.positions && hierarchy.positions.length > 0) {
+          const cartographics = hierarchy.positions.map(p => Cesium.Cartographic.fromCartesian(p));
+          const fieldRect = Cesium.Rectangle.fromCartographicArray(cartographics);
+          if (Cesium.Rectangle.intersection(viewRect, fieldRect)) {
+            toRemove.push(guid);
+          }
+        }
+      }
+    });
+
+    toRemove.forEach(guid => this.removeField(guid));
   }
 
   private updateFieldEntity(entity: Cesium.Entity, data: FieldData): void {

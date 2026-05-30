@@ -66,6 +66,10 @@ export class PortalEntityManager {
     this.removePortalEntity(guid);
   }
 
+  public removePortalInView(viewRect: Cesium.Rectangle): void {
+    this.removePortalEntityInView(viewRect);
+  }
+
   public async requestPortalDetails(guid: string): Promise<Cesium.Entity | undefined> {
     const request = new PortalRequest(guid);
     const response = await request.send();
@@ -112,6 +116,20 @@ export class PortalEntityManager {
       this.layerManager.getOrCreateSource(layerId).entities.remove(portalInfo.entity);
       this.portals.delete(guid);
     }
+  }
+  
+  private removePortalEntityInView(viewRect: Cesium.Rectangle): void {
+    const toRemove: string[] = [];
+    this.portals.forEach((info, guid) => {
+      const position = info.entity.position?.getValue(Cesium.JulianDate.now());
+      if (position) {
+        const cartographic = Cesium.Cartographic.fromCartesian(position);
+        if (Cesium.Rectangle.contains(viewRect, cartographic)) {
+          toRemove.push(guid);
+        }
+      }
+    });
+    toRemove.forEach(guid => this.removePortalEntity(guid));
   }
 
   private updatePortalEntity(entity: Cesium.Entity, data: PortalData): void {

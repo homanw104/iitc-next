@@ -102,4 +102,31 @@ export class PortalHistoryEntityManager {
     this.layerManager.getOrCreateSource("history-visited-captured").entities.removeById(historyHaloId);
     this.layerManager.getOrCreateSource("history-visited-captured-reverse").entities.removeById(historyHaloIdReverse);
   }
+
+  public removeHistoryHaloInView(viewRect: Cesium.Rectangle): void {
+    const source = this.layerManager.getOrCreateSource("history-visited-captured");
+    const sourceReverse = this.layerManager.getOrCreateSource("history-visited-captured-reverse");
+    source.entities.values.forEach(entity => {
+      if (entity.position) {
+        const position = entity.position.getValue(Cesium.JulianDate.now());
+        if (position) {
+          const cartographic = Cesium.Cartographic.fromCartesian(position);
+          if (Cesium.Rectangle.contains(viewRect, cartographic)) {
+            source.entities.remove(entity);
+          }
+        }
+      }
+    });
+    sourceReverse.entities.values.forEach(entity => {
+      if (entity.position) {
+        const position = entity.position.getValue(Cesium.JulianDate.now());
+        if (position) {
+          const cartographic = Cesium.Cartographic.fromCartesian(position);
+          if (Cesium.Rectangle.contains(viewRect, cartographic)) {
+            sourceReverse.entities.remove(entity);
+          }
+        }
+      }
+    });
+  }
 }

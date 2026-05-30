@@ -245,7 +245,7 @@ export class TileManager {
     }
 
     let entitiesFound = 0;
-    let entitiesRemoved = 0;
+
     for (const tileKey of tileKeys) {
       const tileData = data.result.map[tileKey];
       if (!tileData) {
@@ -277,11 +277,10 @@ export class TileManager {
         fields.forEach((f) => this.entityManager.addOrUpdateField(f));
       }
     }
-    logManager.debug("TileManager", `Processed ${entitiesFound} entities`);
 
-    if (entitiesFound > 0 || entitiesRemoved > 0) {
-      this.entityManager.requestRender();
-    }
+    logManager.debug("TileManager", `Processed ${entitiesFound} entities`);
+    logManager.debug("TileManager", "Request render");
+    this.entityManager.requestRender();
   }
 }
 

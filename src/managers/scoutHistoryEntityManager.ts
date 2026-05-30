@@ -63,4 +63,31 @@ export class ScoutHistoryEntityManager {
     this.layerManager.getOrCreateSource("history-scout-control").entities.removeById(scoutHaloId);
     this.layerManager.getOrCreateSource("history-scout-control-reverse").entities.removeById(scoutHaloIdReverse);
   }
+
+  public removeScoutControlHaloInView(viewRect: Cesium.Rectangle): void {
+    const source = this.layerManager.getOrCreateSource("history-scout-control");
+    const sourceReverse = this.layerManager.getOrCreateSource("history-scout-control-reverse");
+    source.entities.values.forEach(entity => {
+      if (entity.position) {
+        const position = entity.position.getValue(Cesium.JulianDate.now());
+        if (position) {
+          const cartographic = Cesium.Cartographic.fromCartesian(position);
+          if (Cesium.Rectangle.contains(viewRect, cartographic)) {
+            source.entities.remove(entity);
+          }
+        }
+      }
+    });
+    sourceReverse.entities.values.forEach(entity => {
+      if (entity.position) {
+        const position = entity.position.getValue(Cesium.JulianDate.now());
+        if (position) {
+          const cartographic = Cesium.Cartographic.fromCartesian(position);
+          if (Cesium.Rectangle.contains(viewRect, cartographic)) {
+            sourceReverse.entities.remove(entity);
+          }
+        }
+      }
+    });
+  }
 }

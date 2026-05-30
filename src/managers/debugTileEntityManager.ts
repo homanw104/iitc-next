@@ -6,6 +6,7 @@
 import * as Cesium from "cesium";
 import { TileManager, TileStatus, getMapZoomTileParameters, tileToLat, tileToLng } from "./tileManager";
 import { EntityManager } from "./entityManager";
+import { logManager } from "./logManager";
 
 /**
  * Manages the visualization of tiles for debugging purposes.
@@ -45,6 +46,7 @@ export class DebugTileEntityManager {
         this.updateEntity(entity, status); // Handle immediate removal if status is already loaded/error
       }
     }
+    logManager.debug("DebugTileEntityManager", "Request render");
     this.entityManager.requestRender();
   }
 
@@ -134,8 +136,9 @@ export class DebugTileEntityManager {
             break;
           }
         }
+        logManager.debug("DebugTileEntityManager", "Request render");
         this.entityManager.requestRender();
-      }, 3000);
+      }, 2000);
     }
   }
 

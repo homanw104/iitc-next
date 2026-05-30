@@ -81,6 +81,17 @@ export class EntityManager {
     this.fieldManager.removeField(guid);
   }
 
+  public removeGameEntitiesInView(): void {
+    const viewRect = this.viewer.camera.computeViewRectangle(this.viewer.scene.globe.ellipsoid);
+    if (!viewRect) return;
+
+    this.portalManager.removePortalInView(viewRect);
+    this.historyManager.removeHistoryHaloInView(viewRect);
+    this.scoutControlHistoryManager.removeScoutControlHaloInView(viewRect);
+    this.linkManager.removeLinkInView(viewRect);
+    this.fieldManager.removeFieldInView(viewRect);
+  }
+
   public async requestPortalDetails(guid: string): Promise<void> {
     await this.portalManager.requestPortalDetails(guid);
     const portalData = this.portalManager.getPortalData(guid);
@@ -150,16 +161,20 @@ export class EntityManager {
     // History
     const historyVisible = this.filterState.get("history") !== false;
     this.layerManager.setLayerVisible("history-visited-captured", historyVisible);
+
+    // History Reverse
     const historyReverseVisible = this.filterState.get("history-reverse") !== false;
     this.layerManager.setLayerVisible("history-visited-captured-reverse", historyReverseVisible);
 
     // Scout Control History
     const scoutControlVisible = this.filterState.get("scout-control") !== false;
     this.layerManager.setLayerVisible("history-scout-control", scoutControlVisible);
+
+    // Scout Control Reverse
     const scoutControlReverseVisible = this.filterState.get("scout-control-reverse") !== false;
     this.layerManager.setLayerVisible("history-scout-control-reverse", scoutControlReverseVisible);
 
-    // Debug
+    // Debug tiles
     const debugTilesVisible = this.filterState.get("debug-tiles") !== false;
     this.layerManager.setLayerVisible("debug-tiles", debugTilesVisible);
 

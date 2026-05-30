@@ -439,65 +439,6 @@ function calculateTileKeys(viewer: Cesium.Viewer): string[] {
 }
 
 /**
- * Remove all entities that are inside the current viewport.
- *
- * @param viewer - Viewer to get the entities.
- * @param entityManager - Manager to delete the entities.
- */
-function removeEntitiesInView(viewer: Cesium.Viewer, entityManager: EntityManager): void {
-  // 1. Get the frustum and compute the culling volume
-  const camera = viewer.camera;
-  const cullingVolume = camera.frustum.computeCullingVolume(
-    camera.position,
-    camera.direction,
-    camera.up
-  );
-
-  const visibleEntities: Cesium.Entity[] = [];
-
-  // 2. Iterate through all entities
-  viewer.entities.values.forEach((entity) => {
-    // 3. Get the entity's bounding sphere
-    let boundingSphere = new Cesium.BoundingSphere();
-    // Cast as any to bypass the missing type declaration
-    const display = viewer.dataSourceDisplay as any;
-    const isBoundingSphereValid = display.getBoundingSphere(
-      entity,
-      false,
-      boundingSphere
-    );
-    console.log(isBoundingSphereValid);
-
-    // 4. Test if it is inside the view frustum
-    if (isBoundingSphereValid) {
-      const intersection = cullingVolume.computeVisibility(boundingSphere);
-
-      // INTERSECTING (0) or INSIDE (1)
-      if (intersection !== Cesium.Intersect.OUTSIDE) {
-        visibleEntities.push(entity);
-        console.log("CesiumViewer", entity);
-      }
-    }
-  });
-
-  visibleEntities.forEach((entity) => {
-    let guid: string;
-    if (entity.id.startsWith("portal-")) {
-      guid = entity.id.substring(7);
-      entityManager.removePortal(guid);
-    }
-    if (entity.id.startsWith("link-")) {
-      guid = entity.id.substring(5);
-      entityManager.removeLink(guid);
-    }
-    if (entity.id.startsWith("field-")) {
-      guid = entity.id.substring(6);
-      entityManager.removeField(guid);
-    }
-  })
-}
-
-/**
  * Trigger reloading of tiles.
  *
  * @param viewer - Cesium viewer to calculate view range.
@@ -507,7 +448,7 @@ function removeEntitiesInView(viewer: Cesium.Viewer, entityManager: EntityManage
 function triggerDataReload(viewer: Cesium.Viewer, entityManager: EntityManager, tileManager: TileManager): void {
   const tileKeys = calculateTileKeys(viewer);
 
-  removeEntitiesInView(viewer, entityManager);
+  entityManager.removeGameEntitiesInView();
 
   if (tileKeys.length > 0) {
     tileManager.removeTiles(tileKeys);

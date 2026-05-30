@@ -57,6 +57,10 @@ export class LinkEntityManager {
     return false;
   }
 
+  public removeLinkInView(viewRect: Cesium.Rectangle): void {
+    this.removeLinkEntityInView(viewRect);
+  }
+
   private createLinkEntity(data: LinkData): Cesium.Entity {
     const layerId = getLinkLayerId(data);
     const entity = this.layerManager.getOrCreateSource(layerId).entities.add({
@@ -73,6 +77,25 @@ export class LinkEntityManager {
     });
     (entity as any).selectable = false;
     return entity;
+  }
+
+  private removeLinkEntityInView(viewRect: Cesium.Rectangle): void {
+    const toRemove: string[] = [];
+    this.links.forEach((info, guid) => {
+      if (info.entity.polyline && info.entity.polyline.positions) {
+        const positions = info.entity.polyline.positions.getValue(Cesium.JulianDate.now()) as Cesium.Cartesian3[];
+        if (positions && positions.length > 1) {
+          const carto1 = Cesium.Cartographic.fromCartesian(positions[0]);
+          const carto2 = Cesium.Cartographic.fromCartesian(positions[1]);
+          const linkRect = Cesium.Rectangle.fromCartographicArray([carto1, carto2]);
+          if (Cesium.Rectangle.intersection(viewRect, linkRect)) {
+            toRemove.push(guid);
+          }
+        }
+      }
+    });
+
+    toRemove.forEach(guid => this.removeLink(guid));
   }
 
   private updateLinkEntity(entity: Cesium.Entity, data: LinkData): void {
