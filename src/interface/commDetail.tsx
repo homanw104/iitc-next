@@ -281,6 +281,10 @@ class CommUI {
   }
 
   private closePane(): void {
+    if (this.messageDivs) {
+      this.previousScrollTop = this.messageDivs.scrollTop;
+      this.previousScrollHeight = this.messageDivs.scrollHeight;
+    }
     if (this.pane) {
       this.pane.remove();
       this.pane = null;
@@ -297,16 +301,17 @@ class CommUI {
     this.pane = this.createPaneEl();
     this.container.appendChild(this.pane);
     const messages = this.commManager.getMessages(this.currentChannel);
-    if (messages.length === 0) {
-      this.refreshData().then(() => this.renderPane());
-    }
+    if (messages.length === 0) this.refreshData().then(() => this.renderPane());
+    if (this.messageDivs) this.messageDivs.scrollTop = this.previousScrollTop;
   }
 
   private renderPane(): void {
     if (!this.pane) return;
 
-    this.previousScrollHeight = this.messageDivs?.scrollHeight || 0;
-    this.previousScrollTop = this.messageDivs?.scrollTop || 0;
+    if (this.messageDivs) {
+      this.previousScrollTop = this.messageDivs.scrollTop;
+      this.previousScrollHeight = this.messageDivs.scrollHeight;
+    }
 
     const isAtBottom = this.messageDivs
       ? this.previousScrollTop + this.messageDivs.clientHeight >= this.previousScrollHeight - 20
