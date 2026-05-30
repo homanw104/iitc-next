@@ -98,7 +98,11 @@ export function showOrUpdateDetailBar(container: HTMLElement, display?: PortalDa
         cursor: "pointer",
       }}
     >
-      <div>
+      <div style={{
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
+      }}>
         {data && data.title || msg || "Loading portal..." }
       </div>
       <div>
@@ -166,7 +170,17 @@ export function showOrUpdateDetailPane(container: HTMLElement, data: PortalData)
       <div style={{ alignSelf: "stretch" }}>
         <div style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display:"flex", flexDirection: "column", alignItems: "flex-start", justifyContent: "flex-start", gap: "8px"}}>
-            <div style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "flex-start", height: "24px", fontSize: "16px" }}>
+            <div style={{
+              display: "flex",
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "flex-start",
+              height: "24px",
+              fontSize: "16px",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}>
               {data.title || "Loading..."}
             </div>
             <div style={{ display:"flex", flexDirection: "row", alignItems: "center", justifyContent: "flex-start", gap: "8px" }}>
