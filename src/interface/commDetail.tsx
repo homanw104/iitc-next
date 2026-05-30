@@ -3,6 +3,7 @@ import { Viewer } from "cesium";
 import { h } from "../utils/dom";
 import { getTeamColor } from "../utils/color";
 import { CommManager, Plext } from "../managers/commManager";
+import { logManager } from "../managers/logManager";
 
 type Channel = "all" | "faction" | "alerts";
 
@@ -91,8 +92,10 @@ const CommTab = ({ id, label, isActive, onClick }: {
   </button>
 );
 
-const CommLoading = () => (
-  <div style={{ marginBottom: "8px", display: "flex", flexDirection: "row" }}>
+const CommLoading = ({ onRef }: {
+  onRef: (el: HTMLElement) => void;
+}) => (
+  <div ref={onRef} style={{ marginBottom: "8px", display: "flex", flexDirection: "row" }}>
     <div style={{ fontSize: "14px", paddingBottom: "2px", color: "rgba(214, 254, 250, 0.5)" }}>Loading...</div>
   </div>
 );
@@ -133,7 +136,8 @@ const CommPane = ({
   isFetching,
   onTabClick,
   onRefresh,
-  onMessageListRef,
+  onLoadingDivRef,
+  onMessageDivsRef,
   onFetchLatestBtnRef,
   onScroll,
 }: {
@@ -143,7 +147,8 @@ const CommPane = ({
   isFetching: boolean;
   onTabClick: (tab: Channel) => void;
   onRefresh: () => void;
-  onMessageListRef: (el: HTMLElement) => void;
+  onLoadingDivRef: (el: HTMLElement) => void;
+  onMessageDivsRef: (el: HTMLElement) => void;
   onFetchLatestBtnRef: (el: HTMLElement) => void;
   onScroll: (e: Event) => void;
 }) => {
@@ -196,11 +201,11 @@ const CommPane = ({
         ))}
       </div>
       <div
-        ref={onMessageListRef}
+        ref={onMessageDivsRef}
         onScroll={onScroll}
         style={{ flex: 1, overflowY: "auto", paddingRight: "5px", position: "relative" }}
       >
-        <CommLoading />
+        <CommLoading onRef={onLoadingDivRef} />
         <div style={{ minHeight: "100%" }}>
           {messages.map((plext) => (
             <CommMessage plext={plext} viewer={viewer} channel={channel} />
@@ -222,7 +227,8 @@ class CommUI {
   private readonly commManager: CommManager;
   private container: HTMLElement;
   private pane: HTMLElement | null = null;
-  private messageList: HTMLElement | null = null;
+  private loadingDiv: HTMLElement | null = null;
+  private messageDivs: HTMLElement | null = null;
   private fetchLatestBtn: HTMLElement | null = null;
   private currentChannel: Channel = "all";
   private isFetching = false;
@@ -234,9 +240,9 @@ class CommUI {
     this.viewer = viewer;
     this.container = container;
     this.commManager = commManager;
-    // this.refreshInterval = setInterval(() => {
-    //   this.refresh().then();
-    // }, 30000);
+    this.refreshInterval = setInterval(() => {
+      this.refreshData().then(() => this.renderPane());
+    }, 30000);
   }
 
   private async refreshData(fetchOld = false): Promise<void> {
@@ -248,9 +254,19 @@ class CommUI {
 
     try {
       const channel = this.currentChannel;
+      const msgCount = this.commManager.getMessages(channel).length;
+
       if (channel === "all") await this.commManager.requestAll(fetchOld);
       if (channel === "faction") await this.commManager.requestFaction(fetchOld);
       if (channel === "alerts") await this.commManager.requestAlerts(fetchOld);
+
+      const newMsgCount = this.commManager.getMessages(channel).length - msgCount;
+      logManager.debug("CommDetailPane", `Received ${newMsgCount} new message(s)`);
+
+      if (newMsgCount === 0 && this.loadingDiv) {
+        this.loadingDiv.remove();
+        this.loadingDiv = null;
+      }
     } finally {
       this.isFetching = false;
     }
@@ -268,7 +284,7 @@ class CommUI {
     if (this.pane) {
       this.pane.remove();
       this.pane = null;
-      this.messageList = null;
+      this.messageDivs = null;
       this.fetchLatestBtn = null;
     }
     if (this.refreshInterval) {
@@ -278,7 +294,7 @@ class CommUI {
   }
 
   private showPane(): void {
-    this.pane = this.createPane();
+    this.pane = this.createPaneEl();
     this.container.appendChild(this.pane);
     const messages = this.commManager.getMessages(this.currentChannel);
     if (messages.length === 0) {
@@ -289,27 +305,27 @@ class CommUI {
   private renderPane(): void {
     if (!this.pane) return;
 
-    this.previousScrollHeight = this.messageList?.scrollHeight || 0;
-    this.previousScrollTop = this.messageList?.scrollTop || 0;
+    this.previousScrollHeight = this.messageDivs?.scrollHeight || 0;
+    this.previousScrollTop = this.messageDivs?.scrollTop || 0;
 
-    const isAtBottom = this.messageList
-      ? this.previousScrollTop + this.messageList.clientHeight >= this.previousScrollHeight - 20
+    const isAtBottom = this.messageDivs
+      ? this.previousScrollTop + this.messageDivs.clientHeight >= this.previousScrollHeight - 20
       : true;
 
-    const newPane = this.createPane();
+    const newPane = this.createPaneEl();
     this.pane.replaceWith(newPane);
     this.pane = newPane;
 
-    if (this.messageList) {
+    if (this.messageDivs) {
       if (isAtBottom) {
-        this.messageList.scrollTop = this.messageList.scrollHeight;
+        this.messageDivs.scrollTop = this.messageDivs.scrollHeight;
       } else {
-        this.messageList.scrollTop = this.previousScrollTop + (this.messageList.scrollHeight - this.previousScrollHeight);
+        this.messageDivs.scrollTop = this.previousScrollTop + (this.messageDivs.scrollHeight - this.previousScrollHeight);
       }
     }
   }
 
-  private createPane(): HTMLElement {
+  private createPaneEl(): HTMLElement {
     return (
       <CommPane
         viewer={this.viewer}
@@ -318,7 +334,8 @@ class CommUI {
         isFetching={this.isFetching}
         onTabClick={this.handleTabClick}
         onRefresh={() => this.refreshData().then(() => this.renderPane())}
-        onMessageListRef={(el: HTMLElement) => (this.messageList = el)}
+        onLoadingDivRef={(el: HTMLElement) => (this.loadingDiv = el)}
+        onMessageDivsRef={(el: HTMLElement) => (this.messageDivs = el)}
         onFetchLatestBtnRef={(el: HTMLElement) => (this.fetchLatestBtn = el)}
         onScroll={this.handleScroll}
       />

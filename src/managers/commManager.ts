@@ -146,7 +146,7 @@ export class CommManager {
           this.messages[channel].set(p.guid, p);
         });
 
-        // Limit storage to 1000000 messages per channel to avoid memory leaks
+        // Limit storage to one million messages per channel to avoid memory leaks
         if (this.messages[channel].size > 1000000) {
           const sorted = Array.from(this.messages[channel].values()).sort((a, b) => b.timestamp - a.timestamp);
           const toRemove = sorted.slice(1000000);
