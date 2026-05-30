@@ -442,17 +442,14 @@ function calculateTileKeys(viewer: Cesium.Viewer): string[] {
  * Trigger reloading of tiles.
  *
  * @param viewer - Cesium viewer to calculate view range.
- * @param entityManager - Entity manager to delete game entities.
  * @param tileManager - Tile manager to add and process tiles.
  */
-function triggerDataReload(viewer: Cesium.Viewer, entityManager: EntityManager, tileManager: TileManager): void {
+function triggerDataReload(viewer: Cesium.Viewer, tileManager: TileManager): void {
   const tileKeys = calculateTileKeys(viewer);
-
-  entityManager.removeGameEntitiesInView();
 
   if (tileKeys.length > 0) {
     tileManager.removeTiles(tileKeys);
-    tileManager.addTiles(tileKeys);
+    tileManager.addTiles(tileKeys, true);
   }
 }
 
@@ -504,7 +501,7 @@ export default function loadCesiumViewer(): void {
   const redeemManager = new RedeemManager();
   const commManager = new CommManager(viewer);
 
-  addRefreshButton(container, () => triggerDataReload(viewer, entityManager, tileManager));
+  addRefreshButton(container, () => triggerDataReload(viewer, tileManager));
   addGameDetailButton(container, scoreManager, redeemManager);
   addCommDetailButton(viewer, container, commManager);
 

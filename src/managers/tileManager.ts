@@ -126,8 +126,9 @@ export class TileManager {
    * Adds a list of tile keys to the queue for processing.
    *
    * @param tileKeys - An array of string keys representing the tiles to be added.
+   * @param refreshExisting - A flag indicating whether to refresh existing tiles.
    */
-  public addTiles(tileKeys: string[]): void {
+  public addTiles(tileKeys: string[], refreshExisting: boolean = false): void {
     logManager.debug("TileManager", `Adding ${tileKeys.length} tiles to queue`);
     let skippedCount = 0;
     tileKeys.forEach((key) => {
@@ -139,7 +140,7 @@ export class TileManager {
       }
     });
     logManager.debug("TileManager", `Skipped ${skippedCount} tile${skippedCount === 1 ? "" : "s"}`);
-    this.processQueue().then();
+    this.processQueue(refreshExisting).then();
   }
 
   public removeTiles(tileKeys: string[]): void {
@@ -183,7 +184,7 @@ export class TileManager {
    *
    * @return {Promise<void>} - A promise that resolves when the tile processing is complete or no more tiles are available to process.
    */
-  private async processQueue(): Promise<void> {
+  private async processQueue(refreshExisting: boolean = false): Promise<void> {
     if (this.activeRequestCount >= this.maxRequests) {
       logManager.info("TileManager", `Max request count (${this.maxRequests}) reached`);
       return;
@@ -214,6 +215,8 @@ export class TileManager {
     try {
       const response = await request.send();
       logManager.debug("TileManager", `Received response for ${tilesToRequest.length} tiles`);
+      if (response && refreshExisting) this.entityManager.removeGameEntitiesInView();
+      logManager.debug("TileManager", "Removed entities from current view");
       this.handleResponse(response, tilesToRequest);
     } catch (error) {
       logManager.error("TileManager", "Tile request failed:", error);
