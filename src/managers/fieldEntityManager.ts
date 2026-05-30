@@ -1,5 +1,5 @@
 import * as Cesium from "cesium";
-import { FieldData, RawEntity } from "../types/ingress";
+import { FieldData, PortalData, RawEntity } from "../types/ingress";
 import { getTeamColor } from "../utils/color";
 import { LayerManager } from "./layerManager";
 import { PortalEntityManager } from "./portalEntityManager";
@@ -11,14 +11,20 @@ export class FieldEntityManager {
 
   public addOrUpdateField(data: FieldData): Cesium.Entity {
     data.points.forEach((p) => {
-      this.portalManager.createPortalPlaceholderEntity(p.guid, data.team, p.latE6, p.lngE6);
+      this.portalManager.addOrUpdatePortal({
+        guid: p.guid,
+        team: data.team,
+        latE6: p.latE6,
+        lngE6: p.lngE6,
+        isPlaceholder: true,
+      } as PortalData);
     });
 
     const existing = this.fields.get(data.guid);
     if (existing) {
       if (data.timestamp > existing.data.timestamp) {
-        const oldLayerId = this.getFieldLayerId(existing.data);
-        const newLayerId = this.getFieldLayerId(data);
+        const oldLayerId = getFieldLayerId(existing.data);
+        const newLayerId = getFieldLayerId(data);
         if (oldLayerId !== newLayerId) {
           this.layerManager.getOrCreateSource(oldLayerId).entities.remove(existing.entity);
           this.layerManager.getOrCreateSource(newLayerId).entities.add(existing.entity);
@@ -37,7 +43,7 @@ export class FieldEntityManager {
   public removeField(guid: string): boolean {
     const fieldInfo = this.fields.get(guid);
     if (fieldInfo) {
-      const layerId = this.getFieldLayerId(fieldInfo.data);
+      const layerId = getFieldLayerId(fieldInfo.data);
       this.layerManager.getOrCreateSource(layerId).entities.remove(fieldInfo.entity);
       this.fields.delete(guid);
       return true;
@@ -46,7 +52,7 @@ export class FieldEntityManager {
   }
 
   private createFieldEntity(data: FieldData): Cesium.Entity {
-    const layerId = this.getFieldLayerId(data);
+    const layerId = getFieldLayerId(data);
     const points = data.points.flatMap(p => [p.lngE6 / 1e6, p.latE6 / 1e6]);
     const entity = this.layerManager.getOrCreateSource(layerId).entities.add({
       id: `field-${data.guid}`,
@@ -67,11 +73,17 @@ export class FieldEntityManager {
       entity.polygon.material = new Cesium.ColorMaterialProperty(getTeamColor(data.team).withAlpha(0.2));
     }
   }
+}
 
-  private getFieldLayerId(data: FieldData): string {
-    const team = data.team.toLowerCase();
-    return `fields-${team}`;
-  }
+/**
+ * Generates a field layer ID based on the provided team data.
+ *
+ * @param {FieldData} data - The data object containing the team information.
+ * @returns {string} The generated field layer ID in the format 'fields-teamName'.
+ */
+export function getFieldLayerId(data: FieldData): string {
+  const team = data.team.toLowerCase();
+  return `fields-${team}`;
 }
 
 /**

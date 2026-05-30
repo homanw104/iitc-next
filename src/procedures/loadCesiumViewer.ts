@@ -26,6 +26,7 @@ import { AmapMercatorTilingScheme } from "../utils/map";
 import { CommManager } from "../managers/commManager";
 import { ScoreManager } from "../managers/scoreManager";
 import { RedeemManager } from "../managers/redeemManager";
+import { getPortalLayerId } from "../managers/portalEntityManager";
 
 // Tell Cesium where to find its assets (Images, Workers, etc.)
 // Since we use the CDN for the main library, we should also use it for assets.
@@ -188,24 +189,41 @@ function setInitialView(viewer: Cesium.Viewer): void {
  * @param container - The HTMLDivElement element containing the cesium widget.
  */
 function setupClickHandler(viewer: Cesium.Viewer, entityManager: EntityManager, container: HTMLElement): void {
+  let isClickLoading = false;
+  let isClickCancelled = false;
+  let lastEntity: Cesium.Entity | undefined;
   const handler = viewer.screenSpaceEventHandler;
+
   handler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_CLICK);
   handler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
-
   handler.setInputAction((click: { position: Cesium.Cartesian2 }) => {
     const pickedObjects = viewer.scene.drillPick(click.position);
     const entity = pickedObjects.find(
-      (p) => p.id instanceof Cesium.Entity && (p.id as any).selectable !== false
+      (o) => o.id instanceof Cesium.Entity && (o.id as any).selectable !== false
     )?.id as Cesium.Entity | undefined;
 
+    if (isClickLoading && lastEntity !== entity) {
+      isClickCancelled = true;
+    }
+    lastEntity = entity;
+
     if (entity && entity.id.startsWith("portal-")) {
-      const guid = entity.id.substring(7);
-      const portalData = entityManager.getPortalData(guid);
+      isClickLoading = true;
+      const portalGuid = entity.id.substring(7);
+      const portalData = entityManager.getPortalData(portalGuid);
       if (portalData) {
-        viewer.selectedEntity = entity;
         showOrUpdateDetailBar(container, portalData);
-        entityManager.requestPortalDetails(guid).then((freshData) => {
-          if (viewer.selectedEntity?.id === `portal-${guid}`) {
+        entityManager.requestPortalDetails(portalGuid).then(() => {
+          isClickLoading = false;
+          if (isClickCancelled) {
+            isClickCancelled = false;
+            return;
+          }
+          const freshData = entityManager.getPortalData(portalGuid);
+          if (freshData) {
+            const layerId = getPortalLayerId(freshData);
+            const source = entityManager.layerManager.getOrCreateSource(layerId);
+            viewer.selectedEntity = source.entities.getById(`portal-${portalGuid}`);
             showOrUpdateDetailBar(container, freshData);
           }
         });
@@ -421,13 +439,75 @@ function calculateTileKeys(viewer: Cesium.Viewer): string[] {
 }
 
 /**
+ * Remove all entities that are inside the current viewport.
+ *
+ * @param viewer - Viewer to get the entities.
+ * @param entityManager - Manager to delete the entities.
+ */
+function removeEntitiesInView(viewer: Cesium.Viewer, entityManager: EntityManager): void {
+  // 1. Get the frustum and compute the culling volume
+  const camera = viewer.camera;
+  const cullingVolume = camera.frustum.computeCullingVolume(
+    camera.position,
+    camera.direction,
+    camera.up
+  );
+
+  const visibleEntities: Cesium.Entity[] = [];
+
+  // 2. Iterate through all entities
+  viewer.entities.values.forEach((entity) => {
+    // 3. Get the entity's bounding sphere
+    let boundingSphere = new Cesium.BoundingSphere();
+    // Cast as any to bypass the missing type declaration
+    const display = viewer.dataSourceDisplay as any;
+    const isBoundingSphereValid = display.getBoundingSphere(
+      entity,
+      false,
+      boundingSphere
+    );
+    console.log(isBoundingSphereValid);
+
+    // 4. Test if it is inside the view frustum
+    if (isBoundingSphereValid) {
+      const intersection = cullingVolume.computeVisibility(boundingSphere);
+
+      // INTERSECTING (0) or INSIDE (1)
+      if (intersection !== Cesium.Intersect.OUTSIDE) {
+        visibleEntities.push(entity);
+        console.log("CesiumViewer", entity);
+      }
+    }
+  });
+
+  visibleEntities.forEach((entity) => {
+    let guid: string;
+    if (entity.id.startsWith("portal-")) {
+      guid = entity.id.substring(7);
+      entityManager.removePortal(guid);
+    }
+    if (entity.id.startsWith("link-")) {
+      guid = entity.id.substring(5);
+      entityManager.removeLink(guid);
+    }
+    if (entity.id.startsWith("field-")) {
+      guid = entity.id.substring(6);
+      entityManager.removeField(guid);
+    }
+  })
+}
+
+/**
  * Trigger reloading of tiles.
  *
  * @param viewer - Cesium viewer to calculate view range.
+ * @param entityManager - Entity manager to delete game entities.
  * @param tileManager - Tile manager to add and process tiles.
  */
-function triggerDataReload(viewer: Cesium.Viewer, tileManager: TileManager): void {
+function triggerDataReload(viewer: Cesium.Viewer, entityManager: EntityManager, tileManager: TileManager): void {
   const tileKeys = calculateTileKeys(viewer);
+
+  removeEntitiesInView(viewer, entityManager);
 
   if (tileKeys.length > 0) {
     tileManager.removeTiles(tileKeys);
@@ -483,7 +563,7 @@ export default function loadCesiumViewer(): void {
   const redeemManager = new RedeemManager();
   const commManager = new CommManager(viewer);
 
-  addRefreshButton(container, () => triggerDataReload(viewer, tileManager));
+  addRefreshButton(container, () => triggerDataReload(viewer, entityManager, tileManager));
   addGameDetailButton(container, scoreManager, redeemManager);
   addCommDetailButton(viewer, container, commManager);
 

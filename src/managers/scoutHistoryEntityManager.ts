@@ -10,9 +10,9 @@ export class ScoutHistoryEntityManager {
 
   constructor(private layerManager: LayerManager) {}
 
-  public addOrUpdateScoutControlHalo(entity: Cesium.Entity, data: PortalData): void {
-    const scoutHaloId = `${entity.id}-scout-halo`;
-    const scoutHaloIdReverse = `${entity.id}-scout-halo-reverse`;
+  public addOrUpdateScoutControlHalo(data: PortalData): void {
+    const scoutHaloId = `portal-${data.guid}-scout-halo`;
+    const scoutHaloIdReverse = `portal-${data.guid}-scout-halo-reverse`;
     const source = this.layerManager.getOrCreateSource("history-scout-control");
     const sourceReverse = this.layerManager.getOrCreateSource("history-scout-control-reverse");
     let scoutHalo = source.entities.getById(scoutHaloId);
@@ -24,7 +24,7 @@ export class ScoutHistoryEntityManager {
       if (!scoutHalo) {
         source.entities.add({
           id: scoutHaloId,
-          position: entity.position,
+          position: Cesium.Cartesian3.fromDegrees(data.lngE6 / 1e6, data.latE6 / 1e6),
           point: {
             pixelSize: 24,
             color: Cesium.Color.TRANSPARENT,
@@ -42,7 +42,7 @@ export class ScoutHistoryEntityManager {
       if (!scoutHaloReverse) {
         sourceReverse.entities.add({
           id: scoutHaloIdReverse,
-          position: entity.position,
+          position: Cesium.Cartesian3.fromDegrees(data.lngE6 / 1e6, data.latE6 / 1e6),
           point: {
             pixelSize: 24,
             color: Cesium.Color.TRANSPARENT,
@@ -55,5 +55,12 @@ export class ScoutHistoryEntityManager {
         scoutHaloReverse.point.outlineColor = new Cesium.ConstantProperty(color);
       }
     }
+  }
+
+  public removeScoutControlHalo(guid: string): void {
+    const scoutHaloId = `portal-${guid}-scout-halo`;
+    const scoutHaloIdReverse = `portal-${guid}-scout-halo-reverse`;
+    this.layerManager.getOrCreateSource("history-scout-control").entities.removeById(scoutHaloId);
+    this.layerManager.getOrCreateSource("history-scout-control-reverse").entities.removeById(scoutHaloIdReverse);
   }
 }

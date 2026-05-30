@@ -1,5 +1,5 @@
 import * as Cesium from "cesium";
-import { PortalData, PortalLevel, PortalMod, PortalResonator, RawEntity, Team } from "../types/ingress";
+import { PortalData, PortalLevel, PortalMod, PortalResonator, RawEntity } from "../types/ingress";
 import { getTeamColor } from "../utils/color";
 import { LayerManager } from "./layerManager";
 import { apiRequest } from "../utils/network";
@@ -36,22 +36,17 @@ export class PortalEntityManager {
 
   constructor(private layerManager: LayerManager) {}
 
-  public async requestPortalDetails(guid: string): Promise<PortalData> {
-    const request = new PortalRequest(guid);
-    const response = await request.send();
-    const data = response as any;
-    const portalData = parsePortal([guid, data.result[13], data.result]);
-    this.addOrUpdatePortal(portalData);
-    return portalData;
-  }
-
-  public addOrUpdatePortal(data: PortalData): Cesium.Entity {
+  public addOrUpdatePortal(data: PortalData): Cesium.Entity | undefined {
     const existing = this.portals.get(data.guid);
     if (existing) {
-      if (data.placeholder) return existing.entity; // Don't downgrade full portal to placeholder
-      if (existing.data.placeholder || data.timestamp > existing.data.timestamp) {
-        const oldLayerId = this.getPortalLayerId(existing.data);
-        const newLayerId = this.getPortalLayerId(data);
+      if (data.isPlaceholder) return existing.entity;
+      if (
+        existing.data.isPlaceholder ||
+        data.timestamp > existing.data.timestamp ||
+        data.resonators
+      ) {
+        const oldLayerId = getPortalLayerId(existing.data);
+        const newLayerId = getPortalLayerId(data);
         if (oldLayerId !== newLayerId) {
           this.layerManager.getOrCreateSource(oldLayerId).entities.remove(existing.entity);
           this.layerManager.getOrCreateSource(newLayerId).entities.add(existing.entity);
@@ -67,40 +62,24 @@ export class PortalEntityManager {
     return portalEntity;
   }
 
-  public createPortalPlaceholderEntity(guid: string, team: Team, latE6: number, lngE6: number): void {
-    if (this.portals.has(guid)) return;
-
-    this.addOrUpdatePortal({
-      guid,
-      team,
-      latE6,
-      lngE6,
-      timestamp: 0,
-      placeholder: true,
-    });
+  public removePortal(guid: string): void {
+    this.removePortalEntity(guid);
   }
 
-  public removePortal(guid: string): boolean {
-    const portalInfo = this.portals.get(guid);
-    if (portalInfo) {
-      const layerId = this.getPortalLayerId(portalInfo.data);
-      this.layerManager.getOrCreateSource(layerId).entities.remove(portalInfo.entity);
-      this.portals.delete(guid);
-      return true;
-    }
-    return false;
+  public async requestPortalDetails(guid: string): Promise<Cesium.Entity | undefined> {
+    const request = new PortalRequest(guid);
+    const response = await request.send();
+    const data = response as any;
+    const portalData = parsePortal([guid, data.result[13], data.result]);
+    return this.addOrUpdatePortal(portalData);
   }
 
   public getPortalData(guid: string): PortalData | undefined {
     return this.portals.get(guid)?.data;
   }
 
-  public getPortalEntity(guid: string): Cesium.Entity | undefined {
-    return this.portals.get(guid)?.entity;
-  }
-
   private createPortalEntity(data: PortalData): Cesium.Entity {
-    const layerId = this.getPortalLayerId(data);
+    const layerId = getPortalLayerId(data);
     return this.layerManager.getOrCreateSource(layerId).entities.add({
       id: `portal-${data.guid}`,
       position: Cesium.Cartesian3.fromDegrees(data.lngE6 / 1e6, data.latE6 / 1e6),
@@ -126,6 +105,15 @@ export class PortalEntityManager {
     });
   }
 
+  private removePortalEntity(guid: string): void {
+    const portalInfo = this.portals.get(guid);
+    if (portalInfo) {
+      const layerId = getPortalLayerId(portalInfo.data);
+      this.layerManager.getOrCreateSource(layerId).entities.remove(portalInfo.entity);
+      this.portals.delete(guid);
+    }
+  }
+
   private updatePortalEntity(entity: Cesium.Entity, data: PortalData): void {
     if (entity.point) {
       entity.point.color = new Cesium.ConstantProperty(getTeamColor(data.team));
@@ -134,15 +122,21 @@ export class PortalEntityManager {
       entity.label.text = new Cesium.ConstantProperty(data.title || "");
     }
   }
+}
 
-  private getPortalLayerId(data: PortalData): string {
-    const team = data.team.toLowerCase();
-    const level = data.level ?? 0;
-    if (data.placeholder || level === 0) {
-      return `portals-placeholder-${team}`;
-    }
-    return `portals-l${level}-${team}`;
+/**
+ * Retrieves the portal layer ID based on the provided data.
+ *
+ * @param {PortalData} data - An object containing team, level, and isPlaceholder properties.
+ * @returns {string} The generated portal layer ID.
+ */
+export function getPortalLayerId(data: PortalData): string {
+  const team = data.team.toLowerCase();
+  const level = data.level ?? 0;
+  if (data.isPlaceholder || level === 0) {
+    return `portals-placeholder-${team}`;
   }
+  return `portals-l${level}-${team}`;
 }
 
 /**

@@ -21,7 +21,7 @@ export interface PortalData {
   image?: string;
   title?: string;
   timestamp: number;
-  placeholder?: boolean;
+  isPlaceholder?: boolean;
   mods?: (PortalMod | null)[];
   resonators?: (PortalResonator | null)[];
   owner?: string;

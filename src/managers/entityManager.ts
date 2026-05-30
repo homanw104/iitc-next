@@ -54,59 +54,44 @@ export class EntityManager {
   }
 
   public addOrUpdatePortal(data: PortalData): void {
-    const isSelected = this.viewer.selectedEntity?.id === `portal-${data.guid}`;
-    const entity = this.portalManager.addOrUpdatePortal(data);
-    if (isSelected && this.viewer.selectedEntity !== entity) {
-      this.viewer.selectedEntity = entity;
-    }
-
-    // Update history and scout control if portal was updated and has history data
-    if (entity) {
-      this.historyManager.addOrUpdateHistoryHalo(entity, data);
-      this.scoutControlHistoryManager.addOrUpdateScoutControlHalo(entity, data);
-    }
+    this.portalManager.addOrUpdatePortal(data);
+    this.historyManager.addOrUpdateHistoryHalo(data);
+    this.scoutControlHistoryManager.addOrUpdateScoutControlHalo(data);
   }
 
   public addOrUpdateLink(data: LinkData): void {
-    const isSelected = this.viewer.selectedEntity?.id === `link-${data.guid}`;
-    const entity = this.linkManager.addOrUpdateLink(data);
-    if (isSelected && this.viewer.selectedEntity !== entity) {
-      this.viewer.selectedEntity = entity;
-    }
+    this.linkManager.addOrUpdateLink(data);
   }
 
   public addOrUpdateField(data: FieldData): void {
-    const isSelected = this.viewer.selectedEntity?.id === `field-${data.guid}`;
-    const entity = this.fieldManager.addOrUpdateField(data);
-    if (isSelected && this.viewer.selectedEntity !== entity) {
-      this.viewer.selectedEntity = entity;
-    }
+    this.fieldManager.addOrUpdateField(data);
   }
 
-  public async requestPortalDetails(guid: string): Promise<PortalData> {
-    const isSelected = this.viewer.selectedEntity?.id === `portal-${guid}`;
-    const portalData = await this.portalManager.requestPortalDetails(guid);
-    const entity = this.portalManager.getPortalEntity(guid);
+  public removePortal(guid: string): void {
+    this.portalManager.removePortal(guid);
+    this.historyManager.removeHistoryHalo(guid);
+    this.scoutControlHistoryManager.removeScoutControlHalo(guid);
+  }
 
-    if (entity) {
-      this.historyManager.addOrUpdateHistoryHalo(entity, portalData);
-      this.scoutControlHistoryManager.addOrUpdateScoutControlHalo(entity, portalData);
-    }
+  public removeLink(guid: string): void {
+    this.linkManager.removeLink(guid);
+  }
 
-    if (isSelected && this.viewer.selectedEntity !== entity) {
-      this.viewer.selectedEntity = this.portalManager.getPortalEntity(guid);
+  public removeField(guid: string): void {
+    this.fieldManager.removeField(guid);
+  }
+
+  public async requestPortalDetails(guid: string): Promise<void> {
+    await this.portalManager.requestPortalDetails(guid);
+    const portalData = this.portalManager.getPortalData(guid);
+    if (portalData) {
+      this.historyManager.addOrUpdateHistoryHalo(portalData);
+      this.scoutControlHistoryManager.addOrUpdateScoutControlHalo(portalData);
     }
-    return portalData;
   }
 
   public getPortalData(guid: string): PortalData | undefined {
     return this.portalManager.getPortalData(guid);
-  }
-
-  public removeGameEntity(guid: string): void {
-    if (this.portalManager.removePortal(guid)) return;
-    if (this.linkManager.removeLink(guid)) return;
-    if (this.fieldManager.removeField(guid)) return;
   }
 
   public setLayerVisible(type: string, visible: boolean): void {

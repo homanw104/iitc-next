@@ -138,7 +138,7 @@ export class TileManager {
         skippedCount += 1;
       }
     });
-    logManager.debug("TileManager", `Skipped ${skippedCount} tiles already in queue or loaded`);
+    logManager.debug("TileManager", `Skipped ${skippedCount} tile${skippedCount === 1 ? "" : "s"}`);
     this.processQueue().then();
   }
 
@@ -269,11 +269,6 @@ export class TileManager {
 
       this.setTileStatus(tileKey, "loaded");
 
-      if (tileData.deletedGameEntityGuids) {
-        entitiesRemoved += tileData.deletedGameEntityGuids.length;
-        tileData.deletedGameEntityGuids.forEach((guid) => this.entityManager.removeGameEntity(guid));
-      }
-
       if (tileData.gameEntities) {
         entitiesFound += tileData.gameEntities.length;
         const { portals, links, fields } = parseTileEntities(tileData.gameEntities);
@@ -282,7 +277,7 @@ export class TileManager {
         fields.forEach((f) => this.entityManager.addOrUpdateField(f));
       }
     }
-    logManager.debug("TileManager", `Processed ${entitiesFound} entities and removed ${entitiesRemoved} from ${tileKeys.length} tiles.`);
+    logManager.debug("TileManager", `Processed ${entitiesFound} entities`);
 
     if (entitiesFound > 0 || entitiesRemoved > 0) {
       this.entityManager.requestRender();

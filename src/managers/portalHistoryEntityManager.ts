@@ -10,9 +10,9 @@ export class PortalHistoryEntityManager {
 
   constructor(private layerManager: LayerManager) {}
 
-  public addOrUpdateHistoryHalo(entity: Cesium.Entity, data: PortalData): void {
-    const historyHaloId = `${entity.id}-history-halo`;
-    const historyHaloIdReverse = `${entity.id}-history-halo-reverse`;
+  public addOrUpdateHistoryHalo(data: PortalData): void {
+    const historyHaloId = `portal-${data.guid}-history-halo`;
+    const historyHaloIdReverse = `portal-${data.guid}-history-halo-reverse`;
     const source = this.layerManager.getOrCreateSource("history-visited-captured");
     const sourceReverse = this.layerManager.getOrCreateSource("history-visited-captured-reverse");
     let historyHalo = source.entities.getById(historyHaloId);
@@ -25,7 +25,7 @@ export class PortalHistoryEntityManager {
       if (!historyHalo) {
         source.entities.add({
           id: historyHaloId,
-          position: entity.position,
+          position: Cesium.Cartesian3.fromDegrees(data.lngE6 / 1e6, data.latE6 / 1e6),
           point: {
             pixelSize: 16,
             color: Cesium.Color.TRANSPARENT,
@@ -45,7 +45,7 @@ export class PortalHistoryEntityManager {
       if (!historyHalo) {
         source.entities.add({
           id: historyHaloId,
-          position: entity.position,
+          position: Cesium.Cartesian3.fromDegrees(data.lngE6 / 1e6, data.latE6 / 1e6),
           point: {
             pixelSize: 16,
             color: Cesium.Color.TRANSPARENT,
@@ -60,7 +60,7 @@ export class PortalHistoryEntityManager {
       if (!historyHaloReverse) {
         sourceReverse.entities.add({
           id: historyHaloIdReverse,
-          position: entity.position,
+          position: Cesium.Cartesian3.fromDegrees(data.lngE6 / 1e6, data.latE6 / 1e6),
           point: {
             pixelSize: 16,
             color: Cesium.Color.TRANSPARENT,
@@ -81,7 +81,7 @@ export class PortalHistoryEntityManager {
       if (!historyHaloReverse) {
         sourceReverse.entities.add({
           id: historyHaloIdReverse,
-          position: entity.position,
+          position: Cesium.Cartesian3.fromDegrees(data.lngE6 / 1e6, data.latE6 / 1e6),
           point: {
             pixelSize: 16,
             color: Cesium.Color.TRANSPARENT,
@@ -94,5 +94,12 @@ export class PortalHistoryEntityManager {
         historyHaloReverse.point.outlineColor = new Cesium.ConstantProperty(color);
       }
     }
+  }
+
+  public removeHistoryHalo(guid: string): void {
+    const historyHaloId = `portal-${guid}-history-halo`;
+    const historyHaloIdReverse = `portal-${guid}-history-halo-reverse`;
+    this.layerManager.getOrCreateSource("history-visited-captured").entities.removeById(historyHaloId);
+    this.layerManager.getOrCreateSource("history-visited-captured-reverse").entities.removeById(historyHaloIdReverse);
   }
 }

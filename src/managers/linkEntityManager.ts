@@ -1,5 +1,5 @@
 import * as Cesium from "cesium";
-import { LinkData, RawEntity } from "../types/ingress";
+import { LinkData, PortalData, RawEntity } from "../types/ingress";
 import { getTeamColor } from "../utils/color";
 import { LayerManager } from "./layerManager";
 import { PortalEntityManager } from "./portalEntityManager";
@@ -10,14 +10,27 @@ export class LinkEntityManager {
   constructor(private layerManager: LayerManager, private portalManager: PortalEntityManager) {}
 
   public addOrUpdateLink(data: LinkData): Cesium.Entity {
-    this.portalManager.createPortalPlaceholderEntity(data.oGuid, data.team, data.oLatE6, data.oLngE6);
-    this.portalManager.createPortalPlaceholderEntity(data.dGuid, data.team, data.dLatE6, data.dLngE6);
+    this.portalManager.addOrUpdatePortal({
+      guid: data.oGuid,
+      team: data.team,
+      latE6: data.oLatE6,
+      lngE6: data.oLngE6,
+      isPlaceholder: true,
+    } as PortalData);
+
+    this.portalManager.addOrUpdatePortal({
+      guid: data.dGuid,
+      team: data.team,
+      latE6: data.dLatE6,
+      lngE6: data.dLngE6,
+      isPlaceholder: true,
+    } as PortalData);
 
     const existing = this.links.get(data.guid);
     if (existing) {
       if (data.timestamp > existing.data.timestamp) {
-        const oldLayerId = this.getLinkLayerId(existing.data);
-        const newLayerId = this.getLinkLayerId(data);
+        const oldLayerId = getLinkLayerId(existing.data);
+        const newLayerId = getLinkLayerId(data);
         if (oldLayerId !== newLayerId) {
           this.layerManager.getOrCreateSource(oldLayerId).entities.remove(existing.entity);
           this.layerManager.getOrCreateSource(newLayerId).entities.add(existing.entity);
@@ -36,7 +49,7 @@ export class LinkEntityManager {
   public removeLink(guid: string): boolean {
     const linkInfo = this.links.get(guid);
     if (linkInfo) {
-      const layerId = this.getLinkLayerId(linkInfo.data);
+      const layerId = getLinkLayerId(linkInfo.data);
       this.layerManager.getOrCreateSource(layerId).entities.remove(linkInfo.entity);
       this.links.delete(guid);
       return true;
@@ -45,7 +58,7 @@ export class LinkEntityManager {
   }
 
   private createLinkEntity(data: LinkData): Cesium.Entity {
-    const layerId = this.getLinkLayerId(data);
+    const layerId = getLinkLayerId(data);
     const entity = this.layerManager.getOrCreateSource(layerId).entities.add({
       id: `link-${data.guid}`,
       polyline: {
@@ -71,11 +84,17 @@ export class LinkEntityManager {
       entity.polyline.material = new Cesium.ColorMaterialProperty(getTeamColor(data.team).withAlpha(0.7));
     }
   }
+}
 
-  private getLinkLayerId(data: LinkData): string {
-    const team = data.team.toLowerCase();
-    return `links-${team}`;
-  }
+/**
+ * Retrieves a link layer ID based on the provided team information.
+ *
+ * @param {LinkData} data - An object containing team details.
+ * @return {string} A formatted string representing the link layer ID.
+ */
+export function getLinkLayerId(data: LinkData): string {
+  const team = data.team.toLowerCase();
+  return `links-${team}`;
 }
 
 /**
