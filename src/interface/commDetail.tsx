@@ -6,10 +6,10 @@ import { CommManager, Plext } from "../managers/commManager";
 
 type Channel = "all" | "faction" | "alerts";
 
-const CommMessage = ({ plext, viewer, currentChannel }: {
+const CommMessage = ({ plext, viewer, channel }: {
   plext: Plext;
   viewer: Viewer;
-  currentChannel: Channel;
+  channel: Channel;
 }) => {
   const dateObj = new Date(plext.timestamp);
   let timeStr: string;
@@ -29,7 +29,6 @@ const CommMessage = ({ plext, viewer, currentChannel }: {
       </div>
       <div style={{ fontSize: "12px", paddingBottom: "2px", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
         {plext.markup.map(([type, data]) => {
-          console.log(type, data);
           let color = "white";
           if (data.team === "ENLIGHTENED") color = getTeamColor("ENLIGHTENED").toCssColorString();
           if (data.team === "RESISTANCE") color = getTeamColor("RESISTANCE").toCssColorString();
@@ -54,7 +53,7 @@ const CommMessage = ({ plext, viewer, currentChannel }: {
               </span>
             );
           } else if (type === "SECURE") {
-            if (currentChannel === "all") {
+            if (channel === "all") {
               return <span style={{ color: "#f88" }}>{data.plain}</span>;
             } else {
               return;
@@ -127,32 +126,145 @@ const CommFetchLatestButton = ({ onRef, onClick, isLoading }: {
   </div>
 );
 
+const CommPane = ({
+  viewer,
+  commManager,
+  channel,
+  isFetching,
+  onTabClick,
+  onRefresh,
+  onMessageListRef,
+  onFetchLatestBtnRef,
+  onScroll,
+}: {
+  viewer: Viewer;
+  commManager: CommManager;
+  channel: Channel;
+  isFetching: boolean;
+  onTabClick: (tab: Channel) => void;
+  onRefresh: () => void;
+  onMessageListRef: (el: HTMLElement) => void;
+  onFetchLatestBtnRef: (el: HTMLElement) => void;
+  onScroll: (e: Event) => void;
+}) => {
+  const messages = commManager.getMessages(channel);
+
+  const tabs: { id: Channel; label: string }[] = [
+    { id: "all", label: "ALL" },
+    { id: "faction", label: "FACTION" },
+    { id: "alerts", label: "ALERTS" },
+  ];
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        bottom: "41px",
+        right: "5px",
+        margin: "2px 3px",
+        width: "600px",
+        height: "500px",
+        maxWidth: "calc(100% - 18px - 24px)",
+        maxHeight: "calc(100% - 16px - 24px)",
+        display: "flex",
+        flexDirection: "column",
+        padding: "12px",
+        backgroundColor: "rgba(42, 42, 42, 0.9)",
+        border: "1px solid #555",
+        borderRadius: "4.2px",
+        color: "white",
+        zIndex: "10015",
+      }}
+    >
+      <div
+        className="comm-tabs"
+        style={{
+          display: "flex",
+          gap: "10px",
+          marginBottom: "8px",
+          borderBottom: "1px solid #555",
+          paddingBottom: "5px",
+        }}
+      >
+        {tabs.map((tab) => (
+          <CommTab
+            id={tab.id}
+            label={tab.label}
+            isActive={channel === tab.id}
+            onClick={onTabClick}
+          />
+        ))}
+      </div>
+      <div
+        ref={onMessageListRef}
+        onScroll={onScroll}
+        style={{ flex: 1, overflowY: "auto", paddingRight: "5px", position: "relative" }}
+      >
+        <CommLoading />
+        <div style={{ minHeight: "100%" }}>
+          {messages.map((plext) => (
+            <CommMessage plext={plext} viewer={viewer} channel={channel} />
+          ))}
+          <div style={{ height: "60px" }}></div>
+        </div>
+      </div>
+      <CommFetchLatestButton
+        onRef={onFetchLatestBtnRef}
+        onClick={onRefresh}
+        isLoading={isFetching}
+      />
+    </div>
+  ) as HTMLElement;
+};
+
 class CommUI {
   private readonly viewer: Viewer;
+  private readonly commManager: CommManager;
   private container: HTMLElement;
-  private commManager: CommManager;
   private pane: HTMLElement | null = null;
   private messageList: HTMLElement | null = null;
   private fetchLatestBtn: HTMLElement | null = null;
   private currentChannel: Channel = "all";
   private isFetching = false;
   private refreshInterval: any = null;
+  private previousScrollHeight = 0;
+  private previousScrollTop = 0;
 
   constructor(viewer: Viewer, container: HTMLElement, commManager: CommManager) {
     this.viewer = viewer;
     this.container = container;
     this.commManager = commManager;
+    // this.refreshInterval = setInterval(() => {
+    //   this.refresh().then();
+    // }, 30000);
   }
 
-  public toggle(): void {
-    if (this.pane) {
-      this.close();
+  private async refreshData(fetchOld = false): Promise<void> {
+    if (this.isFetching) {
+      return;
     } else {
-      this.show();
+      this.isFetching = true;
+    }
+
+    try {
+      const channel = this.currentChannel;
+      if (channel === "all") await this.commManager.requestAll(fetchOld);
+      if (channel === "faction") await this.commManager.requestFaction(fetchOld);
+      if (channel === "alerts") await this.commManager.requestAlerts(fetchOld);
+    } finally {
+      this.isFetching = false;
     }
   }
 
-  public close(): void {
+  public togglePane(): void {
+    if (this.pane) {
+      this.closePane();
+    } else {
+      this.showPane();
+    }
+  }
+
+  private closePane(): void {
     if (this.pane) {
       this.pane.remove();
       this.pane = null;
@@ -165,38 +277,59 @@ class CommUI {
     }
   }
 
-  private async refresh(fetchOld = false): Promise<void> {
-    if (this.isFetching) return;
-    this.isFetching = true;
-    this.updateFetchButtonState();
-
-    try {
-      const channel = this.currentChannel;
-      if (channel === "all") await this.commManager.requestAll(fetchOld);
-      else if (channel === "faction") await this.commManager.requestFaction(fetchOld);
-      else if (channel === "alerts") await this.commManager.requestAlerts(fetchOld);
-
-      if (this.pane && this.currentChannel === channel) {
-        this.renderMessages();
-      }
-    } finally {
-      this.isFetching = false;
-      this.updateFetchButtonState();
+  private showPane(): void {
+    this.pane = this.createPane();
+    this.container.appendChild(this.pane);
+    const messages = this.commManager.getMessages(this.currentChannel);
+    if (messages.length === 0) {
+      this.refreshData().then(() => this.renderPane());
     }
   }
 
-  private updateFetchButtonState(): void {
-    if (this.fetchLatestBtn) {
-      this.fetchLatestBtn.textContent = this.isFetching ? "Loading..." : "Fetch latest messages";
+  private renderPane(): void {
+    if (!this.pane) return;
+
+    this.previousScrollHeight = this.messageList?.scrollHeight || 0;
+    this.previousScrollTop = this.messageList?.scrollTop || 0;
+
+    const isAtBottom = this.messageList
+      ? this.previousScrollTop + this.messageList.clientHeight >= this.previousScrollHeight - 20
+      : true;
+
+    const newPane = this.createPane();
+    this.pane.replaceWith(newPane);
+    this.pane = newPane;
+
+    if (this.messageList) {
+      if (isAtBottom) {
+        this.messageList.scrollTop = this.messageList.scrollHeight;
+      } else {
+        this.messageList.scrollTop = this.previousScrollTop + (this.messageList.scrollHeight - this.previousScrollHeight);
+      }
     }
+  }
+
+  private createPane(): HTMLElement {
+    return (
+      <CommPane
+        viewer={this.viewer}
+        commManager={this.commManager}
+        channel={this.currentChannel}
+        isFetching={this.isFetching}
+        onTabClick={this.handleTabClick}
+        onRefresh={() => this.refreshData().then(() => this.renderPane())}
+        onMessageListRef={(el: HTMLElement) => (this.messageList = el)}
+        onFetchLatestBtnRef={(el: HTMLElement) => (this.fetchLatestBtn = el)}
+        onScroll={this.handleScroll}
+      />
+    ) as HTMLElement;
   }
 
   private handleScroll = async (e: Event) => {
     const el = e.target as HTMLElement;
-    if (this.isFetching) return;
 
-    if (el.scrollTop === 0) {
-      await this.refresh(true);
+    if (el.scrollTop === 0 && !this.isFetching) {
+      this.refreshData(true).then(() => this.renderPane());
     }
 
     if (this.fetchLatestBtn) {
@@ -207,122 +340,13 @@ class CommUI {
 
   private handleTabClick = (tab: Channel) => {
     this.currentChannel = tab;
-    this.renderTabs();
-    this.renderMessages();
-  };
-
-  private renderTabs(): void {
-    const tabs: { id: Channel; label: string }[] = [
-      { id: "all", label: "ALL" },
-      { id: "faction", label: "FACTION" },
-      { id: "alerts", label: "ALERTS" },
-    ];
-
-    const tabContainer = this.pane?.querySelector(".comm-tabs");
-    if (tabContainer) {
-      tabContainer.innerHTML = "";
-      tabs.forEach((tab) => {
-        tabContainer.appendChild(
-          <CommTab
-            id={tab.id}
-            label={tab.label}
-            isActive={this.currentChannel === tab.id}
-            onClick={this.handleTabClick}
-          /> as HTMLElement
-        );
-      });
-    }
-  }
-
-  private renderMessages(): void {
-    if (!this.messageList) return;
-
-    const messages = this.commManager.getMessages(this.currentChannel);
-
+    const messages = this.commManager.getMessages(tab);
     if (messages.length === 0) {
-      this.messageList.innerHTML = "";
-      this.messageList.appendChild(<CommLoading /> as HTMLElement);
-      this.refresh().then();
-      return;
-    }
-
-    const previousScrollHeight = this.messageList.scrollHeight;
-    const previousScrollTop = this.messageList.scrollTop;
-    const isAtBottom = previousScrollTop + this.messageList.clientHeight >= previousScrollHeight - 20;
-
-    this.messageList.innerHTML = "";
-    this.messageList.appendChild(<CommLoading /> as HTMLElement);
-    messages.forEach((plext) => {
-      this.messageList!.appendChild(
-        <CommMessage plext={plext} viewer={this.viewer} currentChannel={this.currentChannel} /> as HTMLElement
-      );
-    });
-
-    this.messageList.appendChild(<div style={{ height: "60px" }}></div> as HTMLElement);
-
-    if (isAtBottom) {
-      this.messageList.scrollTop = this.messageList.scrollHeight;
+      this.refreshData().then(() => this.renderPane());
     } else {
-      this.messageList.scrollTop = previousScrollTop + (this.messageList.scrollHeight - previousScrollHeight);
+      this.renderPane();
     }
-  }
-
-  private show(): void {
-    this.pane = (
-      <div
-        style={{
-          position: "absolute",
-          bottom: "41px",
-          right: "5px",
-          margin: "2px 3px",
-          width: "600px",
-          height: "500px",
-          maxWidth: "calc(100% - 18px - 24px)",
-          maxHeight: "calc(100% - 16px - 24px)",
-          display: "flex",
-          flexDirection: "column",
-          padding: "12px",
-          backgroundColor: "rgba(42, 42, 42, 0.9)",
-          border: "1px solid #555",
-          borderRadius: "4.2px",
-          color: "white",
-          zIndex: "10015",
-        }}
-      >
-        <div
-          className="comm-tabs"
-          style={{
-            display: "flex",
-            gap: "10px",
-            marginBottom: "8px",
-            borderBottom: "1px solid #555",
-            paddingBottom: "5px",
-          }}
-        ></div>
-        <div
-          ref={(el: HTMLElement) => (this.messageList = el)}
-          onScroll={this.handleScroll}
-          style={{ flex: 1, overflowY: "auto", paddingRight: "5px", position: "relative" }}
-        ></div>
-        <CommFetchLatestButton
-          onRef={(el: HTMLElement) => (this.fetchLatestBtn = el)}
-          onClick={async () => {
-            if (this.messageList) this.messageList.scrollTop = this.messageList.scrollHeight;
-            await this.refresh();
-          }}
-          isLoading={this.isFetching}
-        />
-      </div>
-    ) as HTMLElement;
-
-    this.container.appendChild(this.pane);
-    this.renderTabs();
-    this.renderMessages();
-
-    this.refreshInterval = setInterval(() => {
-      this.refresh().then();
-    }, 30000);
-  }
+  };
 }
 
 let commUIInstance: CommUI | null = null;
@@ -347,7 +371,7 @@ export function addCommDetailButton(viewer: Viewer, container: HTMLElement, comm
         type="button"
         title="COMM"
         className="cesium-button cesium-toolbar-button"
-        onClick={() => commUIInstance?.toggle()}
+        onClick={() => commUIInstance?.togglePane()}
         style={{
           display: "flex",
           alignItems: "center",
