@@ -102,7 +102,7 @@ export class CommManager {
 
       let minTimestamp = -1;
       let maxTimestamp = -1;
-      let ascendingTimestampOrder = true;
+      let ascendingTimestampOrder = false;
       let plextContinuationGuid: string | undefined = undefined;
 
       const existing = Array.from(this.messages[channel].values());
