@@ -190,7 +190,7 @@ const CommPane = ({
   viewer,
   commManager,
   channel,
-  isFetching,
+  isFetchingNew,
   onTabClick,
   onCloseClick,
   onFetchLatestClick,
@@ -201,7 +201,7 @@ const CommPane = ({
   viewer: Viewer;
   commManager: CommManager;
   channel: Channel;
-  isFetching: boolean;
+  isFetchingNew: boolean;
   onTabClick: (tab: Channel) => void;
   onCloseClick: () => void;
   onFetchLatestClick: () => void;
@@ -271,7 +271,7 @@ const CommPane = ({
         </div>
         <CommFetchLatestButton
           onClick={onFetchLatestClick}
-          isLoading={isFetching}
+          isLoading={isFetchingNew}
         />
       </div>
       <form
@@ -298,7 +298,8 @@ class CommUI {
   private messageDivs: HTMLElement | null = null;
 
   private currentChannel: Channel = "all";
-  private isFetching = false;
+  private isFetchingNew = false;
+  private isFetchingOld = false;
   private isUpdatingScroll = false;
   private refreshInterval: any = null;
 
@@ -313,10 +314,11 @@ class CommUI {
   }
 
   private async refreshData(fetchOld = false): Promise<void> {
-    if (this.isFetching) {
-      return;
+    if (this.isFetchingNew || this.isFetchingOld) return;
+    if (fetchOld) {
+      this.isFetchingOld = true;
     } else {
-      this.isFetching = true;
+      this.isFetchingNew = true;
     }
 
     try {
@@ -331,7 +333,8 @@ class CommUI {
       logManager.info("CommDetailPane", `Received ${newMsgCount} message${newMsgCount === 1 ? "" : "s"} from ${channel} channel`);
       this.refreshNewMsgCount.set(channel, newMsgCount);
     } finally {
-      this.isFetching = false;
+      this.isFetchingNew = false;
+      this.isFetchingOld = false;
     }
   }
 
@@ -395,10 +398,6 @@ class CommUI {
       } else {
         this.messageDivs.scrollTop = prevScrollTop + (this.messageDivs.scrollHeight - prevScrollHeight);
       }
-
-      if (this.refreshNewMsgCount.get(this.currentChannel) === 0 && this.loadingDiv) {
-        this.messageDivs.scrollTop += this.loadingDiv.offsetHeight;
-      }
       this.isUpdatingScroll = false;
 
       // Manually update stored values immediately after setting scrollTop.
@@ -408,7 +407,8 @@ class CommUI {
       this.previousScrollHeights.set(this.currentChannel, this.messageDivs.scrollHeight);
     }
 
-    if (!this.isFetching) {
+    // Loading div is at the top, and fetch latest button is at the bottom
+    if (!this.isFetchingOld) {
       if (this.loadingDiv) this.loadingDiv.style.visibility = "hidden";
     } else {
       if (this.loadingDiv) this.loadingDiv.style.visibility = "show";
@@ -421,7 +421,7 @@ class CommUI {
         viewer={this.viewer}
         commManager={this.commManager}
         channel={this.currentChannel}
-        isFetching={this.isFetching}
+        isFetchingNew={this.isFetchingNew}
         onTabClick={this.handleTabClick}
         onCloseClick={this.handleCloseClick}
         onFetchLatestClick={this.handleFetchLatestClick}
@@ -435,7 +435,7 @@ class CommUI {
   private handleScroll = async (e: Event) => {
     const el = e.target as HTMLElement;
 
-    if (el.scrollTop === 0 && !this.isFetching) {
+    if (el.scrollTop === 0 && !this.isFetchingNew && !this.isFetchingOld) {
       this.refreshData(true).then(() => this.renderPane());
       this.renderPane();
     }
