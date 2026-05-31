@@ -85,7 +85,7 @@ const CommTab = ({ id, label, isActive, onClick }: {
       color: "white",
       cursor: "pointer",
       width: "80px",
-      padding: "4px 8px",
+      padding: "8px 8px 16px 8px",
     }}
   >
     {label}
@@ -101,32 +101,87 @@ const CommLoading = ({ onRef }: {
 );
 
 const CommFetchLatestButton = ({ onRef, onClick, isLoading }: {
-  onRef: (el: HTMLElement) => void;
-  onClick: () => void;
+  onRef?: (el: HTMLElement) => void;
+  onClick?: () => void;
   isLoading: boolean;
 }) => (
-  <div
-    ref={onRef}
+  <button
     onClick={onClick}
     style={{
-      display: "none",
-      position: "absolute",
-      bottom: "20px",
-      left: "50%",
-      transform: "translateX(-50%)",
-      backgroundColor: "#ffce00",
-      color: "black",
-      padding: "5px 10px",
-      borderRadius: "10px",
-      cursor: "pointer",
-      fontSize: "12px",
-      fontWeight: "bold",
-      boxShadow: "0 2px 5px rgba(0,0,0,0.5)",
-      zIndex: "10016",
+      border: "none",
+      backgroundColor: "rgba(0, 0, 0, 0)",
+      fontSize: "14px",
+      padding: "4px 0px",
+      color: "rgba(214, 254, 250, 0.5)",
+      textDecoration: isLoading ? "none" : "underline",
+      cursor: isLoading ? "default" : "pointer",
     }}
   >
     {isLoading ? "Loading..." : "Fetch latest messages"}
-  </div>
+  </button>
+);
+
+const CommTextInput = ({
+  onRef,
+}: {
+  onRef?: (el: HTMLInputElement) => void;
+}) => (
+  <input
+    ref={onRef}
+    type="text"
+    placeholder="Broadcast message"
+    style={{
+      border: "none",
+      backgroundColor: "#303030",
+      color: "white",
+      padding: "1px 4px",
+      cursor: "pointer",
+      borderRadius: "2px",
+      fontSize: "13px",
+      maxWidth: "75%",
+    }}
+  />
+);
+
+const CommSendButton = ({ onRef }: {
+  onRef?: (el: HTMLInputElement) => void;
+}) => (
+  <button
+    ref={onRef}
+    type="button"
+    style={{
+      border: "none",
+      backgroundColor: "#303030",
+      color: "white",
+      padding: "1px 4px",
+      cursor: "pointer",
+      borderRadius: "2px",
+      fontSize: "13px",
+      maxWidth: "75%",
+    }}
+  >
+    Send
+  </button>
+);
+
+const CommCloseButton = ({ onRef }: {
+  onRef?: (el: HTMLElement) => void;
+}) => (
+  <button
+    ref={onRef}
+    type="button"
+    style={{
+      padding: "0px",
+      border: "none",
+      backgroundColor: "rgba(0, 0, 0, 0)",
+      color: "white",
+      cursor: "pointer",
+    }}
+  >
+    <svg viewBox="0 -960 960 960" width="30" height="30" fill="currentColor">
+      <path d="M480-344 240-584l56-56 184 184 184-184 56 56-240 240Z" />
+    </svg>
+  </button>
 );
 
 const CommPane = ({
@@ -185,20 +240,21 @@ const CommPane = ({
         className="comm-tabs"
         style={{
           display: "flex",
-          gap: "10px",
-          marginBottom: "8px",
+          justifyContent: "space-between",
           borderBottom: "1px solid #555",
-          paddingBottom: "5px",
         }}
       >
-        {tabs.map((tab) => (
-          <CommTab
-            id={tab.id}
-            label={tab.label}
-            isActive={channel === tab.id}
-            onClick={onTabClick}
-          />
-        ))}
+        <div style={{ display: "flex", gap: "10px" }}>
+          {tabs.map((tab) => (
+            <CommTab
+              id={tab.id}
+              label={tab.label}
+              isActive={channel === tab.id}
+              onClick={onTabClick}
+            />
+          ))}
+        </div>
+        <CommCloseButton />
       </div>
       <div
         ref={onMessageDivsRef}
@@ -210,14 +266,23 @@ const CommPane = ({
           {messages.map((plext) => (
             <CommMessage plext={plext} viewer={viewer} channel={channel} />
           ))}
-          <div style={{ height: "60px" }}></div>
         </div>
+        <CommFetchLatestButton
+          onRef={onFetchLatestBtnRef}
+          onClick={onRefresh}
+          isLoading={isFetching}
+        />
       </div>
-      <CommFetchLatestButton
-        onRef={onFetchLatestBtnRef}
-        onClick={onRefresh}
-        isLoading={isFetching}
-      />
+      <form
+        style={{ display: "flex" , flexDirection: "row", alignItems: "center", gap: "8px" }}
+      >
+        <div style={{ flex: 1 }}>
+          <CommTextInput />
+        </div>
+        <div>
+          <CommSendButton />
+        </div>
+      </form>
     </div>
   ) as HTMLElement;
 };
@@ -225,24 +290,24 @@ const CommPane = ({
 class CommUI {
   private readonly viewer: Viewer;
   private readonly commManager: CommManager;
+
   private container: HTMLElement;
   private pane: HTMLElement | null = null;
   private loadingDiv: HTMLElement | null = null;
   private messageDivs: HTMLElement | null = null;
   private fetchLatestBtn: HTMLElement | null = null;
+
   private currentChannel: Channel = "all";
   private isFetching = false;
   private refreshInterval: any = null;
-  private previousScrollHeight = 0;
-  private previousScrollTop = 0;
+
+  private previousScrollHeights: Map<string, number> = new Map([["all", 0], ["faction", 0], ["alerts", 0]]);
+  private previousScrollTops: Map<string, number> = new Map([["all", 0], ["faction", 0], ["alerts", 0]]);
 
   constructor(viewer: Viewer, container: HTMLElement, commManager: CommManager) {
     this.viewer = viewer;
     this.container = container;
     this.commManager = commManager;
-    this.refreshInterval = setInterval(() => {
-      this.refreshData().then(() => this.renderPane());
-    }, 30000);
   }
 
   private async refreshData(fetchOld = false): Promise<void> {
@@ -261,7 +326,7 @@ class CommUI {
       if (channel === "alerts") await this.commManager.requestAlerts(fetchOld);
 
       const newMsgCount = this.commManager.getMessages(channel).length - msgCount;
-      logManager.debug("CommDetailPane", `Received ${newMsgCount} new message(s)`);
+      logManager.debug("CommDetailPane", `Received ${newMsgCount} new message${newMsgCount === 1 ? "" : "s"}`);
 
       if (newMsgCount === 0 && this.loadingDiv) {
         this.loadingDiv.remove();
@@ -281,10 +346,6 @@ class CommUI {
   }
 
   private closePane(): void {
-    if (this.messageDivs) {
-      this.previousScrollTop = this.messageDivs.scrollTop;
-      this.previousScrollHeight = this.messageDivs.scrollHeight;
-    }
     if (this.pane) {
       this.pane.remove();
       this.pane = null;
@@ -300,21 +361,22 @@ class CommUI {
   private showPane(): void {
     this.pane = this.createPaneEl();
     this.container.appendChild(this.pane);
+    if (this.messageDivs) this.messageDivs.scrollTop = this.previousScrollTops.get(this.currentChannel) || 0;
+
     const messages = this.commManager.getMessages(this.currentChannel);
     if (messages.length === 0) this.refreshData().then(() => this.renderPane());
-    if (this.messageDivs) this.messageDivs.scrollTop = this.previousScrollTop;
+    this.refreshInterval = setInterval(() => {
+      this.refreshData().then(() => this.renderPane());
+    }, 30000);
   }
 
   private renderPane(): void {
     if (!this.pane) return;
 
-    if (this.messageDivs) {
-      this.previousScrollTop = this.messageDivs.scrollTop;
-      this.previousScrollHeight = this.messageDivs.scrollHeight;
-    }
-
+    const prevScrollTop = this.previousScrollTops.get(this.currentChannel) || 0;
+    const prevScrollHeight = this.previousScrollHeights.get(this.currentChannel) || 0;
     const isAtBottom = this.messageDivs
-      ? this.previousScrollTop + this.messageDivs.clientHeight >= this.previousScrollHeight - 20
+      ? prevScrollTop + this.messageDivs.clientHeight >= prevScrollHeight - 20
       : true;
 
     const newPane = this.createPaneEl();
@@ -325,7 +387,7 @@ class CommUI {
       if (isAtBottom) {
         this.messageDivs.scrollTop = this.messageDivs.scrollHeight;
       } else {
-        this.messageDivs.scrollTop = this.previousScrollTop + (this.messageDivs.scrollHeight - this.previousScrollHeight);
+        this.messageDivs.scrollTop = prevScrollTop + (this.messageDivs.scrollHeight - prevScrollHeight);
       }
     }
   }
@@ -354,9 +416,9 @@ class CommUI {
       this.refreshData(true).then(() => this.renderPane());
     }
 
-    if (this.fetchLatestBtn) {
-      const isAtBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 5;
-      this.fetchLatestBtn.style.display = isAtBottom ? "block" : "none";
+    if (this.messageDivs) {
+      this.previousScrollTops.set(this.currentChannel, this.messageDivs.scrollTop);
+      this.previousScrollHeights.set(this.currentChannel, this.messageDivs.scrollHeight);
     }
   };
 
