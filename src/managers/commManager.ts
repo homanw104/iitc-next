@@ -50,7 +50,8 @@ export class CommManager {
         maxLngE6: Math.round(Cesium.Math.toDegrees(viewRect.east) * 1e6),
       };
     }
-    // Fallback or handle null
+
+    // Fall back or handle null
     return {
       minLatE6: -90000000,
       minLngE6: -180000000,
@@ -58,6 +59,7 @@ export class CommManager {
       maxLngE6: 180000000,
     };
   }
+
 
   public getMessages(channel: string, bounds?: { minLatE6: number; minLngE6: number; maxLatE6: number; maxLngE6: number }): Plext[] {
     const channelMessages = Array.from(this.messages[channel]?.values() || []);
@@ -82,6 +84,33 @@ export class CommManager {
       }
       return true;  // System message with no coordinates or other type
     }).sort((a, b) => a.timestamp - b.timestamp);
+  }
+
+  public async sendMessage(channel: string, message: string): Promise<void> {
+    try {
+      const viewRect = this.viewer.camera.computeViewRectangle();
+      let latE6 = 0;
+      let lngE6 = 0;
+
+      if (viewRect) {
+        latE6 = Math.round(Cesium.Math.toDegrees(Cesium.Rectangle.center(viewRect).latitude) * 1e6);
+        lngE6 = Math.round(Cesium.Math.toDegrees(Cesium.Rectangle.center(viewRect).longitude) * 1e6);
+      }
+
+      const payload = {
+        message,
+        latE6,
+        lngE6,
+        tab: channel
+      };
+
+      const response: any = await apiRequest("sendPlext", payload);
+      if (response && response.error) {
+        logManager.error("CommManager", `Failed to send message to ${channel} channel`, response.error);
+      }
+    } catch (e) {
+      logManager.error("CommManager", `Failed to send message to ${channel} channel`, e);
+    }
   }
 
   public async requestAll(fetchOld: boolean = false): Promise<void> {

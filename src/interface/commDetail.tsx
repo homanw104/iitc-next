@@ -21,7 +21,7 @@ const CommMessage = ({ plext, viewer, channel }: {
   }
 
   return (
-    <div style={{ marginBottom: "8px", display: "flex", flexDirection: "row" }}>
+    <div style={{ margin: "4px 0px", display: "flex", flexDirection: "row" }}>
       <div
         style={{ fontSize: "12px", color: "rgba(214, 254, 250, 0.5)", minWidth: "75px", width: "75px" }}
         title={dateObj.toLocaleString()}
@@ -95,7 +95,7 @@ const CommTab = ({ id, label, isActive, onClick }: {
 const CommLoading = ({ onRef }: {
   onRef: (el: HTMLElement) => void;
 }) => (
-  <div ref={onRef} style={{ marginBottom: "8px", display: "flex", flexDirection: "row" }}>
+  <div ref={onRef} style={{ padding: "8px 0px", display: "flex", flexDirection: "row" }}>
     <div style={{ fontSize: "14px", paddingBottom: "2px", color: "rgba(214, 254, 250, 0.5)" }}>Loading...</div>
   </div>
 );
@@ -113,8 +113,9 @@ const CommFetchLatestButton = ({ onRef, onClick, isLoading }: {
       border: "none",
       backgroundColor: "rgba(0, 0, 0, 0)",
       fontSize: "14px",
-      padding: "4px 0px",
+      padding: "16px 0px",
       color: "rgba(214, 254, 250, 0.5)",
+      fontFamily: "coda_regular, arial, helvetica, sans-serif",
       textDecoration: isLoading ? "none" : "underline",
       cursor: isLoading ? "default" : "pointer",
     }}
@@ -123,41 +124,56 @@ const CommFetchLatestButton = ({ onRef, onClick, isLoading }: {
   </button>
 );
 
-const CommTextInput = ({ onRef }: {
+const CommTextInput = ({ onRef, onSend, onFocus, onBlur }: {
   onRef?: (el: HTMLInputElement) => void;
+  onSend: (message: string) => void;
+  onFocus?: () => void;
+  onBlur?: () => void;
 }) => (
   <input
+    id="broadcast-input"
     ref={onRef}
     type="text"
     placeholder="Broadcast message"
+    onFocus={onFocus}
+    onBlur={onBlur}
     style={{
-      border: "none",
-      backgroundColor: "#303030",
+      flex: 1,
+      backgroundColor: "#111",
+      border: "1px solid #555",
       color: "white",
-      padding: "1px 4px",
-      cursor: "pointer",
+      padding: "4px 8px",
       borderRadius: "2px",
-      fontSize: "13px",
-      maxWidth: "75%",
+    }}
+    onKeypress={(e: KeyboardEvent) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const input = e.target as HTMLInputElement;
+        if (input.value) {
+          onSend(input.value);
+        }
+      }
     }}
   />
 );
 
-const CommSendButton = ({ onRef }: {
-  onRef?: (el: HTMLInputElement) => void;
+const CommSendButton = ({ onClick, onRef }: {
+  onClick: () => void;
+  onRef?: (el: HTMLButtonElement) => void;
 }) => (
   <button
     ref={onRef}
     type="button"
+    onclick={onClick}
     style={{
-      border: "none",
-      backgroundColor: "#303030",
+      backgroundColor: "#5091ff",
+      border: "1px solid #555",
       color: "white",
-      padding: "1px 4px",
-      cursor: "pointer",
+      height: "34px",
+      padding: "4px 8px",
       borderRadius: "2px",
-      fontSize: "13px",
-      maxWidth: "75%",
+      fontFamily: "coda_regular, arial, helvetica, sans-serif",
+      cursor: "pointer",
     }}
   >
     Send
@@ -194,6 +210,9 @@ const CommPane = ({
   onTabClick,
   onCloseClick,
   onFetchLatestClick,
+  onSendMessage,
+  onInputFocus,
+  onInputBlur,
   onLoadingDivRef,
   onMessageDivsRef,
   onScroll,
@@ -205,11 +224,15 @@ const CommPane = ({
   onTabClick: (tab: Channel) => void;
   onCloseClick: () => void;
   onFetchLatestClick: () => void;
+  onSendMessage: (message: string) => void;
+  onInputFocus: () => void;
+  onInputBlur: () => void;
   onLoadingDivRef: (el: HTMLElement) => void;
   onMessageDivsRef: (el: HTMLElement) => void;
   onScroll: (e: Event) => void;
 }) => {
   const messages = commManager.getMessages(channel);
+  let textInput: HTMLInputElement | null = null;
 
   const tabs: { id: Channel; label: string }[] = [
     { id: "all", label: "ALL" },
@@ -274,15 +297,23 @@ const CommPane = ({
           isLoading={isFetchingNew}
         />
       </div>
+      <div style={{ display: "flex", justifyContent: "space-between", height: "8px", borderTop: "1px solid #555" }} />
       <form
-        style={{ display: "flex" , flexDirection: "row", alignItems: "center", gap: "8px" }}
+        onSubmit={(e: Event) => e.preventDefault()}
+        style={{ display: "flex", gap: "8px" }}
       >
-        <div style={{ flex: 1 }}>
-          <CommTextInput />
-        </div>
-        <div>
-          <CommSendButton />
-        </div>
+        <CommTextInput
+          onRef={(el) => (textInput = el)}
+          onSend={onSendMessage}
+          onFocus={onInputFocus}
+          onBlur={onInputBlur}
+        />
+        <CommSendButton onClick={() => {
+          if (textInput && textInput.value) {
+            onSendMessage(textInput.value);
+            textInput.value = "";
+          }
+        }} />
       </form>
     </div>
   ) as HTMLElement;
@@ -301,6 +332,7 @@ class CommUI {
   private isFetchingNew = false;
   private isFetchingOld = false;
   private isUpdatingScroll = false;
+  private isInputFocused = false;
   private refreshInterval: any = null;
 
   private refreshNewMsgCount = new Map([["all", 0], ["faction", 0], ["alerts", 0]]);
@@ -370,6 +402,7 @@ class CommUI {
     }
 
     this.refreshInterval = setInterval(() => {
+      if (this.isInputFocused) return;
       this.refreshData().then(() => this.renderPane());
       this.renderPane();
     }, 30000);
@@ -425,12 +458,31 @@ class CommUI {
         onTabClick={this.handleTabClick}
         onCloseClick={this.handleCloseClick}
         onFetchLatestClick={this.handleFetchLatestClick}
+        onSendMessage={this.handleSendMessage}
+        onInputFocus={() => { this.isInputFocused = true; }}
+        onInputBlur={() => { this.isInputFocused = false; }}
         onLoadingDivRef={(el: HTMLElement) => (this.loadingDiv = el)}
         onMessageDivsRef={(el: HTMLElement) => (this.messageDivs = el)}
         onScroll={this.handleScroll}
       />
     ) as HTMLElement;
   }
+
+  private handleSendMessage = async (message: string) => {
+    if (this.currentChannel === "alerts") {
+      alert("__JARVIS__: A strange game. The only winning move is not to play. How about a nice game of chess?");
+      return;
+    }
+
+    try {
+      await this.commManager.sendMessage(this.currentChannel, message);
+      setTimeout(() => {
+        this.refreshData().then(() => this.renderPane());
+      }, 1000);
+    } catch (e) {
+      logManager.warn("CommUI", "Error sending message:", e);
+    }
+  };
 
   private handleScroll = async (e: Event) => {
     const el = e.target as HTMLElement;
