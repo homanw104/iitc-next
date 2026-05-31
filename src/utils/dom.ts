@@ -70,6 +70,8 @@ export function h(tag: string | Function, props: any, ...children: any[]): JSX.E
           }
         `;
         el.appendChild(style);
+      } else if (key === "disabled" && (el instanceof HTMLButtonElement || el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement)) {
+        el.disabled = !!value;
       } else {
         el.setAttribute(key, value as string);
       }
