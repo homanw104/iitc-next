@@ -15,8 +15,8 @@ This project is a Total Conversion for Ingress Intel that adds a 3D globe view u
 
 ## Build Userscript
 
-`npm run build`: Generates the final .user.js file in the `dist/` folder,
-ready for distribution.
+1. `npm run build`: Generates the final .user.js file in the `dist/` folder.
+2. `npm run build:plugin`: Generates plugin .js files in the `dist/` folder.
 
 ## Build for Android
 

@@ -108,7 +108,7 @@ export class TileRequest {
 /**
  * TileRequestManager class for managing multiple TileRequests.
  */
-export class TileManager {
+export class TileRequestManager {
   private activeRequestCount: number = 0;
   private maxRequests: number = 5;
   private tilesPerRequest: number = TILES_PER_REQUEST;
@@ -129,7 +129,7 @@ export class TileManager {
    * @param refreshExisting - A flag indicating whether to refresh existing tiles.
    */
   public addTiles(tileKeys: string[], refreshExisting: boolean = false): void {
-    logManager.debug("TileManager", `Adding ${tileKeys.length} tiles to queue`);
+    logManager.debug("TileRequestManager", `Adding ${tileKeys.length} tiles to queue`);
     let skippedCount = 0;
     tileKeys.forEach((key) => {
       if (!this.requestedTiles.has(key) && !this.queuedTiles.has(key)) {
@@ -139,12 +139,12 @@ export class TileManager {
         skippedCount += 1;
       }
     });
-    logManager.debug("TileManager", `Skipped ${skippedCount} tile${skippedCount === 1 ? "" : "s"}`);
+    logManager.debug("TileRequestManager", `Skipped ${skippedCount} tile${skippedCount === 1 ? "" : "s"}`);
     this.processQueue(refreshExisting).then();
   }
 
   public removeTiles(tileKeys: string[]): void {
-    logManager.debug("TileManager", `Removing ${tileKeys.length} tiles from registry`);
+    logManager.debug("TileRequestManager", `Removing ${tileKeys.length} tiles from registry`);
     tileKeys.forEach((key) => {
       if (this.queuedTiles.has(key)) {
         this.queuedTiles.delete(key);
@@ -186,12 +186,12 @@ export class TileManager {
    */
   private async processQueue(refreshExisting: boolean = false): Promise<void> {
     if (this.activeRequestCount >= this.maxRequests) {
-      logManager.info("TileManager", `Max request count (${this.maxRequests}) reached`);
+      logManager.info("TileRequestManager", `Max request count (${this.maxRequests}) reached`);
       return;
     }
 
     if (this.queuedTiles.size === 0) {
-      logManager.info("TileManager", "Loaded");
+      logManager.info("TileRequestManager", "Loaded");
       return;
     }
 
@@ -205,21 +205,23 @@ export class TileManager {
     const request = new TileRequest(tilesToRequest);
     this.activeRequestCount++;
 
-    logManager.debug("TileManager", `Sending request for ${tilesToRequest.length} tiles`);
+    logManager.debug("TileRequestManager", `Sending request for ${tilesToRequest.length} tiles`);
     const size = this.queuedTiles.size + tilesToRequest.length;
     logManager.info(
-      "TileManager",
+      "TileRequestManager",
       `Loading ${size} tile${size === 1 ? "" : "s"}`
     );
 
     try {
       const response = await request.send();
-      logManager.debug("TileManager", `Received response for ${tilesToRequest.length} tiles`);
-      if (response && refreshExisting) this.entityManager.removeGameEntitiesInView();
-      logManager.debug("TileManager", "Removed entities from current view");
+      logManager.debug("TileRequestManager", `Received response for ${tilesToRequest.length} tile${tilesToRequest.length === 1 ? "" : "s"}`);
+      if (response && refreshExisting) {
+        this.entityManager.removeGameEntitiesInView();
+        logManager.debug("TileRequestManager", "Removed entities from current view");
+      }
       this.handleResponse(response, tilesToRequest);
     } catch (error) {
-      logManager.error("TileManager", "Tile request failed:", error);
+      logManager.error("TileRequestManager", "Tile request failed:", error);
       tilesToRequest.forEach((key) => {
         this.requestedTiles.delete(key);
         this.setTileStatus(key, "error");
@@ -239,7 +241,7 @@ export class TileManager {
   private handleResponse(response: unknown, tileKeys: string[]): void {
     const data = response as TileResponse;
     if (!data || !data.result) {
-      logManager.warn("TileManager", "Invalid response data:", data);
+      logManager.warn("TileRequestManager", "Invalid response data:", data);
       tileKeys.forEach((key) => {
         this.requestedTiles.delete(key);
         this.setTileStatus(key, "error");
@@ -263,7 +265,7 @@ export class TileManager {
         if (tileData.error == "TIMEOUT") {
           this.setTileStatus(tileKey, "loaded");
         } else {
-          logManager.warn("TileManager", `Tile ${tileKey} failed: ${tileData.error}`);
+          logManager.warn("TileRequestManager", `Tile ${tileKey} failed: ${tileData.error}`);
           this.setTileStatus(tileKey, "error");
         }
         this.requestedTiles.delete(tileKey);
@@ -281,8 +283,7 @@ export class TileManager {
       }
     }
 
-    logManager.debug("TileManager", `Processed ${entitiesFound} entities`);
-    logManager.debug("TileManager", "Request render");
+    logManager.debug("TileRequestManager", `Processed ${entitiesFound} entities`);
     this.entityManager.requestRender();
   }
 }

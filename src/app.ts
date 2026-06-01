@@ -2,39 +2,39 @@
  * Entry point for the application.
  */
 
-import loadCesiumViewer from "./procedures/loadCesiumViewer";
+import setUpLogManager from "./procedures/setUpLogManager";
 import extractPlayerInfo from "./procedures/extractPlayerInfo";
 import extractVersionString from "./procedures/extractVersionString";
+import loadCesiumViewer from "./procedures/loadCesiumViewer";
 import unloadOriginalIntelMap from "./procedures/unloadOriginalIntelMap";
-import { logManager, LogLevel } from "./managers/logManager";
+import loadPlugins from "./procedures/loadPlugins";
+import registerPlugins from "./procedures/registerPlugins";
 import { getPlayerInfo } from "./utils/player";
-
-declare global {
-  interface Window {
-    logger: typeof logManager;
-    iitcLogger: typeof logManager;
-    LogLevel: typeof LogLevel;
-  }
-}
-
-window.logger = logManager;
-window.iitcLogger = logManager;
-window.LogLevel = LogLevel;
+import "./types/iitc.d.ts";
 
 const init = () => {
-  logManager.setLevel(LogLevel.DEBUG);
-  logManager.info("Initializing IITC Next");
+  // Initialize iitc variable
+  window.iitc = {}
+
+  // Set up logging for this app
+  setUpLogManager();
+
+  // Register plugins and expose registration function globally
+  registerPlugins();
 
   // Extract data from the original intel map
   extractVersionString();
   extractPlayerInfo();
 
-  // Return if user isn't logged in
+  // Halt if user isn't logged in
   if (!getPlayerInfo()) return;
 
   // Initialize IITC Next
   unloadOriginalIntelMap();
   loadCesiumViewer();
+
+  // Load all plugins
+  loadPlugins();
 };
 
 // Disable vanilla JS

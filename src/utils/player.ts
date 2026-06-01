@@ -1,5 +1,5 @@
 /**
- * Class to manage player info
+ * Functions to manage player info
  */
 
 import { Player } from "../types/ingress";
@@ -13,7 +13,7 @@ let player: Player | undefined;
  * @param playerInfo - Formatted player info object.
  */
 export function setPlayerInfo(playerInfo: Player) {
-  logManager.debug("PlayerInfo", "Setting player info", playerInfo);
+  logManager.debug("PlayerInfo", "Setting player info");
   player = playerInfo;
 }
 

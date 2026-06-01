@@ -13,8 +13,8 @@ import {
   getMapZoomTileParameters,
   latToTileIndex,
   lngToTileIndex,
-  TileManager
-} from "../managers/tileManager";
+  TileRequestManager
+} from "../managers/tileRequestManager";
 import { logManager } from "../managers/logManager";
 import { EntityManager } from "../managers/entityManager";
 import { DebugTileEntityManager } from "../managers/debugTileEntityManager";
@@ -442,14 +442,14 @@ function calculateTileKeys(viewer: Cesium.Viewer): string[] {
  * Trigger reloading of tiles.
  *
  * @param viewer - Cesium viewer to calculate view range.
- * @param tileManager - Tile manager to add and process tiles.
+ * @param tileRequestManager - Tile manager to add and process tiles.
  */
-function triggerDataReload(viewer: Cesium.Viewer, tileManager: TileManager): void {
+function triggerDataReload(viewer: Cesium.Viewer, tileRequestManager: TileRequestManager): void {
   const tileKeys = calculateTileKeys(viewer);
 
   if (tileKeys.length > 0) {
-    tileManager.removeTiles(tileKeys);
-    tileManager.addTiles(tileKeys, true);
+    tileRequestManager.removeTiles(tileKeys);
+    tileRequestManager.addTiles(tileKeys, true);
   }
 }
 
@@ -457,13 +457,13 @@ function triggerDataReload(viewer: Cesium.Viewer, tileManager: TileManager): voi
  * Trigger loading of tiles.
  *
  * @param viewer - Cesium viewer to calculate view range.
- * @param tileManager - Tile manager to add and process tiles.
+ * @param tileRequestManager - Tile manager to add and process tiles.
  */
-const triggerDataLoad = (viewer: Cesium.Viewer, tileManager: TileManager) => {
+const triggerDataLoad = (viewer: Cesium.Viewer, tileRequestManager: TileRequestManager) => {
   const tileKeys = calculateTileKeys(viewer);
 
   if (tileKeys.length > 0) {
-    tileManager.addTiles(tileKeys);
+    tileRequestManager.addTiles(tileKeys);
   }
 };
 
@@ -471,10 +471,10 @@ const triggerDataLoad = (viewer: Cesium.Viewer, tileManager: TileManager) => {
  * Sets up data loading for the tile manager.
  *
  * @param viewer - The Cesium.Viewer instance to listen for camera changes.
- * @param tileManager - The TileManager instance to add tiles to.
+ * @param tileRequestManager - The TileRequestManager instance to add tiles to.
  */
-function setupDataLoading(viewer: Cesium.Viewer, tileManager: TileManager): void {
-  viewer.camera.moveEnd.addEventListener(() => triggerDataLoad(viewer, tileManager));
+function setupDataLoading(viewer: Cesium.Viewer, tileRequestManager: TileRequestManager): void {
+  viewer.camera.moveEnd.addEventListener(() => triggerDataLoad(viewer, tileRequestManager));
 }
 
 /**
@@ -494,14 +494,22 @@ export default function loadCesiumViewer(): void {
   setInitialView(viewer);
 
   const entityManager = new EntityManager(viewer);
-  const tileManager = new TileManager(entityManager);
-  new DebugTileEntityManager(tileManager, entityManager);
+  const tileRequestManager = new TileRequestManager(entityManager);
+  new DebugTileEntityManager(tileRequestManager, entityManager);
 
   const scoreManager = new ScoreManager();
   const redeemManager = new RedeemManager();
   const commManager = new CommManager(viewer);
 
-  addRefreshButton(container, () => triggerDataReload(viewer, tileManager));
+  // Expose managers to the global iitc object
+  window.iitc.viewer = viewer;
+  window.iitc.entityManager = entityManager;
+  window.iitc.tileRequestManager = tileRequestManager;
+  window.iitc.scoreManager = scoreManager;
+  window.iitc.redeemManager = redeemManager;
+  window.iitc.commManager = commManager;
+
+  addRefreshButton(container, () => triggerDataReload(viewer, tileRequestManager));
   addGameDetailButton(container, scoreManager, redeemManager);
   addCommDetailButton(viewer, container, commManager);
 
@@ -511,5 +519,5 @@ export default function loadCesiumViewer(): void {
 
   setupGoogleMapsGestures(viewer);
   setupClickHandler(viewer, entityManager, container);
-  setupDataLoading(viewer, tileManager);
+  setupDataLoading(viewer, tileRequestManager);
 }

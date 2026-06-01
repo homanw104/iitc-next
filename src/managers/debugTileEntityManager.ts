@@ -4,25 +4,23 @@
  */
 
 import * as Cesium from "cesium";
-import { TileManager, TileStatus, getMapZoomTileParameters, tileToLat, tileToLng } from "./tileManager";
+import { TileRequestManager, TileStatus, getMapZoomTileParameters, tileToLat, tileToLng } from "./tileRequestManager";
 import { EntityManager } from "./entityManager";
-import { logManager } from "./logManager";
 
 /**
  * Manages the visualization of tiles for debugging purposes.
  * It shows rectangles on the map representing the tiles being loaded.
  */
 export class DebugTileEntityManager {
-  private tileManager: TileManager;
+  private tileRequestManager: TileRequestManager;
   private entityManager: EntityManager;
   private tileEntities: Map<string, Cesium.Entity> = new Map();
   private layerId = "debug-tiles";
 
-  constructor(tileManager: TileManager, entityManager: EntityManager) {
-    this.tileManager = tileManager;
+  constructor(tileRequestManager: TileRequestManager, entityManager: EntityManager) {
     this.entityManager = entityManager;
-
-    this.tileManager.onTileStatusChange((key, status) => {
+    this.tileRequestManager = tileRequestManager;
+    this.tileRequestManager.onTileStatusChange((key, status) => {
       this.updateTile(key, status);
     });
   }
@@ -46,7 +44,6 @@ export class DebugTileEntityManager {
         this.updateEntity(entity, status); // Handle immediate removal if status is already loaded/error
       }
     }
-    logManager.debug("DebugTileEntityManager", "Request render");
     this.entityManager.requestRender();
   }
 
@@ -136,7 +133,6 @@ export class DebugTileEntityManager {
             break;
           }
         }
-        logManager.debug("DebugTileEntityManager", "Request render");
         this.entityManager.requestRender();
       }, 2000);
     }
