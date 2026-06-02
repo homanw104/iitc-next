@@ -1,87 +1,14 @@
 package world.homans.iitcnext;
 
 import android.annotation.SuppressLint;
-import android.app.Dialog;
-import android.content.Intent;
-import android.net.Uri;
+import android.content.Context;
 import android.os.Bundle;
-import android.os.Message;
-import android.view.ViewGroup;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
-import android.webkit.WebViewClient;
-import android.webkit.WebResourceRequest;
-import android.webkit.WebResourceResponse;
-import androidx.annotation.Nullable;
-import androidx.browser.customtabs.CustomTabsIntent;
 import com.getcapacitor.BridgeActivity;
-import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
-import java.util.Map;
-import org.json.JSONObject;
 
 public class MainActivity extends BridgeActivity {
-    private Dialog popupDialog;
-    private String userScript;
-
-    private static final String CESIUM_JS = "https://cdn.jsdelivr.net/npm/cesium@1.141.0/Build/Cesium/Cesium.js";
-    private static final String CESIUM_CSS = "https://cdn.jsdelivr.net/npm/cesium@latest/Build/Cesium/Widgets/widgets.css";
-    private static final String SYSTEM_JS = "https://cdn.jsdelivr.net/npm/systemjs@6.15.1/dist/system.min.js";
-    private static final String SYSTEM_NAMED_REGISTER = "https://cdn.jsdelivr.net/npm/systemjs@6.15.1/dist/extras/named-register.min.js";
-
-    private String getLoaderJs() {
-        return "javascript:(function() { " +
-            "try { " +
-            "console.log('IITC-Next: getLoaderJs triggered'); " +
-            "if (window.IITC_NEXT_INJECTED) { console.log('IITC-Next: Already injected'); return; } " +
-            "window.IITC_NEXT_INJECTED = true; " +
-            "var cScript = document.createElement('script'); " +
-            "cScript.type = 'text/javascript'; " +
-            "cScript.src = '" + CESIUM_JS + "'; " +
-            "var sScript = document.createElement('script'); " +
-            "sScript.type = 'text/javascript'; " +
-            "sScript.src = '" + SYSTEM_JS + "'; " +
-            "var snScript = document.createElement('script'); " +
-            "snScript.type = 'text/javascript'; " +
-            "snScript.src = '" + SYSTEM_NAMED_REGISTER + "'; " +
-            "var lScript = document.createElement('link'); " +
-            "lScript.rel = 'stylesheet'; " +
-            "lScript.href = '" + CESIUM_CSS + "'; " +
-            "var script = document.createElement('script'); " +
-            "script.type = 'text/javascript'; " +
-            "script.src = 'https://intel.ingress.com/iitc-next/inject.js'; " +
-            "var target = document.head || document.documentElement; " +
-            "if (target) { " +
-            "  console.log('IITC-Next: Appending scripts to head/documentElement'); " +
-            "  target.appendChild(cScript); target.appendChild(sScript); " +
-            "  target.appendChild(snScript); target.appendChild(lScript); " +
-            "  target.appendChild(script); " +
-            "} " +
-            "else { " +
-            "console.log('IITC-Next: Waiting for DOMContentLoaded to append scripts'); " +
-            "document.addEventListener('DOMContentLoaded', function() { " +
-            "  var t = document.head || document.documentElement; " +
-            "  t.appendChild(cScript); t.appendChild(sScript); " +
-            "  t.appendChild(snScript); t.appendChild(lScript); " +
-            "  t.appendChild(script); " +
-            "}); } " +
-            "} catch(e) { console.error('IITC-Next Loader Error', e); }" +
-            "})();";
-    }
-
-    private void injectLoader(WebView view) {
-        String url = view.getUrl();
-        if (url != null && (url.contains("/signinhandler") || url.contains("/login"))) {
-            return;
-        }
-        view.evaluateJavascript(getLoaderJs(), null);
-    }
+    private final ScriptInjector scriptInjector = new ScriptInjector();
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -89,44 +16,22 @@ public class MainActivity extends BridgeActivity {
         if (0 != (getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE)) {
             WebView.setWebContentsDebuggingEnabled(true);
         }
-        loadUserScript();
-    }
-
-    private void addIITCInterface(WebView webView) {
-        // Keep the interface for compatibility with existing userscripts
-        webView.addJavascriptInterface(new Object() {
-            @android.webkit.JavascriptInterface
-            public void log(String msg) {
-                android.util.Log.i("IITC-Next", "JS Log: " + msg);
-            }
-
-            @android.webkit.JavascriptInterface
-            public void diag(String data) {
-                android.util.Log.d("IITC-Next", "JS Diag: " + data);
-            }
-        }, "IITC_Native");
+        scriptInjector.loadUserScript(this);
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        loadUserScript();
+        scriptInjector.loadUserScript(this);
     }
 
-    private void loadUserScript() {
-        try {
-            InputStream is = getAssets().open("public/iitc-next.user.js");
-            BufferedReader reader = new BufferedReader(new InputStreamReader(is));
-            StringBuilder sb = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                sb.append(line).append("\n");
-            }
-            userScript = sb.toString();
-            reader.close();
-        } catch (Exception e) {
-            android.util.Log.e("IITC-Next", "Error loading userscript from assets", e);
-        }
+    public ScriptInjector getScriptInjector() {
+        return scriptInjector;
+    }
+
+    public static String getCleanedUserAgent(Context context) {
+        String defaultUA = WebSettings.getDefaultUserAgent(context);
+        return defaultUA.replaceAll("Version/\\d+\\.\\d+\\s?", "").replaceAll(";\\s?wv", "");
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -134,299 +39,29 @@ public class MainActivity extends BridgeActivity {
     protected void load() {
         super.load();
         final WebView webView = getBridge().getWebView();
+        configureWebView(webView);
+
+        webView.setWebViewClient(new IITCWebViewClient(getBridge(), this));
+        webView.setWebChromeClient(new IITCPopupHandler(getBridge(), this));
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private void configureWebView(WebView webView) {
         WebSettings settings = webView.getSettings();
         settings.setSupportMultipleWindows(true);
         settings.setJavaScriptCanOpenWindowsAutomatically(true);
         settings.setDomStorageEnabled(true);
         settings.setDatabaseEnabled(true);
-        settings.setJavaScriptEnabled(true); // Ensure JS is enabled
+        settings.setJavaScriptEnabled(true);
+        settings.setAllowUniversalAccessFromFileURLs(true);
+        settings.setAllowFileAccessFromFileURLs(true);
+        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
 
         android.webkit.CookieManager cookieManager = android.webkit.CookieManager.getInstance();
         cookieManager.setAcceptThirdPartyCookies(webView, true);
 
-        // Dynamically set User Agent by removing WebView identifiers to bypass Google's block
-        String defaultUA = WebSettings.getDefaultUserAgent(this);
-        String cleanedUA = defaultUA.replaceAll("Version/\\d+\\.\\d+\\s?", "").replaceAll(";\\s?wv", "");
-        settings.setUserAgentString(cleanedUA);
+        settings.setUserAgentString(getCleanedUserAgent(this));
 
-        addIITCInterface(webView);
-
-        // Inject userscript using a more aggressive approach: re-set the client AFTER bridge initialization
-        webView.post(() -> {
-            webView.setWebViewClient(new com.getcapacitor.BridgeWebViewClient(getBridge()) {
-                @Nullable
-                @Override
-                public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
-                    String urlStr = request.getUrl().toString();
-                    
-                    // Handle internal script requests
-                    if (urlStr.contains("intel.ingress.com/iitc-next/")) {
-                        if (userScript == null) loadUserScript();
-                        if (userScript != null) {
-                            String content = "";
-                            if (urlStr.endsWith("inject.js")) {
-                                content = "(function() { " +
-                                    "window.GM_addStyle = window.GM_addStyle || function(css) { " +
-                                    "  var style = document.createElement('style'); " +
-                                    "  style.type = 'text/css'; " +
-                                    "  style.innerHTML = css; " +
-                                    "  (document.head || document.documentElement).appendChild(style); " +
-                                    "  return style; " +
-                                    "}; " +
-                                    "window.GM_getResourceText = window.GM_getResourceText || function() { return ''; }; " +
-                                    "function start() { " +
-                                    "  try { " +
-                                    "    if (typeof Cesium === 'undefined') { " +
-                                    "      console.log('IITC-Next: Waiting for Cesium...'); " +
-                                    "      setTimeout(start, 100); " +
-                                    "      return; " +
-                                    "    } " +
-                                    "    if (typeof System === 'undefined' || typeof System.constructor !== 'function') { " +
-                                    "      console.log('IITC-Next: Waiting for SystemJS...'); " +
-                                    "      setTimeout(start, 100); " +
-                                    "      return; " +
-                                    "    } " +
-                                    "    console.log('IITC-Next: Libraries ready, fetching module'); " +
-                                    "    if (typeof System.addImportMap !== 'function') { " +
-                                    "      System = new System.constructor(); " +
-                                    "    } " +
-                                    "    fetch('https://intel.ingress.com/iitc-next/___monkey.entry.js') " +
-                                    "      .then(r => r.text()) " +
-                                    "      .then(text => { " +
-                                    "        console.log('IITC-Next: Module fetched, preparing blob'); " +
-                                    "        var patched = text.replace(/System\\.import\\(\"\\.\\/___monkey\\.entry\\.js\", \"\\.\\/\"\\);?$/, ''); " +
-                                    "        var blob = new Blob([patched], { type: 'application/javascript' }); " +
-                                    "        var url = URL.createObjectURL(blob); " +
-                                    "        console.log('IITC-Next: Importing blob URL'); " +
-                                    "        return System.import(url); " +
-                                    "      }) " +
-                                    "      .catch(e => console.error('IITC-Next Fetch Error', e)); " +
-                                    "  } catch (e) { " +
-                                    "    console.error('IITC-Next Bootstrapper Error', e); " +
-                                    "  } " +
-                                    "} " +
-                                    "start(); " +
-                                    "})();";
-                            } else {
-                                content = userScript;
-                            }
-                            InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
-                            return new WebResourceResponse("application/javascript", "UTF-8", is);
-                        }
-                    }
-
-                    if (urlStr.contains("intel.ingress.com") && request.isForMainFrame() && userScript != null) {
-                        // Skip injection on non-map pages (like login handler) to avoid errors
-                        if (urlStr.contains("/signinhandler") || urlStr.contains("/login")) {
-                            return null;
-                        }
-                        try {
-                            URL url = new URL(urlStr);
-                            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                            conn.setRequestMethod(request.getMethod());
-                            
-                            // Copy request headers
-                            for (Map.Entry<String, String> entry : request.getRequestHeaders().entrySet()) {
-                                conn.setRequestProperty(entry.getKey(), entry.getValue());
-                            }
-                            
-                            // Handle response
-                            InputStream in;
-                            int responseCode = conn.getResponseCode();
-                            if (responseCode >= 400) {
-                                in = conn.getErrorStream();
-                            } else {
-                                in = conn.getInputStream();
-                            }
-                            
-                            if (in == null) {
-                                conn.disconnect();
-                                return null;
-                            }
-
-                            String contentEncoding = conn.getContentEncoding();
-                            if (contentEncoding != null && contentEncoding.equalsIgnoreCase("gzip")) {
-                                in = new java.util.zip.GZIPInputStream(in);
-                            }
-                            
-                            BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
-                            StringBuilder responseBuilder = new StringBuilder();
-                            String line;
-                            while ((line = reader.readLine()) != null) {
-                                responseBuilder.append(line).append("\n");
-                            }
-                            reader.close();
-                            conn.disconnect();
-                            
-                            String html = responseBuilder.toString();
-                            
-                            // INJECT HERE - Use the old project's strategy: add a script tag that loads our script
-                            String scriptTag = "<script type=\"text/javascript\" src=\"" + CESIUM_JS + "\"></script>" +
-                                "<script type=\"text/javascript\" src=\"" + SYSTEM_JS + "\"></script>" +
-                                "<script type=\"text/javascript\" src=\"" + SYSTEM_NAMED_REGISTER + "\"></script>" +
-                                "<script type=\"text/javascript\">" +
-                                "(function(){" +
-                                "try {" +
-                                "if (window.IITC_NEXT_INJECTED) return; " +
-                                "window.IITC_NEXT_INJECTED = true; " +
-                                "var script = document.createElement('script'); " +
-                                "script.type = 'text/javascript'; " +
-                                "script.src = 'https://intel.ingress.com/iitc-next/inject.js'; " +
-                                "var target = document.head || document.documentElement; " +
-                                "if (target) { target.appendChild(script); } " +
-                                "else { " +
-                                "document.addEventListener('DOMContentLoaded', function() { (document.head || document.documentElement).appendChild(script); }); } " +
-                                "} catch(e) { console.error('IITC-Next Interceptor Error', e); }" +
-                                "})();" +
-                                "</script>";
-                            
-                            // Try to inject at the very beginning of the response
-                            if (html.toLowerCase().contains("<head>")) {
-                                html = html.replaceFirst("(?i)<head>", "<head>" + scriptTag + "<link rel=\"stylesheet\" href=\"" + CESIUM_CSS + "\">");
-                            } else if (html.toLowerCase().contains("<html>")) {
-                                html = html.replaceFirst("(?i)<html>", "<html>" + scriptTag + "<link rel=\"stylesheet\" href=\"" + CESIUM_CSS + "\">");
-                            } else {
-                                html = scriptTag + "<link rel=\"stylesheet\" href=\"" + CESIUM_CSS + "\">" + html;
-                            }
-
-                            InputStream is = new ByteArrayInputStream(html.getBytes(StandardCharsets.UTF_8));
-                            Map<String, String> responseHeaders = new HashMap<>();
-                            for (int i = 0; ; i++) {
-                                String name = conn.getHeaderFieldKey(i);
-                                String value = conn.getHeaderField(i);
-                                if (name == null && value == null) break;
-                                if (name != null) {
-                                    if (name.equalsIgnoreCase("Content-Encoding") || name.equalsIgnoreCase("Content-Length")) continue;
-                                    responseHeaders.put(name, value);
-                                }
-                            }
-                            responseHeaders.put("Content-Type", "text/html; charset=utf-8");
-                            responseHeaders.put("Access-Control-Allow-Origin", "*");
-                            
-                            return new WebResourceResponse("text/html", "UTF-8", responseCode, conn.getResponseMessage(), responseHeaders, is);
-                        } catch (Exception e) {
-                            android.util.Log.e("IITC-Next", "Interceptor Error", e);
-                        }
-                    }
-                    return super.shouldInterceptRequest(view, request);
-                }
-
-                @Override
-                public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
-                    super.onPageStarted(view, url, favicon);
-                    if (url != null && url.contains("intel.ingress.com")) {
-                        injectLoader(view);
-                    }
-                }
-
-                @Override
-                public void onPageFinished(WebView view, String url) {
-                    super.onPageFinished(view, url);
-                    if (url != null && url.contains("intel.ingress.com")) {
-                        injectLoader(view);
-                        view.postDelayed(() -> injectLoader(view), 2000);
-                    }
-                }
-
-                @Override
-                public void onPageCommitVisible(WebView view, String url) {
-                    super.onPageCommitVisible(view, url);
-                    if (url != null && url.contains("intel.ingress.com")) {
-                        injectLoader(view);
-                    }
-                }
-            });
-        });
-
-        webView.setWebChromeClient(new com.getcapacitor.BridgeWebChromeClient(getBridge()) {
-            @Override
-            public void onProgressChanged(WebView view, int newProgress) {
-                super.onProgressChanged(view, newProgress);
-                if (newProgress == 100) {
-                    String url = view.getUrl();
-                    if (url != null && url.contains("intel.ingress.com")) {
-                        injectLoader(view);
-                    }
-                }
-            }
-
-            @SuppressLint("SetJavaScriptEnabled")
-            @Override
-            public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, Message resultMsg) {
-                final WebView newWebView = new WebView(MainActivity.this);
-                WebSettings settings = newWebView.getSettings();
-                settings.setJavaScriptEnabled(true);
-                settings.setSupportMultipleWindows(true);
-                settings.setJavaScriptCanOpenWindowsAutomatically(true);
-                settings.setDomStorageEnabled(true);
-
-                // Dynamically set User Agent for the popup as well
-                String defaultUA = WebSettings.getDefaultUserAgent(MainActivity.this);
-                String cleanedUA = defaultUA.replaceAll("Version/\\d+\\.\\d+\\s?", "").replaceAll(";\\s?wv", "");
-                settings.setUserAgentString(cleanedUA);
-
-                if (popupDialog != null && popupDialog.isShowing()) {
-                    popupDialog.dismiss();
-                }
-
-                popupDialog = new Dialog(MainActivity.this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
-                popupDialog.setContentView(newWebView);
-                ViewGroup.LayoutParams params = newWebView.getLayoutParams();
-                params.width = ViewGroup.LayoutParams.MATCH_PARENT;
-                params.height = ViewGroup.LayoutParams.MATCH_PARENT;
-                newWebView.setLayoutParams(params);
-                popupDialog.show();
-
-                newWebView.setWebViewClient(new WebViewClient() {
-                    @Override
-                    public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                        String url = request.getUrl().toString();
-                        if (url.contains("google.com") || url.contains("nianticspatial.com") || url.contains("ingress.com")) {
-                            return false; // Let the new WebView handle it
-                        }
-
-                        // For everything else, use Custom Tabs
-                        try {
-                            CustomTabsIntent.Builder builder = new CustomTabsIntent.Builder();
-                            CustomTabsIntent customTabsIntent = builder.build();
-                            customTabsIntent.launchUrl(MainActivity.this, Uri.parse(url));
-                            return true;
-                        } catch (Exception e) {
-                            // Fallback to external browser
-                            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-                            startActivity(intent);
-                            return true;
-                        }
-                    }
-
-                    @Override
-                    public void onPageFinished(WebView view, String url) {
-                        super.onPageFinished(view, url);
-                        // If it redirects back to ingress.com, we might want to close this popup
-                        if (url.contains("intel.ingress.com") && !url.contains("auth")) {
-                            if (popupDialog != null && popupDialog.isShowing()) {
-                                popupDialog.dismiss();
-                                popupDialog = null;
-                            }
-                        }
-                    }
-                });
-
-                newWebView.setWebChromeClient(new android.webkit.WebChromeClient() {
-                    @Override
-                    public void onCloseWindow(WebView window) {
-                        if (popupDialog != null && popupDialog.isShowing()) {
-                            popupDialog.dismiss();
-                            popupDialog = null;
-                        }
-                    }
-                });
-
-                WebView.WebViewTransport transport = (WebView.WebViewTransport) resultMsg.obj;
-                transport.setWebView(newWebView);
-                resultMsg.sendToTarget();
-                return true;
-            }
-        });
+        webView.addJavascriptInterface(new IITCNativeInterface(), "IITC_Native");
     }
 }
