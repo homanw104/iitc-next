@@ -486,7 +486,7 @@ function setupDataLoading(viewer: Cesium.Viewer, tileRequestManager: TileRequest
  * setting up data loading.
  */
 export default function loadCesiumViewer(): void {
-  logManager.debug("CesiumViewer", "Loading...");
+  logManager.debug("CesiumViewer", "Loading");
 
   const container = createCesiumContainer();
   const viewer = initCesiumViewer(container.id);

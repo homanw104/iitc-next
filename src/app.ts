@@ -7,20 +7,20 @@ import extractPlayerInfo from "./procedures/extractPlayerInfo";
 import extractVersionString from "./procedures/extractVersionString";
 import loadCesiumViewer from "./procedures/loadCesiumViewer";
 import unloadOriginalIntelMap from "./procedures/unloadOriginalIntelMap";
-import loadPlugins from "./procedures/loadPlugins";
-import registerPlugins from "./procedures/registerPlugins";
+import setUpPluginManager from "./procedures/registerPlugins";
+import initPlugins from "./procedures/initPlugins";
 import { getPlayerInfo } from "./utils/player";
-import "./types/iitc.d.ts";
+import "./types/iitc.ts";
 
-const init = () => {
+const init = async () => {
   // Initialize iitc variable
   window.iitc = {}
 
   // Set up logging for this app
   setUpLogManager();
 
-  // Register plugins and expose registration function globally
-  registerPlugins();
+  // Expose plugin manager first
+  await setUpPluginManager();
 
   // Extract data from the original intel map
   extractVersionString();
@@ -34,7 +34,7 @@ const init = () => {
   loadCesiumViewer();
 
   // Load all plugins
-  loadPlugins();
+  initPlugins();
 };
 
 // Disable vanilla JS
@@ -43,7 +43,7 @@ document.body.onload = function () {};
 
 // Initialize once the DOM content is loaded
 if (document.readyState === "complete") {
-  init();
+  init().then();
 } else {
   window.addEventListener("load", init);
 }

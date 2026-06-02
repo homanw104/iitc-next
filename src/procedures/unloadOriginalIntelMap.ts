@@ -10,6 +10,6 @@ import { logManager } from "../managers/logManager";
  * @return {void}
  */
 export default function unloadOriginalIntelMap(): void {
-  logManager.debug("OriginalIntelMap", "Unloading...");
+  logManager.debug("OriginalIntelMap", "Unloading");
   document.body = document.createElement("body");
 }

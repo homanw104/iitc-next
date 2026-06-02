@@ -1,3 +1,7 @@
+/**
+ * Extract player information from the intel map.
+ */
+
 import { Team } from "../types/ingress";
 import { logManager } from "../managers/logManager";
 import { setPlayerInfo } from "../utils/player";

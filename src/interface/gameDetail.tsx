@@ -6,9 +6,13 @@ import { h } from "../utils/dom";
 import { getTeamColor } from "../utils/color";
 import { RedeemManager } from "../managers/redeemManager";
 import { ScoreManager } from "../managers/scoreManager";
+import { pluginManager } from "../managers/pluginManager";
+import { logManager } from "../managers/logManager";
 import { getPlayerInfo } from "../utils/player";
 
 let gameDetailPane: HTMLElement | null = null;
+let pluginDetailPane: HTMLElement | null = null;
+let redeemResultPane: HTMLElement | null = null;
 
 export function addGameDetailButton(container: HTMLElement, scoreManager: ScoreManager, redeemManager: RedeemManager): void {
   const ui = (
@@ -41,16 +45,23 @@ export function addGameDetailButton(container: HTMLElement, scoreManager: ScoreM
 
 function toggleGameDetailPane(container: HTMLElement, scoreManager: ScoreManager, redeemManager: RedeemManager) {
   if (gameDetailPane) {
-    gameDetailPane.remove();
-    gameDetailPane = null;
-  } else {
-    showGameDetailPane(container, scoreManager, redeemManager);
+    closeGameDetailPane();
+    return;
   }
+  if (pluginDetailPane) {
+    closePluginDetailPane();
+    return;
+  }
+  showGameDetailPane(container, scoreManager, redeemManager);
 }
 
 function showGameDetailPane(container: HTMLElement, scoreManager: ScoreManager, redeemManager: RedeemManager) {
   const player = getPlayerInfo();
-  if (!player) return;
+
+  if (!player) {
+    logManager.error("GameDetailPane", "Player not defined");
+    return;
+  }
 
   const renderPane = () => {
     const totalEnl = scoreManager.getEnlScore();
@@ -78,6 +89,7 @@ function showGameDetailPane(container: HTMLElement, scoreManager: ScoreManager, 
           display: "flex",
           flexDirection: "column",
           gap: "10px",
+          overflowY: "auto",
         }}
       >
         {/* Player info */}
@@ -178,8 +190,21 @@ function showGameDetailPane(container: HTMLElement, scoreManager: ScoreManager, 
           </button>
         </div>
 
-        {/* Sign out */}
-        <div style={{ marginTop: "20px", marginBottom: "10px", display: "flex", justifyContent: "flex-end" }}>
+        {/* Plugins and Sign out */}
+        <div style={{ marginTop: "20px", marginBottom: "10px", display: "flex", justifyContent: "space-between", gap: "8px" }}>
+          <a
+            id="plugins"
+            style={{
+              color: "#6088ff",
+              cursor: "pointer",
+            }}
+            onClick={() => {
+              closeGameDetailPane();
+              showPluginDetailPane(container);
+            }}
+          >
+            Plugins
+          </a>
           <a
             id="signout"
             href="https://intel.ingress.com/logout"
@@ -187,7 +212,7 @@ function showGameDetailPane(container: HTMLElement, scoreManager: ScoreManager, 
               color: "#6088ff",
             }}
           >
-            sign out
+            Sign out
           </a>
         </div>
       </div>
@@ -208,8 +233,109 @@ function showGameDetailPane(container: HTMLElement, scoreManager: ScoreManager, 
   }
 }
 
+function closeGameDetailPane() {
+  if (gameDetailPane) {
+    gameDetailPane.remove();
+    gameDetailPane = null;
+  }
+}
+
+function showPluginDetailPane(container: HTMLElement) {
+  const renderPane = () => {
+    const plugins = pluginManager.getPlugins();
+
+    const pane = (
+      <div
+        ref={(el: HTMLElement) => (pluginDetailPane = el)}
+        style={{
+          position: "absolute",
+          left: "5px",
+          top: "calc(5px + 36px + 2px)",
+          padding: "12px",
+          margin: "2px 3px",
+          width: "400px",
+          maxWidth: "calc(100% - 18px - 24px)",
+          maxHeight: "80vh",
+          backgroundColor: "rgba(42, 42, 42, 0.9)",
+          border: "1px solid #555",
+          borderRadius: "4.2px",
+          color: "white",
+          zIndex: "10016",
+          display: "flex",
+          flexDirection: "column",
+          gap: "10px",
+          overflowY: "auto",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+          <span style={{ fontSize: "24px", fontWeight: "bold" }}>Plugins</span>
+          <div
+            onClick={() => closePluginDetailPane()}
+            style={{ cursor: "pointer" }}
+          >
+            <svg viewBox="0 -960 960 960" width="24px" height="24px" fill="currentColor">
+              <path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z" />
+            </svg>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          {plugins.length === 0 && <div>No plugins registered.</div>}
+          {plugins.map((plugin) => (
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "8px",
+                backgroundColor: "rgba(255, 255, 255, 0.05)",
+                borderRadius: "4px",
+              }}
+            >
+              <div>
+                <div style={{ fontWeight: "bold" }}>{plugin.name}</div>
+                <div style={{ fontSize: "12px", color: "#aaa" }}>{plugin.id}</div>
+              </div>
+              <input
+                type="checkbox"
+                checked={pluginManager.isEnabled(plugin.id)}
+                onClick={(e: Event) => {
+                  const target = e.target as HTMLInputElement;
+                  if (target.checked) {
+                    pluginManager.enablePlugin(plugin.id);
+                  } else {
+                    pluginManager.disablePlugin(plugin.id);
+                  }
+                  // Re-render to update the checkbox state
+                  renderPane();
+                }}
+                style={{
+                  width: "20px",
+                  height: "20px",
+                  cursor: "pointer",
+                }}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+    ) as HTMLElement;
+
+    container.appendChild(pane);
+  };
+
+  renderPane();
+}
+
+function closePluginDetailPane() {
+  if (pluginDetailPane) {
+    pluginDetailPane.remove();
+    pluginDetailPane = null;
+  }
+}
+
 function showRedeemResult(container: HTMLElement, msg: string) {
-  const popup = (
+  const pane = (
     <div style={{
       position: "absolute",
       top: "0px",
@@ -239,7 +365,7 @@ function showRedeemResult(container: HTMLElement, msg: string) {
           {msg}
         </div>
         <div
-          onclick={() => {closeRedeemResult(container, popup)}}
+          onclick={() => {closeRedeemResult()}}
           style={{
             position: "absolute",
             top: "12px",
@@ -256,9 +382,12 @@ function showRedeemResult(container: HTMLElement, msg: string) {
       </div>
     </div>
   ) as HTMLElement;
-  container.appendChild(popup);
+  container.appendChild(pane);
 }
 
-function closeRedeemResult(container: HTMLElement, popup: HTMLElement) {
-  popup.remove();
+function closeRedeemResult() {
+  if (redeemResultPane) {
+    redeemResultPane.remove();
+    redeemResultPane = null;
+  }
 }

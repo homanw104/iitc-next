@@ -6,38 +6,43 @@
  */
 
 import * as Cesium from "cesium";
-import "../types/iitc.d.ts";
+import "../types/iitc.ts";
+import { IITCCore } from "../types/iitc";
+import { logManager } from "../managers/logManager";
 
-/**
- * Player Activity Plugin for IITC Next
- */
+interface PlayerActivity {
+  lat: number;
+  lng: number;
+  timestamp: number;
+}
+
 class PlayerActivityPlugin {
   public name = "Player Activity Tracker";
   public id = "player-activity";
 
+  private dataSource: Cesium.CustomDataSource = new Cesium.CustomDataSource("player-activity");
   private playerPoints: Map<string, Cesium.Entity> = new Map();
   private playerPaths: Map<string, Cesium.Entity> = new Map();
-  private playerActivity: Map<string, { lat: number, lng: number, timestamp: number }[]> = new Map();
+  private playerActivities: Map<string, PlayerActivity[]> = new Map();
   private interval: number | undefined;
 
-  // Objects from IITC Next core
-  private viewer!: Cesium.Viewer;
-  private commManager!: any;
-  private logManager!: any;
-  private dataSource!: Cesium.CustomDataSource;
+  private viewer: IITCCore["viewer"];
+  private logManager: IITCCore["logManager"];
+  private commManager: IITCCore["commManager"];
 
   public init() {
-    const iitc = window.iitc;
-    this.viewer = iitc.viewer!;
-    this.commManager = iitc.commManager!;
-    this.logManager = iitc.logManager!;
+    this.viewer = window.iitc.viewer!;
+    this.commManager = window.iitc.commManager!;
+    this.logManager = window.iitc.logManager!;
 
     if (!this.viewer || !this.commManager || !this.logManager) {
-      console.error("PlayerActivityPlugin", "IITC Next core components missing");
+      logManager.error("PlayerActivityPlugin", "IITC Next core components missing", {
+        viewer: !!this.viewer,
+        commManager: !!this.commManager,
+        logManager: !!this.logManager
+      });
       return;
     }
-
-    this.logManager.info("PlayerActivityPlugin", "Initializing Player Activity Plugin");
 
     this.dataSource = new Cesium.CustomDataSource("player-activity");
     this.viewer.dataSources.add(this.dataSource).then();
@@ -52,9 +57,9 @@ class PlayerActivityPlugin {
   }
 
   private updatePlayerActivity(): void {
-    const messages = this.commManager.getMessages("all");
+    const messages = this.commManager?.getMessages("all");
 
-    messages.forEach((msg: any) => {
+    messages?.forEach((msg: any) => {
       let player: { name: string, team: string } | null = null;
       let portal: { latE6: number, lngE6: number } | null = null;
 
@@ -75,10 +80,10 @@ class PlayerActivityPlugin {
         const lng = (portal as any).lngE6 / 1e6;
         const timestamp = msg.timestamp;
 
-        let activity = this.playerActivity.get(playerName);
+        let activity = this.playerActivities.get(playerName);
         if (!activity) {
           activity = [];
-          this.playerActivity.set(playerName, activity);
+          this.playerActivities.set(playerName, activity);
         }
 
         // Avoid duplicate activity at same timestamp
@@ -91,19 +96,13 @@ class PlayerActivityPlugin {
     });
   };
 
-  private getTeamColor(team: string): Cesium.Color {
-    if (team === "ENLIGHTENED") return Cesium.Color.LIME;
-    if (team === "RESISTANCE") return Cesium.Color.CORNFLOWERBLUE;
-    return Cesium.Color.WHITE;
-  }
-
   private renderPlayer(playerName: string, team: string): void {
-    const activity = this.playerActivity.get(playerName);
+    const activity = this.playerActivities.get(playerName);
     if (!activity || activity.length === 0) return;
 
     const lastLoc = activity[activity.length - 1];
     const position = Cesium.Cartesian3.fromDegrees(lastLoc.lng, lastLoc.lat);
-    const color = this.getTeamColor(team);
+    const color = Cesium.Color.fromCssColorString("#E130DE");
 
     // Update or create point
     let pointEntity = this.playerPoints.get(playerName);
@@ -119,10 +118,10 @@ class PlayerActivityPlugin {
         },
         label: {
           text: playerName,
-          font: "14pt monospace",
+          font: "14pt",
           style: Cesium.LabelStyle.FILL_AND_OUTLINE,
           outlineWidth: 2,
-          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+          verticalOrigin: Cesium.VerticalOrigin.BASELINE,
           pixelOffset: new Cesium.Cartesian2(0, -9),
           fillColor: color,
         }
@@ -154,9 +153,12 @@ class PlayerActivityPlugin {
   }
 }
 
-if (window.iitc && window.iitc.registerPlugin) {
-  window.iitc.registerPlugin(new PlayerActivityPlugin);
-} else {
-  window.iitc.plugins = window.iitc.plugins || [];
-  window.iitc.plugins.push(new PlayerActivityPlugin);
-}
+const register = () => {
+  if (window.iitc && window.iitc.pluginManager) {
+    window.iitc.pluginManager.registerPlugin(new PlayerActivityPlugin());
+  } else {
+    setTimeout(register, 1000);
+  }
+};
+
+register();
