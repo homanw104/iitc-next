@@ -221,6 +221,7 @@ function showGameDetailPane(container: HTMLElement, scoreManager: ScoreManager, 
     container.appendChild(pane);
   };
 
+  closeGameDetailPane();
   renderPane();
 
   // Fetch score if there's no score
@@ -241,9 +242,9 @@ function closeGameDetailPane() {
 }
 
 function showPluginDetailPane(container: HTMLElement) {
-  const renderPane = () => {
-    const plugins = pluginManager.getPlugins();
+  const plugins = pluginManager.getPlugins();
 
+  const renderPane = () => {
     const pane = (
       <div
         ref={(el: HTMLElement) => (pluginDetailPane = el)}
@@ -306,7 +307,7 @@ function showPluginDetailPane(container: HTMLElement) {
                   } else {
                     pluginManager.disablePlugin(plugin.id);
                   }
-                  // Re-render to update the checkbox state
+                  closePluginDetailPane();
                   renderPane();
                 }}
                 style={{
@@ -324,6 +325,7 @@ function showPluginDetailPane(container: HTMLElement) {
     container.appendChild(pane);
   };
 
+  closePluginDetailPane();
   renderPane();
 }
 
@@ -365,7 +367,7 @@ function showRedeemResult(container: HTMLElement, msg: string) {
           {msg}
         </div>
         <div
-          onclick={() => {closeRedeemResult()}}
+          onclick={() => closeRedeemResult()}
           style={{
             position: "absolute",
             top: "12px",
@@ -382,6 +384,7 @@ function showRedeemResult(container: HTMLElement, msg: string) {
       </div>
     </div>
   ) as HTMLElement;
+
   container.appendChild(pane);
 }
 
