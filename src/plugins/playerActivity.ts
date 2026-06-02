@@ -8,7 +8,6 @@
 import * as Cesium from "cesium";
 import "../types/iitc.ts";
 import { IITCCore } from "../types/iitc";
-import { logManager } from "../managers/logManager";
 
 interface PlayerActivity {
   lat: number;
@@ -32,14 +31,14 @@ class PlayerActivityPlugin {
 
   public init() {
     this.viewer = window.iitc.viewer!;
-    this.commManager = window.iitc.commManager!;
     this.logManager = window.iitc.logManager!;
+    this.commManager = window.iitc.commManager!;
 
-    if (!this.viewer || !this.commManager || !this.logManager) {
-      logManager.error("PlayerActivityPlugin", "IITC Next core components missing", {
+    if (!this.viewer || !this.logManager || !this.commManager) {
+      console.log("[PlayerActivityPlugin] IITC Next core components missing", {
         viewer: !!this.viewer,
-        commManager: !!this.commManager,
-        logManager: !!this.logManager
+        logManager: !!this.logManager,
+        commManager: !!this.commManager
       });
       return;
     }

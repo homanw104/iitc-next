@@ -2,6 +2,7 @@
  * Entry point for the application.
  */
 
+import { unsafeWindow } from "vite-plugin-monkey/dist/client";
 import setUpLogManager from "./procedures/setUpLogManager";
 import extractPlayerInfo from "./procedures/extractPlayerInfo";
 import extractVersionString from "./procedures/extractVersionString";
@@ -15,6 +16,7 @@ import "./types/iitc.ts";
 const init = async () => {
   // Initialize iitc variable
   window.iitc = {}
+  unsafeWindow.iitc = window.iitc;
 
   // Set up logging for this app
   setUpLogManager();

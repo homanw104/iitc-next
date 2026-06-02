@@ -6,7 +6,7 @@ import { IITCPlugin } from "../types/iitc";
 import { logManager } from "./logManager";
 
 export class PluginManager {
-  private plugins: Map<string, IITCPlugin & { initialized?: boolean }> = new Map();
+  private plugins: Map<string, IITCPlugin> = new Map();
   private enabledPlugins: Set<string> = new Set();
   private initializedPlugins = new Set<string>();
   private ENABLED_PLUGINS_STORAGE_KEY = "iitc-enabled-plugins";
@@ -54,6 +54,10 @@ export class PluginManager {
     } else {
       this.plugins.set(plugin.id, plugin);
       logManager.info("PluginManager", `Plugin registered: ${plugin.name}`);
+    }
+
+    if (this.isEnabled(plugin.id) && !this.isInitialized(plugin.id)) {
+      this.enablePlugin(plugin.id);
     }
   }
 
