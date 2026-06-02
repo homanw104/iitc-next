@@ -24,6 +24,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
+import org.json.JSONObject;
 
 public class MainActivity extends BridgeActivity {
     private Dialog popupDialog;
@@ -31,25 +32,45 @@ public class MainActivity extends BridgeActivity {
 
     private static final String CESIUM_JS = "https://cdn.jsdelivr.net/npm/cesium@1.141.0/Build/Cesium/Cesium.js";
     private static final String CESIUM_CSS = "https://cdn.jsdelivr.net/npm/cesium@latest/Build/Cesium/Widgets/widgets.css";
+    private static final String SYSTEM_JS = "https://cdn.jsdelivr.net/npm/systemjs@6.15.1/dist/system.min.js";
+    private static final String SYSTEM_NAMED_REGISTER = "https://cdn.jsdelivr.net/npm/systemjs@6.15.1/dist/extras/named-register.min.js";
 
     private String getLoaderJs() {
         return "javascript:(function() { " +
             "try { " +
-            "if (window.IITC_NEXT_INJECTED) return; " +
+            "console.log('IITC-Next: getLoaderJs triggered'); " +
+            "if (window.IITC_NEXT_INJECTED) { console.log('IITC-Next: Already injected'); return; } " +
             "window.IITC_NEXT_INJECTED = true; " +
             "var cScript = document.createElement('script'); " +
             "cScript.type = 'text/javascript'; " +
             "cScript.src = '" + CESIUM_JS + "'; " +
+            "var sScript = document.createElement('script'); " +
+            "sScript.type = 'text/javascript'; " +
+            "sScript.src = '" + SYSTEM_JS + "'; " +
+            "var snScript = document.createElement('script'); " +
+            "snScript.type = 'text/javascript'; " +
+            "snScript.src = '" + SYSTEM_NAMED_REGISTER + "'; " +
             "var lScript = document.createElement('link'); " +
             "lScript.rel = 'stylesheet'; " +
             "lScript.href = '" + CESIUM_CSS + "'; " +
             "var script = document.createElement('script'); " +
             "script.type = 'text/javascript'; " +
-            "script.src = 'https://iitc-next.local/inject.js'; " +
+            "script.src = 'https://intel.ingress.com/iitc-next/inject.js'; " +
             "var target = document.head || document.documentElement; " +
-            "if (target) { target.appendChild(cScript); target.appendChild(lScript); target.appendChild(script); } " +
+            "if (target) { " +
+            "  console.log('IITC-Next: Appending scripts to head/documentElement'); " +
+            "  target.appendChild(cScript); target.appendChild(sScript); " +
+            "  target.appendChild(snScript); target.appendChild(lScript); " +
+            "  target.appendChild(script); " +
+            "} " +
             "else { " +
-            "document.addEventListener('DOMContentLoaded', function() { var t = document.head || document.documentElement; t.appendChild(cScript); t.appendChild(lScript); t.appendChild(script); }); } " +
+            "console.log('IITC-Next: Waiting for DOMContentLoaded to append scripts'); " +
+            "document.addEventListener('DOMContentLoaded', function() { " +
+            "  var t = document.head || document.documentElement; " +
+            "  t.appendChild(cScript); t.appendChild(sScript); " +
+            "  t.appendChild(snScript); t.appendChild(lScript); " +
+            "  t.appendChild(script); " +
+            "}); } " +
             "} catch(e) { console.error('IITC-Next Loader Error', e); }" +
             "})();";
     }
@@ -76,12 +97,12 @@ public class MainActivity extends BridgeActivity {
         webView.addJavascriptInterface(new Object() {
             @android.webkit.JavascriptInterface
             public void log(String msg) {
-                // Silenced for production
+                android.util.Log.i("IITC-Next", "JS Log: " + msg);
             }
 
             @android.webkit.JavascriptInterface
             public void diag(String data) {
-                // Silenced for production
+                android.util.Log.d("IITC-Next", "JS Diag: " + data);
             }
         }, "IITC_Native");
     }
@@ -138,44 +159,58 @@ public class MainActivity extends BridgeActivity {
                 public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
                     String urlStr = request.getUrl().toString();
                     
-                    // Handle internal script requests (like the old project did)
-                    if (urlStr.contains("iitc-next.local/inject.js")) {
+                    // Handle internal script requests
+                    if (urlStr.contains("intel.ingress.com/iitc-next/")) {
                         if (userScript == null) loadUserScript();
                         if (userScript != null) {
-                            String wrapper = "(function() { " +
-                                "if (typeof GM_getResourceText === 'undefined') { " +
-                                "  window.GM_getResourceText = function(name) { " +
-                                "    return ''; " +
-                                "  }; " +
-                                "} " +
-                                "if (typeof GM_addStyle === 'undefined') { " +
-                                "  window.GM_addStyle = function(css) { " +
-                                "    var style = document.createElement('style'); " +
-                                "    style.type = 'text/css'; " +
-                                "    style.innerHTML = css; " +
-                                "    var target = document.head || document.documentElement; " +
-                                "    if (target) target.appendChild(style); " +
-                                "    return style; " +
-                                "  }; " +
-                                "} " +
-                                "function start() { " +
-                                "  try { " +
-                                "    if (!document.body) { " +
-                                "      setTimeout(start, 100); " +
-                                "      return; " +
-                                "    } " +
-                                "    if (typeof Cesium === 'undefined') { " +
-                                "      setTimeout(start, 100); " +
-                                "      return; " +
-                                "    } " +
-                                userScript +
-                                "  } catch (e) { " +
-                                "    console.error('IITC-Next Execution Error', e); " +
-                                "  } " +
-                                "} " +
-                                "start(); " +
-                                "})();";
-                            InputStream is = new ByteArrayInputStream(wrapper.getBytes(StandardCharsets.UTF_8));
+                            String content = "";
+                            if (urlStr.endsWith("inject.js")) {
+                                content = "(function() { " +
+                                    "window.GM_addStyle = window.GM_addStyle || function(css) { " +
+                                    "  var style = document.createElement('style'); " +
+                                    "  style.type = 'text/css'; " +
+                                    "  style.innerHTML = css; " +
+                                    "  (document.head || document.documentElement).appendChild(style); " +
+                                    "  return style; " +
+                                    "}; " +
+                                    "window.GM_getResourceText = window.GM_getResourceText || function() { return ''; }; " +
+                                    "function start() { " +
+                                    "  try { " +
+                                    "    if (typeof Cesium === 'undefined') { " +
+                                    "      console.log('IITC-Next: Waiting for Cesium...'); " +
+                                    "      setTimeout(start, 100); " +
+                                    "      return; " +
+                                    "    } " +
+                                    "    if (typeof System === 'undefined' || typeof System.constructor !== 'function') { " +
+                                    "      console.log('IITC-Next: Waiting for SystemJS...'); " +
+                                    "      setTimeout(start, 100); " +
+                                    "      return; " +
+                                    "    } " +
+                                    "    console.log('IITC-Next: Libraries ready, fetching module'); " +
+                                    "    if (typeof System.addImportMap !== 'function') { " +
+                                    "      System = new System.constructor(); " +
+                                    "    } " +
+                                    "    fetch('https://intel.ingress.com/iitc-next/___monkey.entry.js') " +
+                                    "      .then(r => r.text()) " +
+                                    "      .then(text => { " +
+                                    "        console.log('IITC-Next: Module fetched, preparing blob'); " +
+                                    "        var patched = text.replace(/System\\.import\\(\"\\.\\/___monkey\\.entry\\.js\", \"\\.\\/\"\\);?$/, ''); " +
+                                    "        var blob = new Blob([patched], { type: 'application/javascript' }); " +
+                                    "        var url = URL.createObjectURL(blob); " +
+                                    "        console.log('IITC-Next: Importing blob URL'); " +
+                                    "        return System.import(url); " +
+                                    "      }) " +
+                                    "      .catch(e => console.error('IITC-Next Fetch Error', e)); " +
+                                    "  } catch (e) { " +
+                                    "    console.error('IITC-Next Bootstrapper Error', e); " +
+                                    "  } " +
+                                    "} " +
+                                    "start(); " +
+                                    "})();";
+                            } else {
+                                content = userScript;
+                            }
+                            InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
                             return new WebResourceResponse("application/javascript", "UTF-8", is);
                         }
                     }
@@ -227,6 +262,8 @@ public class MainActivity extends BridgeActivity {
                             
                             // INJECT HERE - Use the old project's strategy: add a script tag that loads our script
                             String scriptTag = "<script type=\"text/javascript\" src=\"" + CESIUM_JS + "\"></script>" +
+                                "<script type=\"text/javascript\" src=\"" + SYSTEM_JS + "\"></script>" +
+                                "<script type=\"text/javascript\" src=\"" + SYSTEM_NAMED_REGISTER + "\"></script>" +
                                 "<script type=\"text/javascript\">" +
                                 "(function(){" +
                                 "try {" +
@@ -234,7 +271,7 @@ public class MainActivity extends BridgeActivity {
                                 "window.IITC_NEXT_INJECTED = true; " +
                                 "var script = document.createElement('script'); " +
                                 "script.type = 'text/javascript'; " +
-                                "script.src = 'https://iitc-next.local/inject.js'; " +
+                                "script.src = 'https://intel.ingress.com/iitc-next/inject.js'; " +
                                 "var target = document.head || document.documentElement; " +
                                 "if (target) { target.appendChild(script); } " +
                                 "else { " +
