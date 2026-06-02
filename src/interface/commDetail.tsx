@@ -333,16 +333,24 @@ class CommUI {
   private isFetchingOld = false;
   private isUpdatingScroll = false;
   private isInputFocused = false;
-  private refreshInterval: any = null;
 
   private refreshNewMsgCount = new Map([["all", 0], ["faction", 0], ["alerts", 0]]);
-  private previousScrollHeights: Map<string, number> = new Map([["all", 0], ["faction", 0], ["alerts", 0]]);
-  private previousScrollTops: Map<string, number> = new Map([["all", 0], ["faction", 0], ["alerts", 0]]);
+  private previousScrollHeights: Map<string, number> = new Map([]);
+  private previousScrollTops: Map<string, number> = new Map([]);
 
   constructor(viewer: Viewer, container: HTMLElement, commManager: CommManager) {
     this.viewer = viewer;
     this.container = container;
     this.commManager = commManager;
+
+    this.refreshData().then(() => this.renderPane());
+    this.renderPane();
+
+    setInterval(() => {
+      if (this.isInputFocused) return;
+      this.refreshData().then(() => this.renderPane());
+      this.renderPane();
+    }, 30000);
   }
 
   private async refreshData(fetchOld = false): Promise<void> {
@@ -357,7 +365,10 @@ class CommUI {
       const channel = this.currentChannel;
       const msgCount = this.commManager.getMessages(channel).length;
 
-      if (channel === "all") await this.commManager.requestAll(fetchOld);
+      // Always tries to fetch "all" channel and wait for 0.2 seconds before the next possible request
+      await this.commManager.requestAll(fetchOld);
+      await new Promise<void>(resolve => setTimeout(() => resolve(), 200));
+
       if (channel === "faction") await this.commManager.requestFaction(fetchOld);
       if (channel === "alerts") await this.commManager.requestAlerts(fetchOld);
 
@@ -384,28 +395,20 @@ class CommUI {
       this.pane = null;
       this.messageDivs = null;
     }
-    if (this.refreshInterval) {
-      clearInterval(this.refreshInterval);
-      this.refreshInterval = null;
-    }
   }
 
   private showPane(): void {
     this.pane = this.createPaneEl();
     this.container.appendChild(this.pane);
-    if (this.messageDivs) this.messageDivs.scrollTop = this.previousScrollTops.get(this.currentChannel) || 0;
+    if (this.messageDivs) this.messageDivs.scrollTop =
+      this.previousScrollTops.get(this.currentChannel) ||
+      this.messageDivs.scrollHeight;
 
     const messages = this.commManager.getMessages(this.currentChannel);
     if (messages.length === 0) {
       this.refreshData().then(() => this.renderPane());
       this.renderPane();
     }
-
-    this.refreshInterval = setInterval(() => {
-      if (this.isInputFocused) return;
-      this.refreshData().then(() => this.renderPane());
-      this.renderPane();
-    }, 30000);
   }
 
   private renderPane(): void {
@@ -424,7 +427,7 @@ class CommUI {
     if (this.messageDivs) {
       // We set isUpdatingScroll to true to prevent handleScroll from updating previousScrollTops
       // while we are programmatically adjusting the scroll position here.
-      // Setting scrollTop triggers a 'scroll' event asynchronously or synchronously depending on the browser.
+      // Setting scrollTop triggers a "scroll" event asynchronously or synchronously depending on the browser.
       this.isUpdatingScroll = true;
       if (isAtBottom) {
         this.messageDivs.scrollTop = this.messageDivs.scrollHeight;
