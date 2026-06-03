@@ -3,21 +3,10 @@
  */
 
 import * as Cesium from "cesium";
-import { PortalData, LinkData, FieldData, TEAMS, PORTAL_LEVELS } from "../types/ingress";
-import { PortalEntityManager } from "./portalEntityManager";
-import { LinkEntityManager } from "./linkEntityManager";
-import { FieldEntityManager } from "./fieldEntityManager";
-import { PortalHistoryEntityManager } from "./portalHistoryEntityManager";
-import { ScoutHistoryEntityManager } from "./scoutHistoryEntityManager";
+import { TEAMS, PORTAL_LEVELS } from "../types/ingress";
 
 export class LayerManager {
   private viewer: Cesium.Viewer;
-
-  public readonly portalManager: PortalEntityManager;
-  public readonly linkManager: LinkEntityManager;
-  public readonly fieldManager: FieldEntityManager;
-  public readonly historyManager: PortalHistoryEntityManager;
-  public readonly scoutControlHistoryManager: ScoutHistoryEntityManager;
 
   // Maps sourceVisibility keys to Cesium Sources (layers)
   private sources: Map<string, Cesium.CustomDataSource> = new Map();
@@ -30,14 +19,9 @@ export class LayerManager {
 
   constructor(viewer: Cesium.Viewer) {
     this.viewer = viewer;
-    this.portalManager = new PortalEntityManager(this);
-    this.linkManager = new LinkEntityManager(this, this.portalManager);
-    this.fieldManager = new FieldEntityManager(this, this.portalManager);
-    this.historyManager = new PortalHistoryEntityManager(this);
-    this.scoutControlHistoryManager = new ScoutHistoryEntityManager(this);
 
     TEAMS.forEach(t => this.filterState.set(`team-${t.toLowerCase()}`, true));
-    PORTAL_LEVELS.forEach(l => this.filterState.set(`portals-level-${l}`, true));
+    PORTAL_LEVELS.forEach(l => this.filterState.set(`level-${l}`, true));
     this.filterState.set("portals-placeholder", true);
     this.filterState.set("portals", true);
     this.filterState.set("links", true);
@@ -50,65 +34,9 @@ export class LayerManager {
     this.applyFilters();
   }
 
-  public requestRender(): void {
-    this.viewer.scene.requestRender();
-  }
-
-  public addOrUpdatePortal(data: PortalData): void {
-    this.portalManager.addOrUpdatePortal(data);
-    this.historyManager.addOrUpdateHistoryHalo(data);
-    this.scoutControlHistoryManager.addOrUpdateScoutControlHalo(data);
-  }
-
-  public addOrUpdateLink(data: LinkData): void {
-    this.linkManager.addOrUpdateLink(data);
-  }
-
-  public addOrUpdateField(data: FieldData): void {
-    this.fieldManager.addOrUpdateField(data);
-  }
-
-  public removePortal(guid: string): void {
-    this.portalManager.removePortal(guid);
-    this.historyManager.removeHistoryHalo(guid);
-    this.scoutControlHistoryManager.removeScoutControlHalo(guid);
-  }
-
-  public removeLink(guid: string): void {
-    this.linkManager.removeLink(guid);
-  }
-
-  public removeField(guid: string): void {
-    this.fieldManager.removeField(guid);
-  }
-
-  public removeGameEntitiesInView(): void {
-    const viewRect = this.viewer.camera.computeViewRectangle(this.viewer.scene.globe.ellipsoid);
-    if (!viewRect) return;
-
-    this.portalManager.removePortalInView(viewRect);
-    this.historyManager.removeHistoryHaloInView(viewRect);
-    this.scoutControlHistoryManager.removeScoutControlHaloInView(viewRect);
-    this.linkManager.removeLinkInView(viewRect);
-    this.fieldManager.removeFieldInView(viewRect);
-  }
-
-  public async requestPortalDetails(guid: string): Promise<void> {
-    await this.portalManager.requestPortalDetails(guid);
-    const portalData = this.portalManager.getPortalData(guid);
-    if (portalData) {
-      this.historyManager.addOrUpdateHistoryHalo(portalData);
-      this.scoutControlHistoryManager.addOrUpdateScoutControlHalo(portalData);
-    }
-  }
-
-  public getPortalData(guid: string): PortalData | undefined {
-    return this.portalManager.getPortalData(guid);
-  }
-
   public setFilter(type: string, enabled: boolean): void {
     if (type === "portals") {
-      PORTAL_LEVELS.forEach(l => this.filterState.set(`portals-level-${l}`, enabled));
+      PORTAL_LEVELS.forEach(l => this.filterState.set(`level-${l}`, enabled));
       this.filterState.set("portals-placeholder", enabled);
     }
     this.filterState.set(type, enabled);
@@ -117,7 +45,7 @@ export class LayerManager {
 
   public isFilterEnabled(type: string): boolean {
     if (type === "portals") {
-      const allLevels = PORTAL_LEVELS.every(l => this.filterState.get(`portals-level-${l}`) !== false);
+      const allLevels = PORTAL_LEVELS.every(l => this.filterState.get(`level-${l}`) !== false);
       const placeholder = this.filterState.get("portals-placeholder") !== false;
       return allLevels && placeholder;
     }
@@ -126,7 +54,7 @@ export class LayerManager {
 
   public isFilterIndeterminate(type: string): boolean {
     if (type === "portals") {
-      const states = PORTAL_LEVELS.map(l => this.filterState.get(`portals-level-${l}`) !== false);
+      const states = PORTAL_LEVELS.map(l => this.filterState.get(`level-${l}`) !== false);
       states.push(this.filterState.get("portals-placeholder") !== false);
       const visibleCount = states.filter(v => v).length;
       return visibleCount > 0 && visibleCount < states.length;
@@ -166,7 +94,7 @@ export class LayerManager {
 
       // Portals
       PORTAL_LEVELS.forEach(l => {
-        const levelVisible = this.filterState.get(`portals-level-${l}`) !== false;
+        const levelVisible = this.filterState.get(`level-${l}`) !== false;
         this.setSourceVisible(`portals-l${l}-${t}`, teamVisible && levelVisible);
       });
 

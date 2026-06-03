@@ -26,7 +26,12 @@ import { AmapMercatorTilingScheme } from "../utils/map";
 import { CommManager } from "../managers/commManager";
 import { ScoreManager } from "../managers/scoreManager";
 import { RedeemManager } from "../managers/redeemManager";
-import { getPortalLayerId } from "../managers/portalEntityManager";
+import { PortalEntityManager, getPortalLayerId } from "../managers/portalEntityManager";
+import { LinkEntityManager } from "../managers/linkEntityManager";
+import { FieldEntityManager } from "../managers/fieldEntityManager";
+import { PortalHistoryEntityManager } from "../managers/portalHistoryEntityManager";
+import { ScoutHistoryEntityManager } from "../managers/scoutHistoryEntityManager";
+import { unsafeWindow } from "vite-plugin-monkey/dist/client";
 
 // Tell Cesium where to find its assets (Images, Workers, etc.)
 // Since we use the CDN for the main library, we should also use it for assets.
@@ -115,7 +120,7 @@ function initCesiumViewer(containerId: string): Cesium.Viewer {
     maximumRenderTimeChange: Infinity,
   });
 
-  // Remove some of the imagery layer options
+  // Remove unused imagery layer options
   let models = viewer.baseLayerPicker.viewModel.imageryProviderViewModels;
   viewer.baseLayerPicker.viewModel.imageryProviderViewModels = models.filter((model) => {
     return model.name !== "Sentinel-2" &&
@@ -130,9 +135,11 @@ function initCesiumViewer(containerId: string): Cesium.Viewer {
   // Add Gaode imagery options to the base layer picker
   viewer.baseLayerPicker.viewModel.imageryProviderViewModels.unshift(gaodeSatelliteViewModel, gaodeRoadViewModel);
 
+  // Constraint the tilt angle
   const controller = viewer.scene.screenSpaceCameraController;
   controller.maximumTiltAngle = Cesium.Math.toRadians(35);
 
+  // Set avilable tilt event types
   controller.tiltEventTypes = [
     Cesium.CameraEventType.MIDDLE_DRAG,
     Cesium.CameraEventType.RIGHT_DRAG,
@@ -147,9 +154,10 @@ function initCesiumViewer(containerId: string): Cesium.Viewer {
   ];
 
   // Force Cesium to load higher resolution tiles sooner,
-  // which can bypass broken intermediate KTX2 levels on mobile
+  // which may bypass broken intermediate KTX2 levels on mobile
   viewer.scene.globe.maximumScreenSpaceError = 1.5;
 
+  // Other options for the camera and scene to improve visual quality and performance
   viewer.scene.logarithmicDepthBuffer = true;
   viewer.scene.globe.showGroundAtmosphere = true;
   viewer.scene.globe.baseColor = Cesium.Color.BLACK;
@@ -158,6 +166,7 @@ function initCesiumViewer(containerId: string): Cesium.Viewer {
   viewer.resolutionScale = 2.0;
   viewer.scene.postProcessStages.fxaa.enabled = true;
 
+  // Remove the credits widget
   const credits = document.querySelector(".cesium-widget-credits") as HTMLElement;
   if (credits) {
     credits.style.display = "none";
@@ -179,60 +188,6 @@ function setInitialView(viewer: Cesium.Viewer): void {
       destination: Cartesian3.fromDegrees(pos.lng, pos.lat, height),
     });
   }
-}
-
-/**
- * Set up event handlers on Cesium's screenSpaceEventHandler.
- *
- * @param viewer - The Cesium.Viewer instance to attach event handlers to.
- * @param layerManager - The entity manager object to use for retrieving portal data.
- * @param container - The HTMLDivElement element containing the cesium widget.
- */
-function setupClickHandler(viewer: Cesium.Viewer, layerManager: LayerManager, container: HTMLElement): void {
-  let isClickLoading = false;
-  let isClickCancelled = false;
-  let lastEntity: Cesium.Entity | undefined;
-  const handler = viewer.screenSpaceEventHandler;
-
-  handler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_CLICK);
-  handler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
-  handler.setInputAction((click: { position: Cesium.Cartesian2 }) => {
-    const pickedObjects = viewer.scene.drillPick(click.position);
-    const entity = pickedObjects.find(
-      (o) => o.id instanceof Cesium.Entity && (o.id as any).selectable !== false
-    )?.id as Cesium.Entity | undefined;
-
-    if (isClickLoading && lastEntity !== entity) {
-      isClickCancelled = true;
-    }
-    lastEntity = entity;
-
-    if (entity && entity.id.startsWith("portal-")) {
-      isClickLoading = true;
-      const portalGuid = entity.id.substring(7);
-      const portalData = layerManager.getPortalData(portalGuid);
-      if (portalData) {
-        showOrUpdateDetailBar(container, portalData);
-        layerManager.requestPortalDetails(portalGuid).then(() => {
-          isClickLoading = false;
-          if (isClickCancelled) {
-            isClickCancelled = false;
-            return;
-          }
-          const freshData = layerManager.getPortalData(portalGuid);
-          if (freshData) {
-            const layerId = getPortalLayerId(freshData);
-            const source = layerManager.getOrCreateSource(layerId);
-            viewer.selectedEntity = source.entities.getById(`portal-${portalGuid}`);
-            showOrUpdateDetailBar(container, freshData);
-          }
-        });
-      }
-    } else {
-      viewer.selectedEntity = undefined;
-      showOrUpdateDetailBar(container);
-    }
-  }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 }
 
 /**
@@ -377,6 +332,72 @@ function setupGoogleMapsGestures(viewer: Cesium.Viewer): void {
 }
 
 /**
+ * Set up event handlers on Cesium's screenSpaceEventHandler.
+ *
+ * @param viewer - The Cesium.Viewer instance to attach event handlers to.
+ * @param layerManager - The entity manager object to use for retrieving portal data.
+ * @param portalEntityManager
+ * @param portalHistoryEntityManager
+ * @param scoutHistoryEntityManager
+ * @param container - The HTMLDivElement element containing the cesium widget.
+ */
+function setupClickHandler(
+  viewer: Cesium.Viewer,
+  layerManager: LayerManager,
+  portalEntityManager: PortalEntityManager,
+  portalHistoryEntityManager: PortalHistoryEntityManager,
+  scoutHistoryEntityManager: ScoutHistoryEntityManager,
+  container: HTMLElement
+): void {
+  let isClickLoading = false;
+  let isClickCancelled = false;
+  let lastEntity: Cesium.Entity | undefined;
+  const handler = viewer.screenSpaceEventHandler;
+
+  handler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_CLICK);
+  handler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
+  handler.setInputAction((click: { position: Cesium.Cartesian2 }) => {
+    const pickedObjects = viewer.scene.drillPick(click.position);
+    const entity = pickedObjects.find(
+      (o) => o.id instanceof Cesium.Entity && (o.id as any).selectable !== false
+    )?.id as Cesium.Entity | undefined;
+
+    if (isClickLoading && lastEntity !== entity) {
+      isClickCancelled = true;
+    }
+    lastEntity = entity;
+
+    if (entity && entity.id.startsWith("portal-")) {
+      isClickLoading = true;
+      const portalGuid = entity.id.substring(7);
+      const portalData = portalEntityManager.getPortalData(portalGuid);
+      if (portalData) {
+        showOrUpdateDetailBar(container, portalData);
+        portalEntityManager.requestPortalDetails(portalGuid).then(() => {
+          isClickLoading = false;
+          if (isClickCancelled) {
+            isClickCancelled = false;
+            return;
+          }
+          const freshData = portalEntityManager.getPortalData(portalGuid);
+          if (freshData) {
+            const layerId = getPortalLayerId(freshData);
+            const source = layerManager.getOrCreateSource(layerId);
+            viewer.selectedEntity = source.entities.getById(`portal-${portalGuid}`);
+            showOrUpdateDetailBar(container, freshData);
+            portalHistoryEntityManager.addOrUpdateHistoryHalo(freshData);
+            scoutHistoryEntityManager.addOrUpdateScoutControlHalo(freshData);
+          }
+        });
+      }
+    } else {
+      viewer.selectedEntity = undefined;
+      showOrUpdateDetailBar(container, undefined);
+    }
+  }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+}
+
+/**
  * Calculate the tile keys based on the current view.
  *
  * @param viewer - Viewer to calculaate.
@@ -494,31 +515,47 @@ export default function loadCesiumViewer(): void {
   setInitialView(viewer);
 
   const layerManager = new LayerManager(viewer);
-  const entityManager = new LayerManager(viewer);
-  const tileRequestManager = new TileRequestManager(entityManager);
-  new DebugTileEntityManager(tileRequestManager, entityManager);
+  const portalEntityManager = new PortalEntityManager(layerManager);
+  const portalHistoryEntityManager = new PortalHistoryEntityManager(layerManager);
+  const scoutHistoryEntityManager = new ScoutHistoryEntityManager(layerManager);
+  const linkEntityManager = new LinkEntityManager(layerManager, portalEntityManager);
+  const fieldEntityManager = new FieldEntityManager(layerManager, portalEntityManager);
+
+  const tileRequestManager = new TileRequestManager(
+    viewer,
+    portalEntityManager,
+    portalHistoryEntityManager,
+    scoutHistoryEntityManager,
+    linkEntityManager,
+    fieldEntityManager
+  );
+
+  const debugTileEntityManager = new DebugTileEntityManager(viewer, layerManager);
+  tileRequestManager.onTileStatusChange((key, status) => {
+    debugTileEntityManager.updateTile(key, status);
+  });
 
   const scoreManager = new ScoreManager();
   const redeemManager = new RedeemManager();
   const commManager = new CommManager(viewer);
 
   // Expose managers to the global iitc object
-  window.iitc.viewer = viewer;
-  window.iitc.layerManager = layerManager;
-  window.iitc.tileRequestManager = tileRequestManager;
-  window.iitc.scoreManager = scoreManager;
-  window.iitc.redeemManager = redeemManager;
-  window.iitc.commManager = commManager;
+  unsafeWindow.iitc.viewer = viewer;
+  unsafeWindow.iitc.layerManager = layerManager;
+  unsafeWindow.iitc.tileRequestManager = tileRequestManager;
+  unsafeWindow.iitc.scoreManager = scoreManager;
+  unsafeWindow.iitc.redeemManager = redeemManager;
+  unsafeWindow.iitc.commManager = commManager;
 
   addRefreshButton(container, () => triggerDataReload(viewer, tileRequestManager));
   addGameDetailButton(container, scoreManager, redeemManager);
   addCommDetailButton(viewer, container, commManager);
 
-  addLayerChooser(container, entityManager);
+  addLayerChooser(container, layerManager);
   showOrUpdateDetailBar(container);
   logManager.setCallback((msg: string) => showOrUpdateDetailBar(container, msg));
 
   setupGoogleMapsGestures(viewer);
-  setupClickHandler(viewer, entityManager, container);
+  setupClickHandler(viewer, layerManager, portalEntityManager, portalHistoryEntityManager, scoutHistoryEntityManager, container);
   setupDataLoading(viewer, tileRequestManager);
 }

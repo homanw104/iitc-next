@@ -2,14 +2,16 @@
  * Utility functions and classes for getting data tiles.
  */
 
+import * as Cesium from "cesium";
 import { apiRequest } from "../utils/network";
 import { FieldData, LinkData, PortalData, RawEntity, TileResponse } from "../types/ingress";
 import { ParsedEntities } from "../types/map";
-import { LayerManager } from "./layerManager";
 import { logManager } from "./logManager";
-import { parsePortal } from "./portalEntityManager";
-import { parseLink } from "./linkEntityManager";
-import { parseField } from "./fieldEntityManager";
+import { PortalEntityManager, parsePortal } from "./portalEntityManager";
+import { LinkEntityManager, parseLink } from "./linkEntityManager";
+import { FieldEntityManager, parseField } from "./fieldEntityManager";
+import { PortalHistoryEntityManager } from "./portalHistoryEntityManager";
+import { ScoutHistoryEntityManager } from "./scoutHistoryEntityManager";
 
 /**
  * Defines the number of tiles per edge to zoom into at each level of detail.
@@ -49,6 +51,13 @@ const DEFAULT_ZOOM_TO_LEVEL: number[] = [8, 8, 8, 8, 7, 7, 7, 6, 6, 5, 4, 4, 3, 
 const DEFAULT_ZOOM_TO_LINK_LENGTH: number[] = [200000, 200000, 200000, 200000, 200000, 60000, 60000, 10000, 5000, 2500, 2500, 800, 300, 0, 0];
 
 /**
+ * The maximum number of parallel requests that can be sent at once to the server.
+ *
+ * @type {number}
+ */
+const MAX_REQUESTS: number = 5;
+
+/**
  * The number of tiles requested in a single batch.
  *
  * @type {number}
@@ -59,7 +68,7 @@ const TILES_PER_REQUEST: number = 25;
  * Represents parameters for configuring a tile in a grid or map system.
  *
  * @property {number} level - The zoom level of the tile, where higher numbers indicate more detailed tiles.
- * @property {number} tilesPerEdge - The number of tiles along one edge of the grid at this level.
+ * @property {number} tilesPerEdge - The number of tiles along one global edge of the grid at this level.
  * @property {number} minLinkLength - The minimum length allowed for links or paths within the tile.
  * @property {boolean} hasPortals - Indicates whether portals are present in the tile.
  * @property {number} zoom - The current zoom factor, affecting how detailed the tile appears.
@@ -81,7 +90,7 @@ export type TileStatusCallback = (key: string, status: TileStatus) => void;
 export class TileRequest {
   public tileKeys: string[];
   public active: boolean = false;
-  public retryCount: number = 0;
+  private retryCount: number = 0;
   private maxRetries: number = 3;
 
   constructor(tileKeys: string[]) {
@@ -110,16 +119,32 @@ export class TileRequest {
  */
 export class TileRequestManager {
   private activeRequestCount: number = 0;
-  private maxRequests: number = 5;
-  private tilesPerRequest: number = TILES_PER_REQUEST;
   private queuedTiles: Set<string> = new Set();
   private requestedTiles: Set<string> = new Set();
   private tileStatuses: Map<string, TileStatus> = new Map();
   private tileStatusListeners: TileStatusCallback[] = [];
-  private layerManager: LayerManager;
 
-  constructor(layerManager: LayerManager) {
-    this.layerManager = layerManager;
+  private viewer: Cesium.Viewer;
+  private portalEntityManager: PortalEntityManager;
+  private portalHistoryEntityManager: PortalHistoryEntityManager;
+  private scoutHistoryEntityManager: ScoutHistoryEntityManager;
+  private linkEntityManager: LinkEntityManager;
+  private fieldEntityManager: FieldEntityManager;
+
+  constructor(
+    viewer: Cesium.Viewer,
+    portalEntityManager: PortalEntityManager,
+    portalHistoryEntityManager: PortalHistoryEntityManager,
+    scoutHistoryEntityManager: ScoutHistoryEntityManager,
+    linkEntityManager: LinkEntityManager,
+    fieldEntityManager: FieldEntityManager,
+  ) {
+    this.viewer = viewer;
+    this.portalEntityManager = portalEntityManager;
+    this.portalHistoryEntityManager = portalHistoryEntityManager;
+    this.scoutHistoryEntityManager = scoutHistoryEntityManager;
+    this.linkEntityManager = linkEntityManager;
+    this.fieldEntityManager = fieldEntityManager;
   }
 
   /**
@@ -185,8 +210,8 @@ export class TileRequestManager {
    * @return {Promise<void>} - A promise that resolves when the tile processing is complete or no more tiles are available to process.
    */
   private async processQueue(refreshExisting: boolean = false): Promise<void> {
-    if (this.activeRequestCount >= this.maxRequests) {
-      logManager.info("TileRequestManager", `Max request count (${this.maxRequests}) reached`);
+    if (this.activeRequestCount >= MAX_REQUESTS) {
+      logManager.info("TileRequestManager", `Max request count (${MAX_REQUESTS}) reached`);
       return;
     }
 
@@ -195,7 +220,7 @@ export class TileRequestManager {
       return;
     }
 
-    const tilesToRequest = Array.from(this.queuedTiles).slice(0, this.tilesPerRequest);
+    const tilesToRequest = Array.from(this.queuedTiles).slice(0, TILES_PER_REQUEST);
     tilesToRequest.forEach((key) => {
       this.queuedTiles.delete(key);
       this.requestedTiles.add(key);
@@ -216,7 +241,13 @@ export class TileRequestManager {
       const response = await request.send();
       logManager.debug("TileRequestManager", `Received response for ${tilesToRequest.length} tile${tilesToRequest.length === 1 ? "" : "s"}`);
       if (response && refreshExisting) {
-        this.layerManager.removeGameEntitiesInView();
+        const viewRect = this.viewer.camera.computeViewRectangle(this.viewer.scene.globe.ellipsoid);
+        if (!viewRect) return;
+        this.portalEntityManager.removePortalInView(viewRect);
+        this.portalHistoryEntityManager.removeHistoryHaloInView(viewRect);
+        this.scoutHistoryEntityManager.removeScoutControlHaloInView(viewRect);
+        this.linkEntityManager.removeLinkInView(viewRect);
+        this.fieldEntityManager.removeFieldInView(viewRect);
         logManager.debug("TileRequestManager", "Removed entities from current view");
       }
       this.handleResponse(response, tilesToRequest);
@@ -261,7 +292,7 @@ export class TileRequestManager {
 
       if (tileData.error) {
         // Ignore TIMEOUT errors from Niantic's internal server (which seems like intended)
-        // but still delete them from the requestedTiles for further retrying
+        // and delete them from the requestedTiles for further retrying
         if (tileData.error == "TIMEOUT") {
           this.setTileStatus(tileKey, "loaded");
         } else {
@@ -277,14 +308,16 @@ export class TileRequestManager {
       if (tileData.gameEntities) {
         entitiesFound += tileData.gameEntities.length;
         const { portals, links, fields } = parseTileEntities(tileData.gameEntities);
-        portals.forEach((p) => this.layerManager.addOrUpdatePortal(p));
-        links.forEach((l) => this.layerManager.addOrUpdateLink(l));
-        fields.forEach((f) => this.layerManager.addOrUpdateField(f));
+        portals.forEach((p) => this.portalEntityManager.addOrUpdatePortal(p));
+        portals.forEach((p) => this.portalHistoryEntityManager.addOrUpdateHistoryHalo(p));
+        portals.forEach((p) => this.scoutHistoryEntityManager.addOrUpdateScoutControlHalo(p));
+        links.forEach((l) => this.linkEntityManager.addOrUpdateLink(l));
+        fields.forEach((f) => this.fieldEntityManager.addOrUpdateField(f));
       }
     }
 
     logManager.debug("TileRequestManager", `Processed ${entitiesFound} entities`);
-    this.layerManager.requestRender();
+    this.viewer.scene.requestRender();
   }
 }
 

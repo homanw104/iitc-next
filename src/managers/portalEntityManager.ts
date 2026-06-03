@@ -36,10 +36,10 @@ export class PortalEntityManager {
 
   constructor(private layerManager: LayerManager) {}
 
-  public addOrUpdatePortal(data: PortalData): Cesium.Entity | undefined {
+  public addOrUpdatePortal(data: PortalData): void {
     const existing = this.portals.get(data.guid);
     if (existing) {
-      if (data.isPlaceholder) return existing.entity;
+      if (data.isPlaceholder) return;
       if (
         existing.data.isPlaceholder ||
         data.timestamp > existing.data.timestamp ||
@@ -54,12 +54,11 @@ export class PortalEntityManager {
         this.updatePortalEntity(existing.entity, data);
         existing.data = data;
       }
-      return existing.entity;
+      return;
     }
 
     const portalEntity = this.createPortalEntity(data);
     this.portals.set(data.guid, { data, entity: portalEntity });
-    return portalEntity;
   }
 
   public removePortal(guid: string): void {
@@ -70,12 +69,12 @@ export class PortalEntityManager {
     this.removePortalEntityInView(viewRect);
   }
 
-  public async requestPortalDetails(guid: string): Promise<Cesium.Entity | undefined> {
+  public async requestPortalDetails(guid: string): Promise<void> {
     const request = new PortalRequest(guid);
     const response = await request.send();
     const data = response as any;
     const portalData = parsePortal([guid, data.result[13], data.result]);
-    return this.addOrUpdatePortal(portalData);
+    this.addOrUpdatePortal(portalData);
   }
 
   public getPortalData(guid: string): PortalData | undefined {

@@ -15,14 +15,10 @@ import "./types/iitc.ts";
 
 const init = async () => {
   // Initialize iitc variable
-  window.iitc = {}
-  unsafeWindow.iitc = window.iitc;
+  unsafeWindow.iitc = {};
 
   // Set up logging for this app
   setUpLogManager();
-
-  // Expose plugin manager first
-  await setUpPluginManager();
 
   // Extract data from the original intel map
   extractVersionString();
@@ -36,6 +32,7 @@ const init = async () => {
   loadCesiumViewer();
 
   // Load all plugins
+  await setUpPluginManager();
   initPlugins();
 };
 

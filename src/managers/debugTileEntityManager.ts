@@ -4,7 +4,7 @@
  */
 
 import * as Cesium from "cesium";
-import { TileRequestManager, TileStatus, getMapZoomTileParameters, tileToLat, tileToLng } from "./tileRequestManager";
+import { TileStatus, getMapZoomTileParameters, tileToLat, tileToLng } from "./tileRequestManager";
 import { LayerManager } from "./layerManager";
 
 /**
@@ -12,17 +12,14 @@ import { LayerManager } from "./layerManager";
  * It shows rectangles on the map representing the tiles being loaded.
  */
 export class DebugTileEntityManager {
-  private tileRequestManager: TileRequestManager;
+  private viewer: Cesium.Viewer;
   private layerManager: LayerManager;
   private tileEntities: Map<string, Cesium.Entity> = new Map();
-  private layerId = "debug-tiles";
+  private readonly layerId = "debug-tiles";
 
-  constructor(tileRequestManager: TileRequestManager, entityManager: LayerManager) {
+  constructor(viewer: Cesium.Viewer, entityManager: LayerManager) {
+    this.viewer = viewer;
     this.layerManager = entityManager;
-    this.tileRequestManager = tileRequestManager;
-    this.tileRequestManager.onTileStatusChange((key, status) => {
-      this.updateTile(key, status);
-    });
   }
 
   /**
@@ -31,20 +28,20 @@ export class DebugTileEntityManager {
    * @param key - The unique identifier for the tile.
    * @param status - The current status of the tile.
    */
-  private updateTile(key: string, status: TileStatus): void {
+  public updateTile(key: string, status: TileStatus): void {
     const existing = this.tileEntities.get(key);
     if (existing) {
-      this.updateEntity(existing, status);
+      this.updateTileEntity(existing, status);
     } else {
-      const entity = this.createEntity(key, status);
+      const entity = this.createTileEntity(key, status);
       if (entity) {
         this.tileEntities.set(key, entity);
         const source = this.layerManager.getOrCreateSource(this.layerId);
         source.entities.add(entity);
-        this.updateEntity(entity, status); // Handle immediate removal if status is already loaded/error
+        this.updateTileEntity(entity, status); // Handle immediate removal if status is already loaded/error
       }
     }
-    this.layerManager.requestRender();
+    this.viewer.scene.requestRender();
   }
 
   /**
@@ -54,7 +51,7 @@ export class DebugTileEntityManager {
    * @param status - The initial status of the tile.
    * @returns A Cesium entity representing the tile, or undefined if parsing fails.
    */
-  private createEntity(key: string, status: TileStatus): Cesium.Entity | undefined {
+  private createTileEntity(key: string, status: TileStatus): Cesium.Entity | undefined {
     const parts = key.split("_");
     if (parts.length < 3) return undefined;
 
@@ -115,7 +112,7 @@ export class DebugTileEntityManager {
    * @param entity - The entity to update.
    * @param status - The new status of the tile.
    */
-  private updateEntity(entity: Cesium.Entity, status: TileStatus): void {
+  private updateTileEntity(entity: Cesium.Entity, status: TileStatus): void {
     const color = this.getStatusColor(status);
     if (entity.rectangle) {
       entity.rectangle.outlineColor = new Cesium.ConstantProperty(color) as any;
@@ -133,7 +130,7 @@ export class DebugTileEntityManager {
             break;
           }
         }
-        this.layerManager.requestRender();
+        this.viewer.scene.requestRender();
       }, 2000);
     }
   }

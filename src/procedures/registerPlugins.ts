@@ -1,7 +1,12 @@
+/**
+ * Register official plugins and expose pluginManager for other scripts to register themselves..
+ */
+
+import { unsafeWindow } from "vite-plugin-monkey/dist/client";
 import { pluginManager } from "../managers/pluginManager";
 
 export default async function registerPlugins() {
-  window.iitc.pluginManager = pluginManager;
+  unsafeWindow.iitc.pluginManager = pluginManager;
 
   // Import official plugins
   await import("../plugins/playerActivity");
