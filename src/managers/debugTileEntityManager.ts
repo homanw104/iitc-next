@@ -5,7 +5,7 @@
 
 import * as Cesium from "cesium";
 import { TileRequestManager, TileStatus, getMapZoomTileParameters, tileToLat, tileToLng } from "./tileRequestManager";
-import { EntityManager } from "./entityManager";
+import { LayerManager } from "./layerManager";
 
 /**
  * Manages the visualization of tiles for debugging purposes.
@@ -13,12 +13,12 @@ import { EntityManager } from "./entityManager";
  */
 export class DebugTileEntityManager {
   private tileRequestManager: TileRequestManager;
-  private entityManager: EntityManager;
+  private layerManager: LayerManager;
   private tileEntities: Map<string, Cesium.Entity> = new Map();
   private layerId = "debug-tiles";
 
-  constructor(tileRequestManager: TileRequestManager, entityManager: EntityManager) {
-    this.entityManager = entityManager;
+  constructor(tileRequestManager: TileRequestManager, entityManager: LayerManager) {
+    this.layerManager = entityManager;
     this.tileRequestManager = tileRequestManager;
     this.tileRequestManager.onTileStatusChange((key, status) => {
       this.updateTile(key, status);
@@ -39,12 +39,12 @@ export class DebugTileEntityManager {
       const entity = this.createEntity(key, status);
       if (entity) {
         this.tileEntities.set(key, entity);
-        const source = this.entityManager.layerManager.getOrCreateSource(this.layerId);
+        const source = this.layerManager.getOrCreateSource(this.layerId);
         source.entities.add(entity);
         this.updateEntity(entity, status); // Handle immediate removal if status is already loaded/error
       }
     }
-    this.entityManager.requestRender();
+    this.layerManager.requestRender();
   }
 
   /**
@@ -124,7 +124,7 @@ export class DebugTileEntityManager {
 
     if (status === "loaded" || status === "error") {
       setTimeout(() => {
-        const source = this.entityManager.layerManager.getOrCreateSource(this.layerId);
+        const source = this.layerManager.getOrCreateSource(this.layerId);
         source.entities.remove(entity);
         // Find and remove from map
         for (const [key, ent] of this.tileEntities.entries()) {
@@ -133,7 +133,7 @@ export class DebugTileEntityManager {
             break;
           }
         }
-        this.entityManager.requestRender();
+        this.layerManager.requestRender();
       }, 2000);
     }
   }

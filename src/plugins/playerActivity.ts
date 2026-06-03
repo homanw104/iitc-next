@@ -8,6 +8,7 @@
 import * as Cesium from "cesium";
 import "../types/iitc.ts";
 import { IITCCore } from "../types/iitc";
+import { unsafeWindow } from "vite-plugin-monkey/dist/client";
 
 interface PlayerActivity {
   lat: number;
@@ -27,23 +28,28 @@ class PlayerActivityPlugin {
 
   private viewer: IITCCore["viewer"];
   private logManager: IITCCore["logManager"];
+  private layerManager: IITCCore["layerManager"];
   private commManager: IITCCore["commManager"];
 
   public init() {
-    this.viewer = window.iitc.viewer!;
-    this.logManager = window.iitc.logManager!;
-    this.commManager = window.iitc.commManager!;
+    this.viewer = unsafeWindow.iitc.viewer!;
+    this.logManager = unsafeWindow.iitc.logManager!;
+    this.layerManager = unsafeWindow.iitc.layerManager!;
+    this.commManager = unsafeWindow.iitc.commManager!;
 
-    if (!this.viewer || !this.logManager || !this.commManager) {
+    if (!this.viewer || !this.layerManager || !this.logManager || !this.commManager) {
       console.log("[PlayerActivityPlugin] IITC Next core components missing", {
         viewer: !!this.viewer,
         logManager: !!this.logManager,
+        layerManager: !!this.layerManager,
         commManager: !!this.commManager
       });
       return;
     }
 
     this.dataSource = new Cesium.CustomDataSource("player-activity");
+    this.layerManager.getOrCreateSource("player-activity-enl");
+    this.layerManager.getOrCreateSource("player-activity-res");
     this.viewer.dataSources.add(this.dataSource).then();
 
     this.interval = setInterval(() => this.updatePlayerActivity(), 5000);
@@ -153,8 +159,8 @@ class PlayerActivityPlugin {
 }
 
 const register = () => {
-  if (window.iitc && window.iitc.pluginManager) {
-    window.iitc.pluginManager.registerPlugin(new PlayerActivityPlugin());
+  if (unsafeWindow.iitc && unsafeWindow.iitc.pluginManager) {
+    unsafeWindow.iitc.pluginManager.registerPlugin(new PlayerActivityPlugin());
   } else {
     setTimeout(register, 1000);
   }

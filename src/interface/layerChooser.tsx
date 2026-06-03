@@ -2,7 +2,7 @@
  * Function that adds a layer chooser button and dropdown to the specified container.
  */
 
-import { EntityManager } from "../managers/entityManager";
+import { LayerManager } from "../managers/layerManager";
 import { TEAMS } from "../types/ingress";
 import { h } from "../utils/dom";
 
@@ -10,9 +10,9 @@ import { h } from "../utils/dom";
  * Adds a layer chooser button and dropdown to the specified container.
  *
  * @param container - The HTML element where the layer chooser will be appended.
- * @param entityManager - An instance of EntityManager that manages layer visibility.
+ * @param entityManager - An instance of LayerManager that manages layer visibility.
  */
-export function addLayerChooser(container: HTMLElement, entityManager: EntityManager): void {
+export function addLayerChooser(container: HTMLElement, entityManager: LayerManager): void {
   let chooser: HTMLElement;
 
   const onToggleButton = () => {
@@ -20,15 +20,15 @@ export function addLayerChooser(container: HTMLElement, entityManager: EntityMan
   };
 
   const onToggleCheckbox = (id: string, checked: boolean) => {
-    entityManager.setLayerVisible(id, checked);
+    entityManager.setFilter(id, checked);
     if (!chooser) return;
     const allCheckboxes = chooser.querySelectorAll("input[type='checkbox']");
     allCheckboxes.forEach((cb) => {
       const layerId = cb.getAttribute("data-layer-id");
       if (layerId) {
         const input = cb as HTMLInputElement;
-        input.checked = entityManager.isLayerVisible(layerId);
-        input.indeterminate = entityManager.isLayerIndeterminate(layerId);
+        input.checked = entityManager.isFilterEnabled(layerId);
+        input.indeterminate = entityManager.isFilterIndeterminate(layerId);
       }
     });
   };
@@ -46,8 +46,8 @@ export function addLayerChooser(container: HTMLElement, entityManager: EntityMan
     >
       <input
         type="checkbox"
-        checked={entityManager.isLayerVisible(id)}
-        indeterminate={entityManager.isLayerIndeterminate(id)}
+        checked={entityManager.isFilterEnabled(id)}
+        indeterminate={entityManager.isFilterIndeterminate(id)}
         style={{ marginRight: "8px" }}
         data-layer-id={id}
         onChange={(e: any) => onToggleCheckbox(id, e.target.checked)}

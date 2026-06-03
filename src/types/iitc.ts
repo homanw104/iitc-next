@@ -1,6 +1,6 @@
 import * as Cesium from "cesium";
 import { LogManager } from "../managers/logManager";
-import { EntityManager } from "../managers/entityManager";
+import { LayerManager } from "../managers/layerManager";
 import { TileRequestManager } from "../managers/tileRequestManager";
 import { ScoreManager } from "../managers/scoreManager";
 import { RedeemManager } from "../managers/redeemManager";
@@ -17,7 +17,7 @@ export interface IITCPlugin {
 export interface IITCCore {
   viewer?: Cesium.Viewer;
   logManager?: LogManager;
-  entityManager?: EntityManager;
+  layerManager?: LayerManager;
   tileRequestManager?: TileRequestManager;
   scoreManager?: ScoreManager;
   redeemManager?: RedeemManager;

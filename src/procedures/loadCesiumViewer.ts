@@ -16,7 +16,7 @@ import {
   TileRequestManager
 } from "../managers/tileRequestManager";
 import { logManager } from "../managers/logManager";
-import { EntityManager } from "../managers/entityManager";
+import { LayerManager } from "../managers/layerManager";
 import { DebugTileEntityManager } from "../managers/debugTileEntityManager";
 import { showOrUpdateDetailBar } from "../interface/portalDetail";
 import { addRefreshButton } from "../interface/refreshButton";
@@ -185,10 +185,10 @@ function setInitialView(viewer: Cesium.Viewer): void {
  * Set up event handlers on Cesium's screenSpaceEventHandler.
  *
  * @param viewer - The Cesium.Viewer instance to attach event handlers to.
- * @param entityManager - The entity manager object to use for retrieving portal data.
+ * @param layerManager - The entity manager object to use for retrieving portal data.
  * @param container - The HTMLDivElement element containing the cesium widget.
  */
-function setupClickHandler(viewer: Cesium.Viewer, entityManager: EntityManager, container: HTMLElement): void {
+function setupClickHandler(viewer: Cesium.Viewer, layerManager: LayerManager, container: HTMLElement): void {
   let isClickLoading = false;
   let isClickCancelled = false;
   let lastEntity: Cesium.Entity | undefined;
@@ -210,19 +210,19 @@ function setupClickHandler(viewer: Cesium.Viewer, entityManager: EntityManager, 
     if (entity && entity.id.startsWith("portal-")) {
       isClickLoading = true;
       const portalGuid = entity.id.substring(7);
-      const portalData = entityManager.getPortalData(portalGuid);
+      const portalData = layerManager.getPortalData(portalGuid);
       if (portalData) {
         showOrUpdateDetailBar(container, portalData);
-        entityManager.requestPortalDetails(portalGuid).then(() => {
+        layerManager.requestPortalDetails(portalGuid).then(() => {
           isClickLoading = false;
           if (isClickCancelled) {
             isClickCancelled = false;
             return;
           }
-          const freshData = entityManager.getPortalData(portalGuid);
+          const freshData = layerManager.getPortalData(portalGuid);
           if (freshData) {
             const layerId = getPortalLayerId(freshData);
-            const source = entityManager.layerManager.getOrCreateSource(layerId);
+            const source = layerManager.getOrCreateSource(layerId);
             viewer.selectedEntity = source.entities.getById(`portal-${portalGuid}`);
             showOrUpdateDetailBar(container, freshData);
           }
@@ -493,7 +493,8 @@ export default function loadCesiumViewer(): void {
 
   setInitialView(viewer);
 
-  const entityManager = new EntityManager(viewer);
+  const layerManager = new LayerManager(viewer);
+  const entityManager = new LayerManager(viewer);
   const tileRequestManager = new TileRequestManager(entityManager);
   new DebugTileEntityManager(tileRequestManager, entityManager);
 
@@ -503,7 +504,7 @@ export default function loadCesiumViewer(): void {
 
   // Expose managers to the global iitc object
   window.iitc.viewer = viewer;
-  window.iitc.entityManager = entityManager;
+  window.iitc.layerManager = layerManager;
   window.iitc.tileRequestManager = tileRequestManager;
   window.iitc.scoreManager = scoreManager;
   window.iitc.redeemManager = redeemManager;

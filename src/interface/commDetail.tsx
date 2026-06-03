@@ -196,7 +196,7 @@ const CommCloseButton = ({ onRef, onClick }: {
       cursor: "pointer",
     }}
   >
-    <svg viewBox="0 -960 960 960" width="30" height="30" fill="currentColor">
+    <svg viewBox="0 -960 960 960" width="24px" height="24px" fill="currentColor">
       <path d="M480-344 240-584l56-56 184 184 184-184 56 56-240 240Z" />
     </svg>
   </button>
@@ -265,6 +265,7 @@ const CommPane = ({
         className="comm-tabs"
         style={{
           display: "flex",
+          alignItems: "center",
           justifyContent: "space-between",
           borderBottom: "1px solid #555",
         }}

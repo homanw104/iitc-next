@@ -5,7 +5,7 @@
 import { apiRequest } from "../utils/network";
 import { FieldData, LinkData, PortalData, RawEntity, TileResponse } from "../types/ingress";
 import { ParsedEntities } from "../types/map";
-import { EntityManager } from "./entityManager";
+import { LayerManager } from "./layerManager";
 import { logManager } from "./logManager";
 import { parsePortal } from "./portalEntityManager";
 import { parseLink } from "./linkEntityManager";
@@ -116,10 +116,10 @@ export class TileRequestManager {
   private requestedTiles: Set<string> = new Set();
   private tileStatuses: Map<string, TileStatus> = new Map();
   private tileStatusListeners: TileStatusCallback[] = [];
-  private entityManager: EntityManager;
+  private layerManager: LayerManager;
 
-  constructor(entityManager: EntityManager) {
-    this.entityManager = entityManager;
+  constructor(layerManager: LayerManager) {
+    this.layerManager = layerManager;
   }
 
   /**
@@ -216,7 +216,7 @@ export class TileRequestManager {
       const response = await request.send();
       logManager.debug("TileRequestManager", `Received response for ${tilesToRequest.length} tile${tilesToRequest.length === 1 ? "" : "s"}`);
       if (response && refreshExisting) {
-        this.entityManager.removeGameEntitiesInView();
+        this.layerManager.removeGameEntitiesInView();
         logManager.debug("TileRequestManager", "Removed entities from current view");
       }
       this.handleResponse(response, tilesToRequest);
@@ -277,14 +277,14 @@ export class TileRequestManager {
       if (tileData.gameEntities) {
         entitiesFound += tileData.gameEntities.length;
         const { portals, links, fields } = parseTileEntities(tileData.gameEntities);
-        portals.forEach((p) => this.entityManager.addOrUpdatePortal(p));
-        links.forEach((l) => this.entityManager.addOrUpdateLink(l));
-        fields.forEach((f) => this.entityManager.addOrUpdateField(f));
+        portals.forEach((p) => this.layerManager.addOrUpdatePortal(p));
+        links.forEach((l) => this.layerManager.addOrUpdateLink(l));
+        fields.forEach((f) => this.layerManager.addOrUpdateField(f));
       }
     }
 
     logManager.debug("TileRequestManager", `Processed ${entitiesFound} entities`);
-    this.entityManager.requestRender();
+    this.layerManager.requestRender();
   }
 }
 
