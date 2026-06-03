@@ -32,6 +32,7 @@ import { FieldEntityManager } from "../managers/fieldEntityManager";
 import { PortalHistoryEntityManager } from "../managers/portalHistoryEntityManager";
 import { ScoutHistoryEntityManager } from "../managers/scoutHistoryEntityManager";
 import { unsafeWindow } from "vite-plugin-monkey/dist/client";
+import { addGetLocationButton } from "../interface/getLocationButton";
 
 // Tell Cesium where to find its assets (Images, Workers, etc.)
 // Since we use the CDN for the main library, we should also use it for assets.
@@ -555,6 +556,7 @@ export default function loadCesiumViewer(): void {
   addRefreshButton(container, () => triggerDataReload(viewer, tileRequestManager));
   addGameDetailButton(container, scoreManager, redeemManager);
   addCommDetailButton(viewer, container, commManager);
+  addGetLocationButton(viewer, container);
 
   addLayerChooser(container, layerManager);
   showOrUpdateDetailBar(container);
