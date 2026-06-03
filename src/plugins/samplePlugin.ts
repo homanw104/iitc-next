@@ -10,8 +10,9 @@ import { IITCCore } from "../types/iitc";
 import { unsafeWindow } from "vite-plugin-monkey/dist/client";
 
 class SamplePlugin {
-  public name = "Sample Plugin";
   public id = "sample-plugin";
+  public name = "Sample Plugin";
+  public description = "Print a message to the console every 5 seconds.";
 
   private viewer: IITCCore["viewer"];
   private logManager: IITCCore["logManager"];

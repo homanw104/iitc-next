@@ -17,8 +17,9 @@ import { CommManager } from "../managers/commManager";
 import { PluginManager } from "../managers/pluginManager";
 
 export interface IITCPlugin {
-  name: string;
   id: string;
+  name: string;
+  description?: string;
   init: () => void;
   deinit?: () => void;
 }
