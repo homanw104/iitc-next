@@ -22,6 +22,7 @@ import { showOrUpdateDetailBar } from "../interface/portalDetail";
 import { addRefreshButton } from "../interface/refreshButton";
 import { addGameDetailButton } from "../interface/gameDetail";
 import { addCommDetailButton } from "../interface/commDetail";
+import { addGetLocationButton } from "../interface/getLocationButton";
 import { AmapMercatorTilingScheme } from "../utils/map";
 import { CommManager } from "../managers/commManager";
 import { ScoreManager } from "../managers/scoreManager";
@@ -31,8 +32,7 @@ import { LinkEntityManager } from "../managers/linkEntityManager";
 import { FieldEntityManager } from "../managers/fieldEntityManager";
 import { PortalHistoryEntityManager } from "../managers/portalHistoryEntityManager";
 import { ScoutHistoryEntityManager } from "../managers/scoutHistoryEntityManager";
-import { unsafeWindow } from "vite-plugin-monkey/dist/client";
-import { addGetLocationButton } from "../interface/getLocationButton";
+import { safeWindow } from "../utils/window";
 
 // Tell Cesium where to find its assets (Images, Workers, etc.)
 // Since we use the CDN for the main library, we should also use it for assets.
@@ -541,17 +541,20 @@ export default function loadCesiumViewer(): void {
   const commManager = new CommManager(viewer);
 
   // Expose managers to the global iitc object
-  unsafeWindow.iitc.viewer = viewer;
-  unsafeWindow.iitc.layerManager = layerManager;
-  unsafeWindow.iitc.portalEntityManager = portalEntityManager;
-  unsafeWindow.iitc.linkEntityManager = linkEntityManager;
-  unsafeWindow.iitc.fieldEntityManager = fieldEntityManager;
-  unsafeWindow.iitc.portalHistoryEntityManager = portalHistoryEntityManager;
-  unsafeWindow.iitc.scoutHistoryEntityManager = scoutHistoryEntityManager;
-  unsafeWindow.iitc.tileRequestManager = tileRequestManager;
-  unsafeWindow.iitc.scoreManager = scoreManager;
-  unsafeWindow.iitc.redeemManager = redeemManager;
-  unsafeWindow.iitc.commManager = commManager;
+  if (safeWindow) {
+    const iitc = (safeWindow as any).iitc;
+    iitc.viewer = viewer;
+    iitc.layerManager = layerManager;
+    iitc.portalEntityManager = portalEntityManager;
+    iitc.linkEntityManager = linkEntityManager;
+    iitc.fieldEntityManager = fieldEntityManager;
+    iitc.portalHistoryEntityManager = portalHistoryEntityManager;
+    iitc.scoutHistoryEntityManager = scoutHistoryEntityManager;
+    iitc.tileRequestManager = tileRequestManager;
+    iitc.scoreManager = scoreManager;
+    iitc.redeemManager = redeemManager;
+    iitc.commManager = commManager;
+  }
 
   addRefreshButton(container, () => triggerDataReload(viewer, tileRequestManager));
   addGameDetailButton(container, scoreManager, redeemManager);

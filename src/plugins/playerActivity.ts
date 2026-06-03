@@ -8,7 +8,7 @@
 import * as Cesium from "cesium";
 import "../types/iitc.ts";
 import { IITCCore } from "../types/iitc";
-import { unsafeWindow } from "vite-plugin-monkey/dist/client";
+import { safeWindow } from "../utils/window";
 import { CustomDataSource } from "cesium";
 import { getTeamColor } from "../utils/color";
 
@@ -44,16 +44,19 @@ class PlayerActivityPlugin {
   private playerPaths: Map<string, Cesium.Entity> = new Map();
   private interval: number | undefined;
 
-  private viewer: IITCCore["viewer"] = unsafeWindow.iitc.viewer;
-  private logManager: IITCCore["logManager"] = unsafeWindow.iitc.logManager;
-  private layerManager: IITCCore["layerManager"] = unsafeWindow.iitc.layerManager;
-  private commManager: IITCCore["commManager"] = unsafeWindow.iitc.commManager;
+  private viewer: IITCCore["viewer"] = safeWindow ? (safeWindow as any).iitc?.viewer : undefined;
+  private logManager: IITCCore["logManager"] = safeWindow ? (safeWindow as any).iitc?.logManager : undefined;
+  private layerManager: IITCCore["layerManager"] = safeWindow ? (safeWindow as any).iitc?.layerManager : undefined;
+  private commManager: IITCCore["commManager"] = safeWindow ? (safeWindow as any).iitc?.commManager : undefined;
 
   public init() {
-    this.viewer = unsafeWindow.iitc.viewer;
-    this.logManager = unsafeWindow.iitc.logManager;
-    this.layerManager = unsafeWindow.iitc.layerManager;
-    this.commManager = unsafeWindow.iitc.commManager;
+    if (safeWindow) {
+      const iitc = (safeWindow as any).iitc;
+      this.viewer = iitc.viewer;
+      this.logManager = iitc.logManager;
+      this.layerManager = iitc.layerManager;
+      this.commManager = iitc.commManager;
+    }
 
     if (!this.viewer || !this.layerManager || !this.logManager || !this.commManager) {
       console.warn("[WARN][PlayerActivityPlugin] IITC Next core components missing", {
@@ -311,8 +314,8 @@ class PlayerActivityPlugin {
 }
 
 const register = () => {
-  if (unsafeWindow.iitc && unsafeWindow.iitc.pluginManager) {
-    unsafeWindow.iitc.pluginManager.registerPlugin(new PlayerActivityPlugin());
+  if (safeWindow && (safeWindow as any).iitc && (safeWindow as any).iitc.pluginManager) {
+    (safeWindow as any).iitc.pluginManager.registerPlugin(new PlayerActivityPlugin());
   } else {
     setTimeout(register, 1000);
   }

@@ -2,7 +2,8 @@
  * Entry point of the application.
  */
 
-import { unsafeWindow } from "vite-plugin-monkey/dist/client";
+import { safeWindow } from "./utils/window";
+import { safeLocalStorage } from "./utils/storage";
 import setUpLogManager from "./procedures/setUpLogManager";
 import extractPlayerInfo from "./procedures/extractPlayerInfo";
 import extractVersionString from "./procedures/extractVersionString";
@@ -14,8 +15,12 @@ import { getPlayerInfo } from "./utils/player";
 import "./types/iitc.ts";
 
 const init = async () => {
+  // Initialize and shadow storage if needed
+  await safeLocalStorage.initialize();
+  safeLocalStorage.shadow();
+
   // Initialize iitc variable
-  unsafeWindow.iitc = {};
+  if (safeWindow) (safeWindow as any).iitc = {};
 
   // Set up logging for this app
   setUpLogManager();

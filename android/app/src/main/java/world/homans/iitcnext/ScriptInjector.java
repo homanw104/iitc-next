@@ -38,6 +38,7 @@ public class ScriptInjector {
             "try { " +
             "  if (window.IITC_NEXT_INJECTED) return; " +
             "  window.IITC_NEXT_INJECTED = true; " +
+            "  window.unsafeWindow = window; " + // Provide unsafeWindow fallback
             "  console.log('IITC-Next: Starting injection'); " +
             
             "  var l = document.createElement('link'); " +

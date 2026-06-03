@@ -13,12 +13,12 @@ export default function initPlugins(): void {
       try {
         pluginManager.enablePlugin(plugin.id);
       } catch (e) {
-        logManager.error("RegisterPlugins", `Failed to initialize plugin ${plugin.name}`, e);
+        logManager.error("InitPlugins", `Failed to initialize plugin ${plugin.name}`, e);
       }
     } else if (pluginManager.isInitialized(plugin.id)) {
-      logManager.info("RegisterPlugins", `Plugin ${plugin.name} is already initialized`);
+      logManager.info("InitPlugins", `Plugin ${plugin.name} is already initialized`);
     } else {
-      logManager.info("RegisterPlugins", `Plugin ${plugin.name} is disabled`);
+      logManager.info("InitPlugins", `Plugin ${plugin.name} is disabled`);
     }
   });
 }

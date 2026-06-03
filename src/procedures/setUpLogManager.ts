@@ -2,10 +2,10 @@
  * Simply sets up the global log manager.
  */
 
-import { unsafeWindow } from "vite-plugin-monkey/dist/client";
+import { safeWindow } from "../utils/window";
 import { logManager } from "../managers/logManager";
 
 export default function setUpLogManager(): void {
   logManager.setLevel("DEBUG");
-  unsafeWindow.iitc.logManager = logManager;
+  if (safeWindow) (safeWindow as any).iitc.logManager = logManager;
 }

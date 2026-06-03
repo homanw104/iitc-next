@@ -4,39 +4,60 @@
 
 import { IITCPlugin } from "../types/iitc";
 import { logManager } from "./logManager";
+import { safeLocalStorage } from "../utils/storage";
+
+const ENABLED_PLUGINS_STORAGE_KEY = "iitc-enabled-plugins";
 
 export class PluginManager {
   private plugins: Map<string, IITCPlugin> = new Map();
   private enabledPlugins: Set<string> = new Set();
   private initializedPlugins = new Set<string>();
-  private ENABLED_PLUGINS_STORAGE_KEY = "iitc-enabled-plugins";
 
-  constructor() {
-    this.loadState();
+  private initialized = false;
+
+  /**
+   * Initializes the PluginManager by loading the stored state.
+   */
+  public async initialize() {
+    if (this.initialized) return;
+    await this.loadState();
+    this.initialized = true;
+    logManager.debug("PluginManager", "Initialization complete.");
   }
 
-  private loadState() {
-    const stored = localStorage.getItem(this.ENABLED_PLUGINS_STORAGE_KEY);
+  private async loadState() {
+    // safeLocalStorage.initialize() is called in app.ts,
+    // but we can call it here too just to be sure
+    await safeLocalStorage.initialize();
+
+    const stored = safeLocalStorage.getItem(ENABLED_PLUGINS_STORAGE_KEY);
+    logManager.debug("PluginManager", `Loading state for key ${ENABLED_PLUGINS_STORAGE_KEY}: ${stored}`);
+
     if (stored) {
       try {
         const ids = JSON.parse(stored);
-        if (Array.isArray(ids)) this.enabledPlugins = new Set(ids);
-        logManager.debug("PluginManager", "Loaded plugins state");
+        if (Array.isArray(ids)) {
+          this.enabledPlugins = new Set(ids);
+          logManager.debug("PluginManager", `Loaded ${ids.length} enabled plugins from storage.`);
+        }
       } catch (e) {
         logManager.error("PluginManager", "Failed to load plugin state", e);
         this.removeState();
       }
+    } else {
+      logManager.debug("PluginManager", "No stored plugin state found.");
     }
   }
 
   private saveState() {
-    logManager.debug("PluginManager", "Saving plugin states");
-    localStorage.setItem(this.ENABLED_PLUGINS_STORAGE_KEY, JSON.stringify(Array.from(this.enabledPlugins)));
+    const ids = Array.from(this.enabledPlugins);
+    logManager.debug("PluginManager", `Saving plugin states: ${JSON.stringify(ids)}`);
+    safeLocalStorage.setItem(ENABLED_PLUGINS_STORAGE_KEY, JSON.stringify(ids));
   }
 
   private removeState() {
     logManager.debug("PluginManager", "Clearing plugin states");
-    localStorage.removeItem(this.ENABLED_PLUGINS_STORAGE_KEY);
+    safeLocalStorage.removeItem(ENABLED_PLUGINS_STORAGE_KEY);
   }
 
   public isEnabled(pluginId: string): boolean {
