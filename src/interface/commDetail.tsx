@@ -36,8 +36,9 @@ const CommMessage = ({ plext, viewer, channel }: {
         {plext.markup.map(([type, data]) => {
           let color = "white";
           if (data.team === "ENLIGHTENED") color = getTeamColor("ENLIGHTENED").toCssColorString();
-          if (data.team === "RESISTANCE") color = getTeamColor("RESISTANCE").toCssColorString();
-          if (data.team === "MACHINA") color = getTeamColor("MACHINA").toCssColorString();
+          else if (data.team === "RESISTANCE") color = getTeamColor("RESISTANCE").toCssColorString();
+          else if (data.team === "MACHINA") color = getTeamColor("MACHINA").toCssColorString();
+          else if (data.team === "NEUTRAL") color = getTeamColor("MACHINA").toCssColorString();
 
           if (type === "PLAYER" || type === "SENDER") {
             return <span style={{ color, fontWeight: "bold", marginRight: "3px" }}>{data.plain}</span>;
