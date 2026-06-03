@@ -1,6 +1,7 @@
 /**
  * Define procedures for loading plugins.
  */
+
 import { logManager } from "../managers/logManager";
 import { pluginManager } from "../managers/pluginManager";
 

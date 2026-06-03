@@ -1,3 +1,7 @@
+/**
+ * Handle redeem requests.
+ */
+
 import { apiRequest } from "../utils/network";
 import { logManager } from "./logManager";
 

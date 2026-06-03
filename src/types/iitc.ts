@@ -1,6 +1,15 @@
+/**
+ * Definitions of the iitc global object and plugin objects.
+ */
+
 import * as Cesium from "cesium";
 import { LogManager } from "../managers/logManager";
 import { LayerManager } from "../managers/layerManager";
+import { PortalEntityManager } from "../managers/portalEntityManager";
+import { LinkEntityManager } from "../managers/linkEntityManager";
+import { FieldEntityManager } from "../managers/fieldEntityManager";
+import { PortalHistoryEntityManager } from "../managers/portalHistoryEntityManager";
+import { ScoutHistoryEntityManager } from "../managers/scoutHistoryEntityManager";
 import { TileRequestManager } from "../managers/tileRequestManager";
 import { ScoreManager } from "../managers/scoreManager";
 import { RedeemManager } from "../managers/redeemManager";
@@ -18,6 +27,11 @@ export interface IITCCore {
   viewer?: Cesium.Viewer;
   logManager?: LogManager;
   layerManager?: LayerManager;
+  portalEntityManager?: PortalEntityManager;
+  linkEntityManager?: LinkEntityManager;
+  fieldEntityManager?: FieldEntityManager;
+  portalHistoryEntityManager?: PortalHistoryEntityManager;
+  scoutHistoryEntityManager?: ScoutHistoryEntityManager;
   tileRequestManager?: TileRequestManager;
   scoreManager?: ScoreManager;
   redeemManager?: RedeemManager;

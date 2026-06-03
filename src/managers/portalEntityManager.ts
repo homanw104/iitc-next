@@ -1,3 +1,7 @@
+/**
+ * Manage portal entities.
+ */
+
 import * as Cesium from "cesium";
 import { PortalData, PortalLevel, PortalMod, PortalResonator, RawEntity } from "../types/ingress";
 import { getTeamColor } from "../utils/color";

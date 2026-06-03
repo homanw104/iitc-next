@@ -1,3 +1,7 @@
+/**
+ * Functions that add comm channel panes and a toggle button
+ */
+
 import * as Cesium from "cesium";
 import { Viewer } from "cesium";
 import { h } from "../utils/dom";

@@ -1,5 +1,5 @@
 /**
- * Register official plugins and expose pluginManager for other scripts to register themselves..
+ * Register official plugins and expose the pluginManager for other scripts to register themselves.
  */
 
 import { unsafeWindow } from "vite-plugin-monkey/dist/client";

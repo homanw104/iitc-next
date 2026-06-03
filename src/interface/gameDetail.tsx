@@ -1,5 +1,5 @@
 /**
- * Functions that add a game detail button and pane to show player info and game status.
+ * Functions that show the game info pane, redeem pane, and plugin pane.
  */
 
 import { h } from "../utils/dom";

@@ -1,3 +1,7 @@
+/**
+ * Manage field entities.
+ */
+
 import * as Cesium from "cesium";
 import { FieldData, PortalData, RawEntity } from "../types/ingress";
 import { getTeamColor } from "../utils/color";

@@ -1,6 +1,7 @@
 /**
- * Functions that adds a refresh button that refresh tiles in current view on click.
+ * Functions that add a refresh button that refresh tiles in the current view on click.
  */
+
 import { h } from "../utils/dom";
 
 export function addRefreshButton(container: HTMLElement, onclick: () => void): void {

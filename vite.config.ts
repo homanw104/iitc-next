@@ -1,3 +1,7 @@
+/**
+ * The vite configuration for IITC Next.
+ */
+
 import { defineConfig } from "vite";
 import monkey, { cdn } from "vite-plugin-monkey";
 

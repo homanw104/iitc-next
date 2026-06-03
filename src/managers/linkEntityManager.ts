@@ -1,3 +1,7 @@
+/**
+ * Manage link entities.
+ */
+
 import * as Cesium from "cesium";
 import { LinkData, PortalData, RawEntity } from "../types/ingress";
 import { getTeamColor } from "../utils/color";

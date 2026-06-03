@@ -1,5 +1,5 @@
 /**
- * Functions to manage player info
+ * Functions to manage player info.
  */
 
 import { Player } from "../types/ingress";

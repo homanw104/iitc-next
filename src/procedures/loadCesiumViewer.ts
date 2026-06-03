@@ -542,6 +542,11 @@ export default function loadCesiumViewer(): void {
   // Expose managers to the global iitc object
   unsafeWindow.iitc.viewer = viewer;
   unsafeWindow.iitc.layerManager = layerManager;
+  unsafeWindow.iitc.portalEntityManager = portalEntityManager;
+  unsafeWindow.iitc.linkEntityManager = linkEntityManager;
+  unsafeWindow.iitc.fieldEntityManager = fieldEntityManager;
+  unsafeWindow.iitc.portalHistoryEntityManager = portalHistoryEntityManager;
+  unsafeWindow.iitc.scoutHistoryEntityManager = scoutHistoryEntityManager;
   unsafeWindow.iitc.tileRequestManager = tileRequestManager;
   unsafeWindow.iitc.scoreManager = scoreManager;
   unsafeWindow.iitc.redeemManager = redeemManager;

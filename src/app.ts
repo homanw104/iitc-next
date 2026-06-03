@@ -1,5 +1,5 @@
 /**
- * Entry point for the application.
+ * Entry point of the application.
  */
 
 import { unsafeWindow } from "vite-plugin-monkey/dist/client";

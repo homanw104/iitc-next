@@ -7,6 +7,7 @@
  * This allows each plugin to be built into its own `.user.js` file
  * with independent metadata and dependencies.
  */
+
 import { defineConfig } from "vite";
 import monkey, { cdn } from "vite-plugin-monkey";
 import { readdirSync } from "fs";

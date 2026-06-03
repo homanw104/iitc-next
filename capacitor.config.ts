@@ -1,3 +1,7 @@
+/**
+ * Config for build with capacitor android.
+ */
+
 import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
