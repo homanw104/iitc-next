@@ -1,15 +1,20 @@
 package world.homans.iitcnext;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import com.getcapacitor.BridgeActivity;
 import java.io.File;
 
 public class MainActivity extends BridgeActivity {
     private final ScriptInjector scriptInjector = new ScriptInjector();
+    private static final int PERMISSION_REQUEST_CODE = 1234;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -18,6 +23,17 @@ public class MainActivity extends BridgeActivity {
             WebView.setWebContentsDebuggingEnabled(true);
         }
         scriptInjector.loadUserScript(this);
+        checkAndRequestPermissions();
+    }
+
+    private void checkAndRequestPermissions() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            
+            ActivityCompat.requestPermissions(this,
+                new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION},
+                PERMISSION_REQUEST_CODE);
+        }
     }
 
     @Override
@@ -59,6 +75,7 @@ public class MainActivity extends BridgeActivity {
         settings.setAllowUniversalAccessFromFileURLs(true);
         settings.setAllowFileAccessFromFileURLs(true);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        settings.setGeolocationEnabled(true);
 
         // Ensure persistent storage has a path (deprecated but helpful in some environments)
         String databasePath = getApplicationContext().getDir("databases", Context.MODE_PRIVATE).getPath();
@@ -69,6 +86,6 @@ public class MainActivity extends BridgeActivity {
 
         settings.setUserAgentString(getCleanedUserAgent(this));
 
-        webView.addJavascriptInterface(new IITCNativeInterface(), "IITC_Native");
+        webView.addJavascriptInterface(new IITCNativeInterface(webView), "IITC_Native");
     }
 }

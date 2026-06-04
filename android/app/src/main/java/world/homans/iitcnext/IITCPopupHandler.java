@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Message;
 import android.view.ViewGroup;
+import android.webkit.GeolocationPermissions;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
@@ -33,6 +34,11 @@ public class IITCPopupHandler extends BridgeWebChromeClient {
                 view.evaluateJavascript(activity.getScriptInjector().getInjectionJs(), null);
             }
         }
+    }
+
+    @Override
+    public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
+        callback.invoke(origin, true, false);
     }
 
     @SuppressLint("SetJavaScriptEnabled")

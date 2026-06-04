@@ -40,6 +40,15 @@ public class ScriptInjector {
             "  window.IITC_NEXT_INJECTED = true; " +
             "  window.unsafeWindow = window; " + // Provide unsafeWindow fallback
             
+            "  if (window.IITC_Native) { " +
+            "    window.navigator.geolocation.getCurrentPosition = function(success, error) { " +
+            "      window.onAndroidLocation = function(lat, lng, acc) { " +
+            "        success({ coords: { latitude: lat, longitude: lng, accuracy: acc }, timestamp: Date.now() }); " +
+            "      }; " +
+            "      window.IITC_Native.getCurrentPosition(); " +
+            "    }; " +
+            "  } " +
+            
             "  var l = document.createElement('link'); " +
             "  l.rel = 'stylesheet'; l.href = '" + CESIUM_CSS + "'; " +
             "  (document.head || document.documentElement).appendChild(l); " +
