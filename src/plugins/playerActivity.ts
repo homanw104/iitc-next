@@ -317,7 +317,7 @@ class PlayerActivityPlugin {
 
     if (players.length > 5) {
       ctx.strokeText(`(${players.length - 5} more)`, half + offset, startY);
-      ctx.fillText("(${players.length - 5} more)", half + offset, startY);
+      ctx.fillText(`(${players.length - 5} more)`, half + offset, startY);
     }
 
     return canvas;

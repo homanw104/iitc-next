@@ -12,6 +12,7 @@ export default defineConfig({
       userscript: {
         name: "iitc-next",
         author: "Homan",
+        version: "1.0.2",
         description: "IITC Next",
         namespace: "npm/vite-plugin-monkey",
         match: ["https://intel.ingress.com/*"],

@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">iitc-next</string>
-    <string name="title_activity_main">iitc-next</string>
+    <string name="app_name">IITC Next</string>
+    <string name="title_activity_main">IITC Next</string>
     <string name="package_name">world.homans.iitcnext</string>
     <string name="custom_url_scheme">world.homans.iitcnext</string>
 </resources>
