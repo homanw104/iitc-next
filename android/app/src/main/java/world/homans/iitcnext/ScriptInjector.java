@@ -39,7 +39,6 @@ public class ScriptInjector {
             "  if (window.IITC_NEXT_INJECTED) return; " +
             "  window.IITC_NEXT_INJECTED = true; " +
             "  window.unsafeWindow = window; " + // Provide unsafeWindow fallback
-            "  console.log('IITC-Next: Starting injection'); " +
             
             "  var l = document.createElement('link'); " +
             "  l.rel = 'stylesheet'; l.href = '" + CESIUM_CSS + "'; " +
@@ -55,11 +54,9 @@ public class ScriptInjector {
             "  addScript('" + CESIUM_JS + "'); " +
             "  addScript('" + SYSTEM_JS + "', function() { " +
             "    addScript('" + SYSTEM_NAMED_REGISTER + "', function() { " +
-            "      console.log('IITC-Next: Dependencies loaded, waiting for Cesium global'); " +
             "      var checkCesium = setInterval(function() { " +
             "        if (typeof Cesium !== 'undefined') { " +
             "          clearInterval(checkCesium); " +
-            "          console.log('IITC-Next: Cesium ready, injecting userscript'); " +
             "          window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1.141.0/Build/Cesium/'; " +
             "          window.GM_info = { script: { name: 'iitc-next', version: '1.0.0' } }; " +
             "          window.GM_addStyle = window.GM_addStyle || function(css) { " +
@@ -78,7 +75,7 @@ public class ScriptInjector {
             "      }, 100); " +
             "    }); " +
             "  }); " +
-            "} catch(e) { console.error('IITC-Next Injection Error', e); } " +
+            "} catch(e) { /* ignore injection errors */ } " +
             "})();";
     }
 }

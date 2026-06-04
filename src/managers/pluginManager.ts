@@ -22,16 +22,10 @@ export class PluginManager {
     if (this.initialized) return;
     await this.loadState();
     this.initialized = true;
-    logManager.debug("PluginManager", "Initialization complete.");
   }
 
   private async loadState() {
-    // safeLocalStorage.initialize() is called in app.ts,
-    // but we can call it here too just to be sure
-    await safeLocalStorage.initialize();
-
     const stored = safeLocalStorage.getItem(ENABLED_PLUGINS_STORAGE_KEY);
-    logManager.debug("PluginManager", `Loading state for key ${ENABLED_PLUGINS_STORAGE_KEY}: ${stored}`);
 
     if (stored) {
       try {
@@ -44,19 +38,15 @@ export class PluginManager {
         logManager.error("PluginManager", "Failed to load plugin state", e);
         this.removeState();
       }
-    } else {
-      logManager.debug("PluginManager", "No stored plugin state found.");
     }
   }
 
   private saveState() {
     const ids = Array.from(this.enabledPlugins);
-    logManager.debug("PluginManager", `Saving plugin states: ${JSON.stringify(ids)}`);
     safeLocalStorage.setItem(ENABLED_PLUGINS_STORAGE_KEY, JSON.stringify(ids));
   }
 
   private removeState() {
-    logManager.debug("PluginManager", "Clearing plugin states");
     safeLocalStorage.removeItem(ENABLED_PLUGINS_STORAGE_KEY);
   }
 

@@ -16,7 +16,6 @@ class SafeStorage implements Storage {
 
   constructor() {
     this.isNative = Capacitor.isNativePlatform();
-    logManager.debug("Storage", `Platform is native? ${this.isNative}`);
     this.checkAccessibility();
   }
 
@@ -26,11 +25,9 @@ class SafeStorage implements Storage {
       window.localStorage.setItem(testKey, testKey);
       window.localStorage.removeItem(testKey);
       this.useLocalStorage = true;
-      logManager.debug("Storage", "window.localStorage is accessible.");
 
       // In non-native environment, populate memory cache from localStorage if available
       if (!this.isNative) {
-        logManager.info("Storage", "Populating memory cache from localStorage (Web).");
         for (let i = 0; i < window.localStorage.length; i++) {
           const key = window.localStorage.key(i);
           if (key) {
@@ -57,21 +54,17 @@ class SafeStorage implements Storage {
     }
 
     try {
-      logManager.debug("Storage", "Loading from Capacitor Preferences...");
       const { keys } = await Preferences.keys();
-      logManager.debug("Storage", `Found ${keys.length} keys in Preferences.`);
-
       for (const key of keys) {
         const { value } = await Preferences.get({ key });
         if (value !== null) {
-          logManager.debug("Storage", `Loaded key "${key}" = "${value.substring(0, 50)}${value.length > 50 ? '...' : ''}"`);
           this.memoryStorage[key] = value;
           // If localStorage is available, sync it
           if (this.useLocalStorage) {
             try {
               window.localStorage.setItem(key, value);
-            } catch (e) {
-              logManager.warn("Storage", `Failed to sync key "${key}" to localStorage`, e);
+            } catch {
+              // Ignore sync errors
             }
           }
         }
@@ -88,17 +81,16 @@ class SafeStorage implements Storage {
   }
 
   clear(): void {
-    logManager.debug("Storage", "Clearing all storage.");
     if (this.useLocalStorage) {
       try {
         window.localStorage.clear();
-      } catch (e) {
-        logManager.debug("Storage", "Failed to clear localStorage", e);
+      } catch {
+        // Ignore
       }
     }
     this.memoryStorage = {};
     if (this.isNative) {
-      Preferences.clear().then(() => logManager.debug("Storage", "Preferences cleared."));
+      Preferences.clear().then();
     }
   }
 
@@ -112,36 +104,30 @@ class SafeStorage implements Storage {
   }
 
   removeItem(key: string): void {
-    logManager.debug("Storage", `Removing key "${key}"`);
     if (this.useLocalStorage) {
       try {
         window.localStorage.removeItem(key);
-      } catch (e) {
-        logManager.warn("Storage", `Failed to remove key "${key}" from localStorage`, e);
+      } catch {
+        // Ignore
       }
     }
     delete this.memoryStorage[key];
     if (this.isNative) {
-      Preferences.remove({ key }).then(() => logManager.debug("Storage", `Key "${key}" removed from Preferences.`));
+      Preferences.remove({ key }).then();
     }
   }
 
   setItem(key: string, value: string): void {
-    logManager.debug("Storage", `Setting key "${key}" = "${value.substring(0, 50)}${value.length > 50 ? '...' : ''}"`);
     if (this.useLocalStorage) {
       try {
         window.localStorage.setItem(key, value);
-      } catch (e) {
-        logManager.warn("Storage", `Failed to set key "${key}" in localStorage`, e);
+      } catch {
+        // Ignore
       }
     }
     this.memoryStorage[key] = value;
     if (this.isNative) {
-      Preferences.set({ key, value }).then(() => {
-        logManager.debug("Storage", `Key "${key}" persisted to Preferences.`);
-      }).catch(e => {
-        logManager.error("Storage", `Failed to persist key "${key}" to Preferences`, e);
-      });
+      Preferences.set({ key, value }).then();
     }
   }
 
@@ -150,10 +136,7 @@ class SafeStorage implements Storage {
    * Call this only if localStorage is inaccessible.
    */
   shadow() {
-    if (this.useLocalStorage) {
-      logManager.debug("Storage", "Skipping shadow as localStorage is available.");
-      return;
-    }
+    if (this.useLocalStorage) return;
     try {
       Object.defineProperty(window, "localStorage", {
         value: this,
