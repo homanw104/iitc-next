@@ -36,8 +36,8 @@ export class LinkEntityManager {
         const oldLayerId = getLinkLayerId(existing.data);
         const newLayerId = getLinkLayerId(data);
         if (oldLayerId !== newLayerId) {
-          this.layerManager.getOrCreateSource(oldLayerId).entities.remove(existing.entity);
-          this.layerManager.getOrCreateSource(newLayerId).entities.add(existing.entity);
+          this.layerManager.getOrCreateSourceAndFilter(oldLayerId).entities.remove(existing.entity);
+          this.layerManager.getOrCreateSourceAndFilter(newLayerId).entities.add(existing.entity);
         }
         this.updateLinkEntity(existing.entity, data);
         existing.data = data;
@@ -54,7 +54,7 @@ export class LinkEntityManager {
     const linkInfo = this.links.get(guid);
     if (linkInfo) {
       const layerId = getLinkLayerId(linkInfo.data);
-      this.layerManager.getOrCreateSource(layerId).entities.remove(linkInfo.entity);
+      this.layerManager.getOrCreateSourceAndFilter(layerId).entities.remove(linkInfo.entity);
       this.links.delete(guid);
       return true;
     }
@@ -67,7 +67,7 @@ export class LinkEntityManager {
 
   private createLinkEntity(data: LinkData): Cesium.Entity {
     const layerId = getLinkLayerId(data);
-    const entity = this.layerManager.getOrCreateSource(layerId).entities.add({
+    const entity = this.layerManager.getOrCreateSourceAndFilter(layerId).entities.add({
       id: `link-${data.guid}`,
       polyline: {
         positions: Cesium.Cartesian3.fromDegreesArray([

@@ -383,7 +383,7 @@ function setupClickHandler(
           const freshData = portalEntityManager.getPortalData(portalGuid);
           if (freshData) {
             const layerId = getPortalLayerId(freshData);
-            const source = layerManager.getOrCreateSource(layerId);
+            const source = layerManager.getOrCreateSourceAndFilter(layerId);
             viewer.selectedEntity = source.entities.getById(`portal-${portalGuid}`);
             showOrUpdateDetailBar(container, freshData);
             portalHistoryEntityManager.addOrUpdateHistoryHalo(freshData);

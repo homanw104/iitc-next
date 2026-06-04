@@ -4,6 +4,11 @@
 
 import * as Cesium from "cesium";
 import { TEAMS, PORTAL_LEVELS } from "../types/ingress";
+import { safeLocalStorage } from "../utils/storage";
+import { logManager } from "./logManager";
+
+const FILTER_STATES_STORAGE_KEY = "iitc-filter-states";
+const PLUGIN_FILTER_STATES_STORAGE_KEY = "iitc-plugin-filter-states";
 
 export class LayerManager {
   private viewer: Cesium.Viewer;
@@ -17,9 +22,16 @@ export class LayerManager {
   // Upper level controls (portals, links, fields)
   private filterState: Map<string, boolean> = new Map();
 
+  // Plugin-specific controls (e.g. "Player activity Res", which will be shown in layer chooser)
+  public pluginFilterStates: Map<string, boolean> = new Map();
+
   constructor(viewer: Cesium.Viewer) {
     this.viewer = viewer;
+    this.loadDefaults();
+    this.loadState().then();
+  }
 
+  private loadDefaults() {
     TEAMS.forEach(t => this.filterState.set(`team-${t.toLowerCase()}`, true));
     PORTAL_LEVELS.forEach(l => this.filterState.set(`level-${l}`, true));
     this.filterState.set("portals-placeholder", true);
@@ -34,35 +46,93 @@ export class LayerManager {
     this.applyFilters();
   }
 
-  public setFilter(type: string, enabled: boolean): void {
-    if (type === "portals") {
-      PORTAL_LEVELS.forEach(l => this.filterState.set(`level-${l}`, enabled));
-      this.filterState.set("portals-placeholder", enabled);
+  private async loadState() {
+    const stored = safeLocalStorage.getItem(FILTER_STATES_STORAGE_KEY);
+    const pluginStored = safeLocalStorage.getItem(PLUGIN_FILTER_STATES_STORAGE_KEY);
+
+    if (stored) {
+      try {
+        const states = JSON.parse(stored);
+        if (Array.isArray(states)) {
+          this.filterState = new Map(states);
+          logManager.debug("LayerManager", `Loaded ${states.length} filters from storage.`);
+        }
+      } catch (e) {
+        logManager.error("LayerManager", "Failed to load filters from storage", e);
+        this.removeState();
+      }
     }
-    this.filterState.set(type, enabled);
+
+    if (pluginStored) {
+      try {
+        const states = JSON.parse(pluginStored);
+        if (Array.isArray(states)) {
+          this.pluginFilterStates = new Map(states);
+          logManager.debug("PluginManager", `Loaded ${states.length} plugin filters from storage.`);
+        }
+      } catch (e) {
+        logManager.error("LayerManager", "Failed to load plugin filter states from storage", e);
+        this.removeState();
+      }
+    }
+
     this.applyFilters();
   }
 
-  public isFilterEnabled(type: string): boolean {
-    if (type === "portals") {
-      const allLevels = PORTAL_LEVELS.every(l => this.filterState.get(`level-${l}`) !== false);
-      const placeholder = this.filterState.get("portals-placeholder") !== false;
-      return allLevels && placeholder;
+  private saveState() {
+    const states = Array.from(this.filterState);
+    const pluginStates = Array.from(this.pluginFilterStates);
+    safeLocalStorage.setItem(FILTER_STATES_STORAGE_KEY, JSON.stringify(states));
+    safeLocalStorage.setItem(PLUGIN_FILTER_STATES_STORAGE_KEY, JSON.stringify(pluginStates));
+  }
+
+  private removeState() {
+    safeLocalStorage.removeItem(FILTER_STATES_STORAGE_KEY);
+    safeLocalStorage.removeItem(PLUGIN_FILTER_STATES_STORAGE_KEY);
+  }
+
+  public setFilter(type: string, enabled: boolean): void {
+    if (this.isBuiltInFilter(type)) {
+      if (type === "portals") {
+        PORTAL_LEVELS.forEach(l => this.filterState.set(`level-${l}`, enabled));
+        this.filterState.set("portals-placeholder", enabled);
+      }
+      this.filterState.set(type, enabled);
+    } else {
+      this.pluginFilterStates.set(type, enabled);
     }
-    return this.filterState.get(type) !== false;
+    this.applyFilters();
+    this.saveState();
+  }
+
+  public isFilterEnabled(type: string): boolean {
+    if (this.isBuiltInFilter(type)) {
+      if (type === "portals") {
+        const allLevels = PORTAL_LEVELS.every(l => this.filterState.get(`level-${l}`) !== false);
+        const placeholder = this.filterState.get("portals-placeholder") !== false;
+        return allLevels && placeholder;
+      }
+      return this.filterState.get(type) !== false;
+    } else {
+      return this.pluginFilterStates.get(type) !== false;
+    }
   }
 
   public isFilterIndeterminate(type: string): boolean {
-    if (type === "portals") {
-      const states = PORTAL_LEVELS.map(l => this.filterState.get(`level-${l}`) !== false);
-      states.push(this.filterState.get("portals-placeholder") !== false);
-      const visibleCount = states.filter(v => v).length;
-      return visibleCount > 0 && visibleCount < states.length;
+    if (this.isBuiltInFilter(type)) {
+      if (type === "portals") {
+        const states = PORTAL_LEVELS.map(l => this.filterState.get(`level-${l}`) !== false);
+        states.push(this.filterState.get("portals-placeholder") !== false);
+        const visibleCount = states.filter(v => v).length;
+        return visibleCount > 0 && visibleCount < states.length;
+      }
+      return false;
+    } else {
+      return false;
     }
-    return false;
   }
 
-  public getOrCreateSource(name: string): Cesium.CustomDataSource {
+  public getOrCreateSourceAndFilter(name: string): Cesium.CustomDataSource {
     let source = this.sources.get(name);
     if (!source) {
       source = new Cesium.CustomDataSource(name);
@@ -74,6 +144,13 @@ export class LayerManager {
       this.sources.set(name, source);
       this.viewer.dataSources.add(source).then();
     }
+
+    // Create the filter as well if it's a plugin layer
+    if (!this.isBuiltInSource(name) && !this.pluginFilterStates.has(name)) {
+      this.pluginFilterStates.set(name, true);
+      this.saveState();
+    }
+
     return source;
   }
 
@@ -84,6 +161,14 @@ export class LayerManager {
       source.show = visible;
       this.viewer.scene.requestRender();
     }
+  }
+
+  private isBuiltInSource(name: string): boolean {
+    return this.sourceVisibility.has(name);
+  }
+
+  private isBuiltInFilter(filterName: string): boolean {
+    return this.filterState.has(filterName);
   }
 
   private applyFilters(): void {
@@ -130,6 +215,13 @@ export class LayerManager {
     // Debug tiles
     const debugTilesVisible = this.filterState.get("debug-tiles") !== false;
     this.setSourceVisible("debug-tiles", debugTilesVisible);
+
+    // Plugins (filter name should be the same as the layer name)
+    const pluginFilters = this.pluginFilterStates.keys();
+    for (const filter of pluginFilters) {
+      const pluginFilterVisible = this.pluginFilterStates.get(filter) !== false;
+      this.setSourceVisible(filter, pluginFilterVisible);
+    }
 
     this.viewer.scene.requestRender();
   }

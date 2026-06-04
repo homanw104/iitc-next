@@ -36,7 +36,7 @@ export class DebugTileEntityManager {
       const entity = this.createTileEntity(key, status);
       if (entity) {
         this.tileEntities.set(key, entity);
-        const source = this.layerManager.getOrCreateSource(this.layerId);
+        const source = this.layerManager.getOrCreateSourceAndFilter(this.layerId);
         source.entities.add(entity);
         this.updateTileEntity(entity, status); // Handle immediate removal if status is already loaded/error
       }
@@ -121,7 +121,7 @@ export class DebugTileEntityManager {
 
     if (status === "loaded" || status === "error") {
       setTimeout(() => {
-        const source = this.layerManager.getOrCreateSource(this.layerId);
+        const source = this.layerManager.getOrCreateSourceAndFilter(this.layerId);
         source.entities.remove(entity);
         // Find and remove from map
         for (const [key, ent] of this.tileEntities.entries()) {

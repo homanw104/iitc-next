@@ -13,8 +13,8 @@ export class PortalHistoryEntityManager {
   public addOrUpdateHistoryHalo(data: PortalData): void {
     const historyHaloId = `portal-${data.guid}-history-halo`;
     const historyHaloIdReverse = `portal-${data.guid}-history-halo-reverse`;
-    const source = this.layerManager.getOrCreateSource("history-visited-captured");
-    const sourceReverse = this.layerManager.getOrCreateSource("history-visited-captured-reverse");
+    const source = this.layerManager.getOrCreateSourceAndFilter("history-visited-captured");
+    const sourceReverse = this.layerManager.getOrCreateSourceAndFilter("history-visited-captured-reverse");
     let historyHalo = source.entities.getById(historyHaloId);
     let historyHaloReverse = sourceReverse.entities.getById(historyHaloIdReverse);
 
@@ -99,13 +99,13 @@ export class PortalHistoryEntityManager {
   public removeHistoryHalo(guid: string): void {
     const historyHaloId = `portal-${guid}-history-halo`;
     const historyHaloIdReverse = `portal-${guid}-history-halo-reverse`;
-    this.layerManager.getOrCreateSource("history-visited-captured").entities.removeById(historyHaloId);
-    this.layerManager.getOrCreateSource("history-visited-captured-reverse").entities.removeById(historyHaloIdReverse);
+    this.layerManager.getOrCreateSourceAndFilter("history-visited-captured").entities.removeById(historyHaloId);
+    this.layerManager.getOrCreateSourceAndFilter("history-visited-captured-reverse").entities.removeById(historyHaloIdReverse);
   }
 
   public removeHistoryHaloInView(viewRect: Cesium.Rectangle): void {
-    const source = this.layerManager.getOrCreateSource("history-visited-captured");
-    const sourceReverse = this.layerManager.getOrCreateSource("history-visited-captured-reverse");
+    const source = this.layerManager.getOrCreateSourceAndFilter("history-visited-captured");
+    const sourceReverse = this.layerManager.getOrCreateSourceAndFilter("history-visited-captured-reverse");
     source.entities.values.forEach(entity => {
       if (entity.position) {
         const position = entity.position.getValue(Cesium.JulianDate.now());

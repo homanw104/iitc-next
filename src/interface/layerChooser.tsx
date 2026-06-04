@@ -10,9 +10,9 @@ import { h } from "../utils/dom";
  * Adds a layer chooser button and dropdown to the specified container.
  *
  * @param container - The HTML element where the layer chooser will be appended.
- * @param entityManager - An instance of LayerManager that manages layer visibility.
+ * @param layerManager - An instance of LayerManager that manages layer visibility.
  */
-export function addLayerChooser(container: HTMLElement, entityManager: LayerManager): void {
+export function addLayerChooser(container: HTMLElement, layerManager: LayerManager): void {
   let chooser: HTMLElement;
 
   const onToggleButton = () => {
@@ -20,15 +20,15 @@ export function addLayerChooser(container: HTMLElement, entityManager: LayerMana
   };
 
   const onToggleCheckbox = (id: string, checked: boolean) => {
-    entityManager.setFilter(id, checked);
+    layerManager.setFilter(id, checked);
     if (!chooser) return;
     const allCheckboxes = chooser.querySelectorAll("input[type='checkbox']");
     allCheckboxes.forEach((cb) => {
       const layerId = cb.getAttribute("data-layer-id");
       if (layerId) {
         const input = cb as HTMLInputElement;
-        input.checked = entityManager.isFilterEnabled(layerId);
-        input.indeterminate = entityManager.isFilterIndeterminate(layerId);
+        input.checked = layerManager.isFilterEnabled(layerId);
+        input.indeterminate = layerManager.isFilterIndeterminate(layerId);
       }
     });
   };
@@ -46,8 +46,8 @@ export function addLayerChooser(container: HTMLElement, entityManager: LayerMana
     >
       <input
         type="checkbox"
-        checked={entityManager.isFilterEnabled(id)}
-        indeterminate={entityManager.isFilterIndeterminate(id)}
+        checked={layerManager.isFilterEnabled(id)}
+        indeterminate={layerManager.isFilterIndeterminate(id)}
         style={{ marginRight: "8px" }}
         data-layer-id={id}
         onChange={(e: any) => onToggleCheckbox(id, e.target.checked)}
@@ -142,6 +142,10 @@ export function addLayerChooser(container: HTMLElement, entityManager: LayerMana
 
         {createSection("Debug")}
         {createCheckbox("Debug Tiles", "debug-tiles")}
+
+        {layerManager.pluginFilterStates.size > 0 && createSection("Plugins")}
+        {Array.from(layerManager.pluginFilterStates.entries()).map(([id, _]) => (
+          createCheckbox(id, id)))}
       </div>
     </div>
   ) as HTMLElement;

@@ -13,8 +13,8 @@ export class ScoutHistoryEntityManager {
   public addOrUpdateScoutControlHalo(data: PortalData): void {
     const scoutHaloId = `portal-${data.guid}-scout-halo`;
     const scoutHaloIdReverse = `portal-${data.guid}-scout-halo-reverse`;
-    const source = this.layerManager.getOrCreateSource("history-scout-control");
-    const sourceReverse = this.layerManager.getOrCreateSource("history-scout-control-reverse");
+    const source = this.layerManager.getOrCreateSourceAndFilter("history-scout-control");
+    const sourceReverse = this.layerManager.getOrCreateSourceAndFilter("history-scout-control-reverse");
     let scoutHalo = source.entities.getById(scoutHaloId);
     let scoutHaloReverse = sourceReverse.entities.getById(scoutHaloIdReverse);
 
@@ -60,13 +60,13 @@ export class ScoutHistoryEntityManager {
   public removeScoutControlHalo(guid: string): void {
     const scoutHaloId = `portal-${guid}-scout-halo`;
     const scoutHaloIdReverse = `portal-${guid}-scout-halo-reverse`;
-    this.layerManager.getOrCreateSource("history-scout-control").entities.removeById(scoutHaloId);
-    this.layerManager.getOrCreateSource("history-scout-control-reverse").entities.removeById(scoutHaloIdReverse);
+    this.layerManager.getOrCreateSourceAndFilter("history-scout-control").entities.removeById(scoutHaloId);
+    this.layerManager.getOrCreateSourceAndFilter("history-scout-control-reverse").entities.removeById(scoutHaloIdReverse);
   }
 
   public removeScoutControlHaloInView(viewRect: Cesium.Rectangle): void {
-    const source = this.layerManager.getOrCreateSource("history-scout-control");
-    const sourceReverse = this.layerManager.getOrCreateSource("history-scout-control-reverse");
+    const source = this.layerManager.getOrCreateSourceAndFilter("history-scout-control");
+    const sourceReverse = this.layerManager.getOrCreateSourceAndFilter("history-scout-control-reverse");
     source.entities.values.forEach(entity => {
       if (entity.position) {
         const position = entity.position.getValue(Cesium.JulianDate.now());

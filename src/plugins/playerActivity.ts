@@ -68,10 +68,8 @@ class PlayerActivityPlugin {
       return;
     }
 
-    this.dataSourceEnl = new Cesium.CustomDataSource("player-activity-enl");
-    this.dataSourceRes = new Cesium.CustomDataSource("player-activity-res");
-    this.viewer.dataSources.add(this.dataSourceEnl).then();
-    this.viewer.dataSources.add(this.dataSourceRes).then();
+    this.dataSourceEnl = this.layerManager.getOrCreateSourceAndFilter("Player Activity Enl");
+    this.dataSourceRes = this.layerManager.getOrCreateSourceAndFilter("Player Activity Res");
     this.setUpDataSource(this.dataSourceEnl);
     this.setUpDataSource(this.dataSourceRes);
 
