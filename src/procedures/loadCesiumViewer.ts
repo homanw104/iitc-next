@@ -85,7 +85,7 @@ function initCesiumViewer(containerId: string): Cesium.Viewer {
     category: "Gaode",
     creationFunction: function() {
       return new Cesium.UrlTemplateImageryProvider({
-        url: "https://webst02.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}",
+        url: "https://wprd01.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=6&x={x}&y={y}&z={z}",
         tilingScheme: new AmapMercatorTilingScheme({}),
         minimumLevel: 1,
         maximumLevel: 20,
@@ -101,7 +101,7 @@ function initCesiumViewer(containerId: string): Cesium.Viewer {
     category: "Gaode",
     creationFunction: function() {
       return new Cesium.UrlTemplateImageryProvider({
-        url: "https://webst02.is.autonavi.com/appmaptile?style=7&x={x}&y={y}&z={z}",
+        url: "https://wprd01.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}",
         tilingScheme: new AmapMercatorTilingScheme({}),
         minimumLevel: 1,
         maximumLevel: 20,
