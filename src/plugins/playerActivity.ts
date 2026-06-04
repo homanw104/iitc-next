@@ -6,10 +6,10 @@
  */
 
 import * as Cesium from "cesium";
+import { CustomDataSource } from "cesium";
 import "../types/iitc.ts";
 import { IITCCore } from "../types/iitc";
 import { safeWindow } from "../utils/window";
-import { CustomDataSource } from "cesium";
 import { getTeamColor } from "../utils/color";
 
 type Team = "ENLIGHTENED" | "RESISTANCE" | "MACHINA";
@@ -92,8 +92,8 @@ class PlayerActivityPlugin {
 
   private setUpDataSource(source: Cesium.DataSource) {
     source.clustering.enabled = true;
-    source.clustering.pixelRange = 10;
-    source.clustering.minimumClusterSize = 2;
+    source.clustering.pixelRange = 5;
+    source.clustering.minimumClusterSize = 4;
     source.clustering.clusterEvent.addEventListener((clusteredEntities, cluster) => {
       const players: Player[] = clusteredEntities.map(e => {
         return {
@@ -105,7 +105,7 @@ class PlayerActivityPlugin {
       cluster.billboard.show = true;
       cluster.billboard.id = cluster;
       cluster.billboard.image = this.buildCanvas(players)?.toDataURL() || "";
-      cluster.billboard.eyeOffset = new Cesium.Cartesian3(0, 0, -1);
+      cluster.billboard.eyeOffset = new Cesium.Cartesian3(0, 0, -2);
     });
   }
 
@@ -178,7 +178,7 @@ class PlayerActivityPlugin {
           position: lastPosition,
           billboard: {
             image: this.buildCanvas([{ name: playerName, team: lastActivity.team }]),
-            eyeOffset: new Cesium.Cartesian3(0, 0, -1),
+            eyeOffset: new Cesium.Cartesian3(0, 0, -2),
           },
           properties: {
             name: playerName,
@@ -195,7 +195,10 @@ class PlayerActivityPlugin {
   private renderPlayerPaths(playerActivities: Map<string, PlayerActivity[]>): void {
     playerActivities.forEach((activities, playerName) => {
       const lastActivity = activities[activities.length - 1];
-      const positions = activities.map(a => Cesium.Cartesian3.fromDegrees(a.lng, a.lat));
+      const coordinates: number[] = [];
+      activities.map(a => coordinates.push(a.lng, a.lat, 3));
+
+      const positions = Cesium.Cartesian3.fromDegreesArrayHeights(coordinates);
 
       let source: CustomDataSource;
       if (lastActivity.team === "ENLIGHTENED") source = this.dataSourceEnl;
@@ -226,6 +229,7 @@ class PlayerActivityPlugin {
     const PADDING = 240;      // padding around the focus square
     const BRACKET_LEN = 0.16; // bracket arm as fraction of the canvas half-side
     const THICKNESS = 3;
+    const BORDER = 4;
     const COLOR = "#ffd200";
 
     // Create a new canvas
@@ -237,12 +241,8 @@ class PlayerActivityPlugin {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Clear the canvas and set line styles
+    // Clear the canvas
     ctx.clearRect(0, 0, CANVAS_PX, CANVAS_PX);
-    ctx.strokeStyle = COLOR;
-    ctx.lineWidth = THICKNESS;
-    ctx.lineCap = "square";
-    ctx.lineJoin = "miter";
 
     // Set up vertex positions
     const pad = PADDING;
@@ -273,20 +273,32 @@ class PlayerActivityPlugin {
       const d1 = unit(cur, prev);  // direction toward previous vertex (inward arm 1)
       const d2 = unit(cur, next);  // direction toward next vertex (inward arm 2)
 
+      ctx.lineCap = "square";
+      ctx.lineJoin = "miter";
+
       ctx.beginPath();
       ctx.moveTo(cur.x + d1.x * arm, cur.y + d1.y * arm);
       ctx.lineTo(cur.x, cur.y);
       ctx.lineTo(cur.x + d2.x * arm, cur.y + d2.y * arm);
+
+      ctx.strokeStyle = "#000000";
+      ctx.lineWidth = THICKNESS + BORDER;
+      ctx.stroke();
+
+      ctx.strokeStyle = COLOR;
+      ctx.lineWidth = THICKNESS;
       ctx.stroke();
     }
 
     // Compile names line by line
     ctx.font = "16px coda_regular, arial, helvetica, sans-serif";
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
     ctx.strokeStyle = "#000000";
-    ctx.lineWidth = 4;
+    ctx.lineWidth = BORDER;
 
     // startY = half + fontSize / 2 - margin;
-    let startY = half + 8 - 2;
+    let startY = half + 8 - 3;
     const lineSpacing = 20;
 
     // Players are grouped by enlightened and resistance layers
@@ -305,8 +317,8 @@ class PlayerActivityPlugin {
     });
 
     if (players.length > 5) {
-      ctx.strokeText("...", half + offset, startY);
-      ctx.fillText("...", half + offset, startY);
+      ctx.strokeText(`(${players.length - 5} more)`, half + offset, startY);
+      ctx.fillText("(${players.length - 5} more)", half + offset, startY);
     }
 
     return canvas;
