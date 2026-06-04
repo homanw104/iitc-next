@@ -1,0 +1,27 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+## 1.0.2
+
+* Added "Get Location" button
+* Added plugin support (currently only for browser)
+* Added "Player Activity" plugin
+* Added "Sample Plugin" plugin
+* Update Gaode map tiles API
+* Refactor and other improvements
+
+## 1.0.1
+
+* Added comm detail pane
+* Added game detail pane
+* Improved soft reload logic by removing tiles in view
+* Improved copy intel link functionality
+* Fixed hardcoded useragent when logging in
+
+## 1.0.0
+
+* Added Android support
+* Added Gaode map imagery options
+* Added a refresh button (soft reload)
+* Improved gestures on mobile devices
