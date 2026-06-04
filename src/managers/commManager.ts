@@ -35,6 +35,7 @@ export class CommManager {
     faction: new Map(),
     alerts: new Map(),
   };
+  private callbacks: (() => void)[] = [() => {}];
 
   constructor(viewer: Cesium.Viewer) {
     this.viewer = viewer;
@@ -60,6 +61,13 @@ export class CommManager {
     };
   }
 
+  public setOnReceiveMsgCallback(callback: () => void): void {
+    this.callbacks.push(callback);
+  }
+
+  public unsetOnReceiveMsgCallback(callback: () => void): void {
+    this.callbacks = this.callbacks.filter(cb => cb !== callback);
+  }
 
   public getMessages(channel: string, bounds?: { minLatE6: number; minLngE6: number; maxLatE6: number; maxLngE6: number }): Plext[] {
     const channelMessages = Array.from(this.messages[channel]?.values() || []);
@@ -174,6 +182,9 @@ export class CommManager {
         plexts.forEach(p => {
           this.messages[channel].set(p.guid, p);
         });
+
+        // Run callbacks
+        this.callbacks.forEach(cb => cb());
 
         // Limit storage to one million messages per channel to avoid memory leaks
         if (this.messages[channel].size > 1000000) {

@@ -42,7 +42,7 @@ class PlayerActivityPlugin {
   private dataSourceRes: Cesium.CustomDataSource = new Cesium.CustomDataSource("player-activity-res");
   private playerLocations: Map<string, Cesium.Entity> = new Map();
   private playerPaths: Map<string, Cesium.Entity> = new Map();
-  private interval: number | undefined;
+  private onReceiveMsgCallback: () => void = () => {};
 
   private viewer: IITCCore["viewer"] = safeWindow ? (safeWindow as any).iitc?.viewer : undefined;
   private logManager: IITCCore["logManager"] = safeWindow ? (safeWindow as any).iitc?.logManager : undefined;
@@ -75,13 +75,13 @@ class PlayerActivityPlugin {
     this.setUpDataSource(this.dataSourceEnl);
     this.setUpDataSource(this.dataSourceRes);
 
-    this.interval = setInterval(() => this.updatePlayerActivity(), 4000);
+    this.onReceiveMsgCallback = () => {this.updatePlayerActivity()};
+    this.commManager.setOnReceiveMsgCallback(this.onReceiveMsgCallback);
     this.updatePlayerActivity();
   }
 
   public deinit() {
-    if (this.interval) clearInterval(this.interval);
-    this.interval = undefined;
+    this.commManager?.unsetOnReceiveMsgCallback(this.onReceiveMsgCallback);
     this.viewer?.dataSources.remove(this.dataSourceEnl, true);
     this.viewer?.dataSources.remove(this.dataSourceRes, true);
     this.dataSourceEnl.entities.removeAll();
@@ -160,6 +160,7 @@ class PlayerActivityPlugin {
 
     this.renderPlayerLocations(playerActivities);
     this.renderPlayerPaths(playerActivities);
+    this.viewer?.scene.requestRender();
   };
 
   private renderPlayerLocations(playerActivities: Map<string, PlayerActivity[]>): void {
