@@ -5,7 +5,7 @@
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import * as Cesium from "cesium";
 import { Cartesian3 } from "cesium";
-import { addLayerChooser } from "../interface/layerChooser";
+import { addLayerChooserButton } from "../interface/layerChooser";
 import { getMapPosition, setCookie } from "../utils/browser";
 import {
   generateTileKey,
@@ -560,8 +560,7 @@ export default function loadCesiumViewer(): void {
   addGameDetailButton(container, scoreManager, redeemManager);
   addCommDetailButton(viewer, container, commManager);
   addGetLocationButton(viewer, container);
-
-  addLayerChooser(container, layerManager);
+  addLayerChooserButton(container, layerManager);
   showOrUpdateDetailBar(container);
   logManager.setCallback((msg: string) => showOrUpdateDetailBar(container, msg));
 

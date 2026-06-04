@@ -7,8 +7,8 @@ import { TEAMS, PORTAL_LEVELS } from "../types/ingress";
 import { safeLocalStorage } from "../utils/storage";
 import { logManager } from "./logManager";
 
-const FILTER_STATES_STORAGE_KEY = "iitc-filter-states";
-const PLUGIN_FILTER_STATES_STORAGE_KEY = "iitc-plugin-filter-states";
+const FILTER_STATES_STORAGE_KEY = "iitc-next-filter-states";
+const PLUGIN_FILTER_STATES_STORAGE_KEY = "iitc-next-plugin-filter-states";
 
 export class LayerManager {
   private viewer: Cesium.Viewer;
@@ -154,6 +154,22 @@ export class LayerManager {
     return source;
   }
 
+  public removeSourceAndFilter(name: string): void {
+    let source = this.sources.get(name);
+    if (source) {
+      this.viewer.dataSources.remove(source);
+      this.sources.delete(name);
+      this.viewer.scene.requestRender();
+    }
+
+    // Delete the filter as well if it's a plugin layer
+    if (!this.isBuiltInSource(name) && this.pluginFilterStates.has(name)) {
+      this.pluginFilterStates.delete(name);
+      this.saveState();
+      console.log(`Removing filter for: ${name}`);
+    }
+  }
+
   public setSourceVisible(name: string, visible: boolean): void {
     this.sourceVisibility.set(name, visible);
     const source = this.sources.get(name);
@@ -164,10 +180,12 @@ export class LayerManager {
   }
 
   private isBuiltInSource(name: string): boolean {
-    return this.sourceVisibility.has(name);
+    // Built-in sources have different names for filter and source
+    return this.sourceVisibility.has(name) && !this.pluginFilterStates.has(name);
   }
 
   private isBuiltInFilter(filterName: string): boolean {
+    // filterState is exclusive to built-in filters
     return this.filterState.has(filterName);
   }
 

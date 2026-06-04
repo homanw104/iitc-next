@@ -80,10 +80,8 @@ class PlayerActivityPlugin {
 
   public deinit() {
     this.commManager?.unsetOnReceiveMsgCallback(this.onReceiveMsgCallback);
-    this.viewer?.dataSources.remove(this.dataSourceEnl, true);
-    this.viewer?.dataSources.remove(this.dataSourceRes, true);
-    this.dataSourceEnl.entities.removeAll();
-    this.dataSourceRes.entities.removeAll();
+    this.layerManager?.removeSourceAndFilter("Player Activity Enl");
+    this.layerManager?.removeSourceAndFilter("Player Activity Res");
     this.playerPaths.clear();
     this.playerLocations.clear();
   }
