@@ -528,8 +528,12 @@ class CommUI {
   }
 }
 
-export const CommDetailButton = (viewer: Viewer, container: HTMLElement, commManager: CommManager): HTMLElement => {
-  const commUIInstance = new CommUI(viewer, container, commManager);
+export const CommDetailButton = ({viewer, container, commManager}: {
+  viewer: Viewer,
+  container: HTMLElement,
+  commManager: CommManager,
+}): HTMLElement => {
+  const commUI = new CommUI(viewer, container, commManager);
 
   return (
     <div
@@ -546,7 +550,7 @@ export const CommDetailButton = (viewer: Viewer, container: HTMLElement, commMan
         type="button"
         title="COMM"
         className="cesium-button cesium-toolbar-button"
-        onClick={() => commUIInstance?.togglePane()}
+        onClick={() => commUI?.togglePane()}
         style={{
           display: "flex",
           alignItems: "center",

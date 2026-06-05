@@ -7,28 +7,30 @@ import { Cartesian3 } from "cesium";
 import { logManager } from "../managers/logManager";
 import * as Cesium from "cesium";
 
-export function addGetLocationButton(viewer: Cesium.Viewer, container: HTMLElement): void {
+export const GetLocationButton = ({ viewer }: {
+  viewer: Cesium.Viewer,
+}): HTMLElement => {
   const onclick = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
-          const height = 2000;
+          const height = 1800;
           viewer.camera.flyTo({
             destination: Cartesian3.fromDegrees(longitude, latitude, height),
-            duration: 1.5,
+            duration: 3,
           });
         },
         (error) => {
-          logManager.error("CesiumViewer", "Failed to get location:", error);
+          logManager.error("CesiumViewer", "Failed to get location", error);
         }
       );
     } else {
-      logManager.error("CesiumViewer", "Geolocation is not supported by this browser.");
+      logManager.error("CesiumViewer", "Geolocation is not supported by this browser");
     }
   }
 
-  const ui = (
+  return (
     <div
       style={{
         position: "absolute",
@@ -62,6 +64,4 @@ export function addGetLocationButton(viewer: Cesium.Viewer, container: HTMLEleme
       </button>
     </div>
   ) as HTMLElement;
-
-  container.appendChild(ui);
 }

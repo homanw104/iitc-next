@@ -181,16 +181,12 @@ class LayerChooserUI {
   }
 }
 
-/**
- * Adds a layer chooser button and dropdown to the specified container.
- *
- * @param container - The HTML element where the layer chooser will be appended.
- * @param layerManager - An instance of LayerManager that manages layer visibility.
- */
-export function addLayerChooserButton(container: HTMLElement, layerManager: LayerManager): void {
+export const LayerChooserButton = ({ layerManager }: {
+  layerManager: LayerManager,
+}): HTMLElement => {
   const uiInstance = new LayerChooserUI(layerManager);
 
-  const ui = (
+  return (
     <div
       style={{
         position: "absolute",
@@ -215,6 +211,4 @@ export function addLayerChooserButton(container: HTMLElement, layerManager: Laye
       <div ref={(el: HTMLElement) => uiInstance.setWrapper(el)} />
     </div>
   ) as HTMLElement;
-
-  container.appendChild(ui);
 }

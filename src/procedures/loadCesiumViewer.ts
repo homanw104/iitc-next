@@ -4,8 +4,8 @@
 
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import * as Cesium from "cesium";
+import { IITCCore } from "../types/iitc";
 import { Cartesian3 } from "cesium";
-import { addLayerChooserButton } from "../interface/layerChooser";
 import { getMapPosition, setCookie } from "../utils/browser";
 import {
   generateTileKey,
@@ -18,12 +18,6 @@ import {
 import { logManager } from "../managers/logManager";
 import { LayerManager } from "../managers/layerManager";
 import { DebugTileEntityManager } from "../managers/debugTileEntityManager";
-import { showOrUpdateDetailBar } from "../interface/portalDetail";
-import { addRefreshButton } from "../interface/refreshButton";
-import { addGameDetailButton } from "../interface/gameDetail";
-import { CommDetailButton } from "../interface/commDetail";
-import { addGetLocationButton } from "../interface/getLocationButton";
-import { AmapMercatorTilingScheme } from "../utils/map";
 import { CommManager } from "../managers/commManager";
 import { ScoreManager } from "../managers/scoreManager";
 import { RedeemManager } from "../managers/redeemManager";
@@ -33,8 +27,15 @@ import { FieldEntityManager } from "../managers/fieldEntityManager";
 import { PortalHistoryEntityManager } from "../managers/portalHistoryEntityManager";
 import { ScoutHistoryEntityManager } from "../managers/scoutHistoryEntityManager";
 import { InterfaceManager } from "../managers/interfaceManager";
-import { IITCCore } from "../types/iitc";
+import { PortalDetailBar, PortalDetailUI } from "../interface/PortalDetailBar";
+import { RefreshButton } from "../interface/RefreshButton";
+import { GameDetailButton } from "../interface/GameDetailButton";
+import { CommDetailButton } from "../interface/CommDetailButton";
+import { GetLocationButton } from "../interface/GetLocationButton";
+import { LayerChooserButton } from "../interface/LayerChooserButton";
+import { AmapMercatorTilingScheme } from "../utils/map";
 import { safeWindow } from "../utils/window";
+import { PortalData } from "../types/ingress";
 
 // Tell Cesium where to find its assets (Images, Workers, etc.)
 // Since we use the CDN for the main library, we should also use it for assets.
@@ -52,6 +53,8 @@ const MAX_TILES_TO_LOAD = 2000;
 
 let lastDataZoom: number | undefined;
 let lastTileKeysCount: number | undefined;
+let lastPortalData: PortalData | null;
+let lastLogMsg: string = "Loading...";
 
 /**
  * Creates a Cesium container as an HTMLDivElement and appends it to the body.
@@ -338,19 +341,23 @@ function setupGoogleMapsGestures(viewer: Cesium.Viewer): void {
  * Set up event handlers on Cesium's screenSpaceEventHandler.
  *
  * @param viewer - The Cesium.Viewer instance to attach event handlers to.
+ * @param container
+ * @param portalDetailBar
+ * @param portalDetailUI
  * @param layerManager - The entity manager object to use for retrieving portal data.
  * @param portalEntityManager
  * @param portalHistoryEntityManager
  * @param scoutHistoryEntityManager
- * @param container - The HTMLDivElement element containing the cesium widget.
  */
 function setupClickHandler(
   viewer: Cesium.Viewer,
+  container: HTMLElement,
+  portalDetailBar: HTMLElement,
+  portalDetailUI: PortalDetailUI,
   layerManager: LayerManager,
   portalEntityManager: PortalEntityManager,
   portalHistoryEntityManager: PortalHistoryEntityManager,
   scoutHistoryEntityManager: ScoutHistoryEntityManager,
-  container: HTMLElement
 ): void {
   let isClickLoading = false;
   let isClickCancelled = false;
@@ -375,7 +382,10 @@ function setupClickHandler(
       const portalGuid = entity.id.substring(7);
       const portalData = portalEntityManager.getPortalData(portalGuid);
       if (portalData) {
-        showOrUpdateDetailBar(container, portalData);
+        lastPortalData = portalData;
+        portalDetailBar?.remove();
+        portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailUI, data: portalData }));
+        portalDetailUI.updateDetailPane(portalData);
         portalEntityManager.requestPortalDetails(portalGuid).then(() => {
           isClickLoading = false;
           if (isClickCancelled) {
@@ -387,7 +397,10 @@ function setupClickHandler(
             const layerId = getPortalLayerId(freshData);
             const source = layerManager.getOrCreateSourceAndFilter(layerId);
             viewer.selectedEntity = source.entities.getById(`portal-${portalGuid}`);
-            showOrUpdateDetailBar(container, freshData);
+            lastPortalData = freshData;
+            portalDetailBar?.remove();
+            portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailUI, data: freshData }));
+            portalDetailUI.updateDetailPane(freshData);
             portalHistoryEntityManager.addOrUpdateHistoryHalo(freshData);
             scoutHistoryEntityManager.addOrUpdateScoutControlHalo(freshData);
           }
@@ -395,7 +408,10 @@ function setupClickHandler(
       }
     } else {
       viewer.selectedEntity = undefined;
-      showOrUpdateDetailBar(container, undefined);
+      lastPortalData = null;
+      portalDetailBar?.remove();
+      portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailUI, msg: lastLogMsg }));
+      portalDetailUI.removeDetailPane();
     }
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 }
@@ -549,15 +565,24 @@ export default function loadCesiumViewer(): void {
     iitc.commManager = commManager;
   }
 
-  addRefreshButton(container, () => triggerDataReload(viewer, tileRequestManager));
-  addGameDetailButton(container, scoreManager, redeemManager);
-  container.appendChild(CommDetailButton(viewer, container, commManager));
-  addGetLocationButton(viewer, container);
-  addLayerChooserButton(container, layerManager);
-  showOrUpdateDetailBar(container);
-  logManager.setCallback((msg: string) => showOrUpdateDetailBar(container, msg));
+  const portalDetailUI = new PortalDetailUI(container);
+  let portalDetailBar: HTMLElement | null;
+  portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailUI }));
+
+  container.appendChild(RefreshButton({ onclick: () => triggerDataReload(viewer, tileRequestManager) }));
+  container.appendChild(GameDetailButton({ container, scoreManager, redeemManager }));
+  container.appendChild(CommDetailButton({ viewer, container, commManager }));
+  container.appendChild(GetLocationButton({ viewer }));
+  container.appendChild(LayerChooserButton({ layerManager }));
+
+  logManager.setCallback((msg: string) => {
+    lastLogMsg = msg;
+    portalDetailBar?.remove();
+    if (lastPortalData) portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailUI, data: lastPortalData }));
+    else portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailUI, msg: lastLogMsg }));
+  });
 
   setupGoogleMapsGestures(viewer);
-  setupClickHandler(viewer, layerManager, portalEntityManager, portalHistoryEntityManager, scoutHistoryEntityManager, container);
+  setupClickHandler(viewer, container, portalDetailBar, portalDetailUI, layerManager, portalEntityManager, portalHistoryEntityManager, scoutHistoryEntityManager);
   setupDataLoading(viewer, tileRequestManager);
 }

@@ -4,8 +4,10 @@
 
 import { h } from "../utils/dom";
 
-export function addRefreshButton(container: HTMLElement, onclick: () => void): void {
-  const ui = (
+export const RefreshButton = ({ onclick }: {
+  onclick: () => void,
+}): HTMLElement => {
+  return (
     <div
       style={{
         position: "absolute",
@@ -29,6 +31,4 @@ export function addRefreshButton(container: HTMLElement, onclick: () => void): v
       </button>
     </div>
   ) as HTMLElement;
-
-  container.appendChild(ui);
 }
