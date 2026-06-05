@@ -4,6 +4,7 @@
 
 import * as Cesium from "cesium";
 import { LogManager } from "../managers/logManager";
+import { PluginManager } from "../managers/pluginManager";
 import { LayerManager } from "../managers/layerManager";
 import { PortalEntityManager } from "../managers/portalEntityManager";
 import { LinkEntityManager } from "../managers/linkEntityManager";
@@ -14,7 +15,7 @@ import { TileRequestManager } from "../managers/tileRequestManager";
 import { ScoreManager } from "../managers/scoreManager";
 import { RedeemManager } from "../managers/redeemManager";
 import { CommManager } from "../managers/commManager";
-import { PluginManager } from "../managers/pluginManager";
+import { InterfaceManager } from "../managers/interfaceManager";
 
 export interface IITCPlugin {
   id: string;
@@ -27,6 +28,7 @@ export interface IITCPlugin {
 export interface IITCCore {
   viewer?: Cesium.Viewer;
   logManager?: LogManager;
+  pluginManager?: PluginManager;
   layerManager?: LayerManager;
   portalEntityManager?: PortalEntityManager;
   linkEntityManager?: LinkEntityManager;
@@ -37,7 +39,7 @@ export interface IITCCore {
   scoreManager?: ScoreManager;
   redeemManager?: RedeemManager;
   commManager?: CommManager;
-  pluginManager?: PluginManager;
+  interfaceManager?: InterfaceManager;
 }
 
 declare global {

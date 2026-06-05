@@ -38,20 +38,20 @@ class PlayerActivityPlugin {
   public name = "Player Activity Tracker";
   public description = "Adds two layers to the map for players and their activity.";
 
+  private viewer: IITCCore["viewer"] = safeWindow ? safeWindow.iitc?.viewer : undefined;
+  private logManager: IITCCore["logManager"] = safeWindow ? safeWindow.iitc?.logManager : undefined;
+  private layerManager: IITCCore["layerManager"] = safeWindow ? safeWindow.iitc?.layerManager : undefined;
+  private commManager: IITCCore["commManager"] = safeWindow ? safeWindow.iitc?.commManager : undefined;
+
   private dataSourceEnl: Cesium.CustomDataSource = new Cesium.CustomDataSource("player-activity-enl");
   private dataSourceRes: Cesium.CustomDataSource = new Cesium.CustomDataSource("player-activity-res");
   private playerLocations: Map<string, Cesium.Entity> = new Map();
   private playerPaths: Map<string, Cesium.Entity> = new Map();
   private onReceiveMsgCallback: () => void = () => {};
 
-  private viewer: IITCCore["viewer"] = safeWindow ? (safeWindow as any).iitc?.viewer : undefined;
-  private logManager: IITCCore["logManager"] = safeWindow ? (safeWindow as any).iitc?.logManager : undefined;
-  private layerManager: IITCCore["layerManager"] = safeWindow ? (safeWindow as any).iitc?.layerManager : undefined;
-  private commManager: IITCCore["commManager"] = safeWindow ? (safeWindow as any).iitc?.commManager : undefined;
-
   public init() {
     if (safeWindow) {
-      const iitc = (safeWindow as any).iitc;
+      const iitc: IITCCore = safeWindow.iitc;
       this.viewer = iitc.viewer;
       this.logManager = iitc.logManager;
       this.layerManager = iitc.layerManager;
@@ -323,8 +323,8 @@ class PlayerActivityPlugin {
 }
 
 const register = () => {
-  if (safeWindow && (safeWindow as any).iitc && (safeWindow as any).iitc.pluginManager) {
-    (safeWindow as any).iitc.pluginManager.registerPlugin(new PlayerActivityPlugin());
+  if (safeWindow && safeWindow.iitc && safeWindow.iitc.pluginManager) {
+    safeWindow.iitc.pluginManager.registerPlugin(new PlayerActivityPlugin());
   } else {
     setTimeout(register, 1000);
   }

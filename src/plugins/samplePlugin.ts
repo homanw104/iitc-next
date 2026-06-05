@@ -27,9 +27,9 @@ class SamplePlugin {
     }
 
     if (!this.viewer || !this.logManager) {
-      console.log("[SamplePlugin] IITC Next core components missing", {
+      console.warn("[WARN][SamplePlugin] IITC Next core components missing", {
         viewer: !!this.viewer,
-        logManager: !!this.logManager
+        logManager: !!this.logManager,
       });
       return;
     }
@@ -48,8 +48,8 @@ class SamplePlugin {
 }
 
 const register = () => {
-  if (safeWindow && (safeWindow as any).iitc && (safeWindow as any).iitc.pluginManager) {
-    (safeWindow as any).iitc.pluginManager.registerPlugin(new SamplePlugin());
+  if (safeWindow && safeWindow.iitc && safeWindow.iitc.pluginManager) {
+    safeWindow.iitc.pluginManager.registerPlugin(new SamplePlugin());
   } else {
     setTimeout(register, 3000);
   }

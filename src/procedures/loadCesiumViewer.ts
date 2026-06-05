@@ -21,7 +21,7 @@ import { DebugTileEntityManager } from "../managers/debugTileEntityManager";
 import { showOrUpdateDetailBar } from "../interface/portalDetail";
 import { addRefreshButton } from "../interface/refreshButton";
 import { addGameDetailButton } from "../interface/gameDetail";
-import { addCommDetailButton } from "../interface/commDetail";
+import { CommDetailButton } from "../interface/commDetail";
 import { addGetLocationButton } from "../interface/getLocationButton";
 import { AmapMercatorTilingScheme } from "../utils/map";
 import { CommManager } from "../managers/commManager";
@@ -32,6 +32,8 @@ import { LinkEntityManager } from "../managers/linkEntityManager";
 import { FieldEntityManager } from "../managers/fieldEntityManager";
 import { PortalHistoryEntityManager } from "../managers/portalHistoryEntityManager";
 import { ScoutHistoryEntityManager } from "../managers/scoutHistoryEntityManager";
+import { InterfaceManager } from "../managers/interfaceManager";
+import { IITCCore } from "../types/iitc";
 import { safeWindow } from "../utils/window";
 
 // Tell Cesium where to find its assets (Images, Workers, etc.)
@@ -521,30 +523,21 @@ export default function loadCesiumViewer(): void {
   const scoutHistoryEntityManager = new ScoutHistoryEntityManager(layerManager);
   const linkEntityManager = new LinkEntityManager(layerManager, portalEntityManager);
   const fieldEntityManager = new FieldEntityManager(layerManager, portalEntityManager);
-
-  const tileRequestManager = new TileRequestManager(
-    viewer,
-    portalEntityManager,
-    portalHistoryEntityManager,
-    scoutHistoryEntityManager,
-    linkEntityManager,
-    fieldEntityManager
-  );
-
   const debugTileEntityManager = new DebugTileEntityManager(viewer, layerManager);
-  tileRequestManager.onTileStatusChange((key, status) => {
-    debugTileEntityManager.updateTile(key, status);
-  });
-
+  const tileRequestManager = new TileRequestManager(viewer, portalEntityManager, portalHistoryEntityManager, scoutHistoryEntityManager, linkEntityManager, fieldEntityManager);
+  const commManager = new CommManager(viewer);
   const scoreManager = new ScoreManager();
   const redeemManager = new RedeemManager();
-  const commManager = new CommManager(viewer);
+  const interfaceManager = new InterfaceManager(container);
+
+  tileRequestManager.onTileStatusChange((key, status) => debugTileEntityManager.updateTile(key, status));
 
   // Expose managers to the global iitc object
   if (safeWindow) {
-    const iitc = (safeWindow as any).iitc;
+    const iitc: IITCCore = safeWindow.iitc;
     iitc.viewer = viewer;
     iitc.layerManager = layerManager;
+    iitc.interfaceManager = interfaceManager;
     iitc.portalEntityManager = portalEntityManager;
     iitc.linkEntityManager = linkEntityManager;
     iitc.fieldEntityManager = fieldEntityManager;
@@ -558,7 +551,7 @@ export default function loadCesiumViewer(): void {
 
   addRefreshButton(container, () => triggerDataReload(viewer, tileRequestManager));
   addGameDetailButton(container, scoreManager, redeemManager);
-  addCommDetailButton(viewer, container, commManager);
+  container.appendChild(CommDetailButton(viewer, container, commManager));
   addGetLocationButton(viewer, container);
   addLayerChooserButton(container, layerManager);
   showOrUpdateDetailBar(container);

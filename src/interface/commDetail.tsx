@@ -528,14 +528,10 @@ class CommUI {
   }
 }
 
-let commUIInstance: CommUI | null = null;
+export const CommDetailButton = (viewer: Viewer, container: HTMLElement, commManager: CommManager): HTMLElement => {
+  const commUIInstance = new CommUI(viewer, container, commManager);
 
-export function addCommDetailButton(viewer: Viewer, container: HTMLElement, commManager: CommManager): void {
-  if (!commUIInstance) {
-    commUIInstance = new CommUI(viewer, container, commManager);
-  }
-
-  const ui = (
+  return (
     <div
       style={{
         position: "absolute",
@@ -563,6 +559,4 @@ export function addCommDetailButton(viewer: Viewer, container: HTMLElement, comm
       </button>
     </div>
   ) as HTMLElement;
-
-  container.appendChild(ui);
 }
