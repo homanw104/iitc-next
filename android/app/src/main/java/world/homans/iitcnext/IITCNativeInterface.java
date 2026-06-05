@@ -9,7 +9,9 @@ import android.os.Bundle;
 import android.util.Log;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
+import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
+import java.util.Locale;
 
 public class IITCNativeInterface {
     private WebView webView;
@@ -58,7 +60,7 @@ public class IITCNativeInterface {
 
                 // Also request a fresh update
                 locationManager.requestSingleUpdate(LocationManager.GPS_PROVIDER, new LocationListener() {
-                    @Override public void onLocationChanged(Location location) { sendLocationToJs(location); }
+                    @Override public void onLocationChanged(@NonNull Location location) { sendLocationToJs(location); }
                     @Override public void onStatusChanged(String provider, int status, Bundle extras) {}
                     @Override public void onProviderEnabled(String provider) {}
                     @Override public void onProviderDisabled(String provider) {}
@@ -72,7 +74,7 @@ public class IITCNativeInterface {
     }
 
     private void sendLocationToJs(Location location) {
-        String js = String.format("if (window.onAndroidLocation) window.onAndroidLocation(%f, %f, %f)",
+        String js = String.format(Locale.US, "if (window.onAndroidLocation) window.onAndroidLocation(%f, %f, %f)",
                 location.getLatitude(), location.getLongitude(), location.getAccuracy());
         webView.evaluateJavascript(js, null);
     }

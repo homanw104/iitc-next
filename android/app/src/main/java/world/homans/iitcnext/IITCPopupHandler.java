@@ -5,7 +5,9 @@ import android.app.Dialog;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Message;
+import android.util.Log;
 import android.view.ViewGroup;
+import android.webkit.CookieManager;
 import android.webkit.GeolocationPermissions;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -110,6 +112,15 @@ public class IITCPopupHandler extends BridgeWebChromeClient {
 
         String cleanedUA = MainActivity.getCleanedUserAgent(activity);
         settings.setUserAgentString(cleanedUA);
+
+        // Set _ncc cookie to disable Niantic's cookie consent banner
+        try {
+            CookieManager cookieManager = CookieManager.getInstance();
+            cookieManager.setAcceptCookie(true);
+            cookieManager.setCookie("https://signin.nianticspatial.com", "_ncc=0; Path=/; Domain=.nianticspatial.com");
+        } catch (Exception e) {
+            Log.w("IITCPopupHandler", "Could not set _ncc cookie: " + e.getMessage());
+        }
     }
 
     private void dismissPopup() {

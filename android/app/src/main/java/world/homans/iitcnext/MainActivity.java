@@ -10,7 +10,6 @@ import android.webkit.WebView;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import com.getcapacitor.BridgeActivity;
-import java.io.File;
 
 public class MainActivity extends BridgeActivity {
     private final ScriptInjector scriptInjector = new ScriptInjector();
@@ -72,17 +71,19 @@ public class MainActivity extends BridgeActivity {
         settings.setJavaScriptEnabled(true);
         settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(true);
-        settings.setAllowUniversalAccessFromFileURLs(true);
-        settings.setAllowFileAccessFromFileURLs(true);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         settings.setGeolocationEnabled(true);
 
-        // Ensure persistent storage has a path (deprecated but helpful in some environments)
-        String databasePath = getApplicationContext().getDir("databases", Context.MODE_PRIVATE).getPath();
-        settings.setDatabasePath(databasePath);
-
         android.webkit.CookieManager cookieManager = android.webkit.CookieManager.getInstance();
         cookieManager.setAcceptThirdPartyCookies(webView, true);
+
+        // Set _ncc cookie to disable Niantic's cookie consent banner
+        try {
+            cookieManager.setAcceptCookie(true);
+            cookieManager.setCookie("https://signin.nianticspatial.com", "_ncc=0; Path=/; Domain=.nianticspatial.com");
+        } catch (Exception e) {
+            android.util.Log.w("MainActivity", "Could not set _ncc cookie: " + e.getMessage());
+        }
 
         settings.setUserAgentString(getCleanedUserAgent(this));
 
