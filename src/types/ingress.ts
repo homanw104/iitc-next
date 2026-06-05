@@ -10,6 +10,9 @@ export type PortalLevel = typeof PORTAL_LEVELS[number];
 export const TEAMS = ["ENLIGHTENED", "RESISTANCE", "MACHINA", "NEUTRAL",] as const;
 export type Team = typeof TEAMS[number];
 
+export const CHANNELS = ["all", "faction", "alerts"];
+export type Channel = typeof CHANNELS[number];
+
 export interface PortalData {
   guid: string;
   team: Team;

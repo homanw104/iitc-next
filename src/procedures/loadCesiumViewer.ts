@@ -6,17 +6,10 @@ import "cesium/Build/Cesium/Widgets/widgets.css";
 import * as Cesium from "cesium";
 import { IITCCore } from "../types/iitc";
 import { Cartesian3 } from "cesium";
-import { getMapPosition, setCookie } from "../utils/browser";
-import {
-  generateTileKey,
-  getDataZoomForMapZoom,
-  getMapZoomTileParameters,
-  latToTileIndex,
-  lngToTileIndex,
-  TileRequestManager
-} from "../managers/tileRequestManager";
+import { getMapPosition } from "../utils/browser";
 import { logManager } from "../managers/logManager";
 import { LayerManager } from "../managers/layerManager";
+import { TileRequestManager } from "../managers/tileRequestManager";
 import { DebugTileEntityManager } from "../managers/debugTileEntityManager";
 import { CommManager } from "../managers/commManager";
 import { ScoreManager } from "../managers/scoreManager";
@@ -28,14 +21,17 @@ import { PortalHistoryEntityManager } from "../managers/portalHistoryEntityManag
 import { ScoutHistoryEntityManager } from "../managers/scoutHistoryEntityManager";
 import { InterfaceManager } from "../managers/interfaceManager";
 import { PortalDetailBar, PortalDetailUI } from "../interface/PortalDetailBar";
-import { RefreshButton } from "../interface/RefreshButton";
+import RefreshButton from "../components/RefreshButton/RefreshButton";
 import { GameDetailButton } from "../interface/GameDetailButton";
-import { CommDetailButton } from "../interface/CommDetailButton";
+import { CommDetailPaneUI } from "../interface/CommDetailPaneUI";
 import { GetLocationButton } from "../interface/GetLocationButton";
 import { LayerChooserButton } from "../interface/LayerChooserButton";
 import { AmapMercatorTilingScheme } from "../utils/map";
 import { safeWindow } from "../utils/window";
 import { PortalData } from "../types/ingress";
+import CommDetailButton from "../components/CommDetailButton/CommDetailButton";
+import { RefreshPaneUI } from "../interface/RefreshPaneUI";
+import { calculateTileKeys, HEIGHT_AT_ZOOM_ZERO } from "../utils/viewer";
 
 // Tell Cesium where to find its assets (Images, Workers, etc.)
 // Since we use the CDN for the main library, we should also use it for assets.
@@ -45,21 +41,13 @@ window.CESIUM_BASE_URL = "https://cdn.jsdelivr.net/npm/cesium@1.141.0/Build/Cesi
 // Default access token restricted to https://intel.ingress.com
 Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJkZGViN2YzNC1hYzgyLTQ2ZTQtYTEyMS0wZGYwOTY2ZWJiMzEiLCJpZCI6NDM1NTgyLCJzdWIiOiJob21hbncxMDQiLCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoiSUlUQyBOZXh0IiwiaWF0IjoxNzc5NTY3OTg4fQ.YBXp3trSarnjwb9R2G5sU57DC0VbI0iCJrZv7TyuZFk";
 
-// Height at zoom level 0, shows more tiles if higher
-const HEIGHT_AT_ZOOM_ZERO = 96000000;
-
-// Default tile limit to load
-const MAX_TILES_TO_LOAD = 2000;
-
-let lastDataZoom: number | undefined;
-let lastTileKeysCount: number | undefined;
 let lastPortalData: PortalData | null;
 let lastLogMsg: string = "Loading...";
 
 /**
  * Creates a Cesium container as an HTMLDivElement and appends it to the body.
  *
- * @return {HTMLDivElement} The newly created div element with id 'cesium-container' styled for full screen display.
+ * @return {HTMLDivElement} The newly created div element with id 'cesium-container' styled for fullscreen display.
  */
 function createCesiumContainer(): HTMLDivElement {
   const container = document.createElement("div");
@@ -145,7 +133,7 @@ function initCesiumViewer(containerId: string): Cesium.Viewer {
   const controller = viewer.scene.screenSpaceCameraController;
   controller.maximumTiltAngle = Cesium.Math.toRadians(35);
 
-  // Set avilable tilt event types
+  // Set available tilt event types
   controller.tiltEventTypes = [
     Cesium.CameraEventType.MIDDLE_DRAG,
     Cesium.CameraEventType.RIGHT_DRAG,
@@ -417,83 +405,6 @@ function setupClickHandler(
 }
 
 /**
- * Calculate the tile keys based on the current view.
- *
- * @param viewer - Viewer to calculaate.
- */
-function calculateTileKeys(viewer: Cesium.Viewer): string[] {
-  const camera = viewer.camera;
-  const cartographic = camera.positionCartographic;
-  const lat = Cesium.Math.toDegrees(cartographic.latitude);
-  const lng = Cesium.Math.toDegrees(cartographic.longitude);
-  const height = cartographic.height;
-
-  const calculatedZoom = Math.round(Math.log2(HEIGHT_AT_ZOOM_ZERO / height));
-  const mapZoom = isNaN(calculatedZoom) ? 0 : calculatedZoom;
-  const dataZoom = getDataZoomForMapZoom(mapZoom);
-
-  setCookie("ingress.intelmap.lat", lat.toFixed(6));
-  setCookie("ingress.intelmap.lng", lng.toFixed(6));
-  setCookie("ingress.intelmap.zoom", mapZoom.toString());
-
-  const tileParams = getMapZoomTileParameters(dataZoom);
-  const viewRect = camera.computeViewRectangle();
-
-  if (viewRect) {
-    const west = Cesium.Math.toDegrees(viewRect.west);
-    const south = Cesium.Math.toDegrees(viewRect.south);
-    const east = Cesium.Math.toDegrees(viewRect.east);
-    const north = Cesium.Math.toDegrees(viewRect.north);
-
-    const minX = lngToTileIndex(west, tileParams);
-    const maxX = lngToTileIndex(east, tileParams);
-    const minY = latToTileIndex(north, tileParams);
-    const maxY = latToTileIndex(south, tileParams);
-
-    const tileKeys: string[] = [];
-    const tilesPerEdge = tileParams.tilesPerEdge;
-    for (let x = minX; ; x = (x + 1) % tilesPerEdge) {
-      for (let y = minY; y <= maxY; y++) {
-        tileKeys.push(generateTileKey(tileParams, x, y));
-        if (tileKeys.length >= MAX_TILES_TO_LOAD) {
-          logManager.warn("CesiumViewer", "Too many tiles to load, truncating.");
-          break;
-        }
-      }
-      if (x === maxX || tileKeys.length >= MAX_TILES_TO_LOAD) break;
-    }
-    const totalTilesForZoom = tilesPerEdge * tilesPerEdge;
-    if (dataZoom <= 3 && lastDataZoom === dataZoom && tileKeys.length === lastTileKeysCount) {
-      if (tileKeys.length >= totalTilesForZoom || tileKeys.length >= MAX_TILES_TO_LOAD) {
-        return [];
-      }
-    }
-
-    lastDataZoom = dataZoom;
-    lastTileKeysCount = tileKeys.length;
-
-    return tileKeys;
-  }
-
-  return [];
-}
-
-/**
- * Trigger reloading of tiles.
- *
- * @param viewer - Cesium viewer to calculate view range.
- * @param tileRequestManager - Tile manager to add and process tiles.
- */
-function triggerDataReload(viewer: Cesium.Viewer, tileRequestManager: TileRequestManager): void {
-  const tileKeys = calculateTileKeys(viewer);
-
-  if (tileKeys.length > 0) {
-    tileRequestManager.removeTiles(tileKeys);
-    tileRequestManager.addTiles(tileKeys, true);
-  }
-}
-
-/**
  * Trigger loading of tiles.
  *
  * @param viewer - Cesium viewer to calculate view range.
@@ -518,7 +429,7 @@ function setupDataLoading(viewer: Cesium.Viewer, tileRequestManager: TileRequest
 }
 
 /**
- * Loads and initializes a Cesium viewer with necessary components.
+ * Loads and initializes a Cesium viewer.
  *
  * This function sets up the viewer by creating a container,
  * initializing the viewer, setting the initial view, managing entities,
@@ -569,9 +480,14 @@ export default function loadCesiumViewer(): void {
   let portalDetailBar: HTMLElement | null;
   portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailUI }));
 
-  container.appendChild(RefreshButton({ onclick: () => triggerDataReload(viewer, tileRequestManager) }));
+  const refreshPaneUI = new RefreshPaneUI(viewer, tileRequestManager);
+  container.appendChild(RefreshButton({ refreshPaneUI }));
+
   container.appendChild(GameDetailButton({ container, scoreManager, redeemManager }));
-  container.appendChild(CommDetailButton({ viewer, container, commManager }));
+
+  const commDetailPaneUI = new CommDetailPaneUI(viewer, container, commManager);
+  container.appendChild(CommDetailButton({ commDetailPaneUI }));
+
   container.appendChild(GetLocationButton({ viewer }));
   container.appendChild(LayerChooserButton({ layerManager }));
 
