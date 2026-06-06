@@ -7,12 +7,13 @@
 
 import * as Cesium from "cesium";
 import { CustomDataSource } from "cesium";
-import "../types/iitc.ts";
+import { h } from "../utils/dom.ts";
 import { IITCCore } from "../types/iitc";
 import { safeWindow } from "../utils/window";
 import { getTeamColor } from "../utils/color";
+import "../types/iitc.ts";
 
-type Team = "ENLIGHTENED" | "RESISTANCE" | "MACHINA";
+type Team = "ENLIGHTENED" | "RESISTANCE" | "MACHINA" | "NEUTRAL";
 
 interface Player {
   name: string;
@@ -22,15 +23,17 @@ interface Player {
 interface Portal {
   name: string;
   latE6: number;
-  lngE6: number
+  lngE6: number;
 }
 
 interface PlayerActivity {
+  name: string;
+  team: Team;
   timestamp: number;
   weight: number;
+  portalName: string;
   lat: number;
   lng: number;
-  team: Team;
 }
 
 class PlayerActivityPlugin {
@@ -41,13 +44,17 @@ class PlayerActivityPlugin {
   private viewer: IITCCore["viewer"] = safeWindow ? safeWindow.iitc?.viewer : undefined;
   private logManager: IITCCore["logManager"] = safeWindow ? safeWindow.iitc?.logManager : undefined;
   private layerManager: IITCCore["layerManager"] = safeWindow ? safeWindow.iitc?.layerManager : undefined;
+  private interfaceManager: IITCCore["interfaceManager"] = safeWindow ? safeWindow.iitc?.interfaceManager : undefined;
   private commManager: IITCCore["commManager"] = safeWindow ? safeWindow.iitc?.commManager : undefined;
 
   private dataSourceEnl: Cesium.CustomDataSource = new Cesium.CustomDataSource("player-activity-enl");
   private dataSourceRes: Cesium.CustomDataSource = new Cesium.CustomDataSource("player-activity-res");
   private playerLocations: Map<string, Cesium.Entity> = new Map();
   private playerPaths: Map<string, Cesium.Entity> = new Map();
-  private onReceiveMsgCallback: () => void = () => {};
+  private onReceiveCommMsgCallback: () => void = () => {};
+
+  private tooltipEl: HTMLElement | null = null;
+  private hoverHandler = new Cesium.ScreenSpaceEventHandler(this.viewer?.scene.canvas);
 
   public init() {
     if (safeWindow) {
@@ -55,58 +62,183 @@ class PlayerActivityPlugin {
       this.viewer = iitc.viewer;
       this.logManager = iitc.logManager;
       this.layerManager = iitc.layerManager;
+      this.interfaceManager = iitc.interfaceManager;
       this.commManager = iitc.commManager;
     }
 
-    if (!this.viewer || !this.layerManager || !this.logManager || !this.commManager) {
+    if (!this.viewer || !this.layerManager || !this.interfaceManager || !this.logManager || !this.commManager) {
       console.warn("[WARN][PlayerActivityPlugin] IITC Next core components missing", {
         viewer: !!this.viewer,
         logManager: !!this.logManager,
         layerManager: !!this.layerManager,
+        interfaceManager: !!this.interfaceManager,
         commManager: !!this.commManager
       });
       return;
     }
+
+    this.setUpTooltipElement();
+    this.setUpHoverAction();
 
     this.dataSourceEnl = this.layerManager.getOrCreateSourceAndFilter("Player Activity Enl");
     this.dataSourceRes = this.layerManager.getOrCreateSourceAndFilter("Player Activity Res");
     this.setUpDataSource(this.dataSourceEnl);
     this.setUpDataSource(this.dataSourceRes);
 
-    this.onReceiveMsgCallback = () => {this.updatePlayerActivity();};
-    this.commManager.setOnReceiveMsgCallback(this.onReceiveMsgCallback);
+    this.onReceiveCommMsgCallback = () => this.updatePlayerActivity();
+    this.commManager.setOnReceiveMsgCallback(this.onReceiveCommMsgCallback);
     this.updatePlayerActivity();
   }
 
   public deinit() {
-    this.commManager?.unsetOnReceiveMsgCallback(this.onReceiveMsgCallback);
+    this.commManager?.unsetOnReceiveMsgCallback(this.onReceiveCommMsgCallback);
     this.layerManager?.removeSourceAndFilter("Player Activity Enl");
     this.layerManager?.removeSourceAndFilter("Player Activity Res");
-    this.playerPaths.clear();
-    this.playerLocations.clear();
+    this.unsetHoverAction();
+    this.unsetTooltipElement();
+  }
+
+  private setUpTooltipElement() {
+    const container = this.interfaceManager?.getContainer();
+    if (!container) return;
+
+    this.tooltipEl = (
+      <div id="cesium-rich-tooltip" style={{
+        display: "none",
+        position: "absolute",
+        backgroundColor: "rgba(42, 42, 42, 0.9)",
+        border: "1px solid #555",
+        padding: "4px",
+        color: "white",
+      }}>
+      </div>
+    ) as HTMLElement;
+
+    container.appendChild(this.tooltipEl);
+  }
+
+  private unsetTooltipElement() {
+    this.tooltipEl?.remove();
+    this.tooltipEl = null;
+  }
+
+  private setUpHoverAction() {
+    const hoverAction = (movement: { endPosition: Cesium.Cartesian2 }) => {
+      const pickedObject = this.viewer?.scene.pick(movement.endPosition);
+      if (Cesium.defined(pickedObject) && pickedObject.id) {
+        const entity = pickedObject.id;
+        if (Array.isArray(entity) && entity[0].id.startsWith("player-activity")) {
+          // Multiplayer activities
+          const allPlayersLastActivities: PlayerActivity[] = entity.map(e => {
+            const specificPlayerActivities: PlayerActivity[] = e.properties.activities.getValue();
+            const activity: PlayerActivity = specificPlayerActivities[specificPlayerActivities.length - 1];
+            return {
+              name: activity.name,
+              team: activity.team,
+              timestamp: activity.timestamp,
+              weight: activity.weight,
+              portalName: activity.portalName,
+              lat: activity.lat,
+              lng: activity.lng,
+            };
+          });
+          allPlayersLastActivities.sort((a, b) => b.timestamp - a.timestamp);
+          const table = (
+            <table>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: "left" }}>{entity.length + " players"}</th>
+                </tr>
+              </thead>
+              {allPlayersLastActivities.map(activity => {
+                return (
+                  <tr style={{ fontSize: "12px" }}>
+                    <td style={{ paddingRight: "8px" }}>{activity.name}</td>
+                    <td style={{ textAlign: "right" }}>{this.calcTimeAgoStr(activity.timestamp)}</td>
+                  </tr>
+                ) as HTMLElement;
+              })}
+            </table>
+          ) as HTMLElement;
+          this.styleTooltipElement(table, allPlayersLastActivities, movement);
+        } else if (entity && entity.id.startsWith("player-activity")) {
+          // Single player activities
+          const activities: PlayerActivity[] = entity.properties.activities.getValue();
+          activities.sort((a, b) => b.timestamp - a.timestamp);
+          const table = (
+            <table>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: "left" }}>{activities[0].name}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {activities.slice(0, 6).map(activity => {
+                  return (
+                    <tr style={{ fontSize: "12px" }}>
+                      <td style={{ paddingRight: "8px" }}>{activity.portalName}</td>
+                      <td style={{ textAlign: "right" }}>{this.calcTimeAgoStr(activity.timestamp)}</td>
+                    </tr>
+                  ) as HTMLElement;
+                })}
+              </tbody>
+            </table>
+          ) as HTMLElement;
+          if (!this.tooltipEl) return;
+          this.styleTooltipElement(table, activities, movement);
+        } else {
+          // Hover out
+          if (!this.tooltipEl) return;
+          this.tooltipEl.innerHTML = "";
+          this.tooltipEl.style.display = "none";
+        }
+      } else {
+        // Hover out
+        if (!this.tooltipEl) return;
+        this.tooltipEl.innerHTML = "";
+        this.tooltipEl.style.display = "none";
+      }
+    };
+    this.hoverHandler.setInputAction(hoverAction, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+  }
+
+  private unsetHoverAction() {
+    this.hoverHandler.destroy();
   }
 
   private setUpDataSource(source: Cesium.DataSource) {
     source.clustering.enabled = true;
-    source.clustering.pixelRange = 0;
+    source.clustering.pixelRange = 20;
     source.clustering.minimumClusterSize = 2;
     source.clustering.clusterLabels = true;
     source.clustering.clusterBillboards = true;
     source.clustering.clusterEvent.addEventListener((clusteredEntities, cluster) => {
-      const players: Player[] = clusteredEntities.map(e => {
+      const maxPlayers = 3;
+      const playerActivities: PlayerActivity[] = clusteredEntities.map(e => {
+        const specificPlayerActivities: PlayerActivity[] = e.properties?.activities.getValue();
+        const lastActivity: PlayerActivity = specificPlayerActivities[specificPlayerActivities.length - 1];
         return {
-          name: e.properties?.name.getValue(),
-          team: e.properties?.team.getValue(),
+          name: lastActivity.name,
+          team: lastActivity.team,
+          timestamp: lastActivity.timestamp,
+          weight: lastActivity.weight,
+          portalName: lastActivity.portalName,
+          lat: lastActivity.lat,
+          lng: lastActivity.lng,
         };
       });
+
+      const displayText = playerActivities.slice(0, maxPlayers).map(p => p.name).join("\n")
+        + (playerActivities.length > maxPlayers ? `\n(${playerActivities.length - maxPlayers} more)` : "");
+      cluster.point.id = playerActivities;  // Point ids are not shown but used for tooltip
       cluster.label.show = true;
-      cluster.label.text = players.map(p => p.name).join("\n");
+      cluster.label.text = displayText;
       cluster.label.font = "16px coda_regular, arial, helvetica, sans-serif";
       cluster.label.verticalOrigin = Cesium.VerticalOrigin.CENTER;
-      cluster.label.horizontalOrigin = players[0].team === "ENLIGHTENED" ? Cesium.HorizontalOrigin.LEFT : Cesium.HorizontalOrigin.RIGHT;
-      cluster.label.pixelOffset = players[0].team === "ENLIGHTENED" ? new Cesium.Cartesian2(25, 0) : new Cesium.Cartesian2(-25, 0);
-      cluster.label.eyeOffset = new Cesium.Cartesian3(0, 0, -2);
-      cluster.label.fillColor = getTeamColor(players[0].team);
+      cluster.label.horizontalOrigin = playerActivities[0].team === "ENLIGHTENED" ? Cesium.HorizontalOrigin.LEFT : Cesium.HorizontalOrigin.RIGHT;
+      cluster.label.pixelOffset = playerActivities[0].team === "ENLIGHTENED" ? new Cesium.Cartesian2(25, 0) : new Cesium.Cartesian2(-25, 0);
+      cluster.label.eyeOffset = new Cesium.Cartesian3(0, 0, -3);
+      cluster.label.fillColor = getTeamColor(playerActivities[0].team);
       cluster.label.outlineColor = Cesium.Color.BLACK;
       cluster.label.outlineWidth = 6;
       cluster.label.style = Cesium.LabelStyle.FILL_AND_OUTLINE;
@@ -140,11 +272,13 @@ class PlayerActivityPlugin {
 
       if (player && portal) {
         const activity = {
+          name: player.name,
+          team: player.team,
           timestamp: msg.timestamp,
           weight: 1,
+          portalName: portal.name,
           lat: portal.latE6 / 1e6,
           lng: portal.lngE6 / 1e6,
-          team: player.team,
         };
 
         const activities = playerActivities.get(player.name) || [];
@@ -156,11 +290,13 @@ class PlayerActivityPlugin {
         if (existing) {
           // Calculate the average location and replace the found activity
           activities[existingIndex] = {
+            name: existing.name,
+            team: existing.team,
             timestamp: existing.timestamp,
             weight: existing.weight + 1,
+            portalName: existing.portalName,
             lat: (existing.lat * existing.weight + activity.lat) / (existing.weight + 1),
             lng: (existing.lng * existing.weight + activity.lng) / (existing.weight + 1),
-            team: existing.team,
           };
         } else {
           // Push the activity into the list
@@ -189,6 +325,7 @@ class PlayerActivityPlugin {
       let entity = this.playerLocations.get(playerName);
       if (!entity) {
         entity = source.entities.add({
+          id: `player-activity-${playerName}`,
           position: lastPosition,
           label: {
             text: playerName,
@@ -207,8 +344,7 @@ class PlayerActivityPlugin {
             eyeOffset: new Cesium.Cartesian3(0, 0, -2),
           },
           properties: {
-            name: playerName,
-            team: lastActivity.team,
+            activities: activities as PlayerActivity[]
           },
         });
       } else {
@@ -317,6 +453,38 @@ class PlayerActivityPlugin {
     }
 
     return canvas;
+  }
+
+  private calcTimeAgoStr(time: number) {
+    const timeDiff = (Date.now() - time) / 1000;
+    const hours = Math.floor(timeDiff / 60 / 60);
+    const minutes = Math.floor(timeDiff / 60 % 60);
+    const hourStr = hours === 0 ? "" : hours === 1 ? "1 hr" : hours > 1 ? hours + (" hrs") : "";
+    const minutesStr = minutes === 0 ? "0 min" : minutes === 1 ? "1 min" : minutes > 1 ? minutes + (" mins") : "";
+    return `${hourStr} ${minutesStr} ago`;
+  }
+
+  private styleTooltipElement(table: HTMLElement, activities: PlayerActivity[], movement: { endPosition: Cesium.Cartesian2 } ): void {
+    if (!this.tooltipEl) return;
+    this.tooltipEl.innerHTML = "";
+    this.tooltipEl.appendChild(table);
+    this.tooltipEl.style.display = "block";
+    this.tooltipEl.style.borderColor = getTeamColor(activities[0].team).toCssColorString();
+    const container = this.interfaceManager?.getContainer();
+    if (container && container.clientWidth - movement.endPosition.x < 200) {
+      this.tooltipEl.style.left = "";
+      this.tooltipEl.style.right = (container.clientWidth - movement.endPosition.x + 15) + "px";
+    } else {
+      this.tooltipEl.style.right = "";
+      this.tooltipEl.style.left = (movement.endPosition.x + 15) + "px";
+    }
+    if (container && container.clientHeight - movement.endPosition.y < 200) {
+      this.tooltipEl.style.top = "";
+      this.tooltipEl.style.bottom = (container.clientHeight - movement.endPosition.y + 15) + "px";
+    } else {
+      this.tooltipEl.style.bottom = "";
+      this.tooltipEl.style.top = (movement.endPosition.y + 15) + "px";
+    }
   }
 }
 
