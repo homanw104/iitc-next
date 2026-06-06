@@ -481,15 +481,15 @@ export default function loadCesiumViewer(): void {
 
   const portalDetailUI = new PortalDetailPaneUI(container);
   const refreshPaneUI = new SoftRefreshUI(viewer, tileRequestManager);
-  const gameDetailPaneUI = new GameDetailPaneUI(scoreManager, redeemManager);
+  const gameDetailPaneUI = new GameDetailPaneUI(container, scoreManager, redeemManager);
   const commDetailPaneUI = new CommDetailPaneUI(viewer, container, commManager);
-  const layerChooserPaneUI = new LayerChooserPaneUI(layerManager);
+  const layerChooserPaneUI = new LayerChooserPaneUI(container, layerManager);
 
   let portalDetailBar: HTMLElement | null;
   portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailUI }));
   container.appendChild(SoftRefreshButton({ refreshPaneUI }));
   container.appendChild(CommDetailButton({ commDetailPaneUI }));
-  container.appendChild(GameDetailButton({ gameDetailPaneUI, container }));
+  container.appendChild(GameDetailButton({ gameDetailPaneUI }));
   container.appendChild(LayerChooserButton({ layerChooserPaneUI }));
   container.appendChild(GetLocationButton({ viewer }));
 

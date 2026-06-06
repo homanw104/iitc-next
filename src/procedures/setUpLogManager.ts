@@ -7,5 +7,5 @@ import { logManager } from "../managers/logManager";
 
 export default function setUpLogManager(): void {
   logManager.setLevel("DEBUG");
-  if (safeWindow) (safeWindow as any).iitc.logManager = logManager;
+  if (safeWindow) safeWindow.iitc.logManager = logManager;
 }

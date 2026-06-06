@@ -1,18 +1,19 @@
-import { h } from "../utils/dom";
 import { LayerManager } from "../managers/layerManager";
 import LayerChooserPane from "../components/LayerChooserPane/LayerChooserPane";
 
 export class LayerChooserPaneUI {
+  private readonly container: HTMLElement;
   private readonly layerManager: LayerManager;
-  private pane: HTMLElement | null = null;
-  private wrapper: HTMLElement | null = null;
+  private layerChooserPane: HTMLElement | null = null;
+  private lastScrollTop: number = 0;
 
-  constructor(layerManager: LayerManager) {
+  constructor(container: HTMLElement, layerManager: LayerManager) {
+    this.container = container;
     this.layerManager = layerManager;
   }
 
   public togglePane(): void {
-    if (this.pane) {
+    if (this.layerChooserPane) {
       this.closePane();
     } else {
       this.showPane();
@@ -20,40 +21,25 @@ export class LayerChooserPaneUI {
   }
 
   private closePane(): void {
-    if (this.pane) {
-      this.pane.remove();
-      this.pane = null;
+    if (this.layerChooserPane) {
+      this.lastScrollTop = this.layerChooserPane.scrollTop;
+      this.layerChooserPane.remove();
+      this.layerChooserPane = null;
     }
   }
 
   private showPane(): void {
-    this.renderPane();
+    this.closePane();
+    this.layerChooserPane = this.container.appendChild(LayerChooserPane({
+      layerManager: this.layerManager,
+      onToggle: this.onToggleCheckbox,
+    }));
+    this.layerChooserPane.scrollTop = this.lastScrollTop;
   }
 
-  private renderPane(): void {
-    const newPane = (
-      <LayerChooserPane
-        layerManager={this.layerManager}
-        onToggle={this.handleToggle}
-      />
-    ) as HTMLElement;
-
-    if (this.pane) {
-      this.pane.replaceWith(newPane);
-    } else {
-      if (this.wrapper) {
-        this.wrapper.appendChild(newPane);
-      }
-    }
-    this.pane = newPane;
-  }
-
-  private handleToggle = (id: string, checked: boolean) => {
+  private onToggleCheckbox = (id: string, checked: boolean) => {
     this.layerManager.setFilter(id, checked);
-    this.renderPane();
+    this.lastScrollTop = this.layerChooserPane?.scrollTop || 0;
+    this.showPane();
   };
-
-  public setWrapper(el: HTMLElement) {
-    this.wrapper = el;
-  }
 }

@@ -7,13 +7,16 @@ import LayerSection from "./LayerSection";
 const LayerChooserPane = ({ layerManager, onToggle }: {
   layerManager: LayerManager;
   onToggle: (id: string, checked: boolean) => void;
-}) => {
+}): HTMLElement => {
   return (
     <div
       style={{
         backgroundColor: "rgba(42, 42, 42, 0.9)",
+        position: "absolute",
+        right: "5px",
+        bottom: "41px",
+        margin: "2px 3px",
         padding: "6px",
-        margin: "3px",
         borderRadius: "4.2px",
         color: "white",
         fontFamily: "sans-serif",
@@ -21,8 +24,9 @@ const LayerChooserPane = ({ layerManager, onToggle }: {
         boxShadow: "0 0 10px rgba(0,0,0,0.5)",
         border: "1px solid #555",
         minWidth: "150px",
-        maxHeight: "calc(100% - 82px)",
+        maxHeight: "calc(100% - 104px)",
         overflowY: "auto",
+        zIndex: "10024",
       }}
     >
       <LayerSection name="Factions" />

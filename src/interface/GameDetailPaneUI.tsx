@@ -8,15 +8,17 @@ export class GameDetailPaneUI {
   private gameDetailPane: HTMLElement | null = null;
   private pluginDetailPane: HTMLElement | null = null;
   private redeemResultPane: HTMLElement | null = null;
+  private readonly container: HTMLElement;
   private readonly scoreManager: ScoreManager;
   private readonly redeemManager: RedeemManager;
 
-  constructor(scoreManager: ScoreManager, redeemManager: RedeemManager) {
+  constructor(container: HTMLElement, scoreManager: ScoreManager, redeemManager: RedeemManager) {
+    this.container = container;
     this.scoreManager = scoreManager;
     this.redeemManager = redeemManager;
   }
 
-  public toggleGameDetailPane(container: HTMLElement) {
+  public toggleGameDetailPane() {
     if (this.gameDetailPane) {
       this.closeGameDetailPane();
       return;
@@ -25,7 +27,7 @@ export class GameDetailPaneUI {
       this.closePluginDetailPane();
       return;
     }
-    this.showGameDetailPane(container);
+    this.showGameDetailPane(this.container);
   }
 
   private closeGameDetailPane() {
