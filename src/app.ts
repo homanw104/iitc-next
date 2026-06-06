@@ -20,7 +20,7 @@ const init = async () => {
   safeLocalStorage.shadow();
 
   // Initialize iitc variable
-  if (safeWindow) (safeWindow as any).iitc = {};
+  if (safeWindow) safeWindow.iitc = {};
 
   // Set up logging for this app
   setUpLogManager();

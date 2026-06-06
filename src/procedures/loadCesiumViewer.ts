@@ -20,17 +20,20 @@ import { FieldEntityManager } from "../managers/fieldEntityManager";
 import { PortalHistoryEntityManager } from "../managers/portalHistoryEntityManager";
 import { ScoutHistoryEntityManager } from "../managers/scoutHistoryEntityManager";
 import { InterfaceManager } from "../managers/interfaceManager";
-import { PortalDetailBar, PortalDetailUI } from "../interface/PortalDetailBar";
-import RefreshButton from "../components/RefreshButton/RefreshButton";
-import { GameDetailButton } from "../interface/GameDetailButton";
+import GameDetailButton from "../components/GameDetailButton/GameDetailButton";
+import GetLocationButton from "../components/GetLocationButton/GetLocationButton";
+import SoftRefreshButton from "../components/SoftRefreshButton/SoftRefreshButton";
+import CommDetailButton from "../components/CommDetailButton/CommDetailButton";
+import LayerChooserButton from "../components/LayerChooserButton/LayerChooserButton";
+import PortalDetailBar from "../components/PortalDetailBar/PortalDetailBar";
 import { CommDetailPaneUI } from "../interface/CommDetailPaneUI";
-import { GetLocationButton } from "../interface/GetLocationButton";
-import { LayerChooserButton } from "../interface/LayerChooserButton";
+import { GameDetailPaneUI } from "../interface/GameDetailPaneUI";
+import { PortalDetailPaneUI } from "../interface/PortalDetailPaneUI";
+import { SoftRefreshUI } from "../interface/SoftRefreshUI";
+import { LayerChooserPaneUI } from "../interface/LayerChooserPaneUI";
 import { AmapMercatorTilingScheme } from "../utils/map";
 import { safeWindow } from "../utils/window";
 import { PortalData } from "../types/ingress";
-import CommDetailButton from "../components/CommDetailButton/CommDetailButton";
-import { RefreshPaneUI } from "../interface/RefreshPaneUI";
 import { calculateTileKeys, HEIGHT_AT_ZOOM_ZERO } from "../utils/viewer";
 
 // Tell Cesium where to find its assets (Images, Workers, etc.)
@@ -115,7 +118,7 @@ function initCesiumViewer(containerId: string): Cesium.Viewer {
   });
 
   // Remove unused imagery layer options
-  let models = viewer.baseLayerPicker.viewModel.imageryProviderViewModels;
+  const models = viewer.baseLayerPicker.viewModel.imageryProviderViewModels;
   viewer.baseLayerPicker.viewModel.imageryProviderViewModels = models.filter((model) => {
     return model.name !== "Sentinel-2" &&
       model.name !== "Blue Marble" &&
@@ -340,8 +343,8 @@ function setupGoogleMapsGestures(viewer: Cesium.Viewer): void {
 function setupClickHandler(
   viewer: Cesium.Viewer,
   container: HTMLElement,
-  portalDetailBar: HTMLElement,
-  portalDetailUI: PortalDetailUI,
+  portalDetailBar: HTMLElement | null,
+  portalDetailUI: PortalDetailPaneUI,
   layerManager: LayerManager,
   portalEntityManager: PortalEntityManager,
   portalHistoryEntityManager: PortalHistoryEntityManager,
@@ -357,7 +360,7 @@ function setupClickHandler(
   handler.setInputAction((click: { position: Cesium.Cartesian2 }) => {
     const pickedObjects = viewer.scene.drillPick(click.position);
     const entity = pickedObjects.find(
-      (o) => o.id instanceof Cesium.Entity && (o.id as any).selectable !== false
+      (o) => o.id instanceof Cesium.Entity && o.id.selectable !== false
     )?.id as Cesium.Entity | undefined;
 
     if (isClickLoading && lastEntity !== entity) {
@@ -476,20 +479,19 @@ export default function loadCesiumViewer(): void {
     iitc.commManager = commManager;
   }
 
-  const portalDetailUI = new PortalDetailUI(container);
+  const portalDetailUI = new PortalDetailPaneUI(container);
+  const refreshPaneUI = new SoftRefreshUI(viewer, tileRequestManager);
+  const gameDetailPaneUI = new GameDetailPaneUI(scoreManager, redeemManager);
+  const commDetailPaneUI = new CommDetailPaneUI(viewer, container, commManager);
+  const layerChooserPaneUI = new LayerChooserPaneUI(layerManager);
+
   let portalDetailBar: HTMLElement | null;
   portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailUI }));
-
-  const refreshPaneUI = new RefreshPaneUI(viewer, tileRequestManager);
-  container.appendChild(RefreshButton({ refreshPaneUI }));
-
-  container.appendChild(GameDetailButton({ container, scoreManager, redeemManager }));
-
-  const commDetailPaneUI = new CommDetailPaneUI(viewer, container, commManager);
+  container.appendChild(SoftRefreshButton({ refreshPaneUI }));
   container.appendChild(CommDetailButton({ commDetailPaneUI }));
-
+  container.appendChild(GameDetailButton({ gameDetailPaneUI, container }));
+  container.appendChild(LayerChooserButton({ layerChooserPaneUI }));
   container.appendChild(GetLocationButton({ viewer }));
-  container.appendChild(LayerChooserButton({ layerManager }));
 
   logManager.setCallback((msg: string) => {
     lastLogMsg = msg;

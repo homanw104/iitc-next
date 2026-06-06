@@ -25,7 +25,7 @@ export function getURLParam(param: string): string {
  * @returns {string|undefined} The value of the cookie, or undefined if not found.
  */
 export function getCookie(name: string): string | undefined {
-  const raw_cookies = document.cookie.split("; ")
+  const raw_cookies = document.cookie.split("; ");
   const cookies = raw_cookies.reduce<Record<string, string>>((acc, cookie) => {
     const [key, value] = cookie.split("=");
     acc[key] = decodeURIComponent(value);

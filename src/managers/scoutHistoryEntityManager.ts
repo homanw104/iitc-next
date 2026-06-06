@@ -15,8 +15,8 @@ export class ScoutHistoryEntityManager {
     const scoutHaloIdReverse = `portal-${data.guid}-scout-halo-reverse`;
     const source = this.layerManager.getOrCreateSourceAndFilter("history-scout-control");
     const sourceReverse = this.layerManager.getOrCreateSourceAndFilter("history-scout-control-reverse");
-    let scoutHalo = source.entities.getById(scoutHaloId);
-    let scoutHaloReverse = sourceReverse.entities.getById(scoutHaloIdReverse);
+    const scoutHalo = source.entities.getById(scoutHaloId);
+    const scoutHaloReverse = sourceReverse.entities.getById(scoutHaloIdReverse);
 
     if (data.history?.scoutControlled) {
       const color = Cesium.Color.fromCssColorString("#FF9000");

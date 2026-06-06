@@ -30,7 +30,7 @@ export class PortalRequest {
         this.retryCount++;
         return this.send();
       }
-      throw error
+      throw error;
     }
   }
 }

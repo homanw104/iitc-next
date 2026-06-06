@@ -1,13 +1,9 @@
-/**
- * Functions that add a get location button that gets the user's current location on click.
- */
-
-import { h } from "../utils/dom";
-import { Cartesian3 } from "cesium";
-import { logManager } from "../managers/logManager";
 import * as Cesium from "cesium";
+import { Cartesian3 } from "cesium";
+import { h } from "../../utils/dom";
+import { logManager } from "../../managers/logManager";
 
-export const GetLocationButton = ({ viewer }: {
+const GetLocationButton = ({ viewer }: {
   viewer: Cesium.Viewer,
 }): HTMLElement => {
   const onclick = () => {
@@ -28,7 +24,7 @@ export const GetLocationButton = ({ viewer }: {
     } else {
       logManager.error("CesiumViewer", "Geolocation is not supported by this browser");
     }
-  }
+  };
 
   return (
     <div
@@ -64,4 +60,6 @@ export const GetLocationButton = ({ viewer }: {
       </button>
     </div>
   ) as HTMLElement;
-}
+};
+
+export default GetLocationButton;

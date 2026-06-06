@@ -15,8 +15,8 @@ export class PortalHistoryEntityManager {
     const historyHaloIdReverse = `portal-${data.guid}-history-halo-reverse`;
     const source = this.layerManager.getOrCreateSourceAndFilter("history-visited-captured");
     const sourceReverse = this.layerManager.getOrCreateSourceAndFilter("history-visited-captured-reverse");
-    let historyHalo = source.entities.getById(historyHaloId);
-    let historyHaloReverse = sourceReverse.entities.getById(historyHaloIdReverse);
+    const historyHalo = source.entities.getById(historyHaloId);
+    const historyHaloReverse = sourceReverse.entities.getById(historyHaloIdReverse);
 
     // Captured and visited
     if (data.history?.captured && data.history?.visited) {

@@ -155,7 +155,7 @@ export class LayerManager {
   }
 
   public removeSourceAndFilter(name: string): void {
-    let source = this.sources.get(name);
+    const source = this.sources.get(name);
     if (source) {
       this.viewer.dataSources.remove(source);
       this.sources.delete(name);

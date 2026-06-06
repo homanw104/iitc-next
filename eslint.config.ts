@@ -7,16 +7,24 @@ export default defineConfig(
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   {
+    files: ["**/*.ts", "**/*.tsx"],
     languageOptions: {
       globals: {
         ...globals.browser,
       },
+      parserOptions: {
+        projectService: true,
+        ecmaFeatures: {
+          jsx: true,
+        },
+      },
     },
     rules: {
+      "semi": ["error", "always"],
       "quotes": ["error", "double"]
     }
   },
   {
     ignores: ["dist/", "old/"]
-  }
+  },
 );

@@ -11,9 +11,9 @@ export class ScoreManager {
 
   constructor() {
     this.fetchGameScore().then(() => {
-      logManager.debug("ScoreManager", "Game score fetched")
+      logManager.debug("ScoreManager", "Game score fetched");
     }).catch(e => {
-      logManager.error("ScoreManager", "Failed to fetch game score", e)
+      logManager.error("ScoreManager", "Failed to fetch game score", e);
     });
   }
 

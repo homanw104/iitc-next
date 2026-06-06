@@ -200,10 +200,10 @@ export class CommDetailPaneUI {
 
   private handleCloseClick = () => {
     this.closePane();
-  }
+  };
 
   private handleFetchLatestClick = () => {
     this.refreshData().then(() => this.renderPane());
     this.renderPane();
-  }
+  };
 }

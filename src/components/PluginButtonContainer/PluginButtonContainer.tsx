@@ -1,6 +1,6 @@
-import { h } from "../utils/dom";
+import { h } from "../../utils/dom";
 
-export const PluginButtonContainer = () => (
+const PluginButtonContainer = () => (
   <div
     className="plugin-button-container"
     style={{
@@ -18,3 +18,5 @@ export const PluginButtonContainer = () => (
     }}
   />
 ) as HTMLElement;
+
+export default PluginButtonContainer;

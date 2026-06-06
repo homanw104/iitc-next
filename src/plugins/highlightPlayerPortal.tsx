@@ -115,7 +115,7 @@ const PlayerSelectorButton = ({ container, onConfirm }: {
       </button>
     </div>
   ) as HTMLElement;
-}
+};
 
 const PlayerSelectorPane = ({ onClose, onConfirm }: {
   onClose: () => void;
@@ -207,7 +207,7 @@ const PlayerSelectorPane = ({ onClose, onConfirm }: {
       </div>
     </div>
   ) as HTMLElement;
-}
+};
 
 const PlayerSelectionTextInput = ({ value, onChange, onConfirm }: {
   value: string;
@@ -239,7 +239,7 @@ const PlayerSelectionTextInput = ({ value, onChange, onConfirm }: {
       }}
     />
   ) as HTMLElement;
-}
+};
 
 const PlayerSelectionConfirmButton = ({ onClick }: {
   onClick: () => void
@@ -262,7 +262,7 @@ const PlayerSelectionConfirmButton = ({ onClick }: {
       Confirm
     </button>
   ) as HTMLElement;
-}
+};
 
 class PlayerSelectorUI {
   private container: HTMLElement;

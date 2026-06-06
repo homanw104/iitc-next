@@ -15,7 +15,7 @@ export class AmapMercatorTilingScheme extends Cesium.WebMercatorTilingScheme {
   }) {
     super(options);
 
-    let projection = new Cesium.WebMercatorProjection();
+    const projection = new Cesium.WebMercatorProjection();
     (this as any)._projection.project = function(cartographic: Cesium.Cartographic, result?: Cesium.Cartesian3): Cesium.Cartesian3 {
       const gcj02 = wgs84ToGcj02(
         Cesium.Math.toDegrees(cartographic.longitude),
@@ -36,7 +36,7 @@ export class AmapMercatorTilingScheme extends Cesium.WebMercatorTilingScheme {
       return cartesian;
     };
     (this as any)._projection.unproject = function(cartesian: Cesium.Cartesian3, result?: Cesium.Cartographic): Cesium.Cartographic {
-      let cartographic = projection.unproject(cartesian);
+      const cartographic = projection.unproject(cartesian);
       const wgs84 = gcj02ToWgs84(
         Cesium.Math.toDegrees(cartographic.longitude),
         Cesium.Math.toDegrees(cartographic.latitude)
@@ -57,7 +57,7 @@ export class AmapMercatorTilingScheme extends Cesium.WebMercatorTilingScheme {
 }
 
 function wgs84ToGcj02(lng: number, lat: number) {
-  const PI = 3.1415926535897932384626;
+  const PI = Math.PI;
   const a = 6378245.0;
   const ee = 0.00669342162296594323;
 
@@ -75,7 +75,7 @@ function wgs84ToGcj02(lng: number, lat: number) {
 }
 
 function gcj02ToWgs84(lng: number, lat: number) {
-  const PI = 3.1415926535897932384626;
+  const PI = Math.PI;
   const a = 6378245.0;
   const ee = 0.00669342162296594323;
 

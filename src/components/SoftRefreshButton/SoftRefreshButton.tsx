@@ -1,12 +1,8 @@
-/**
- * Functions that add a refresh button that refresh tiles in the current view on click.
- */
-
 import { h } from "../../utils/dom";
-import { RefreshPaneUI } from "../../interface/RefreshPaneUI";
+import { SoftRefreshUI } from "../../interface/SoftRefreshUI";
 
-const RefreshButton = ({ refreshPaneUI }: {
-  refreshPaneUI: RefreshPaneUI,
+const SoftRefreshButton = ({ refreshPaneUI }: {
+  refreshPaneUI: SoftRefreshUI,
 }): HTMLElement => {
   return (
     <div
@@ -32,6 +28,6 @@ const RefreshButton = ({ refreshPaneUI }: {
       </button>
     </div>
   ) as HTMLElement;
-}
+};
 
-export default RefreshButton;
+export default SoftRefreshButton;

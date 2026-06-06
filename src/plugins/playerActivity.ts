@@ -73,7 +73,7 @@ class PlayerActivityPlugin {
     this.setUpDataSource(this.dataSourceEnl);
     this.setUpDataSource(this.dataSourceRes);
 
-    this.onReceiveMsgCallback = () => {this.updatePlayerActivity()};
+    this.onReceiveMsgCallback = () => {this.updatePlayerActivity();};
     this.commManager.setOnReceiveMsgCallback(this.onReceiveMsgCallback);
     this.updatePlayerActivity();
   }
@@ -87,9 +87,14 @@ class PlayerActivityPlugin {
   }
 
   private setUpDataSource(source: Cesium.DataSource) {
+    const hiddenEntities: Set<Cesium.Entity> = new Set();
+
     source.clustering.enabled = true;
-    source.clustering.pixelRange = 5;
-    source.clustering.minimumClusterSize = 4;
+    source.clustering.pixelRange = 40;
+    source.clustering.minimumClusterSize = 2;
+    source.clustering.clusterPoints = true;
+    source.clustering.clusterLabels = false;
+    source.clustering.clusterBillboards = false;
     source.clustering.clusterEvent.addEventListener((clusteredEntities, cluster) => {
       const players: Player[] = clusteredEntities.map(e => {
         return {
@@ -102,21 +107,53 @@ class PlayerActivityPlugin {
       cluster.billboard.id = cluster;
       cluster.billboard.image = this.buildCanvas(players)?.toDataURL() || "";
       cluster.billboard.eyeOffset = new Cesium.Cartesian3(0, 0, -2);
+
+      // Loop through all entities assigned to this cluster and hide their original billboards
+      clusteredEntities.forEach(entity => {
+        if (entity.billboard) {
+          entity.billboard.show = new Cesium.ConstantProperty(false);
+          hiddenEntities.add(entity);
+        }
+      });
+    });
+
+    // Temporary solution to show declustered player locations when moving
+    this.viewer?.camera.moveStart.addEventListener(function() {
+      hiddenEntities.forEach(entity => {
+        if (entity.billboard) {
+          entity.billboard.show = new Cesium.ConstantProperty(true);
+          hiddenEntities.delete(entity);
+        }
+      });
+    });
+    this.viewer?.camera.moveEnd.addEventListener(function() {
+      hiddenEntities.forEach(entity => {
+        if (entity.billboard) {
+          entity.billboard.show = new Cesium.ConstantProperty(true);
+          hiddenEntities.delete(entity);
+        }
+      });
     });
   }
 
   private updatePlayerActivity(): void {
     const playerActivities: Map<string, PlayerActivity[]> = new Map();
 
-    this.commManager?.getMessages("all")?.forEach((msg: any) => {
+    this.commManager?.getMessages("all")?.forEach((msg) => {
       let player: Player | null = null;
       let portal: Portal | null = null;
 
-      for (let i = 0; i < msg.markup.length - 2; i++) {
+      for (let i = 0; i < msg.markup.length; i++) {
         if (msg.markup[i][0] === "PLAYER") {
-          player = { name: msg.markup[i][1].plain, team: msg.markup[i][1].team };
+          const name = msg.markup[i][1].plain;
+          const team = msg.markup[i][1].team as Team;
+          player = { name, team };
         } else if (msg.markup[i][0] === "PORTAL") {
-          portal = { name: msg.markup[i][1].name, latE6: msg.markup[i][1].latE6, lngE6: msg.markup[i][1].lngE6 };
+          const name = msg.markup[i][1].name || null;
+          const latE6 = msg.markup[i][1].latE6 || null;
+          const lngE6 = msg.markup[i][1].lngE6 || null;
+          if (!name || !latE6 || !lngE6) continue;
+          portal = { name, latE6, lngE6 };
           break;  // Only take first portal found in message
         }
       }
@@ -128,9 +165,9 @@ class PlayerActivityPlugin {
           lat: portal.latE6 / 1e6,
           lng: portal.lngE6 / 1e6,
           team: player.team,
-        }
+        };
 
-        let activities = playerActivities.get(player.name) || [];
+        const activities = playerActivities.get(player.name) || [];
         if (activities.length === 0) playerActivities.set(player.name, activities);
 
         const existing = activities.find(a => a.timestamp === activity.timestamp);
@@ -173,9 +210,16 @@ class PlayerActivityPlugin {
       if (!entity) {
         entity = source.entities.add({
           position: lastPosition,
+          point: {
+            pixelSize: 1,
+            color: Cesium.Color.TRANSPARENT // Completely hidden, used only as a mathematical anchor
+          },
           billboard: {
             image: this.buildCanvas([{ name: playerName, team: lastActivity.team }]),
             eyeOffset: new Cesium.Cartesian3(0, 0, -2),
+            width: 5.12,
+            height: 5.12,
+            scale: 100,
           },
           properties: {
             name: playerName,
@@ -218,7 +262,7 @@ class PlayerActivityPlugin {
         if (entity.polyline) entity.polyline.positions = new Cesium.ConstantProperty(positions);
       }
       this.playerPaths.set(playerName, entity);
-    })
+    });
   }
 
   private buildCanvas(players: Player[]): HTMLCanvasElement | undefined {

@@ -21,7 +21,7 @@ class SamplePlugin {
 
   public init() {
     if (safeWindow) {
-      const iitc = (safeWindow as any).iitc;
+      const iitc: IITCCore = safeWindow.iitc;
       this.viewer = iitc.viewer!;
       this.logManager = iitc.logManager!;
     }
@@ -34,7 +34,7 @@ class SamplePlugin {
       return;
     }
 
-    this.interval = setInterval(() => {
+    this.interval = window.setInterval(() => {
       this.logManager!.info("SamplePlugin", "Sample plugin loaded");
     }, 5000);
   }

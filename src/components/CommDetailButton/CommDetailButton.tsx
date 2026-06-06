@@ -32,6 +32,6 @@ const CommDetailButton = ({ commDetailPaneUI }: {
       </button>
     </div>
   ) as HTMLElement;
-}
+};
 
 export default CommDetailButton;

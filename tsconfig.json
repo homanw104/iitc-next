@@ -5,6 +5,7 @@
     "moduleResolution": "bundler",
     "lib": ["ESNext", "DOM"],
     "esModuleInterop": true,
+    "allowImportingTsExtensions": true,
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "skipLibCheck": true,
@@ -13,7 +14,11 @@
     "jsxFactory": "h",
     "jsxFragmentFactory": "Fragment",
     "noEmit": true,
-    "types": ["vite/client"]
+    "types": ["vite/client"],
   },
-  "include": ["src"]
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "*.ts",
+  ],
 }

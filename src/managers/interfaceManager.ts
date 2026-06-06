@@ -2,7 +2,7 @@
  * Manage and handle various interface elements.
  */
 
-import { PluginButtonContainer } from "../interface/PluginButtonContainer";
+import PluginButtonContainer from "../components/PluginButtonContainer/PluginButtonContainer";
 
 export class InterfaceManager {
   private readonly container: HTMLElement;

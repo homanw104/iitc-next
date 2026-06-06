@@ -1,6 +1,6 @@
 {
   "name": "iitc-next",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "",
   "main": "dist/index.js",
   "scripts": {
@@ -14,23 +14,23 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@typescript-eslint/eslint-plugin": "^8.59.4",
-    "@typescript-eslint/parser": "^8.59.4",
-    "eslint": "^10.4.0",
+    "@typescript-eslint/eslint-plugin": "^8.60.1",
+    "@typescript-eslint/parser": "^8.60.1",
+    "eslint": "^10.4.1",
     "globals": "^17.6.0",
     "jiti": "^2.7.0",
-    "typescript": "^5.5.3",
-    "typescript-eslint": "^8.59.4",
-    "vite": "^8.0.14",
-    "vite-plugin-monkey": "^8.0.5"
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.60.1",
+    "vite": "^8.0.16",
+    "vite-plugin-monkey": "^8.0.6"
   },
   "private": true,
   "type": "module",
   "dependencies": {
-    "@capacitor/android": "^8.3.4",
-    "@capacitor/cli": "^8.3.4",
-    "@capacitor/core": "^8.3.4",
+    "@capacitor/android": "^8.4.0",
+    "@capacitor/cli": "^8.4.0",
+    "@capacitor/core": "^8.4.0",
     "@capacitor/preferences": "^8.0.1",
-    "cesium": "^1.141.0"
+    "cesium": "^1.142.0"
   }
 }
