@@ -2,6 +2,8 @@
 
 This project is a Total Conversion for Ingress Intel that adds a 3D globe view using CesiumJS.
 
+![Cover](./assets/cover.png)
+
 ## Features
 
 * Full 3D Globe view of the Earth.
