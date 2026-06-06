@@ -11,6 +11,7 @@ import { h } from "../utils/dom.ts";
 import { IITCCore } from "../types/iitc";
 import { safeWindow } from "../utils/window";
 import { getTeamColor } from "../utils/color";
+import { PlextMark } from "../managers/commManager";
 import "../types/iitc.ts";
 
 type Team = "ENLIGHTENED" | "RESISTANCE" | "MACHINA" | "NEUTRAL";
@@ -54,7 +55,8 @@ class PlayerActivityPlugin {
   private onReceiveCommMsgCallback: () => void = () => {};
 
   private tooltipEl: HTMLElement | null = null;
-  private hoverHandler = new Cesium.ScreenSpaceEventHandler(this.viewer?.scene.canvas);
+  private hoverHandler: Cesium.ScreenSpaceEventHandler | undefined;
+  private hoverAction: Cesium.ScreenSpaceEventHandler.MotionEventCallback = () => {};
 
   public init() {
     if (safeWindow) {
@@ -77,6 +79,8 @@ class PlayerActivityPlugin {
       return;
     }
 
+    this.hoverHandler = new Cesium.ScreenSpaceEventHandler(this.viewer.scene.canvas);
+
     this.setUpTooltipElement();
     this.setUpHoverAction();
 
@@ -94,6 +98,8 @@ class PlayerActivityPlugin {
     this.commManager?.unsetOnReceiveMsgCallback(this.onReceiveCommMsgCallback);
     this.layerManager?.removeSourceAndFilter("Player Activity Enl");
     this.layerManager?.removeSourceAndFilter("Player Activity Res");
+    this.playerLocations.clear();
+    this.playerPaths.clear();
     this.unsetHoverAction();
     this.unsetTooltipElement();
   }
@@ -123,14 +129,14 @@ class PlayerActivityPlugin {
   }
 
   private setUpHoverAction() {
-    const hoverAction = (movement: { endPosition: Cesium.Cartesian2 }) => {
+    this.hoverAction = (movement: Cesium.ScreenSpaceEventHandler.MotionEvent) => {
       const pickedObject = this.viewer?.scene.pick(movement.endPosition);
       if (Cesium.defined(pickedObject) && pickedObject.id) {
-        const entity = pickedObject.id;
+        const entity = pickedObject.id as Cesium.Entity | Cesium.Entity[];
         if (Array.isArray(entity) && entity[0].id.startsWith("player-activity")) {
           // Multiplayer activities
           const allPlayersLastActivities: PlayerActivity[] = entity.map(e => {
-            const specificPlayerActivities: PlayerActivity[] = e.properties.activities.getValue();
+            const specificPlayerActivities: PlayerActivity[] = e.properties?.activities.getValue();
             const activity: PlayerActivity = specificPlayerActivities[0];
             return {
               name: activity.name,
@@ -161,9 +167,9 @@ class PlayerActivityPlugin {
             </table>
           ) as HTMLElement;
           this.styleTooltipElement(table, allPlayersLastActivities, movement);
-        } else if (entity && entity.id.startsWith("player-activity")) {
+        } else if (!Array.isArray(entity) && entity.id.startsWith("player-activity")) {
           // Single player activities
-          const activities: PlayerActivity[] = entity.properties.activities.getValue();
+          const activities: PlayerActivity[] = entity.properties?.activities.getValue();
           activities.sort((a, b) => b.timestamp - a.timestamp);
           const table = (
             <table>
@@ -199,11 +205,13 @@ class PlayerActivityPlugin {
         this.tooltipEl.style.display = "none";
       }
     };
-    this.hoverHandler.setInputAction(hoverAction, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+    this.hoverHandler?.setInputAction(this.hoverAction, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
   }
 
   private unsetHoverAction() {
-    this.hoverHandler.destroy();
+    this.hoverHandler?.removeInputAction(Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+    this.hoverHandler?.destroy();
+    this.hoverHandler = undefined;
   }
 
   private setUpDataSource(source: Cesium.DataSource) {
@@ -256,20 +264,21 @@ class PlayerActivityPlugin {
       let portal: Portal | null = null;
 
       for (let i = 0; i < msg.markup.length; i++) {
-        if (msg.markup[i][0] === "PLAYER") {
-          const name = msg.markup[i][1].plain;
-          const team = msg.markup[i][1].team as Team;
+        const markup = msg.markup[i] as PlextMark;
+        if (markup[0] === "PLAYER") {
+          const name = markup[1].plain;
+          const team = markup[1].team as Team;
           player = { name, team };
-        } else if (msg.markup[i][0] === "PORTAL") {
-          const name = msg.markup[i][1].name || null;
-          const latE6 = msg.markup[i][1].latE6 || null;
-          const lngE6 = msg.markup[i][1].lngE6 || null;
+        } else if (markup[0] === "PORTAL") {
+          const name = markup[1].name || null;
+          const latE6 = markup[1].latE6 || null;
+          const lngE6 = markup[1].lngE6 || null;
           if (!name || !latE6 || !lngE6) continue;
           portal = { name, latE6, lngE6 };
           break;  // Only take first portal found in message
         }
       }
-
+      
       if (player && portal) {
         const activity = {
           name: player.name,
@@ -480,7 +489,7 @@ class PlayerActivityPlugin {
     return `${hourStr} ${minutesStr} ago`;
   }
 
-  private styleTooltipElement(table: HTMLElement, activities: PlayerActivity[], movement: { endPosition: Cesium.Cartesian2 } ): void {
+  private styleTooltipElement(table: HTMLElement, activities: PlayerActivity[], movement: Cesium.ScreenSpaceEventHandler.MotionEvent ): void {
     if (!this.tooltipEl) return;
     this.tooltipEl.innerHTML = "";
     this.tooltipEl.appendChild(table);

@@ -165,8 +165,8 @@ export class LayerManager {
     // Delete the filter as well if it's a plugin layer
     if (!this.isBuiltInSource(name) && this.pluginFilterStates.has(name)) {
       this.pluginFilterStates.delete(name);
+      this.sourceVisibility.delete(name);
       this.saveState();
-      console.log(`Removing filter for: ${name}`);
     }
   }
 
