@@ -131,7 +131,7 @@ class PlayerActivityPlugin {
           // Multiplayer activities
           const allPlayersLastActivities: PlayerActivity[] = entity.map(e => {
             const specificPlayerActivities: PlayerActivity[] = e.properties.activities.getValue();
-            const activity: PlayerActivity = specificPlayerActivities[specificPlayerActivities.length - 1];
+            const activity: PlayerActivity = specificPlayerActivities[0];
             return {
               name: activity.name,
               team: activity.team,
@@ -349,6 +349,22 @@ class PlayerActivityPlugin {
         });
       } else {
         entity.position = new Cesium.ConstantPositionProperty(lastPosition);
+
+        // For rare ocations where agents might change their faction
+        if (entity.label) {
+          entity.label.horizontalOrigin = lastActivity.team === "ENLIGHTENED" ?
+            new Cesium.ConstantProperty(Cesium.HorizontalOrigin.LEFT) :
+            new Cesium.ConstantProperty(Cesium.HorizontalOrigin.RIGHT);
+          entity.label.pixelOffset = lastActivity.team === "ENLIGHTENED" ?
+            new Cesium.ConstantProperty(new Cesium.Cartesian2(25, 0)) :
+            new Cesium.ConstantProperty(new Cesium.Cartesian2(-25, 0));
+          entity.label.fillColor = new Cesium.ConstantProperty(getTeamColor(lastActivity.team));
+        }
+
+        // Update the properties for tooltips
+        if (entity.properties) {
+          entity.properties?.activities.setValue(activities as PlayerActivity[]);
+        }
       }
       this.playerLocations.set(playerName, entity);
     });
