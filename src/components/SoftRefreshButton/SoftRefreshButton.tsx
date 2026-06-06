@@ -10,7 +10,7 @@ const SoftRefreshButton = ({ refreshPaneUI }: {
         position: "absolute",
         bottom: "5px",
         right: "81px",
-        zIndex: "10012",
+        zIndex: "10000",
         display: "flex",
         flexDirection: "column-reverse",
         alignItems: "flex-end",

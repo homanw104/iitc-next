@@ -32,7 +32,7 @@ const GetLocationButton = ({ viewer }: {
         position: "absolute",
         bottom: "70px",
         right: "34px",
-        zIndex: "10008",
+        zIndex: "10000",
         display: "flex",
       }}
     >

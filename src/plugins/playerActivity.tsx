@@ -342,15 +342,15 @@ class PlayerActivityPlugin {
             verticalOrigin: Cesium.VerticalOrigin.CENTER,
             horizontalOrigin: lastActivity.team === "ENLIGHTENED" ? Cesium.HorizontalOrigin.LEFT : Cesium.HorizontalOrigin.RIGHT,
             pixelOffset: lastActivity.team === "ENLIGHTENED" ? new Cesium.Cartesian2(25, 0) : new Cesium.Cartesian2(-25, 0),
-            eyeOffset: new Cesium.Cartesian3(0, 0, -2),
             fillColor: getTeamColor(lastActivity.team),
             outlineColor: Cesium.Color.BLACK,
             outlineWidth: 6,
             style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY,
           },
           billboard: {
             image: this.buildCanvas(),
-            eyeOffset: new Cesium.Cartesian3(0, 0, -2),
+            disableDepthTestDistance: Number.POSITIVE_INFINITY,
           },
           properties: {
             activities: activities as PlayerActivity[]

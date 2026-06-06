@@ -10,7 +10,7 @@ const CommDetailButton = ({ commDetailPaneUI }: {
         position: "absolute",
         bottom: "5px",
         right: "43px",
-        zIndex: "10012",
+        zIndex: "10000",
         display: "flex",
         flexDirection: "column",
       }}

@@ -19,11 +19,9 @@ export class InterfaceManager {
 
   public mountSidebarButton(button: HTMLElement): void {
     this.pluginButtonContainer.appendChild(button);
-    this.pluginButtonContainer.appendChild(button);
   }
 
-  public unmountSidebarButton(buttonId: string): void {
-    const button = document.getElementById(buttonId);
-    if (button) this.pluginButtonContainer.removeChild(button);
+  public unmountSidebarButton(button: HTMLElement): void {
+    this.pluginButtonContainer.removeChild(button);
   }
 }

@@ -10,7 +10,7 @@ const GameDetailButton = ({ gameDetailPaneUI }: {
         position: "absolute",
         top: "5px",
         left: "5px",
-        zIndex: "10012",
+        zIndex: "10000",
         display: "flex",
         flexDirection: "column",
         alignItems: "flex",

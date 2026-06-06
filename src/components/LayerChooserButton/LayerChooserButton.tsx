@@ -10,7 +10,7 @@ const LayerChooserButton = ({ layerChooserPaneUI }: {
         position: "absolute",
         bottom: "5px",
         right: "5px",
-        zIndex: "10010",
+        zIndex: "10000",
         display: "flex",
         flexDirection: "column-reverse",
         alignItems: "flex-end",
