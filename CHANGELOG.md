@@ -2,9 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.0.3
+
+* Player Activity Plugin: Added hover for detail
+* Player Activity Plugin: Improved clustering logic
+* Remember the layer chooser scroll position
+* Disabled the cookie consent dialog when initiating the app
+* UI components refactor and other improvements
+
 ## 1.0.2
 
-* Added "Get Location" button
+* Added the "Get Location" button
 * Added plugin support (currently only for browser)
 * Added "Player Activity" plugin
 * Added "Sample Plugin" plugin
