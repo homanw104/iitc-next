@@ -87,14 +87,11 @@ class PlayerActivityPlugin {
   }
 
   private setUpDataSource(source: Cesium.DataSource) {
-    const hiddenEntities: Set<Cesium.Entity> = new Set();
-
     source.clustering.enabled = true;
-    source.clustering.pixelRange = 40;
+    source.clustering.pixelRange = 0;
     source.clustering.minimumClusterSize = 2;
-    source.clustering.clusterPoints = true;
-    source.clustering.clusterLabels = false;
-    source.clustering.clusterBillboards = false;
+    source.clustering.clusterLabels = true;
+    source.clustering.clusterBillboards = true;
     source.clustering.clusterEvent.addEventListener((clusteredEntities, cluster) => {
       const players: Player[] = clusteredEntities.map(e => {
         return {
@@ -102,37 +99,20 @@ class PlayerActivityPlugin {
           team: e.properties?.team.getValue(),
         };
       });
-      cluster.label.show = false;
+      cluster.label.show = true;
+      cluster.label.text = players.map(p => p.name).join("\n");
+      cluster.label.font = "16px coda_regular, arial, helvetica, sans-serif";
+      cluster.label.verticalOrigin = Cesium.VerticalOrigin.CENTER;
+      cluster.label.horizontalOrigin = players[0].team === "ENLIGHTENED" ? Cesium.HorizontalOrigin.LEFT : Cesium.HorizontalOrigin.RIGHT;
+      cluster.label.pixelOffset = players[0].team === "ENLIGHTENED" ? new Cesium.Cartesian2(25, 0) : new Cesium.Cartesian2(-25, 0);
+      cluster.label.eyeOffset = new Cesium.Cartesian3(0, 0, -2);
+      cluster.label.fillColor = getTeamColor(players[0].team);
+      cluster.label.outlineColor = Cesium.Color.BLACK;
+      cluster.label.outlineWidth = 6;
+      cluster.label.style = Cesium.LabelStyle.FILL_AND_OUTLINE;
       cluster.billboard.show = true;
-      cluster.billboard.id = cluster;
-      cluster.billboard.image = this.buildCanvas(players)?.toDataURL() || "";
+      cluster.billboard.image = this.buildCanvas()?.toDataURL() || "";
       cluster.billboard.eyeOffset = new Cesium.Cartesian3(0, 0, -2);
-
-      // Loop through all entities assigned to this cluster and hide their original billboards
-      clusteredEntities.forEach(entity => {
-        if (entity.billboard) {
-          entity.billboard.show = new Cesium.ConstantProperty(false);
-          hiddenEntities.add(entity);
-        }
-      });
-    });
-
-    // Temporary solution to show declustered player locations when moving
-    this.viewer?.camera.moveStart.addEventListener(function() {
-      hiddenEntities.forEach(entity => {
-        if (entity.billboard) {
-          entity.billboard.show = new Cesium.ConstantProperty(true);
-          hiddenEntities.delete(entity);
-        }
-      });
-    });
-    this.viewer?.camera.moveEnd.addEventListener(function() {
-      hiddenEntities.forEach(entity => {
-        if (entity.billboard) {
-          entity.billboard.show = new Cesium.ConstantProperty(true);
-          hiddenEntities.delete(entity);
-        }
-      });
     });
   }
 
@@ -210,16 +190,21 @@ class PlayerActivityPlugin {
       if (!entity) {
         entity = source.entities.add({
           position: lastPosition,
-          point: {
-            pixelSize: 1,
-            color: Cesium.Color.TRANSPARENT // Completely hidden, used only as a mathematical anchor
+          label: {
+            text: playerName,
+            font: "16px coda_regular, arial, helvetica, sans-serif",
+            verticalOrigin: Cesium.VerticalOrigin.CENTER,
+            horizontalOrigin: lastActivity.team === "ENLIGHTENED" ? Cesium.HorizontalOrigin.LEFT : Cesium.HorizontalOrigin.RIGHT,
+            pixelOffset: lastActivity.team === "ENLIGHTENED" ? new Cesium.Cartesian2(25, 0) : new Cesium.Cartesian2(-25, 0),
+            eyeOffset: new Cesium.Cartesian3(0, 0, -2),
+            fillColor: getTeamColor(lastActivity.team),
+            outlineColor: Cesium.Color.BLACK,
+            outlineWidth: 6,
+            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
           },
           billboard: {
-            image: this.buildCanvas([{ name: playerName, team: lastActivity.team }]),
+            image: this.buildCanvas(),
             eyeOffset: new Cesium.Cartesian3(0, 0, -2),
-            width: 5.12,
-            height: 5.12,
-            scale: 100,
           },
           properties: {
             name: playerName,
@@ -265,9 +250,9 @@ class PlayerActivityPlugin {
     });
   }
 
-  private buildCanvas(players: Player[]): HTMLCanvasElement | undefined {
-    const CANVAS_PX = 512;    // billboard size in screen pixels
-    const PADDING = 240;      // padding around the focus square
+  private buildCanvas(): HTMLCanvasElement | undefined {
+    const CANVAS_PX = 40;     // billboard size in screen pixels
+    const PADDING = 4;        // padding around the focus square
     const BRACKET_LEN = 0.16; // bracket arm as fraction of the canvas half-side
     const THICKNESS = 3;
     const BORDER = 4;
@@ -329,37 +314,6 @@ class PlayerActivityPlugin {
       ctx.strokeStyle = COLOR;
       ctx.lineWidth = THICKNESS;
       ctx.stroke();
-    }
-
-    // Compile names line by line
-    ctx.font = "16px coda_regular, arial, helvetica, sans-serif";
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.strokeStyle = "#000000";
-    ctx.lineWidth = BORDER;
-
-    // startY = half + fontSize / 2 - margin;
-    let startY = half + 8 - 3;
-    const lineSpacing = 20;
-
-    // Players are grouped by enlightened and resistance layers
-    // So we can infer properties from the first player of the list
-    const offset = players[0].team === "ENLIGHTENED" ? 24 : -24;
-    ctx.textAlign = players[0].team === "ENLIGHTENED" ? "left" : "right";
-    ctx.fillStyle = players[0].team === "ENLIGHTENED" ?
-      getTeamColor("ENLIGHTENED").toCssColorString() :
-      getTeamColor("RESISTANCE").toCssColorString();
-
-    players.slice(0, 5).forEach((player) => {
-      const labelText = player.name || "";
-      ctx.strokeText(labelText, half + offset, startY);
-      ctx.fillText(labelText, half + offset, startY);
-      startY += lineSpacing;
-    });
-
-    if (players.length > 5) {
-      ctx.strokeText(`(${players.length - 5} more)`, half + offset, startY);
-      ctx.fillText(`(${players.length - 5} more)`, half + offset, startY);
     }
 
     return canvas;

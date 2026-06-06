@@ -14,7 +14,7 @@ const GetLocationButton = ({ viewer }: {
           const height = 1800;
           viewer.camera.flyTo({
             destination: Cartesian3.fromDegrees(longitude, latitude, height),
-            duration: 3,
+            duration: 2.4,
           });
         },
         (error) => {
