@@ -17,15 +17,18 @@ class SamplePlugin {
   private viewer: IITCCore["viewer"];
   private logManager: IITCCore["logManager"];
 
+  // Your variables are set here
   private interval: number | undefined;
 
   public init() {
+    // Hire more managers here
     if (safeWindow) {
       const iitc: IITCCore = safeWindow.iitc;
       this.viewer = iitc.viewer!;
       this.logManager = iitc.logManager!;
     }
 
+    // Check for the core components here
     if (!this.viewer || !this.logManager) {
       console.warn("[WARN][SamplePlugin] IITC Next core components missing", {
         viewer: !!this.viewer,
@@ -34,19 +37,26 @@ class SamplePlugin {
       return;
     }
 
-    this.interval = window.setInterval(() => {
-      this.logManager!.info("SamplePlugin", "Sample plugin loaded");
-    }, 5000);
+    // Your code runs here
+    this.logEveryFiveSeconds();
   }
 
+  // Remember to remove the interval when deinitializing
   public deinit() {
     if (this.interval) {
       clearInterval(this.interval);
       this.interval = undefined;
     }
   }
+
+  private logEveryFiveSeconds() {
+    this.interval = window.setInterval(() => {
+      this.logManager!.info("SamplePlugin", "Sample plugin loaded");
+    }, 5000);
+  }
 }
 
+// Register yourself to IITC Next
 const register = () => {
   if (safeWindow && safeWindow.iitc && safeWindow.iitc.pluginManager) {
     safeWindow.iitc.pluginManager.registerPlugin(new SamplePlugin());
