@@ -39,10 +39,13 @@ import { calculateTileKeys, HEIGHT_AT_ZOOM_ZERO } from "../utils/viewer";
 // Tell Cesium where to find its assets (Images, Workers, etc.)
 // Since we use the CDN for the main library, we should also use it for assets.
 // @ts-expect-error - CESIUM_BASE_URL is a global config variable for Cesium
-window.CESIUM_BASE_URL = "https://cdn.jsdelivr.net/npm/cesium@1.141.0/Build/Cesium/";
+window.CESIUM_BASE_URL = "https://cdn.jsdelivr.net/npm/cesium@1.142.0/Build/Cesium/";
 
 // Default access token restricted to https://intel.ingress.com
 Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJkZGViN2YzNC1hYzgyLTQ2ZTQtYTEyMS0wZGYwOTY2ZWJiMzEiLCJpZCI6NDM1NTgyLCJzdWIiOiJob21hbncxMDQiLCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoiSUlUQyBOZXh0IiwiaWF0IjoxNzc5NTY3OTg4fQ.YBXp3trSarnjwb9R2G5sU57DC0VbI0iCJrZv7TyuZFk";
+
+// Storage key to save the base layer info
+const BASE_LAYER_STORAGE_KEY = "iitc-next-base-layer";
 
 let lastPortalData: PortalData | null;
 let lastLogMsg: string = "Loading...";
@@ -173,11 +176,20 @@ function initCesiumViewer(containerId: string): Cesium.Viewer {
 }
 
 /**
- * Sets the initial view of Cesium to the map position from url params or cookies.
+ * Sets the initial view of the Cesium viewer based on stored settings and map position.
  *
- * @param viewer - The Cesium.Viewer instance to apply changes to.
+ * @param viewer - The Cesium Viewer instance to modify.
  */
 function setInitialView(viewer: Cesium.Viewer): void {
+  const modelName = localStorage.getItem(BASE_LAYER_STORAGE_KEY);
+  const viewModel = viewer.baseLayerPicker.viewModel.imageryProviderViewModels.find(m => m.name === modelName);
+  if (viewModel) viewer.baseLayerPicker.viewModel.selectedImagery = viewModel;
+  document.querySelectorAll(".cesium-baseLayerPicker-item").forEach((item) => {
+    item.addEventListener("click", () => {
+      localStorage.setItem(BASE_LAYER_STORAGE_KEY, viewer.baseLayerPicker.viewModel.selectedImagery.name);
+    });
+  });
+
   const pos = getMapPosition();
   if (pos) {
     const height = HEIGHT_AT_ZOOM_ZERO / Math.pow(2, pos.zoom);
