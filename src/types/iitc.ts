@@ -20,7 +20,7 @@ import { InterfaceManager } from "../managers/interfaceManager";
 export interface IITCPlugin {
   id: string;
   name: string;
-  description?: string;
+  description: string;
   init: () => void;
   deinit?: () => void;
 }

@@ -55,7 +55,7 @@ const PluginDetailPane = ({ onClose }: {
           >
             <div>
               <div style={{ fontWeight: "bold" }}>{plugin.name}</div>
-              <div style={{ fontSize: "12px", color: "#aaa" }}>{plugin.id}</div>
+              <div style={{ fontSize: "12px", color: "#aaa" }}>{plugin.description}</div>
             </div>
             <input
               type="checkbox"
