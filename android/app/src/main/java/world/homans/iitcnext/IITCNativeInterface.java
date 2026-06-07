@@ -1,16 +1,21 @@
 package world.homans.iitcnext;
 
 import android.Manifest;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
 import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
+import androidx.core.content.FileProvider;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.util.Locale;
 
 public class IITCNativeInterface {
@@ -77,5 +82,35 @@ public class IITCNativeInterface {
         String js = String.format(Locale.US, "if (window.onAndroidLocation) window.onAndroidLocation(%f, %f, %f)",
                 location.getLatitude(), location.getLongitude(), location.getAccuracy());
         webView.evaluateJavascript(js, null);
+    }
+
+    @JavascriptInterface
+    public void saveFile(String content, String filename, String mimeType) {
+        webView.post(() -> {
+            try {
+                File cachePath = new File(webView.getContext().getCacheDir(), "exports");
+                cachePath.mkdirs();
+                File file = new File(cachePath, filename);
+                FileOutputStream stream = new FileOutputStream(file);
+                stream.write(content.getBytes());
+                stream.close();
+
+                Uri contentUri = FileProvider.getUriForFile(webView.getContext(),
+                        webView.getContext().getPackageName() + ".fileprovider", file);
+
+                if (contentUri != null) {
+                    Intent shareIntent = new Intent();
+                    shareIntent.setAction(Intent.ACTION_SEND);
+                    shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    shareIntent.setDataAndType(contentUri, mimeType);
+                    shareIntent.putExtra(Intent.EXTRA_STREAM, contentUri);
+                    shareIntent.setType(mimeType);
+
+                    webView.getContext().startActivity(Intent.createChooser(shareIntent, "Save/Share " + filename));
+                }
+            } catch (Exception e) {
+                Log.e("IITC-Next", "Error saving/sharing file", e);
+            }
+        });
     }
 }

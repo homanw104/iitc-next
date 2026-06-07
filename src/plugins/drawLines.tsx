@@ -265,6 +265,15 @@ class DrawLines {
     
     const entities = Array.from(this.dataSource.entities.values);
     const kml = this.writeLinesToKml(entities);
+
+    // Support for Android Wrapper
+    // @ts-expect-error support for Android wrapper
+    if (window.IITC_Native && window.IITC_Native.saveFile) {
+      // @ts-expect-error support for Android wrapper
+      window.IITC_Native.saveFile(kml, "draw-lines.kml", "application/vnd.google-earth.kml+xml");
+      return;
+    }
+
     const blob = new Blob([kml], { type: "application/vnd.google-earth.kml+xml" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
