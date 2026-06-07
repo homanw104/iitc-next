@@ -10,7 +10,7 @@ const PluginButtonContainer = () => (
       top: "41px",
       bottom: "41px",
       paddingTop: "72px",
-      width: "36px",
+      width: "38px",
       display: "flex",
       flexDirection: "column",
       alignItems: "center",
