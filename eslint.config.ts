@@ -21,7 +21,7 @@ export default defineConfig(
     },
     rules: {
       "semi": ["error", "always"],
-      "quotes": ["error", "double"]
+      "quotes": ["error", "double", { "allowTemplateLiterals": true }]
     }
   },
   {

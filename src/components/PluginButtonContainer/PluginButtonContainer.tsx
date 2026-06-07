@@ -15,6 +15,7 @@ const PluginButtonContainer = () => (
       flexDirection: "column",
       alignItems: "center",
       justifyContent: "flex-start",
+      gap: "2px",
     }}
   />
 ) as HTMLElement;
