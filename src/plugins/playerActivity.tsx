@@ -496,9 +496,9 @@ class PlayerActivityPlugin {
     this.tooltipEl.style.display = "block";
     this.tooltipEl.style.borderColor = getTeamColor(activities[0].team).toCssColorString();
     const container = this.interfaceManager?.getContainer();
-    if (container && container.clientWidth - movement.endPosition.x < 200) {
+    if (container && container.clientWidth - movement.endPosition.x - this.tooltipEl.clientWidth < 30) {
       this.tooltipEl.style.left = "";
-      this.tooltipEl.style.right = (container.clientWidth - movement.endPosition.x + 15) + "px";
+      this.tooltipEl.style.right = "15px";
     } else {
       this.tooltipEl.style.right = "";
       this.tooltipEl.style.left = (movement.endPosition.x + 15) + "px";
