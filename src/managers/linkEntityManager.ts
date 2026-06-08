@@ -67,7 +67,7 @@ export class LinkEntityManager {
 
   private createLinkEntity(data: LinkData): Cesium.Entity {
     const layerId = getLinkLayerId(data);
-    const entity = this.layerManager.getOrCreateSourceAndFilter(layerId).entities.add({
+    return this.layerManager.getOrCreateSourceAndFilter(layerId).entities.add({
       id: `link-${data.guid}`,
       polyline: {
         positions: Cesium.Cartesian3.fromDegreesArray([
@@ -78,9 +78,10 @@ export class LinkEntityManager {
         material: getTeamColor(data.team).withAlpha(0.7),
         arcType: Cesium.ArcType.GEODESIC,
       },
+      properties: {
+        selectable: false,
+      }
     });
-    (entity as any).selectable = false;
-    return entity;
   }
 
   private removeLinkEntityInView(viewRect: Cesium.Rectangle): void {

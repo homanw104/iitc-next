@@ -32,8 +32,10 @@ const init = async () => {
   // Halt if user isn't logged in
   if (!getPlayerInfo()) return;
 
-  // Initialize IITC Next
+  // Unload the original intel map
   unloadOriginalIntelMap();
+
+  // Initialize Cesium
   loadCesiumViewer();
 
   // Load all plugins

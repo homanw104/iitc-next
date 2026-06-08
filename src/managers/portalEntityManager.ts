@@ -115,6 +115,9 @@ export class PortalEntityManager {
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         translucencyByDistance: new Cesium.NearFarScalar(8e2, 1.0, 1.2e3, 0.0),
       },
+      properties: {
+        selectable: true,
+      },
     });
   }
 

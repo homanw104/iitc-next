@@ -86,7 +86,7 @@ export class DebugTileEntityManager {
 
     const color = this.getStatusColor(status);
 
-    const entity = new Cesium.Entity({
+    return new Cesium.Entity({
       rectangle: {
         coordinates: Cesium.Rectangle.fromDegrees(
           finalWest,
@@ -101,9 +101,10 @@ export class DebugTileEntityManager {
         outlineWidth: 2,
         height: 10,   // Slightly above ground to prevent z-fighting
       },
+      properties: {
+        selectable: false,
+      }
     });
-    (entity as any).selectable = false;
-    return entity;
   }
 
   /**

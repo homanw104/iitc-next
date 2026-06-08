@@ -74,7 +74,7 @@ class DrawLines {
     this.interfaceManager.mountSidebarButton(this.importLinesButtonEl);
 
     this.dataSource = this.layerManager.getOrCreateSourceAndFilter(LAYER_NAME);
-    this.handler = new Cesium.ScreenSpaceEventHandler(this.viewer?.scene.canvas);
+    this.handler = new Cesium.ScreenSpaceEventHandler(this.viewer.scene.canvas);
     this.bindEvents();
 
     // Restore from storage

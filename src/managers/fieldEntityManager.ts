@@ -62,16 +62,17 @@ export class FieldEntityManager {
   private createFieldEntity(data: FieldData): Cesium.Entity {
     const layerId = getFieldLayerId(data);
     const points = data.points.flatMap(p => [p.lngE6 / 1e6, p.latE6 / 1e6]);
-    const entity = this.layerManager.getOrCreateSourceAndFilter(layerId).entities.add({
+    return this.layerManager.getOrCreateSourceAndFilter(layerId).entities.add({
       id: `field-${data.guid}`,
       polygon: {
         hierarchy: new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray(points)),
         material: getTeamColor(data.team).withAlpha(0.2),
         outline: false,
       },
+      properties: {
+        selectable: false,
+      }
     });
-    (entity as any).selectable = false;
-    return entity;
   }
 
   private removeFieldEntityInView(viewRect: Cesium.Rectangle): void {
