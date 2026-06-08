@@ -69,29 +69,30 @@ export class CommManager {
     this.callbacks = this.callbacks.filter(cb => cb !== callback);
   }
 
-  public getMessages(channel: string, bounds?: { minLatE6: number; minLngE6: number; maxLatE6: number; maxLngE6: number }): Plext[] {
+  public getMessages(channel: string): Plext[] {
     const channelMessages = Array.from(this.messages[channel]?.values() || []);
+    const bounds = this.getBounds();
     if (!bounds) {
       return channelMessages.sort((a, b) => a.timestamp - b.timestamp);
-    }
-
-    return channelMessages.filter((m) => {
-      const portalMarkup = m.markup.find((markup) => {
-        return markup[0] === "PORTAL";
-      });
-      if (portalMarkup) {
-        const data = portalMarkup[1];
-        if (data.latE6 !== undefined && data.lngE6 !== undefined) {
-          return (
-            data.latE6 >= bounds.minLatE6 &&
-            data.latE6 <= bounds.maxLatE6 &&
-            data.lngE6 >= bounds.minLngE6 &&
-            data.lngE6 <= bounds.maxLngE6
-          );
+    } else {
+      return channelMessages.filter((m) => {
+        const portalMarkup = m.markup.find((markup) => {
+          return markup[0] === "PORTAL";
+        });
+        if (portalMarkup) {
+          const data = portalMarkup[1];
+          if (data.latE6 !== undefined && data.lngE6 !== undefined) {
+            return (
+              data.latE6 >= bounds.minLatE6 &&
+              data.latE6 <= bounds.maxLatE6 &&
+              data.lngE6 >= bounds.minLngE6 &&
+              data.lngE6 <= bounds.maxLngE6
+            );
+          }
         }
-      }
-      return true;  // System message with no coordinates or other type
-    }).sort((a, b) => a.timestamp - b.timestamp);
+        return true;  // System message with no coordinates or other type
+      }).sort((a, b) => a.timestamp - b.timestamp);
+    }
   }
 
   public async sendMessage(channel: string, message: string): Promise<void> {
@@ -142,7 +143,7 @@ export class CommManager {
       let ascendingTimestampOrder = false;
       let plextContinuationGuid: string | undefined = undefined;
 
-      const existing = Array.from(this.messages[channel].values());
+      const existing = this.getMessages(channel);
 
       if (existing.length > 0) {
         if (fetchOld) {
