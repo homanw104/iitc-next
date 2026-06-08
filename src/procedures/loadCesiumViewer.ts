@@ -49,6 +49,7 @@ const BASE_LAYER_STORAGE_KEY = "iitc-next-base-layer";
 
 let lastPortalData: PortalData | null;
 let lastLogMsg: string = "Loading...";
+let lastTouchPosition: Cesium.Cartesian2 | null;
 
 /**
  * Creates a Cesium container as an HTMLDivElement and appends it to the body.
@@ -226,8 +227,9 @@ function setupGoogleMapsGestures(viewer: Cesium.Viewer): void {
   };
 
   // Touch start callback
-  handler.setInputAction(() => {
+  handler.setInputAction((event: Cesium.ScreenSpaceEventHandler.PositionedEvent) => {
     stopMomentum();
+    lastTouchPosition = event.position;
     const now = Date.now();
     if (now - lastTapTime < doubleTapThreshold) {
       isDoubleTapping = true;
@@ -247,12 +249,12 @@ function setupGoogleMapsGestures(viewer: Cesium.Viewer): void {
   }, Cesium.ScreenSpaceEventType.LEFT_DOWN);
 
   // Drag callbacks
-  handler.setInputAction((movement: { startPosition: Cesium.Cartesian2; endPosition: Cesium.Cartesian2 }) => {
+  handler.setInputAction((event: Cesium.ScreenSpaceEventHandler.MotionEvent) => {
     if (isDoubleTapping) {
       const now = Date.now();
       const dt = now - lastMoveTime;
-      const dx = movement.endPosition.x - movement.startPosition.x;
-      const dy = movement.endPosition.y - movement.startPosition.y;
+      const dx = event.endPosition.x - event.startPosition.x;
+      const dy = event.endPosition.y - event.startPosition.y;
 
       if (Math.sqrt(dx * dx + dy * dy) > 5) hasMovedDuringDoubleTap = true;
 
@@ -268,14 +270,25 @@ function setupGoogleMapsGestures(viewer: Cesium.Viewer): void {
       }
       lastMoveTime = now;
 
-      const height = viewer.camera.positionCartographic.height;
-      const zoomFactor = height * 0.003;
-      viewer.camera.zoomIn(dy * zoomFactor);
+      // Zoom based on last touch position
+      if (lastTouchPosition) {
+        const camera = viewer.camera;
+        const height = camera.positionCartographic.height;
+        const zoomFactor = height * 0.003;
+        const amount = dy * zoomFactor;
+        
+        const target = camera.pickEllipsoid(lastTouchPosition, viewer.scene.globe.ellipsoid);
+        if (target) {
+          const direction = Cesium.Cartesian3.subtract(target, camera.position, new Cesium.Cartesian3());
+          Cesium.Cartesian3.normalize(direction, direction);
+          camera.move(direction, amount);
+        }
+      }
     }
   }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
 
   // Touch end callback
-  handler.setInputAction(() => {
+  handler.setInputAction((event: Cesium.ScreenSpaceEventHandler.PositionedEvent) => {
     if (isDoubleTapping) {
       isDoubleTapping = false;
 
@@ -284,19 +297,18 @@ function setupGoogleMapsGestures(viewer: Cesium.Viewer): void {
         const camera = viewer.camera;
         const height = camera.positionCartographic.height;
         const targetHeight = height * 0.5;
-        const destination = Cesium.Cartesian3.fromRadians(
-          camera.positionCartographic.longitude,
-          camera.positionCartographic.latitude,
-          targetHeight
-        );
-
-        camera.flyTo({
-          destination,
-          duration: 0.5,
-          complete: () => {
-            controller.enableInputs = true;
-          }
-        });
+        const destination = viewer.camera.pickEllipsoid(event.position, viewer.scene.globe.ellipsoid);
+        if (destination) {
+          const cartographic = Cesium.Cartographic.fromCartesian(destination);
+          cartographic.height = targetHeight;
+          camera.flyTo({
+            destination: Cesium.Cartographic.toCartesian(cartographic),
+            duration: 0.5,
+            complete: () => {
+              controller.enableInputs = true;
+            }
+          });
+        }
       } else if (Math.abs(zoomVelocity) > 0.1) {
         // Apply momentum if velocity is significant
         let lastFrameTime = Date.now();
@@ -315,7 +327,16 @@ function setupGoogleMapsGestures(viewer: Cesium.Viewer): void {
           const camera = viewer.camera;
           const height = camera.positionCartographic.height;
           const zoomFactor = height * 0.003;
-          camera.zoomIn(dy * zoomFactor);
+          const amount = dy * zoomFactor;
+
+          if (lastTouchPosition) {
+            const target = camera.pickEllipsoid(lastTouchPosition, viewer.scene.globe.ellipsoid);
+            if (target) {
+              const direction = Cesium.Cartesian3.subtract(target, camera.position, new Cesium.Cartesian3());
+              Cesium.Cartesian3.normalize(direction, direction);
+              camera.move(direction, amount);
+            }
+          }
 
           // Decelerate
           zoomVelocity *= 0.92;
@@ -333,8 +354,8 @@ function setupGoogleMapsGestures(viewer: Cesium.Viewer): void {
 
     // Restore move momentum after a while
     inertiaResetTimeoutId = setTimeout(() => {
-      viewer.scene.screenSpaceCameraController.inertiaSpin = 0.9;
-      viewer.scene.screenSpaceCameraController.inertiaTranslate = 0.9;
+      viewer.scene.screenSpaceCameraController.inertiaSpin = 0.9;       // Cesium's default
+      viewer.scene.screenSpaceCameraController.inertiaTranslate = 0.9;  // Cesium's default
       inertiaResetTimeoutId = null;
     }, 1000);
   }, Cesium.ScreenSpaceEventType.LEFT_UP);
