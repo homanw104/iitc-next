@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.1.0
+
+* Added "Draw Lines" plugin with import/export
+* Base layer chooser now remembers your choice
+* Comm pane now shows messages only in viewport bounds
+* Zooming gestures now use touch position as the center point
+* Plugin Pane now shows the description instead of ID
+* Fixed Player Activity plugin not deinitialized properly
+* Fixed Player Activity plugin tooltips not updated over time
+* Fixed Player Activity plugin tooltips distorted at the right screen edge
+* Other minor improvements
+
 ## 1.0.3
 
 * Player Activity Plugin: Added hover for detail
