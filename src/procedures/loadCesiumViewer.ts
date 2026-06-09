@@ -683,6 +683,11 @@ export default function loadCesiumViewer(): void {
   // Disable default pinch tilt and rotate
   viewer.scene.screenSpaceCameraController.enableTilt = false;
   viewer.scene.screenSpaceCameraController.enableLook = false;
-  viewer.scene.screenSpaceCameraController.enableZoom = false;
+
+  // By default, Cesium uses PINCH for zoom. We want to use our own pinch zoom.
+  // But we still want to keep mouse wheel zoom.
+  // So we clear the pinch event type from zoomEventTypes.
+  viewer.scene.screenSpaceCameraController.zoomEventTypes = [Cesium.CameraEventType.WHEEL];
+
   // viewer.scene.screenSpaceCameraController.enableRotate = false; // We need this for single finger pan
 }
