@@ -4,7 +4,7 @@
 
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import * as Cesium from "cesium";
-import { Cartesian3 } from "cesium";
+import { Cartesian3, ScreenSpaceEventType } from "cesium";
 import { IITCCore } from "../types/iitc";
 import { PortalData } from "../types/ingress";
 import { getMapPosition } from "../utils/browser";
@@ -66,7 +66,7 @@ function createCesiumContainer(): HTMLDivElement {
   return container;
 }
 
-function initCesiumViewer(containerId: string): Cesium.Viewer {
+function initCesiumViewer(container: string): Cesium.Viewer {
   const gaodeSatelliteViewModel = new Cesium.ProviderViewModel({
     name: "Gaode Satellite",
     iconUrl: Cesium.buildModuleUrl("Widgets/Images/ImageryProviders/bingAerial.png"),
@@ -99,7 +99,7 @@ function initCesiumViewer(containerId: string): Cesium.Viewer {
     }
   });
 
-  const viewer = new Cesium.Viewer(containerId, {
+  const viewer = new Cesium.Viewer(container, {
     animation: false,
     timeline: false,
     homeButton: false,
@@ -194,9 +194,8 @@ function setupInteractionHandlers(
   scoutHistoryEntityManager: ScoutHistoryEntityManager,
   state: { lastPortalData: PortalData | null; lastLogMsg: string; portalDetailBar: HTMLElement | null },
 ): void {
-  const scene = viewer.scene;
   const handler = viewer.screenSpaceEventHandler;
-  const controller = scene.screenSpaceCameraController;
+  const controller = viewer.scene.screenSpaceCameraController;
 
   let lastTapTime = 0;
   let lastMoveTime = 0;
@@ -451,38 +450,156 @@ function setupInteractionHandlers(
   }, Cesium.ScreenSpaceEventType.LEFT_UP);
 }
 
-/**
- * Trigger loading of tiles.
- *
- * @param viewer - Cesium viewer to calculate view range.
- * @param tileRequestManager - Tile manager to add and process tiles.
- */
-const triggerDataLoad = (viewer: Cesium.Viewer, tileRequestManager: TileRequestManager) => {
-  const tileKeys = calculateTileKeys(viewer);
+function setupPinchInteractionHandlers(viewer: Cesium.Viewer) {
+  const handler = viewer.screenSpaceEventHandler;
+  const camera = viewer.camera;
 
-  if (tileKeys.length > 0) {
-    tileRequestManager.addTiles(tileKeys);
-  }
-};
+  let pinchMode: "zoom" | "rotate" | "tilt" = "zoom";
+  let totalZoomDelta = 0;
+  let totalAngleDelta = 0;
+  let totalHeightDelta = 0;
 
-/**
- * Sets up data loading for the tile manager.
- *
- * @param viewer - The Cesium.Viewer instance to listen for camera changes.
- * @param tileRequestManager - The TileRequestManager instance to add tiles to.
- */
-function setupDataLoading(viewer: Cesium.Viewer, tileRequestManager: TileRequestManager): void {
-  viewer.camera.moveEnd.addEventListener(() => triggerDataLoad(viewer, tileRequestManager));
+  const ZOOM_THRESHOLD = 5.0;     // pixels
+  const ROTATE_THRESHOLD = 0.1;   // radians
+  const TILT_THRESHOLD = 5.0;     // relative height delta
+  const MIN_PITCH = Cesium.Math.toRadians(-90);
+  const MAX_PITCH = Cesium.Math.toRadians(-60);
+
+  // Pinch start callback
+  handler.setInputAction(() => {
+    pinchMode = "zoom";
+    totalZoomDelta = 0;
+    totalAngleDelta = 0;
+    totalHeightDelta = 0;
+  }, ScreenSpaceEventType.PINCH_START);
+
+  // Pinch move callback - handles rotation and tilting
+  // @ts-expect-error - Cesium type definitions are incorrect
+  handler.setInputAction((event: {
+    distance: { startPosition: Cesium.Cartesian2; endPosition: Cesium.Cartesian2 };
+    angleAndHeight: { startPosition: Cesium.Cartesian2; endPosition: Cesium.Cartesian2 };
+  }) => {
+    // We need the internal handler to get the absolute positions
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const handlerInternal = handler as any;
+    const positions = handlerInternal._positions;
+    const previousPositions = handlerInternal._previousPositions;
+    const position1 = positions.values[0];
+    const position2 = positions.values[1];
+    const previousPosition1 = previousPositions.values[0];
+    const previousPosition2 = previousPositions.values[1];
+
+    // Calculate the center of the two fingers now and previously
+    const avgPosition = { x: (position1.x + position2.x) / 2, y: (position1.y + position2.y) / 2 };
+    const previousAvgPosition = { x: (previousPosition1.x + previousPosition2.x) / 2, y: (previousPosition1.y + previousPosition2.y) / 2 };
+
+    // Calculate the midpoint we need to rotate
+    const centerPosition = new Cesium.Cartesian2(
+      (avgPosition.x + previousAvgPosition.x) / 2,
+      (avgPosition.y + previousAvgPosition.y) / 2
+    );
+
+    // Calculate deltas
+    const zoomDelta = event.distance.endPosition.y - event.distance.startPosition.y;
+    let angleDelta = event.angleAndHeight.endPosition.x - event.angleAndHeight.startPosition.x;
+    const heightDelta = event.angleAndHeight.endPosition.y - event.angleAndHeight.startPosition.y;
+
+    // Clip angleDelta between -PI and PI
+    if (angleDelta > Math.PI) {
+      angleDelta -= 2 * Math.PI;
+    } else if (angleDelta < -Math.PI) {
+      angleDelta += 2 * Math.PI;
+    }
+
+    totalZoomDelta += Math.abs(zoomDelta);  // UX optimization
+    totalAngleDelta += angleDelta;
+    totalHeightDelta += heightDelta;
+
+    if (pinchMode === "zoom") {
+      if (Math.abs(totalZoomDelta) > ZOOM_THRESHOLD) {
+        pinchMode = "zoom";
+      } else if (Math.abs(totalHeightDelta) > TILT_THRESHOLD) {
+        pinchMode = "tilt";
+      } else if (Math.abs(totalAngleDelta) > ROTATE_THRESHOLD) {
+        pinchMode = "rotate";
+      }
+    }
+
+    if (pinchMode === "zoom" || pinchMode === "rotate") {
+      const center = camera.pickEllipsoid(centerPosition, viewer.scene.globe.ellipsoid);
+
+      if (center) {
+        // Pan to follow midpoint movement dynamically
+        const dx = avgPosition.x - previousAvgPosition.x;
+        const dy = avgPosition.y - previousAvgPosition.y;
+
+        if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
+          const height = camera.positionCartographic.height;
+          const pixelScale = height * 0.001;
+          camera.moveRight(-dx * pixelScale);
+          camera.moveUp(dy * pixelScale);
+        }
+
+        // Zoom
+        const currentDistance = Cesium.Cartesian2.distance(position1, position2);
+        const previousDistance = Cesium.Cartesian2.distance(previousPosition1, previousPosition2);
+        const distanceDelta = currentDistance - previousDistance;
+
+        if (Math.abs(distanceDelta) > 0) {
+          const height = camera.positionCartographic.height;
+          const zoomFactor = height * 0.005;
+          const direction = Cesium.Cartesian3.subtract(center, camera.position, new Cesium.Cartesian3());
+          Cesium.Cartesian3.normalize(direction, direction);
+          camera.move(direction, distanceDelta * zoomFactor);
+        }
+
+        // Rotate
+        if (pinchMode === "rotate") {
+          const transform = Cesium.Transforms.eastNorthUpToFixedFrame(center);
+          camera.lookAtTransform(transform);
+          camera.rotateRight(angleDelta * 0.6);
+          camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+        }
+      }
+    }
+
+    if (pinchMode === "tilt") {
+      const tiltAmount = heightDelta * 0.02;
+      const currentPitch = camera.pitch;
+
+      // Cesium pitch: 0 is horizontal (looking at the horizon), -90 is looking down (-PI/2).
+      // Constraint: -90 to -60 degrees from horizontal (30 degrees from vertical).
+
+      let actualTiltAmount = tiltAmount;
+      const targetPitch = currentPitch - tiltAmount; // rotateDown(tiltAmount) decreases pitch
+      if (targetPitch > MAX_PITCH) {
+        actualTiltAmount = currentPitch - MAX_PITCH;
+      } else if (targetPitch < MIN_PITCH) {
+        actualTiltAmount = currentPitch - MIN_PITCH;
+      }
+
+      if (Math.abs(actualTiltAmount) > 0) {
+        const canvas = viewer.scene.canvas;
+        const center = camera.pickEllipsoid(new Cesium.Cartesian2(canvas.clientWidth / 2, canvas.clientHeight / 2), viewer.scene.globe.ellipsoid);
+
+        if (center) {
+          const transform = Cesium.Transforms.eastNorthUpToFixedFrame(center);
+          camera.lookAtTransform(transform);
+          camera.rotateDown(actualTiltAmount);
+          camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+        }
+      }
+    }
+  }, ScreenSpaceEventType.PINCH_MOVE);
 }
 
-/**
- * Loads and initializes a Cesium viewer.
- *
- * This function sets up the viewer by creating a container,
- * initializing the viewer, setting the initial view, managing entities,
- * tiles, debugging, adding a layer chooser, handling click events, and
- * setting up data loading.
- */
+function setupDataLoading(viewer: Cesium.Viewer, tileRequestManager: TileRequestManager): void {
+  viewer.camera.moveEnd.addEventListener(() => {
+    const tileKeys = calculateTileKeys(viewer);
+    if (tileKeys.length > 0) tileRequestManager.addTiles(tileKeys);
+  });
+}
+
 export default function loadCesiumViewer(): void {
   logManager.debug("CesiumViewer", "Loading");
 
@@ -530,25 +647,36 @@ export default function loadCesiumViewer(): void {
   const layerChooserPaneUI = new LayerChooserPaneUI(container, layerManager);
 
   const state = {
-    lastPortalData: null as PortalData | null,
     lastLogMsg: "Loading...",
+    lastPortalData: null as PortalData | null,
     portalDetailBar: null as HTMLElement | null,
   };
 
   state.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailUI }));
+  container.appendChild(GetLocationButton({ viewer }));
   container.appendChild(SoftRefreshButton({ refreshPaneUI }));
   container.appendChild(CommDetailButton({ commDetailPaneUI }));
-  container.appendChild(GameDetailButton({ gameDetailPaneUI }));
   container.appendChild(LayerChooserButton({ layerChooserPaneUI }));
-  container.appendChild(GetLocationButton({ viewer }));
+  container.appendChild(GameDetailButton({ gameDetailPaneUI }));
 
   logManager.setCallback((msg: string) => {
     state.lastLogMsg = msg;
     state.portalDetailBar?.remove();
-    if (state.lastPortalData) state.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailUI, data: state.lastPortalData }));
-    else state.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailUI, msg: state.lastLogMsg }));
+    
+    if (state.lastPortalData) {
+      state.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailUI, data: state.lastPortalData }));
+    } else {
+      state.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailUI, msg: state.lastLogMsg }));
+    }
   });
 
   setupInteractionHandlers(viewer, container, portalDetailUI, layerManager, portalEntityManager, portalHistoryEntityManager, scoutHistoryEntityManager, state);
+  setupPinchInteractionHandlers(viewer);
   setupDataLoading(viewer, tileRequestManager);
+
+  // Disable default pinch tilt and rotate
+  viewer.scene.screenSpaceCameraController.enableTilt = false;
+  viewer.scene.screenSpaceCameraController.enableLook = false;
+  viewer.scene.screenSpaceCameraController.enableZoom = false;
+  // viewer.scene.screenSpaceCameraController.enableRotate = false; // We need this for single finger pan
 }
