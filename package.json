@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "cap:sync": "cap sync",
-    "cap:open:android": "cap open android"
+    "cap:open:android": "cap open android",
+    "cap:open:ios": "cap open ios"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -30,6 +31,7 @@
     "@capacitor/android": "^8.4.0",
     "@capacitor/cli": "^8.4.0",
     "@capacitor/core": "^8.4.0",
+    "@capacitor/ios": "^8.4.0",
     "@capacitor/preferences": "^8.0.1",
     "cesium": "^1.142.0"
   }

@@ -21,6 +21,8 @@ const config: CapacitorConfig = {
       "*.googleapis.com",
       "nianticspatial.com",
       "*.nianticspatial.com",
+      "nianticlabs.com",
+      "*.nianticlabs.com",
       "iitc-next.local"
     ]
   },
