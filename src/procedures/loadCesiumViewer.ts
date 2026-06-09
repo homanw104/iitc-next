@@ -201,11 +201,14 @@ function setupInteractionHandlers(
   let lastMoveTime = 0;
   let zoomVelocity = 0;
 
-  // Variable for remembering the total movement length
-  let totalMovementLength: number = 0;
+  // Variable for the pinch gesture
+  let isPinching = false;
 
   // Variable for remembering the zoom center location
   let lastTapPosition: Cesium.Cartesian2 | null = null;
+
+  // Variable for triggering the double tap and drag to zoom
+  let totalMovementLength: number = 0;
 
   // Variables for the double tap and drag gesture
   let isDuringTheTap = false;
@@ -284,7 +287,7 @@ function setupInteractionHandlers(
 
       // Show portal data on the bar if not double-tapped
       setTimeout(() => {
-        if (hasJustDoubleTapped || isDuringTheTap) {
+        if (hasJustDoubleTapped || isDuringTheTap || isPinching) {
           // pass
         } else {
           console.log("showing details in the portal detail bar...");
@@ -300,7 +303,7 @@ function setupInteractionHandlers(
       portalEntityManager.requestPortalDetails(portalGuid).then(() => {
         // Select and display portal detail if not canceled
         setTimeout(() => {
-          if (hasCancelledDisplayPortalDetail || hasJustDoubleTapped || isDuringTheTap) {
+          if (hasCancelledDisplayPortalDetail || hasJustDoubleTapped || isDuringTheTap || isPinching) {
             hasCancelledDisplayPortalDetail = false;
           } else {
             const freshData = portalEntityManager.getPortalData(portalGuid);
@@ -322,7 +325,7 @@ function setupInteractionHandlers(
     } else {
       // Deselect if not double-tapped
       setTimeout(() => {
-        if (hasJustDoubleTapped || isDuringTheTap) return;
+        if (hasJustDoubleTapped || isDuringTheTap || isPinching) return;
         viewer.selectedEntity = undefined;
         state.lastPortalData = null;
         state.portalDetailBar?.remove();
@@ -448,10 +451,8 @@ function setupInteractionHandlers(
       inertiaResetTimeoutId = null;
     }, 1500);
   }, Cesium.ScreenSpaceEventType.LEFT_UP);
-}
 
-function setupPinchInteractionHandlers(viewer: Cesium.Viewer) {
-  const handler = viewer.screenSpaceEventHandler;
+  // Pinch related settings below
   const camera = viewer.camera;
 
   let pinchMode: "zoom" | "rotate" | "tilt" = "zoom";
@@ -467,6 +468,7 @@ function setupPinchInteractionHandlers(viewer: Cesium.Viewer) {
 
   // Pinch start callback
   handler.setInputAction(() => {
+    isPinching = true;
     pinchMode = "zoom";
     totalZoomDelta = 0;
     totalAngleDelta = 0;
@@ -591,6 +593,11 @@ function setupPinchInteractionHandlers(viewer: Cesium.Viewer) {
       }
     }
   }, ScreenSpaceEventType.PINCH_MOVE);
+
+  // Pinch end callback
+  handler.setInputAction(() => {
+    isPinching = false;
+  }, ScreenSpaceEventType.PINCH_END);
 }
 
 function setupDataLoading(viewer: Cesium.Viewer, tileRequestManager: TileRequestManager): void {
@@ -671,7 +678,6 @@ export default function loadCesiumViewer(): void {
   });
 
   setupInteractionHandlers(viewer, container, portalDetailUI, layerManager, portalEntityManager, portalHistoryEntityManager, scoutHistoryEntityManager, state);
-  setupPinchInteractionHandlers(viewer);
   setupDataLoading(viewer, tileRequestManager);
 
   // Disable default pinch tilt and rotate
