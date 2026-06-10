@@ -102,11 +102,19 @@ public class ScriptInjector {
         if (userScript == null) return "";
 
         String cesiumBaseUrl = cesiumJs.substring(0, cesiumJs.lastIndexOf("/") + 1);
+        String cesiumJsLiteral = JSONObject.quote(cesiumJs);
+        String cesiumCssLiteral = JSONObject.quote(cesiumCss);
+        String systemJsLiteral = JSONObject.quote(systemJs);
+        String systemNamedRegisterLiteral = JSONObject.quote(systemNamedRegister);
+        String cesiumBaseUrlLiteral = JSONObject.quote(cesiumBaseUrl);
+        String scriptNameLiteral = JSONObject.quote(scriptName);
+        String scriptVersionLiteral = JSONObject.quote(scriptVersion);
 
         return "javascript:(function() { " +
             "try { " +
             "  if (window.IITC_NEXT_INJECTED) return; " +
-            "  window.IITC_NEXT_INJECTED = true; " +
+            "  if (window.IITC_NEXT_INJECTING) return; " +
+            "  window.IITC_NEXT_INJECTING = true; " +
             "  window.unsafeWindow = window; " + // Provide unsafeWindow fallback
 
             "  if (window.IITC_Native) { " +
@@ -119,24 +127,28 @@ public class ScriptInjector {
             "  } " +
 
             "  var l = document.createElement('link'); " +
-            "  l.rel = 'stylesheet'; l.href = '" + cesiumCss + "'; " +
+            "  l.rel = 'stylesheet'; l.href = " + cesiumCssLiteral + "; " +
             "  (document.head || document.documentElement).appendChild(l); " +
 
             "  function addScript(src, cb) { " +
             "    var s = document.createElement('script'); " +
             "    s.type = 'text/javascript'; s.src = src; " +
             "    if (cb) s.onload = cb; " +
+            "    s.onerror = function() { " +
+            "      window.IITC_NEXT_INJECTING = false; " +
+            "      console.error('IITC-Next: Failed to load dependency:', src); " +
+            "    }; " +
             "    (document.head || document.documentElement).appendChild(s); " +
             "  } " +
 
-            "  addScript('" + cesiumJs + "'); " +
-            "  addScript('" + systemJs + "', function() { " +
-            "    addScript('" + systemNamedRegister + "', function() { " +
+            "  window.CESIUM_BASE_URL = " + cesiumBaseUrlLiteral + "; " +
+            "  addScript(" + cesiumJsLiteral + "); " +
+            "  addScript(" + systemJsLiteral + ", function() { " +
+            "    addScript(" + systemNamedRegisterLiteral + ", function() { " +
             "      var checkCesium = setInterval(function() { " +
             "        if (typeof Cesium !== 'undefined') { " +
             "          clearInterval(checkCesium); " +
-            "          window.CESIUM_BASE_URL = '" + cesiumBaseUrl + "'; " +
-            "          window.GM_info = { script: { name: '" + scriptName + "', version: '" + scriptVersion + "' } }; " +
+            "          window.GM_info = { script: { name: " + scriptNameLiteral + ", version: " + scriptVersionLiteral + " } }; " +
             "          window.GM_addStyle = window.GM_addStyle || function(css) { " +
             "            var style = document.createElement('style'); " +
             "            style.type = 'text/css'; " +
@@ -149,11 +161,23 @@ public class ScriptInjector {
             "          s.type = 'text/javascript'; " +
             "          s.textContent = " + JSONObject.quote(userScript) + "; " +
             "          (document.head || document.documentElement).appendChild(s); " +
+            "          window.IITC_NEXT_INJECTED = true; " +
+            "          window.IITC_NEXT_INJECTING = false; " +
             "        } " +
             "      }, 100); " +
+            "      setTimeout(function() { " +
+            "        if (!window.IITC_NEXT_INJECTED) { " +
+            "          clearInterval(checkCesium); " +
+            "          window.IITC_NEXT_INJECTING = false; " +
+            "          console.error('IITC-Next: Timed out waiting for Cesium'); " +
+            "        } " +
+            "      }, 15000); " +
             "    }); " +
             "  }); " +
-            "} catch(e) { /* ignore injection errors */ } " +
+            "} catch(e) { " +
+            "  window.IITC_NEXT_INJECTING = false; " +
+            "  console.error('IITC-Next injection error:', e); " +
+            "} " +
             "})();";
     }
 }
