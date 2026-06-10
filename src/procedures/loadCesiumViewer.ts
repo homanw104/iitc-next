@@ -501,9 +501,9 @@ function setupInteractionHandlers(
   let totalAngleDelta = 0;
   let totalHeightDelta = 0;
 
-  const ZOOM_THRESHOLD = 5.0;     // pixels
+  const ZOOM_THRESHOLD = 6.0;     // pixels
   const ROTATE_THRESHOLD = 0.1;   // radians
-  const TILT_THRESHOLD = 5.0;     // relative height delta
+  const TILT_THRESHOLD = 4.0;     // relative height delta
   const MIN_PITCH = Cesium.Math.toRadians(-90);
   const MAX_PITCH = Cesium.Math.toRadians(-60);
 
@@ -545,6 +545,7 @@ function setupInteractionHandlers(
       (position1.x + position2.x) / 2,
       (position1.y + position2.y) / 2
     );
+
     const previousAvgPosition = new Cesium.Cartesian2(
       (previousPosition1.x + previousPosition2.x) / 2,
       (previousPosition1.y + previousPosition2.y) / 2
@@ -568,12 +569,12 @@ function setupInteractionHandlers(
       angleDelta += 2 * Math.PI;
     }
 
-    totalZoomDelta += Math.abs(zoomDelta);  // UX optimization
+    totalZoomDelta += Math.abs(zoomDelta);    // UX optimization, calculates the absolute total
     totalAngleDelta += angleDelta;
     totalHeightDelta += heightDelta;
 
     if (pinchMode === "zoom") {
-      if (Math.abs(totalZoomDelta) > ZOOM_THRESHOLD) {
+      if (totalZoomDelta > ZOOM_THRESHOLD) {  // Locked to zoom here, thus zoom threshold should be a little higher than tilt threshold
         pinchMode = "zoom";
       } else if (Math.abs(totalHeightDelta) > TILT_THRESHOLD) {
         pinchMode = "tilt";
