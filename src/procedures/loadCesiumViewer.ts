@@ -200,10 +200,13 @@ function setupInteractionHandlers(
 
   let lastTapTime = 0;
   let lastMoveTime = 0;
+  let lastPinchMoveTime = 0;
   let zoomVelocity = 0;
+  let pinchZoomVelocity = 0;
 
   // Variable for remembering the zoom center location
   let lastTapPosition: Cesium.Cartesian2 | null = null;
+  let lastPinchCenter: Cesium.Cartesian3 | null = null;
 
   // Variable for triggering the double tap and drag to zoom
   let totalMovementLength: number = 0;
@@ -433,7 +436,7 @@ function setupInteractionHandlers(
           }
 
           // Decelerate
-          zoomVelocity *= 0.92;
+          zoomVelocity *= 0.84;
 
           momentumRequestId = requestAnimationFrame(animateMomentum);
         };
@@ -476,6 +479,14 @@ function setupInteractionHandlers(
     totalZoomDelta = 0;
     totalAngleDelta = 0;
     totalHeightDelta = 0;
+    pinchZoomVelocity = 0;
+    lastPinchMoveTime = Date.now();
+
+    // Cancel all existing momentum when pinch start
+    if (momentumRequestId) {
+      cancelAnimationFrame(momentumRequestId);
+      momentumRequestId = null;
+    }
   }, ScreenSpaceEventType.PINCH_START);
 
   // Pinch move callback - handles rotation and tilting
@@ -534,6 +545,8 @@ function setupInteractionHandlers(
       const center = camera.pickEllipsoid(centerPosition, viewer.scene.globe.ellipsoid);
 
       if (center) {
+        lastPinchCenter = center;
+
         // Pan to follow midpoint movement dynamically
         const dx = avgPosition.x - previousAvgPosition.x;
         const dy = avgPosition.y - previousAvgPosition.y;
@@ -551,6 +564,15 @@ function setupInteractionHandlers(
         const distanceDelta = currentDistance - previousDistance;
 
         if (Math.abs(distanceDelta) > 0) {
+          const now = Date.now();
+          const dt = now - lastPinchMoveTime;
+          lastPinchMoveTime = now;
+
+          if (dt > 0) {
+            const currentVelocity = distanceDelta / dt;
+            pinchZoomVelocity = pinchZoomVelocity * 0.4 + currentVelocity * 0.6;
+          }
+
           const height = camera.positionCartographic.height;
           const zoomFactor = height * 0.003;
           const direction = Cesium.Cartesian3.subtract(center, camera.position, new Cesium.Cartesian3());
@@ -603,6 +625,48 @@ function setupInteractionHandlers(
     hasJustPinched = true;
     if (revertHasJustPinchedTimeoutId) clearTimeout(revertHasJustPinchedTimeoutId);
     revertHasJustPinchedTimeoutId = setTimeout(() => hasJustPinched = false, DOUBLE_TAP_THRESHOLD);
+
+    if (Math.abs(pinchZoomVelocity) > 0.1 && (pinchMode === "zoom" || pinchMode == "rotate")) {
+      // Cap the pinchZoomVelocity
+      if (pinchZoomVelocity > 5) pinchZoomVelocity = 5;
+      if (pinchZoomVelocity < -5) pinchZoomVelocity = -5;
+
+      // Apply momentum if velocity is significant
+      let lastFrameTime = Date.now();
+      let avgDt = 16; // Start with 60fps estimate
+      const animateMomentum = () => {
+        const now = Date.now();
+        const dt = now - lastFrameTime;
+        lastFrameTime = now;
+
+        // Smooth dt to prevent spikes from lost frames,
+        avgDt = avgDt * 0.8 + Math.min(dt, 80) * 0.2;  // Cap to 80ms in the calculation
+        const effectiveDt = avgDt;
+
+        if (Math.abs(pinchZoomVelocity) < 0.01) {
+          controller.enableInputs = true;
+          momentumRequestId = null;
+          return;
+        }
+
+        const distanceDelta = pinchZoomVelocity * effectiveDt;
+        const camera = viewer.camera;
+        const height = camera.positionCartographic.height;
+        const zoomFactor = height * 0.003;
+
+        if (lastPinchCenter) {
+          const direction = Cesium.Cartesian3.subtract(lastPinchCenter, camera.position, new Cesium.Cartesian3());
+          Cesium.Cartesian3.normalize(direction, direction);
+          camera.move(direction, distanceDelta * zoomFactor);
+        }
+
+        // Decelerate
+        pinchZoomVelocity *= 0.64;
+
+        momentumRequestId = requestAnimationFrame(animateMomentum);
+      };
+      momentumRequestId = requestAnimationFrame(animateMomentum);
+    }
   }, ScreenSpaceEventType.PINCH_END);
 }
 
