@@ -262,7 +262,6 @@ function setupInteractionHandlers(
   let pinchZoomVelocity = 0;
 
   // Variable for remembering the zoom center location
-  let lastTapPosition: Cesium.Cartesian2 | null = null;
   let lastPinchCenter: Cesium.Cartesian3 | null = null;
 
   // Variable for triggering the double tap and drag to zoom
@@ -296,7 +295,6 @@ function setupInteractionHandlers(
   // Touch start callback
   handler.setInputAction((event: Cesium.ScreenSpaceEventHandler.PositionedEvent) => {
     const now = Date.now();
-    lastTapPosition = event.position;
     totalMovementLength = 0;
     hasMovedDuringTheSecondTap = false;
     isDuringTheTap = true;
@@ -422,20 +420,10 @@ function setupInteractionHandlers(
       zoomVelocity = zoomVelocity * 0.4 + currentVelocity * 0.6;
     }
 
-    // Zoom based on last tap position
-    if (lastTapPosition) {
-      const camera = viewer.camera;
-      const height = camera.positionCartographic.height;
-      const zoomFactor = height * 0.003;
-      const amount = dy * zoomFactor;
-
-      const target = camera.pickEllipsoid(lastTapPosition, viewer.scene.globe.ellipsoid);
-      if (target) {
-        const direction = Cesium.Cartesian3.subtract(target, camera.position, new Cesium.Cartesian3());
-        Cesium.Cartesian3.normalize(direction, direction);
-        camera.move(direction, amount);
-      }
-    }
+    // Zoom from the center of the canvas
+    const height = viewer.camera.positionCartographic.height;
+    const zoomFactor = height * 0.003;
+    viewer.camera.zoomIn(dy * zoomFactor);
   }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
 
   // Touch end callback
@@ -478,19 +466,9 @@ function setupInteractionHandlers(
           }
 
           const dy = zoomVelocity * dt;
-          const camera = viewer.camera;
-          const height = camera.positionCartographic.height;
+          const height = viewer.camera.positionCartographic.height;
           const zoomFactor = height * 0.003;
-          const amount = dy * zoomFactor;
-
-          if (lastTapPosition) {
-            const target = camera.pickEllipsoid(lastTapPosition, viewer.scene.globe.ellipsoid);
-            if (target) {
-              const direction = Cesium.Cartesian3.subtract(target, camera.position, new Cesium.Cartesian3());
-              Cesium.Cartesian3.normalize(direction, direction);
-              camera.move(direction, amount);
-            }
-          }
+          viewer.camera.zoomIn(dy * zoomFactor);
 
           // Decelerate
           zoomVelocity *= 0.84;
