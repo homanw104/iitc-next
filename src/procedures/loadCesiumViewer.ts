@@ -1,5 +1,6 @@
 /**
  * Load the Cesium library and initialize a Viewer.
+ * Including setting up listeners for gestures and log messages.
  */
 
 import "cesium/Build/Cesium/Widgets/widgets.css";
@@ -201,9 +202,6 @@ function setupInteractionHandlers(
   let lastMoveTime = 0;
   let zoomVelocity = 0;
 
-  // Variable for the pinch gesture
-  let isPinching = false;
-
   // Variable for remembering the zoom center location
   let lastTapPosition: Cesium.Cartesian2 | null = null;
 
@@ -225,6 +223,11 @@ function setupInteractionHandlers(
   // Variables for detecting double tap
   let hasJustDoubleTapped = false;
   let revertHasJustDoubleTappedTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  // Variable for detecting pinch gesture
+  let isPinching = false;
+  let hasJustPinched = false;
+  let revertHasJustPinchedTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
   // Remove default callbacks
   handler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_CLICK);
@@ -287,7 +290,7 @@ function setupInteractionHandlers(
 
       // Show portal data on the bar if not double-tapped
       setTimeout(() => {
-        if (hasJustDoubleTapped || isDuringTheTap || isPinching) {
+        if (hasJustDoubleTapped || isDuringTheTap || hasJustPinched || isPinching) {
           // pass
         } else {
           console.log("showing details in the portal detail bar...");
@@ -303,8 +306,8 @@ function setupInteractionHandlers(
       portalEntityManager.requestPortalDetails(portalGuid).then(() => {
         // Select and display portal detail if not canceled
         setTimeout(() => {
-          if (hasCancelledDisplayPortalDetail || hasJustDoubleTapped || isDuringTheTap || isPinching) {
-            hasCancelledDisplayPortalDetail = false;
+          if (hasJustDoubleTapped || isDuringTheTap || hasJustPinched || isPinching) {
+            if (hasCancelledDisplayPortalDetail) hasCancelledDisplayPortalDetail = false;
           } else {
             const freshData = portalEntityManager.getPortalData(portalGuid);
             if (!freshData) return;
@@ -325,7 +328,7 @@ function setupInteractionHandlers(
     } else {
       // Deselect if not double-tapped
       setTimeout(() => {
-        if (hasJustDoubleTapped || isDuringTheTap || isPinching) return;
+        if (hasJustDoubleTapped || isDuringTheTap || hasJustPinched || isPinching) return;
         viewer.selectedEntity = undefined;
         state.lastPortalData = null;
         state.portalDetailBar?.remove();
@@ -549,7 +552,7 @@ function setupInteractionHandlers(
 
         if (Math.abs(distanceDelta) > 0) {
           const height = camera.positionCartographic.height;
-          const zoomFactor = height * 0.005;
+          const zoomFactor = height * 0.003;
           const direction = Cesium.Cartesian3.subtract(center, camera.position, new Cesium.Cartesian3());
           Cesium.Cartesian3.normalize(direction, direction);
           camera.move(direction, distanceDelta * zoomFactor);
@@ -597,6 +600,9 @@ function setupInteractionHandlers(
   // Pinch end callback
   handler.setInputAction(() => {
     isPinching = false;
+    hasJustPinched = true;
+    if (revertHasJustPinchedTimeoutId) clearTimeout(revertHasJustPinchedTimeoutId);
+    revertHasJustPinchedTimeoutId = setTimeout(() => hasJustPinched = false, DOUBLE_TAP_THRESHOLD);
   }, ScreenSpaceEventType.PINCH_END);
 }
 
