@@ -1,13 +1,13 @@
 /**
  * Extracts and sets the Niantic API version from the page.
+ *
+ * Extracts the version from the gen_dashboard script filename.
+ * e.g., /jsc/gen_dashboard_1359f9c6382cf1583dc7b8fa7021b573dcdccf6a.js
  */
 
 import { setApiVersion } from "../utils/network";
 import { logManager } from "../managers/logManager";
 
-/**
- * Extracts and sets the Niantic API version from the page.
- */
 export default function extractVersionString(): void {
   const version = extractVersionFromScript();
   if (version) {
@@ -18,10 +18,6 @@ export default function extractVersionString(): void {
   }
 }
 
-/**
- * Extracts the version from the gen_dashboard script filename.
- * e.g., /jsc/gen_dashboard_1359f9c6382cf1583dc7b8fa7021b573dcdccf6a.js
- */
 export function extractVersionFromScript(): string | undefined {
   const script = document.querySelector("script[src^=\"/jsc/gen_dashboard_\"]");
   if (script) {
