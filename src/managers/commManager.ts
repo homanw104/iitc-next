@@ -7,6 +7,11 @@ import { logManager } from "./logManager";
 import * as Cesium from "cesium";
 import type { Team } from "../types/ingress";
 
+const MIN_COMM_BOUNDS_KM = 10;
+const MIN_KM_PER_DEGREE = 110.574;
+const LATITUDE_DEGREES_RANGE = { min: -90, max: 90 };
+const LONGITUDE_DEGREES_RANGE = { min: -180, max: 180 };
+
 export type PlextMarkType =
   "FACTION" |
   "PLAYER" |
@@ -75,14 +80,91 @@ export class CommManager {
     this.viewer = viewer;
   }
 
-  private getBounds() {
+  private expandRangeToMinSpan(
+    min: number,
+    max: number,
+    minSpan: number,
+    range: { min: number; max: number }
+  ): {
+    min: number;
+    max: number;
+  } {
+    const fullSpan = range.max - range.min;
+    if (minSpan >= fullSpan) {
+      return range;
+    }
+
+    if (max - min >= minSpan) {
+      return {
+        min: Math.max(min, range.min),
+        max: Math.min(max, range.max),
+      };
+    }
+
+    // Expand around the current view center so tiny zoomed-in views still fetch a useful comm area.
+    const center = (min + max) / 2;
+    let expandedMin = center - minSpan / 2;
+    let expandedMax = center + minSpan / 2;
+
+    if (expandedMin < range.min) {
+      expandedMax += range.min - expandedMin;
+      expandedMin = range.min;
+    }
+    if (expandedMax > range.max) {
+      expandedMin -= expandedMax - range.max;
+      expandedMax = range.max;
+    }
+
+    return {
+      min: Math.max(expandedMin, range.min),
+      max: Math.min(expandedMax, range.max),
+    };
+  }
+
+  private getBounds(): {
+    minLatE6: number;
+    minLngE6: number;
+    maxLatE6: number;
+    maxLngE6: number;
+  } {
     const viewRect = this.viewer.camera.computeViewRectangle();
     if (viewRect) {
+      const south = Cesium.Math.toDegrees(viewRect.south);
+      const west = Cesium.Math.toDegrees(viewRect.west);
+      const north = Cesium.Math.toDegrees(viewRect.north);
+      const east = Cesium.Math.toDegrees(viewRect.east);
+      const center = Cesium.Rectangle.center(viewRect);
+      const centerLat = Cesium.Math.toDegrees(center.latitude);
+
+      // Use the smallest latitude degree length so the converted span is always at least 5 km.
+      const minLatSpan = MIN_COMM_BOUNDS_KM / MIN_KM_PER_DEGREE;
+      const latitude = this.expandRangeToMinSpan(
+        south,
+        north,
+        minLatSpan,
+        LATITUDE_DEGREES_RANGE
+      );
+
+      let longitude = LONGITUDE_DEGREES_RANGE;
+      if (east >= west) {
+        // Longitude degrees shrink by cos(latitude); near the poles, 5 km may require the full line.
+        const longitudeScale = Math.cos(Cesium.Math.toRadians(centerLat));
+        const minLngSpan = longitudeScale > 0
+          ? MIN_COMM_BOUNDS_KM / (MIN_KM_PER_DEGREE * longitudeScale)
+          : LONGITUDE_DEGREES_RANGE.max - LONGITUDE_DEGREES_RANGE.min;
+        longitude = this.expandRangeToMinSpan(
+          west,
+          east,
+          minLngSpan,
+          LONGITUDE_DEGREES_RANGE
+        );
+      }
+
       return {
-        minLatE6: Math.round(Cesium.Math.toDegrees(viewRect.south) * 1e6),
-        minLngE6: Math.round(Cesium.Math.toDegrees(viewRect.west) * 1e6),
-        maxLatE6: Math.round(Cesium.Math.toDegrees(viewRect.north) * 1e6),
-        maxLngE6: Math.round(Cesium.Math.toDegrees(viewRect.east) * 1e6),
+        minLatE6: Math.round(latitude.min * 1e6),
+        minLngE6: Math.round(longitude.min * 1e6),
+        maxLatE6: Math.round(latitude.max * 1e6),
+        maxLngE6: Math.round(longitude.max * 1e6),
       };
     }
 
@@ -103,12 +185,10 @@ export class CommManager {
     this.callbacks = this.callbacks.filter(cb => cb !== callback);
   }
 
-  public getMessages(channel: string): CommResponseItem[] {
+  public getMessages(channel: string, calcBounds: boolean = true): CommResponseItem[] {
     const channelMessages = Array.from(this.messages[channel]?.values() || []);
     const bounds = this.getBounds();
-    if (!bounds) {
-      return channelMessages.sort((a, b) => a[1] - b[1]);
-    } else {
+    if (bounds && calcBounds) {
       return channelMessages.filter((m) => {
         const portalMarkup = m[2].plext.markup.find((markup) => {
           return markup[0] === "PORTAL";
@@ -126,6 +206,8 @@ export class CommManager {
         }
         return true;  // System message with no coordinates or another type
       }).sort((a, b) => a[1] - b[1]);
+    } else {
+      return channelMessages.sort((a, b) => a[1] - b[1]);
     }
   }
 

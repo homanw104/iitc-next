@@ -20,7 +20,6 @@ export class CommDetailPaneController {
   private isUpdatingScroll = false;
   private isInputFocused = false;
 
-  private refreshNewMsgCount = new Map([["all", 0], ["faction", 0], ["alerts", 0]]);
   private previousScrollHeights: Map<string, number> = new Map([]);
   private previousScrollTops: Map<string, number> = new Map([]);
 
@@ -49,7 +48,7 @@ export class CommDetailPaneController {
 
     try {
       const channel = this.currentChannel;
-      const msgCount = this.commManager.getMessages(channel).length;
+      const msgCount = this.commManager.getMessages(channel, false).length;
 
       // Always tries to fetch "all" channel and wait for 0.2 seconds before the next possible request
       await this.commManager.requestAll(fetchOld);
@@ -58,9 +57,8 @@ export class CommDetailPaneController {
       if (channel === "faction") await this.commManager.requestFaction(fetchOld);
       if (channel === "alerts") await this.commManager.requestAlerts(fetchOld);
 
-      const newMsgCount = this.commManager.getMessages(channel).length - msgCount;
-      logManager.info("CommDetailPane", `Received ${newMsgCount} message${newMsgCount === 1 ? "" : "s"} from ${channel} channel`);
-      this.refreshNewMsgCount.set(channel, newMsgCount);
+      const newMsgCount = this.commManager.getMessages(channel, false).length - msgCount;
+      logManager.info("CommDetailPane", `Received ${newMsgCount} new message${newMsgCount === 1 ? "" : "s"} from ${channel.toUpperCase()}`);
     } finally {
       this.isFetchingNew = false;
       this.isFetchingOld = false;

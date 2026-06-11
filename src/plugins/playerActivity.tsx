@@ -259,7 +259,7 @@ class PlayerActivityPlugin {
   private updatePlayerActivity(): void {
     const playerActivities: Map<string, PlayerActivity[]> = new Map();
 
-    this.commManager?.getMessages("all")?.forEach((msg) => {
+    this.commManager?.getMessages("all", false)?.forEach((msg) => {
       let player: Player | null = null;
       let portal: Portal | null = null;
       const timestamp = msg[1];
