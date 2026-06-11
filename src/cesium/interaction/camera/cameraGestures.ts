@@ -4,18 +4,6 @@
 
 import * as Cesium from "cesium";
 
-function getCameraUpForDirection(direction: Cesium.Cartesian3, previousUp: Cesium.Cartesian3): Cesium.Cartesian3 {
-  const right = Cesium.Cartesian3.cross(direction, previousUp, new Cesium.Cartesian3());
-
-  if (Cesium.Cartesian3.equalsEpsilon(right, Cesium.Cartesian3.ZERO, Cesium.Math.EPSILON14)) {
-    Cesium.Cartesian3.mostOrthogonalAxis(direction, right);
-  }
-
-  Cesium.Cartesian3.normalize(right, right);
-  const up = Cesium.Cartesian3.cross(right, direction, new Cesium.Cartesian3());
-  return Cesium.Cartesian3.normalize(up, up);
-}
-
 export function panCameraByOrbitingGlobe(
   camera: Cesium.Camera,
   ellipsoid: Cesium.Ellipsoid,
@@ -27,6 +15,9 @@ export function panCameraByOrbitingGlobe(
 
   if (!start || !end) return;
 
+  // Treat the two picked surface points as unit vectors from the globe center.
+  // Rotating the camera around their cross-product axis makes the ground slide
+  // under the fingers without changing camera height.
   const startNormal = Cesium.Cartesian3.normalize(start, new Cesium.Cartesian3());
   const endNormal = Cesium.Cartesian3.normalize(end, new Cesium.Cartesian3());
   const dot = Cesium.Cartesian3.dot(startNormal, endNormal);
@@ -38,25 +29,60 @@ export function panCameraByOrbitingGlobe(
   camera.rotate(axis, Cesium.Math.acosClamped(dot));
 }
 
+export function zoomCameraAlongViewDirection(camera: Cesium.Camera, amount: number): void {
+  camera.zoomIn(amount);
+}
+
+export function getCameraPitchRelativeToGlobePoint(camera: Cesium.Camera, center: Cesium.Cartesian3): number {
+  // Measure pitch against the same local ground frame that tilt gestures rotate around.
+  // Cesium's camera.pitch is relative to the camera's own nadir point, which diverges at a globe scale.
+  const transform = Cesium.Transforms.eastNorthUpToFixedFrame(center);
+  const inverseTransform = Cesium.Matrix4.inverseTransformation(transform, new Cesium.Matrix4());
+  const localDirection = Cesium.Matrix4.multiplyByPointAsVector(inverseTransform, camera.directionWC, new Cesium.Cartesian3());
+
+  // In an ENU frame, +Z is local up. Looking level has z = 0, looking down has z < 0,
+  // so asin(z) gives the signed pitch angle relative to the tangent plane.
+  Cesium.Cartesian3.normalize(localDirection, localDirection);
+  return Cesium.Math.asinClamped(localDirection.z);
+}
+
 export function zoomCameraAroundGlobePoint(camera: Cesium.Camera, center: Cesium.Cartesian3, amount: number): void {
-  const offset = Cesium.Cartesian3.subtract(camera.positionWC, center, new Cesium.Cartesian3());
-  const distance = Cesium.Cartesian3.magnitude(offset);
+  // Work in the picked point's ENU frame so zoom keeps the pinch anchor while preserving
+  // the camera's local direction/up, i.e., its angle relative to the nearby ground.
+  const transform = Cesium.Transforms.eastNorthUpToFixedFrame(center);
+  const inverseTransform = Cesium.Matrix4.inverseTransformation(transform, new Cesium.Matrix4());
+
+  // localPosition is the vector from the pinch anchor to the camera, expressed in
+  // local east/north/up coordinates. Its length is the anchor-to-camera distance.
+  const localPosition = Cesium.Matrix4.multiplyByPoint(inverseTransform, camera.positionWC, new Cesium.Cartesian3());
+  const distance = Cesium.Cartesian3.magnitude(localPosition);
 
   if (distance <= 0) return;
 
+  // Direction and up are vectors, not points, so ignore translation while converting them.
+  // Keeping these vectors in the anchor frame preserves the ground-relative view angle.
+  const localDirection = Cesium.Matrix4.multiplyByPointAsVector(inverseTransform, camera.directionWC, new Cesium.Cartesian3());
+  const localUp = Cesium.Matrix4.multiplyByPointAsVector(inverseTransform, camera.upWC, new Cesium.Cartesian3());
   const targetDistance = Math.max(1, distance - amount);
-  const direction = Cesium.Cartesian3.normalize(offset, offset);
-  const destination = Cesium.Cartesian3.multiplyByScalar(direction, targetDistance, new Cesium.Cartesian3());
+  const scale = targetDistance / distance;
 
-  Cesium.Cartesian3.add(center, destination, destination);
-  const viewDirection = Cesium.Cartesian3.negate(destination, new Cesium.Cartesian3());
-  Cesium.Cartesian3.normalize(viewDirection, viewDirection);
+  // Scaling the whole anchor-to-camera vector moves straight toward or away from the
+  // picked point, so the pinch anchor remains the center of the zoom operation.
+  Cesium.Cartesian3.multiplyByScalar(localPosition, scale, localPosition);
+  Cesium.Cartesian3.normalize(localDirection, localDirection);
+  Cesium.Cartesian3.normalize(localUp, localUp);
 
-  camera.setView({
-    destination,
-    orientation: {
-      direction: viewDirection,
-      up: getCameraUpForDirection(viewDirection, camera.upWC),
-    },
-  });
+  // Mutate the camera in the temporary local frame, then return to world coordinates.
+  camera.lookAtTransform(transform);
+  Cesium.Cartesian3.clone(localPosition, camera.position);
+  Cesium.Cartesian3.clone(localDirection, camera.direction);
+  Cesium.Cartesian3.clone(localUp, camera.up);
+
+  // Cesium expects direction/up/right to be an orthonormal basis. Rebuild right and
+  // then up so a tiny floating-point drift does not accumulate across repeated pinches.
+  Cesium.Cartesian3.cross(camera.direction, camera.up, camera.right);
+  Cesium.Cartesian3.normalize(camera.right, camera.right);
+  Cesium.Cartesian3.cross(camera.right, camera.direction, camera.up);
+  Cesium.Cartesian3.normalize(camera.up, camera.up);
+  camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
 }

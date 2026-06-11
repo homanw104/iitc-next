@@ -3,7 +3,12 @@
  */
 
 import * as Cesium from "cesium";
-import { panCameraByOrbitingGlobe, zoomCameraAroundGlobePoint } from "../camera/cameraGestures";
+import {
+  getCameraPitchRelativeToGlobePoint,
+  panCameraByOrbitingGlobe,
+  zoomCameraAlongViewDirection,
+  zoomCameraAroundGlobePoint,
+} from "../camera/cameraGestures";
 import type { InteractionGestureState } from "../state/interactionGestureState";
 
 interface PinchMoveEvent {
@@ -35,9 +40,10 @@ export function createPinchGestureHandlers(
   let lastPinchCenter: Cesium.Cartesian3 | null = null;
   let revertHasJustPinchedTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
-  const zoomThreshold = 6.0;
+  // Adjusted sweet spots
+  const zoomThreshold = 5.5;
   const rotateThreshold = 0.1;
-  const tiltThreshold = 4.0;
+  const tiltThreshold = 3.5;
   const minPitch = Cesium.Math.toRadians(-90);
   const maxPitch = Cesium.Math.toRadians(-60);
 
@@ -48,6 +54,7 @@ export function createPinchGestureHandlers(
     totalAngleDelta = 0;
     totalHeightDelta = 0;
     pinchZoomVelocity = 0;
+    lastPinchCenter = null;
     lastPinchMoveTime = Date.now();
 
     if (gestureState.momentumRequestId) {
@@ -99,6 +106,7 @@ export function createPinchGestureHandlers(
     totalHeightDelta += heightDelta;
 
     if (pinchMode === "zoom") {
+      // Start optimistic as zoom, then switch once enough gesture evidence accumulates.
       if (totalZoomDelta > zoomThreshold) {
         pinchMode = "zoom";
       } else if (Math.abs(totalHeightDelta) > tiltThreshold) {
@@ -109,68 +117,85 @@ export function createPinchGestureHandlers(
     }
 
     if (pinchMode === "zoom" || pinchMode === "rotate") {
+      const dx = avgPosition.x - previousAvgPosition.x;
+      const dy = avgPosition.y - previousAvgPosition.y;
+
+      if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
+        panCameraByOrbitingGlobe(camera, viewer.scene.globe.ellipsoid, previousAvgPosition, avgPosition);
+      }
+
       const center = camera.pickEllipsoid(centerPosition, viewer.scene.globe.ellipsoid);
+      // Momentum keeps using the last valid anchor if the fingers leave the visible globe.
+      if (center) lastPinchCenter = center;
 
-      if (center) {
-        lastPinchCenter = center;
+      const currentDistance = Cesium.Cartesian2.distance(position1, position2);
+      const previousDistance = Cesium.Cartesian2.distance(previousPosition1, previousPosition2);
+      const distanceDelta = currentDistance - previousDistance;
 
-        const dx = avgPosition.x - previousAvgPosition.x;
-        const dy = avgPosition.y - previousAvgPosition.y;
+      if (Math.abs(distanceDelta) > 0) {
+        const now = Date.now();
+        const dt = now - lastPinchMoveTime;
+        lastPinchMoveTime = now;
 
-        if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
-          panCameraByOrbitingGlobe(camera, viewer.scene.globe.ellipsoid, previousAvgPosition, avgPosition);
+        if (dt > 0) {
+          const currentVelocity = distanceDelta / dt;
+          pinchZoomVelocity = pinchZoomVelocity * 0.4 + currentVelocity * 0.6;
         }
 
-        const currentDistance = Cesium.Cartesian2.distance(position1, position2);
-        const previousDistance = Cesium.Cartesian2.distance(previousPosition1, previousPosition2);
-        const distanceDelta = currentDistance - previousDistance;
-
-        if (Math.abs(distanceDelta) > 0) {
-          const now = Date.now();
-          const dt = now - lastPinchMoveTime;
-          lastPinchMoveTime = now;
-
-          if (dt > 0) {
-            const currentVelocity = distanceDelta / dt;
-            pinchZoomVelocity = pinchZoomVelocity * 0.4 + currentVelocity * 0.6;
-          }
-
-          const height = camera.positionCartographic.height;
-          const zoomFactor = height * 0.003;
+        const height = camera.positionCartographic.height;
+        const zoomFactor = height * 0.003;
+        if (center) {
+          // Prefer anchored zoom, so pinching near an edge still zooms around that point.
           zoomCameraAroundGlobePoint(camera, center, distanceDelta * zoomFactor);
+        } else {
+          zoomCameraAlongViewDirection(camera, distanceDelta * zoomFactor);
         }
+      }
 
-        if (pinchMode === "rotate") {
-          const transform = Cesium.Transforms.eastNorthUpToFixedFrame(center);
-          camera.lookAtTransform(transform);
-          camera.rotateRight(angleDelta * 0.6);
-          camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
-        }
+      if (pinchMode === "rotate" && center) {
+        const transform = Cesium.Transforms.eastNorthUpToFixedFrame(center);
+        camera.lookAtTransform(transform);
+        camera.rotateRight(angleDelta * 0.6);
+        camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
       }
     }
 
     if (pinchMode === "tilt") {
-      const tiltAmount = heightDelta * 0.02;
-      const currentPitch = camera.pitch;
+      const canvas = viewer.scene.canvas;
+      const center = camera.pickEllipsoid(new Cesium.Cartesian2(canvas.clientWidth / 2, canvas.clientHeight / 2), viewer.scene.globe.ellipsoid);
 
-      let actualTiltAmount = tiltAmount;
+      if (!center) return;
+
+      const tiltAmount = heightDelta * 0.02;
+      const currentPitch = getCameraPitchRelativeToGlobePoint(camera, center);
       const targetPitch = currentPitch - tiltAmount;
-      if (targetPitch > maxPitch) {
+      let actualTiltAmount = tiltAmount;
+
+      // When zooming out makes the view-center pitch exceed the normal range, avoid snapping
+      // back to the limit. Let user input reduce the violation but block making it worse.
+      if (currentPitch > maxPitch) {
+        if (targetPitch > currentPitch) {
+          actualTiltAmount = 0;
+        } else if (targetPitch < minPitch) {
+          actualTiltAmount = currentPitch - minPitch;
+        }
+      } else if (currentPitch < minPitch) {
+        if (targetPitch < currentPitch) {
+          actualTiltAmount = 0;
+        } else if (targetPitch > maxPitch) {
+          actualTiltAmount = currentPitch - maxPitch;
+        }
+      } else if (targetPitch > maxPitch) {
         actualTiltAmount = currentPitch - maxPitch;
       } else if (targetPitch < minPitch) {
         actualTiltAmount = currentPitch - minPitch;
       }
 
       if (Math.abs(actualTiltAmount) > 0) {
-        const canvas = viewer.scene.canvas;
-        const center = camera.pickEllipsoid(new Cesium.Cartesian2(canvas.clientWidth / 2, canvas.clientHeight / 2), viewer.scene.globe.ellipsoid);
-
-        if (center) {
-          const transform = Cesium.Transforms.eastNorthUpToFixedFrame(center);
-          camera.lookAtTransform(transform);
-          camera.rotateDown(actualTiltAmount);
-          camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
-        }
+        const transform = Cesium.Transforms.eastNorthUpToFixedFrame(center);
+        camera.lookAtTransform(transform);
+        camera.rotateDown(actualTiltAmount);
+        camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
       }
     }
   };
@@ -208,6 +233,8 @@ export function createPinchGestureHandlers(
 
         if (lastPinchCenter) {
           zoomCameraAroundGlobePoint(camera, lastPinchCenter, distanceDelta * zoomFactor);
+        } else {
+          zoomCameraAlongViewDirection(camera, distanceDelta * zoomFactor);
         }
 
         pinchZoomVelocity *= 0.64;
