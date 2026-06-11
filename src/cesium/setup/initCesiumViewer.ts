@@ -97,12 +97,12 @@ export function initCesiumViewer(container: string): Cesium.Viewer {
 
   // Other options for the camera and scene to improve visual quality and performance
   viewer.scene.logarithmicDepthBuffer = true;
-  viewer.scene.globe.showGroundAtmosphere = true;
+  viewer.scene.globe.showGroundAtmosphere = false;      // Turn off to improve performance
   viewer.scene.globe.baseColor = Cesium.Color.BLACK;
   viewer.scene.highDynamicRange = true;
   viewer.scene.msaaSamples = 4;
-  viewer.resolutionScale = 2.0;
-  viewer.scene.postProcessStages.fxaa.enabled = true;
+  viewer.resolutionScale = 1.5;
+  viewer.scene.postProcessStages.fxaa.enabled = false;  // No need if msaa is enabled. Turn off to improve performance
 
   // Remove the credits widget
   const credits = document.querySelector(".cesium-widget-credits") as HTMLElement;

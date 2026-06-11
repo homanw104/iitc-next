@@ -42,7 +42,7 @@ export class LayerManager {
     this.filterState.set("scout-control", false);
     this.filterState.set("history-reverse", false);
     this.filterState.set("scout-control-reverse", false);
-    this.filterState.set("debug-tiles", true);
+    this.filterState.set("debug-tiles", false);
     this.applyFilters();
   }
 

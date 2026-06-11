@@ -113,7 +113,7 @@ export class PortalEntityManager {
         outlineWidth: 4,
         outlineColor: Cesium.Color.BLACK,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        translucencyByDistance: new Cesium.NearFarScalar(8e2, 1.0, 1.2e3, 0.0),
+        translucencyByDistance: new Cesium.NearFarScalar(6e2, 1.0, 8e2, 0.0),
       },
       properties: {
         selectable: true,

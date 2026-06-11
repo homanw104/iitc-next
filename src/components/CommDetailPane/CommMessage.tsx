@@ -45,7 +45,7 @@ const CommMessage = ({ message, viewer, channel }: {
                 onClick={() => {
                   if (data.latE6 && data.lngE6) {
                     viewer.camera.flyTo({
-                      destination: Cesium.Cartesian3.fromDegrees(data.lngE6 / 1e6, data.latE6 / 1e6, 6e2),
+                      destination: Cesium.Cartesian3.fromDegrees(data.lngE6 / 1e6, data.latE6 / 1e6, 8e2),
                       duration: 1.5,
                     });
                   }
