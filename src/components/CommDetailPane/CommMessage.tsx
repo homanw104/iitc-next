@@ -2,15 +2,17 @@ import * as Cesium from "cesium";
 import { Viewer } from "cesium";
 import { h } from "../../utils/dom";
 import { getTeamColor } from "../../utils/color";
-import { Plext } from "../../managers/commManager";
+import { CommResponseItem } from "../../managers/commManager";
 import { Channel } from "../../types/ingress";
 
-const CommMessage = ({ plext, viewer, channel }: {
-  plext: Plext;
+const CommMessage = ({ message, viewer, channel }: {
+  message: CommResponseItem;
   viewer: Viewer;
   channel: Channel;
 }) => {
-  const dateObj = new Date(plext.timestamp);
+  const timestamp = message[1];
+  const plext = message[2].plext;
+  const dateObj = new Date(timestamp);
   let timeStr: string;
   if (dateObj.toDateString() === new Date(Date.now()).toDateString()) {
     timeStr = dateObj.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });

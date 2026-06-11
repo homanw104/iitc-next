@@ -21,7 +21,7 @@ export function setApiVersion(version: string): void {
  * @param data The JSON data to send.
  * @returns A promise that resolves with the response JSON.
  */
-export async function apiRequest(action: string, data: Record<string, unknown>): Promise<unknown> {
+export async function apiRequest(action: string, data: object): Promise<unknown> {
   const url = `/r/${action}`;
   const csrfToken = getCookie("csrftoken");
 

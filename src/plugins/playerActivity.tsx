@@ -262,9 +262,11 @@ class PlayerActivityPlugin {
     this.commManager?.getMessages("all")?.forEach((msg) => {
       let player: Player | null = null;
       let portal: Portal | null = null;
+      const timestamp = msg[1];
+      const plext = msg[2].plext;
 
-      for (let i = 0; i < msg.markup.length; i++) {
-        const markup = msg.markup[i] as PlextMark;
+      for (let i = 0; i < plext.markup.length; i++) {
+        const markup = plext.markup[i] as PlextMark;
         if (markup[0] === "PLAYER") {
           const name = markup[1].plain;
           const team = markup[1].team as Team;
@@ -283,7 +285,7 @@ class PlayerActivityPlugin {
         const activity = {
           name: player.name,
           team: player.team,
-          timestamp: msg.timestamp,
+          timestamp: timestamp,
           weight: 1,
           portalName: portal.name,
           lat: portal.latE6 / 1e6,

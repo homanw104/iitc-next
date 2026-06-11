@@ -5,32 +5,66 @@
 import { apiRequest } from "../utils/network";
 import { logManager } from "./logManager";
 import * as Cesium from "cesium";
+import type { Team } from "../types/ingress";
+
+export type PlextMarkType =
+  "FACTION" |
+  "PLAYER" |
+  "PORTAL" |
+  "SECURE" |
+  "SENDER" |
+  "TEXT";
 
 export interface PlextMarkData {
   plain: string;
-  team?: string;
+  team?: Team;
   latE6?: number;
   lngE6?: number;
   name?: string;
   address?: string;
 }
 
-export type PlextMark = [string, PlextMarkData];
+export type PlextMark = [PlextMarkType, PlextMarkData];
 
-export interface Plext {
-  guid: string;
-  timestamp: number;
+export interface CommPlextData {
   text: string;
+  team: Team;
   markup: PlextMark[];
+  plextType: string;
+  categories: number;
 }
 
+export type CommResponseItem = [
+  guid: string,
+  timestamp: number,
+  data: {
+    plext: CommPlextData;
+  },
+];
+
 export interface CommResponse {
-  result: any[][];
+  result: CommResponseItem[];
+}
+
+interface SendPlextResponse {
+  error?: unknown;
+}
+
+interface GetPlextsPayload {
+  minLatE6: number;
+  minLngE6: number;
+  maxLatE6: number;
+  maxLngE6: number;
+  minTimestampMs: number;
+  maxTimestampMs: number;
+  tab: string;
+  ascendingTimestampOrder: boolean;
+  plexContinuationGuid?: string;
 }
 
 export class CommManager {
   private viewer: Cesium.Viewer;
-  private messages: Record<string, Map<string, Plext>> = {
+  private messages: Record<string, Map<string, CommResponseItem>> = {
     all: new Map(),
     faction: new Map(),
     alerts: new Map(),
@@ -69,14 +103,14 @@ export class CommManager {
     this.callbacks = this.callbacks.filter(cb => cb !== callback);
   }
 
-  public getMessages(channel: string): Plext[] {
+  public getMessages(channel: string): CommResponseItem[] {
     const channelMessages = Array.from(this.messages[channel]?.values() || []);
     const bounds = this.getBounds();
     if (!bounds) {
-      return channelMessages.sort((a, b) => a.timestamp - b.timestamp);
+      return channelMessages.sort((a, b) => a[1] - b[1]);
     } else {
       return channelMessages.filter((m) => {
-        const portalMarkup = m.markup.find((markup) => {
+        const portalMarkup = m[2].plext.markup.find((markup) => {
           return markup[0] === "PORTAL";
         });
         if (portalMarkup) {
@@ -90,8 +124,8 @@ export class CommManager {
             );
           }
         }
-        return true;  // System message with no coordinates or other type
-      }).sort((a, b) => a.timestamp - b.timestamp);
+        return true;  // System message with no coordinates or another type
+      }).sort((a, b) => a[1] - b[1]);
     }
   }
 
@@ -113,7 +147,7 @@ export class CommManager {
         tab: channel
       };
 
-      const response: any = await apiRequest("sendPlext", payload);
+      const response = (await apiRequest("sendPlext", payload)) as SendPlextResponse;
       if (response && response.error) {
         logManager.error("CommManager", `Failed to send message to ${channel} channel`, response.error);
       }
@@ -147,17 +181,17 @@ export class CommManager {
 
       if (existing.length > 0) {
         if (fetchOld) {
-          maxTimestamp = Math.min(...existing.map(m => m.timestamp));
+          maxTimestamp = Math.min(...existing.map(m => m[1]));
           ascendingTimestampOrder = false;
-          plextContinuationGuid = existing.find(m => m.timestamp === maxTimestamp)?.guid;
+          plextContinuationGuid = existing.find(m => m[1] === maxTimestamp)?.[0];
         } else {
-          minTimestamp = Math.max(...existing.map(m => m.timestamp));
+          minTimestamp = Math.max(...existing.map(m => m[1]));
           ascendingTimestampOrder = true;
-          plextContinuationGuid = existing.find(m => m.timestamp === minTimestamp)?.guid;
+          plextContinuationGuid = existing.find(m => m[1] === minTimestamp)?.[0];
         }
       }
 
-      const payload: any = {
+      const payload: GetPlextsPayload = {
         minLatE6: bounds.minLatE6,
         minLngE6: bounds.minLngE6,
         maxLatE6: bounds.maxLatE6,
@@ -173,15 +207,8 @@ export class CommManager {
       const data = (await apiRequest("getPlexts", payload)) as CommResponse;
 
       if (data && data.result) {
-        const plexts = data.result.map((item) => ({
-          guid: item[0],
-          timestamp: item[1],
-          text: item[2].plext.text,
-          markup: item[2].plext.markup,
-        }));
-
-        plexts.forEach(p => {
-          this.messages[channel].set(p.guid, p);
+        data.result.forEach(item => {
+          this.messages[channel].set(item[0], item);
         });
 
         // Run callbacks
@@ -189,9 +216,9 @@ export class CommManager {
 
         // Limit storage to one million messages per channel to avoid memory leaks
         if (this.messages[channel].size > 1000000) {
-          const sorted = Array.from(this.messages[channel].values()).sort((a, b) => b.timestamp - a.timestamp);
+          const sorted = Array.from(this.messages[channel].values()).sort((a, b) => b[1] - a[1]);
           const toRemove = sorted.slice(1000000);
-          toRemove.forEach(m => this.messages[channel].delete(m.guid));
+          toRemove.forEach(m => this.messages[channel].delete(m[0]));
         }
       }
     } catch (e) {

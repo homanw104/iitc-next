@@ -97,8 +97,8 @@ const CommDetailPane = ({
       >
         <CommLoadingIndicator onRef={onLoadingDivRef} />
         <div style={{ minHeight: "100%" }}>
-          {messages.map((plext) => (
-            <CommMessage plext={plext} viewer={viewer} channel={channel} />
+          {messages.map((message) => (
+            <CommMessage message={message} viewer={viewer} channel={channel} />
           ))}
         </div>
         <CommFetchLatestButton
