@@ -8,7 +8,7 @@ const PortalImage = ({ data }: { data: PortalData }) => (
       borderRadius: "4.2px",
     }}>
       <img
-        src={data.image}
+        src={data.image || ""}
         alt={data.title || "Loading..."}
         style={{
           width: "calc(100% - 16px)",
