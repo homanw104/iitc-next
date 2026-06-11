@@ -5,10 +5,12 @@
 import * as Cesium from "cesium";
 
 export function configureCameraControls(viewer: Cesium.Viewer): void {
-  // Disable default pinch tilt and rotate
-  viewer.scene.screenSpaceCameraController.enableTilt = false;
-  viewer.scene.screenSpaceCameraController.enableLook = false;
+  const controller = viewer.scene.screenSpaceCameraController;
 
-  // Keep mouse wheel zoom while using custom pinch zoom handling.
-  viewer.scene.screenSpaceCameraController.zoomEventTypes = [Cesium.CameraEventType.WHEEL];
+  // Keep Cesium's mouse-driven tilt/rotate/look controls enabled. Touch pinch is
+  // handled by custom gesture handlers, so only default zoom is narrowed to wheel.
+  controller.enableTilt = true;
+  controller.enableLook = true;
+  controller.enableRotate = true;
+  controller.zoomEventTypes = [Cesium.CameraEventType.WHEEL];
 }
