@@ -221,7 +221,7 @@ class PlayerActivityPlugin {
     source.clustering.clusterLabels = true;
     source.clustering.clusterBillboards = true;
     source.clustering.clusterEvent.addEventListener((clusteredEntities, cluster) => {
-      const maxPlayers = 3;
+      const maxPlayers = 2;
       const playerActivities: PlayerActivity[] = clusteredEntities.map(e => {
         const specificPlayerActivities: PlayerActivity[] = e.properties?.activities.getValue();
         const lastActivity: PlayerActivity = specificPlayerActivities[specificPlayerActivities.length - 1];
@@ -236,9 +236,13 @@ class PlayerActivityPlugin {
         };
       });
 
-      const displayText = playerActivities.slice(0, maxPlayers).map(p => p.name).join("\n")
-        + (playerActivities.length > maxPlayers ? `\n(${playerActivities.length - maxPlayers} more)` : "");
-      cluster.point.id = playerActivities;  // Point ids are not shown but used for tooltip
+      const visiblePlayerNames = playerActivities.slice(0, maxPlayers).map(p => p.name).join("\n");
+      const remainingPlayers = playerActivities.length - maxPlayers;
+      const displayText = remainingPlayers === 1
+        ? `${visiblePlayerNames}\n${playerActivities[maxPlayers].name}`
+        : remainingPlayers > 1
+          ? `${visiblePlayerNames}\n(${remainingPlayers} more)`
+          : visiblePlayerNames;
       cluster.label.show = true;
       cluster.label.text = displayText;
       cluster.label.font = "16px coda_regular, arial, helvetica, sans-serif";
