@@ -32,7 +32,7 @@ const CommMessage = ({ plext, viewer, channel }: {
           if (data.team === "ENLIGHTENED") color = getTeamColor("ENLIGHTENED").toCssColorString();
           else if (data.team === "RESISTANCE") color = getTeamColor("RESISTANCE").toCssColorString();
           else if (data.team === "MACHINA") color = getTeamColor("MACHINA").toCssColorString();
-          else if (data.team === "NEUTRAL") color = getTeamColor("MACHINA").toCssColorString();
+          else if (data.team === "NEUTRAL" && data.plain === "_̶̱̍_̴̳͉̆̈́M̷͔̤͒Ą̷̍C̴̼̕ͅH̶̹͕̼̾Ḭ̵̇̾̓N̵̺͕͒̀̍Ä̴̞̰́_̴̦̀͆̓_̷̣̈́") color = getTeamColor("MACHINA").toCssColorString();
 
           if (type === "PLAYER" || type === "SENDER") {
             return <span style={{ color, fontWeight: "bold", marginRight: "3px" }}>{data.plain}</span>;
