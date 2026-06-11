@@ -6,7 +6,7 @@ class ScriptInjector {
     private var cesiumCss = "https://cdn.jsdelivr.net/npm/cesium@latest/Build/Cesium/Widgets/widgets.css"
     private var systemJs = "https://cdn.jsdelivr.net/npm/systemjs@6.15.1/dist/system.min.js"
     private var systemNamedRegister = "https://cdn.jsdelivr.net/npm/systemjs@6.15.1/dist/extras/named-register.min.js"
-    private var scriptVersion = "1.1.0"
+    private var scriptVersion = "1.2.0"
     private var scriptName = "iitc-next"
 
     private var userScript: String?

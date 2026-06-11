@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.2.0
+
+* Improved performance
+* Added iOS project support
+* Added zoom, tilt and rotate gestures for touch devices with huge improvements
+* Comm messages now can select the related portal
+* Comm pane now shows the messages in a range of at least 5 kilometers
+* Fixed undefined portal image requests
+* Other minor improvements
+
 ## 1.1.0
 
 * Added "Draw Lines" plugin with import/export
