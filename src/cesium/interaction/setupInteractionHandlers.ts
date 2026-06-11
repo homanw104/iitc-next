@@ -1,73 +1,16 @@
 import * as Cesium from "cesium";
 import { ScreenSpaceEventType } from "cesium";
 import type { LayerManager } from "../../managers/layerManager";
-import { getPortalLayerId } from "../../managers/portalEntityManager";
 import type { PortalEntityManager } from "../../managers/portalEntityManager";
 import type { PortalHistoryEntityManager } from "../../managers/portalHistoryEntityManager";
 import type { ScoutHistoryEntityManager } from "../../managers/scoutHistoryEntityManager";
-import PortalDetailBar from "../../components/PortalDetailBar/PortalDetailBar";
 import type { PortalDetailPaneUI } from "../../interface/PortalDetailPaneUI";
 import type { PortalDetailState } from "../../core/coreUi";
+import { panCameraByOrbitingGlobe, zoomCameraAroundGlobePoint } from "./cameraGestures";
+import { handlePortalSelection } from "./portalSelection";
+import type { PortalSelectionState } from "./portalSelection";
 
-// Double tap threshold
 const DOUBLE_TAP_THRESHOLD = 300; // ms
-
-function panCameraByOrbitingGlobe(
-  camera: Cesium.Camera,
-  ellipsoid: Cesium.Ellipsoid,
-  startPosition: Cesium.Cartesian2,
-  endPosition: Cesium.Cartesian2,
-): void {
-  const start = camera.pickEllipsoid(startPosition, ellipsoid);
-  const end = camera.pickEllipsoid(endPosition, ellipsoid);
-
-  if (!start || !end) return;
-
-  const startNormal = Cesium.Cartesian3.normalize(start, new Cesium.Cartesian3());
-  const endNormal = Cesium.Cartesian3.normalize(end, new Cesium.Cartesian3());
-  const dot = Cesium.Cartesian3.dot(startNormal, endNormal);
-  const axis = Cesium.Cartesian3.cross(startNormal, endNormal, new Cesium.Cartesian3());
-
-  if (Cesium.Cartesian3.equalsEpsilon(axis, Cesium.Cartesian3.ZERO, Cesium.Math.EPSILON14)) return;
-
-  Cesium.Cartesian3.normalize(axis, axis);
-  camera.rotate(axis, Cesium.Math.acosClamped(dot));
-}
-
-function getCameraUpForDirection(direction: Cesium.Cartesian3, previousUp: Cesium.Cartesian3): Cesium.Cartesian3 {
-  const right = Cesium.Cartesian3.cross(direction, previousUp, new Cesium.Cartesian3());
-
-  if (Cesium.Cartesian3.equalsEpsilon(right, Cesium.Cartesian3.ZERO, Cesium.Math.EPSILON14)) {
-    Cesium.Cartesian3.mostOrthogonalAxis(direction, right);
-  }
-
-  Cesium.Cartesian3.normalize(right, right);
-  const up = Cesium.Cartesian3.cross(right, direction, new Cesium.Cartesian3());
-  return Cesium.Cartesian3.normalize(up, up);
-}
-
-function zoomCameraAroundGlobePoint(camera: Cesium.Camera, center: Cesium.Cartesian3, amount: number): void {
-  const offset = Cesium.Cartesian3.subtract(camera.positionWC, center, new Cesium.Cartesian3());
-  const distance = Cesium.Cartesian3.magnitude(offset);
-
-  if (distance <= 0) return;
-
-  const targetDistance = Math.max(1, distance - amount);
-  const direction = Cesium.Cartesian3.normalize(offset, offset);
-  const destination = Cesium.Cartesian3.multiplyByScalar(direction, targetDistance, new Cesium.Cartesian3());
-
-  Cesium.Cartesian3.add(center, destination, destination);
-  const viewDirection = Cesium.Cartesian3.negate(destination, new Cesium.Cartesian3());
-  Cesium.Cartesian3.normalize(viewDirection, viewDirection);
-
-  camera.setView({
-    destination,
-    orientation: {
-      direction: viewDirection,
-      up: getCameraUpForDirection(viewDirection, camera.upWC),
-    },
-  });
-}
 
 export function setupInteractionHandlers(
   viewer: Cesium.Viewer,
@@ -101,10 +44,10 @@ export function setupInteractionHandlers(
   let momentumRequestId: number | null = null;
   let inertiaResetTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
-  // Variables for preventing loading of the previous portal when a new one is selected
-  let isPortalDetailLoading = false;
-  let hasCancelledDisplayPortalDetail = false;
-  let lastPortalEntity: Cesium.Entity | undefined;
+  const portalSelectionState: PortalSelectionState = {
+    isPortalDetailLoading: false,
+    hasCancelledDisplayPortalDetail: false,
+  };
 
   // Variables for detecting double tap
   let hasJustDoubleTapped = false;
@@ -155,72 +98,26 @@ export function setupInteractionHandlers(
       lastTapTime = now;
     }
 
-    // Pick a portal entity if available
-    const pickedObjects = viewer.scene.drillPick(event.position);
-    const portalEntity = pickedObjects.find(
-      (o) =>
-        (o.id instanceof Cesium.Entity) &&
-        (o.id.id.startsWith("portal-")) &&
-        (o.id as Cesium.Entity).properties?.selectable?.getValue()
-    )?.id as Cesium.Entity | undefined;
-
-    // Check if a different portal is picked during loading
-    if (isPortalDetailLoading && lastPortalEntity !== portalEntity) hasCancelledDisplayPortalDetail = true;
-    lastPortalEntity = portalEntity;
-
-    if (portalEntity) {
-      const portalGuid = portalEntity.id.substring(7);
-      const portalData = portalEntityManager.getPortalData(portalGuid);
-      if (!portalData) return;
-
-      // Show portal data on the bar if not double-tapped
-      setTimeout(() => {
-        if (hasJustDoubleTapped || isDuringTheTap || hasJustPinched || isPinching) {
-          // pass
-        } else {
-          console.log("showing details in the portal detail bar...");
-          state.lastPortalData = portalData;
-          state.portalDetailBar?.remove();
-          state.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailUI, data: portalData }));
-          portalDetailUI.updateDetailPane(portalData);
-        }
-      }, DOUBLE_TAP_THRESHOLD);
-
-      // Request portal detail
-      isPortalDetailLoading = true;
-      portalEntityManager.requestPortalDetails(portalGuid).then(() => {
-        // Select and display portal detail if not canceled
-        setTimeout(() => {
-          if (hasJustDoubleTapped || isDuringTheTap || hasJustPinched || isPinching) {
-            if (hasCancelledDisplayPortalDetail) hasCancelledDisplayPortalDetail = false;
-          } else {
-            const freshData = portalEntityManager.getPortalData(portalGuid);
-            if (!freshData) return;
-            const layerId = getPortalLayerId(freshData);
-            const source = layerManager.getOrCreateSourceAndFilter(layerId);
-            viewer.selectedEntity = source.entities.getById(`portal-${portalGuid}`);
-            state.lastPortalData = freshData;
-            state.portalDetailBar?.remove();
-            state.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailUI, data: freshData }));
-            portalDetailUI.updateDetailPane(freshData);
-            portalHistoryEntityManager.addOrUpdateHistoryHalo(freshData);
-            scoutHistoryEntityManager.addOrUpdateScoutControlHalo(freshData);
-          }
-        }, Math.max(0, lastTapTime + DOUBLE_TAP_THRESHOLD - Date.now()));
-      }).finally(() => {
-        isPortalDetailLoading = false;
-      });
-    } else {
-      // Deselect if not double-tapped
-      setTimeout(() => {
-        if (hasJustDoubleTapped || isDuringTheTap || hasJustPinched || isPinching) return;
-        viewer.selectedEntity = undefined;
-        state.lastPortalData = null;
-        state.portalDetailBar?.remove();
-        state.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailUI, msg: state.lastLogMsg }));
-        portalDetailUI.removeDetailPane();
-      }, DOUBLE_TAP_THRESHOLD);
-    }
+    handlePortalSelection({
+      viewer,
+      container,
+      portalDetailUI,
+      layerManager,
+      portalEntityManager,
+      portalHistoryEntityManager,
+      scoutHistoryEntityManager,
+      state,
+      selectionState: portalSelectionState,
+      gestureState: {
+        get hasJustDoubleTapped() { return hasJustDoubleTapped; },
+        get isDuringTheTap() { return isDuringTheTap; },
+        get hasJustPinched() { return hasJustPinched; },
+        get isPinching() { return isPinching; },
+        get lastTapTime() { return lastTapTime; },
+      },
+      doubleTapThreshold: DOUBLE_TAP_THRESHOLD,
+      position: event.position,
+    });
   }, Cesium.ScreenSpaceEventType.LEFT_DOWN);
 
   // Drag callbacks
