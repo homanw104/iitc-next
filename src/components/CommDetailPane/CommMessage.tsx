@@ -2,12 +2,76 @@ import * as Cesium from "cesium";
 import { Viewer } from "cesium";
 import { h } from "../../utils/dom";
 import { getTeamColor } from "../../utils/color";
+import { calculateTileKeys } from "../../utils/viewer";
 import { CommResponseItem } from "../../managers/commManager";
+import { PortalEntityManager } from "../../managers/portalEntityManager";
+import { PortalHistoryEntityManager } from "../../managers/portalHistoryEntityManager";
+import { ScoutHistoryEntityManager } from "../../managers/scoutHistoryEntityManager";
+import { TileRequestManager } from "../../managers/tileRequestManager";
 import { Channel } from "../../types/ingress";
+import PortalDetailBar from "../PortalDetailBar/PortalDetailBar";
+import type { PortalDetailPaneController } from "../../controllers/PortalDetailPaneController.tsx";
+import type { PortalDetailState } from "../../core/coreControllers";
 
-const CommMessage = ({ message, viewer, channel }: {
+let latestPortalSelectionRequest = 0;
+
+async function selectLoadedPortal(
+  viewer: Viewer,
+  container: HTMLElement,
+  portalEntityManager: PortalEntityManager,
+  portalHistoryEntityManager: PortalHistoryEntityManager,
+  scoutHistoryEntityManager: ScoutHistoryEntityManager,
+  portalDetailPaneController: PortalDetailPaneController,
+  portalDetailState: PortalDetailState,
+  latE6: number,
+  lngE6: number,
+  requestId: number
+): Promise<boolean> {
+  try {
+    const portalData = portalEntityManager.getPortalDataByCoordinates(latE6, lngE6);
+    if (!portalData) return false;
+
+    const portalGuid = portalData.guid;
+    await portalEntityManager.requestPortalDetails(portalGuid);
+    if (requestId !== latestPortalSelectionRequest) return true;
+
+    const freshData = portalEntityManager.getPortalData(portalGuid);
+    if (!freshData) return false;
+
+    viewer.selectedEntity = portalEntityManager.getPortalEntity(portalGuid);
+    portalDetailState.lastPortalData = freshData;
+    portalDetailState.portalDetailBar?.remove();
+    portalDetailState.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailPaneController: portalDetailPaneController, data: freshData }));
+    portalDetailPaneController.updateDetailPane(freshData);
+    portalHistoryEntityManager.addOrUpdateHistoryHalo(freshData);
+    scoutHistoryEntityManager.addOrUpdateScoutControlHalo(freshData);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const CommMessage = ({
+  message,
+  viewer,
+  container,
+  portalEntityManager,
+  tileRequestManager,
+  portalHistoryEntityManager,
+  scoutHistoryEntityManager,
+  portalDetailPaneController,
+  portalDetailState,
+  channel,
+}: {
   message: CommResponseItem;
   viewer: Viewer;
+  container: HTMLElement;
+  portalEntityManager: PortalEntityManager;
+  tileRequestManager: TileRequestManager;
+  portalHistoryEntityManager: PortalHistoryEntityManager;
+  scoutHistoryEntityManager: ScoutHistoryEntityManager;
+  portalDetailPaneController: PortalDetailPaneController;
+  portalDetailState: PortalDetailState;
   channel: Channel;
 }) => {
   const timestamp = message[1];
@@ -43,10 +107,54 @@ const CommMessage = ({ message, viewer, channel }: {
               <span
                 style={{ color: "#bbb", cursor: "pointer", textDecoration: "underline" }}
                 onClick={() => {
-                  if (data.latE6 && data.lngE6) {
+                  if (data.latE6 !== undefined && data.lngE6 !== undefined) {
+                    const latE6 = data.latE6;
+                    const lngE6 = data.lngE6;
+                    const requestId = ++latestPortalSelectionRequest;
+                    const cachedSelectionPromise = selectLoadedPortal(
+                      viewer,
+                      container,
+                      portalEntityManager,
+                      portalHistoryEntityManager,
+                      scoutHistoryEntityManager,
+                      portalDetailPaneController,
+                      portalDetailState,
+                      latE6,
+                      lngE6,
+                      requestId
+                    );
                     viewer.camera.flyTo({
-                      destination: Cesium.Cartesian3.fromDegrees(data.lngE6 / 1e6, data.latE6 / 1e6, 8e2),
+                      destination: Cesium.Cartesian3.fromDegrees(lngE6 / 1e6, latE6 / 1e6, 8e2),
                       duration: 1.5,
+                      complete: () => {
+                        cachedSelectionPromise.then(async (selectionHandled) => {
+                          if (selectionHandled) return;
+
+                          // Cancel selection if there's another selection in flight
+                          if (requestId !== latestPortalSelectionRequest) return;
+
+                          // Explicitly request tiles here to avoid race condition
+                          const tileKeys = calculateTileKeys(viewer);
+                          if (tileKeys.length > 0) tileRequestManager.addTiles(tileKeys);
+                          await tileRequestManager.waitForIdle();
+
+                          // Cancel selection if there's another selection in flight
+                          if (requestId !== latestPortalSelectionRequest) return;
+
+                          await selectLoadedPortal(
+                            viewer,
+                            container,
+                            portalEntityManager,
+                            portalHistoryEntityManager,
+                            scoutHistoryEntityManager,
+                            portalDetailPaneController,
+                            portalDetailState,
+                            latE6,
+                            lngE6,
+                            requestId
+                          );
+                        });
+                      },
                     });
                   }
                 }}

@@ -85,6 +85,16 @@ export class PortalEntityManager {
     return this.portals.get(guid)?.data;
   }
 
+  public getPortalEntity(guid: string): Cesium.Entity | undefined {
+    return this.portals.get(guid)?.entity;
+  }
+
+  public getPortalDataByCoordinates(latE6: number, lngE6: number): PortalData | undefined {
+    return Array.from(this.portals.values()).find(({ data }) =>
+      data.latE6 === latE6 && data.lngE6 === lngE6
+    )?.data;
+  }
+
   public getAllPortalData(): Map<string, PortalData> {
     const result = new Map();
     this.portals.forEach((value) => { result.set(value.data.guid, value.data); });

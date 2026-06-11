@@ -30,17 +30,27 @@ export interface CoreControllers {
 }
 
 export function mountCoreControllersAndUI(viewer: Cesium.Viewer, container: HTMLElement, managers: CoreManagers): CoreControllers {
-  const portalDetailPaneController = new PortalDetailPaneController(container);
-  const softRefreshButtonController = new SoftRefreshButtonController(viewer, managers.tileRequestManager);
-  const gameDetailPaneController = new GameDetailPaneController(container, managers.scoreManager, managers.redeemManager);
-  const commDetailPaneController = new CommDetailPaneController(viewer, container, managers.commManager);
-  const layerChooserPaneController = new LayerChooserPaneController(container, managers.layerManager);
-
   const state: PortalDetailState = {
     lastLogMsg: "Loading...",
     lastPortalData: null,
     portalDetailBar: null,
   };
+
+  const softRefreshButtonController = new SoftRefreshButtonController(viewer, managers.tileRequestManager);
+  const layerChooserPaneController = new LayerChooserPaneController(container, managers.layerManager);
+  const portalDetailPaneController = new PortalDetailPaneController(container);
+  const gameDetailPaneController = new GameDetailPaneController(container, managers.scoreManager, managers.redeemManager);
+  const commDetailPaneController = new CommDetailPaneController(
+    viewer,
+    container,
+    managers.commManager,
+    managers.portalEntityManager,
+    managers.tileRequestManager,
+    managers.portalHistoryEntityManager,
+    managers.scoutHistoryEntityManager,
+    portalDetailPaneController,
+    state
+  );
 
   state.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailPaneController: portalDetailPaneController }));
   container.appendChild(GetLocationButton({ viewer }));

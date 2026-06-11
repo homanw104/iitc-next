@@ -3,8 +3,6 @@
  */
 
 import * as Cesium from "cesium";
-import type { LayerManager } from "../../../managers/layerManager";
-import { getPortalLayerId } from "../../../managers/portalEntityManager";
 import type { PortalEntityManager } from "../../../managers/portalEntityManager";
 import type { PortalHistoryEntityManager } from "../../../managers/portalHistoryEntityManager";
 import type { ScoutHistoryEntityManager } from "../../../managers/scoutHistoryEntityManager";
@@ -28,7 +26,6 @@ interface HandlePortalSelectionOptions {
   viewer: Cesium.Viewer;
   container: HTMLElement;
   portalDetailPaneController: PortalDetailPaneController;
-  layerManager: LayerManager;
   portalEntityManager: PortalEntityManager;
   portalHistoryEntityManager: PortalHistoryEntityManager;
   scoutHistoryEntityManager: ScoutHistoryEntityManager;
@@ -50,7 +47,6 @@ export function handlePortalSelection({
   viewer,
   container,
   portalDetailPaneController,
-  layerManager,
   portalEntityManager,
   portalHistoryEntityManager,
   scoutHistoryEntityManager,
@@ -95,16 +91,16 @@ export function handlePortalSelection({
         }
 
         const freshData = portalEntityManager.getPortalData(portalGuid);
-        if (!freshData) return;
-        const layerId = getPortalLayerId(freshData);
-        const source = layerManager.getOrCreateSourceAndFilter(layerId);
-        viewer.selectedEntity = source.entities.getById(`portal-${portalGuid}`);
-        interfaceState.lastPortalData = freshData;
-        interfaceState.portalDetailBar?.remove();
-        interfaceState.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailPaneController: portalDetailPaneController, data: freshData }));
-        portalDetailPaneController.updateDetailPane(freshData);
-        portalHistoryEntityManager.addOrUpdateHistoryHalo(freshData);
-        scoutHistoryEntityManager.addOrUpdateScoutControlHalo(freshData);
+
+        if (freshData) {
+          viewer.selectedEntity = portalEntityManager.getPortalEntity(portalGuid);
+          interfaceState.lastPortalData = freshData;
+          interfaceState.portalDetailBar?.remove();
+          interfaceState.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailPaneController: portalDetailPaneController, data: freshData }));
+          portalDetailPaneController.updateDetailPane(freshData);
+          portalHistoryEntityManager.addOrUpdateHistoryHalo(freshData);
+          scoutHistoryEntityManager.addOrUpdateScoutControlHalo(freshData);
+        }
       }, Math.max(0, gestureState.lastTapTime + doubleTapThreshold - Date.now()));
     }).finally(() => {
       selectionState.isPortalDetailLoading = false;

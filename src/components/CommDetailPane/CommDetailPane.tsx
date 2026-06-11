@@ -2,6 +2,12 @@ import { Viewer } from "cesium";
 import { h } from "../../utils/dom";
 import { Channel } from "../../types/ingress";
 import { CommManager } from "../../managers/commManager";
+import { PortalEntityManager } from "../../managers/portalEntityManager";
+import { PortalHistoryEntityManager } from "../../managers/portalHistoryEntityManager";
+import { ScoutHistoryEntityManager } from "../../managers/scoutHistoryEntityManager";
+import { TileRequestManager } from "../../managers/tileRequestManager";
+import type { PortalDetailPaneController } from "../../controllers/PortalDetailPaneController.tsx";
+import type { PortalDetailState } from "../../core/coreControllers";
 import CommSendButton from "./CommSendButton";
 import CommCloseButton from "./CommCloseButton";
 import CommTextInput from "./CommTextInput";
@@ -13,6 +19,13 @@ import CommTab from "./CommTab";
 const CommDetailPane = ({
   viewer,
   commManager,
+  portalEntityManager,
+  tileRequestManager,
+  portalHistoryEntityManager,
+  scoutHistoryEntityManager,
+  portalDetailPaneController,
+  portalDetailState,
+  container,
   channel,
   isFetchingNew,
   onTabClick,
@@ -27,6 +40,13 @@ const CommDetailPane = ({
 }: {
   viewer: Viewer;
   commManager: CommManager;
+  portalEntityManager: PortalEntityManager;
+  tileRequestManager: TileRequestManager;
+  portalHistoryEntityManager: PortalHistoryEntityManager;
+  scoutHistoryEntityManager: ScoutHistoryEntityManager;
+  portalDetailPaneController: PortalDetailPaneController;
+  portalDetailState: PortalDetailState;
+  container: HTMLElement;
   channel: Channel;
   isFetchingNew: boolean;
   onTabClick: (tab: Channel) => void;
@@ -98,7 +118,18 @@ const CommDetailPane = ({
         <CommLoadingIndicator onRef={onLoadingDivRef} />
         <div style={{ minHeight: "100%" }}>
           {messages.map((message) => (
-            <CommMessage message={message} viewer={viewer} channel={channel} />
+            <CommMessage
+              message={message}
+              viewer={viewer}
+              portalEntityManager={portalEntityManager}
+              tileRequestManager={tileRequestManager}
+              portalHistoryEntityManager={portalHistoryEntityManager}
+              scoutHistoryEntityManager={scoutHistoryEntityManager}
+              portalDetailPaneController={portalDetailPaneController}
+              portalDetailState={portalDetailState}
+              container={container}
+              channel={channel}
+            />
           ))}
         </div>
         <CommFetchLatestButton

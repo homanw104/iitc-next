@@ -2,12 +2,24 @@ import { Viewer } from "cesium";
 import { h } from "../utils/dom";
 import { Channel } from "../types/ingress";
 import { CommManager } from "../managers/commManager";
+import { PortalEntityManager } from "../managers/portalEntityManager";
+import { PortalHistoryEntityManager } from "../managers/portalHistoryEntityManager";
+import { ScoutHistoryEntityManager } from "../managers/scoutHistoryEntityManager";
+import { TileRequestManager } from "../managers/tileRequestManager";
 import { logManager } from "../managers/logManager";
 import CommDetailPane from "../components/CommDetailPane/CommDetailPane";
+import type { PortalDetailPaneController } from "./PortalDetailPaneController.tsx";
+import type { PortalDetailState } from "../core/coreControllers";
 
 export class CommDetailPaneController {
   private readonly viewer: Viewer;
   private readonly commManager: CommManager;
+  private readonly portalEntityManager: PortalEntityManager;
+  private readonly tileRequestManager: TileRequestManager;
+  private readonly portalHistoryEntityManager: PortalHistoryEntityManager;
+  private readonly scoutHistoryEntityManager: ScoutHistoryEntityManager;
+  private readonly portalDetailPaneController: PortalDetailPaneController;
+  private readonly portalDetailState: PortalDetailState;
 
   private container: HTMLElement;
   private pane: HTMLElement | null = null;
@@ -23,10 +35,26 @@ export class CommDetailPaneController {
   private previousScrollHeights: Map<string, number> = new Map([]);
   private previousScrollTops: Map<string, number> = new Map([]);
 
-  constructor(viewer: Viewer, container: HTMLElement, commManager: CommManager) {
+  constructor(
+    viewer: Viewer,
+    container: HTMLElement,
+    commManager: CommManager,
+    portalEntityManager: PortalEntityManager,
+    tileRequestManager: TileRequestManager,
+    portalHistoryEntityManager: PortalHistoryEntityManager,
+    scoutHistoryEntityManager: ScoutHistoryEntityManager,
+    portalDetailPaneController: PortalDetailPaneController,
+    portalDetailState: PortalDetailState
+  ) {
     this.viewer = viewer;
     this.container = container;
     this.commManager = commManager;
+    this.portalEntityManager = portalEntityManager;
+    this.tileRequestManager = tileRequestManager;
+    this.portalHistoryEntityManager = portalHistoryEntityManager;
+    this.scoutHistoryEntityManager = scoutHistoryEntityManager;
+    this.portalDetailPaneController = portalDetailPaneController;
+    this.portalDetailState = portalDetailState;
 
     this.refreshData().then(() => this.renderPane());
     this.renderPane();
@@ -140,6 +168,13 @@ export class CommDetailPaneController {
       <CommDetailPane
         viewer={this.viewer}
         commManager={this.commManager}
+        portalEntityManager={this.portalEntityManager}
+        tileRequestManager={this.tileRequestManager}
+        portalHistoryEntityManager={this.portalHistoryEntityManager}
+        scoutHistoryEntityManager={this.scoutHistoryEntityManager}
+        portalDetailPaneController={this.portalDetailPaneController}
+        portalDetailState={this.portalDetailState}
+        container={this.container}
         channel={this.currentChannel}
         isFetchingNew={this.isFetchingNew}
         onTabClick={this.handleTabClick}

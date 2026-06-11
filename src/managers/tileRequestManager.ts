@@ -123,6 +123,7 @@ export class TileRequestManager {
   private requestedTiles: Set<string> = new Set();
   private tileStatuses: Map<string, TileStatus> = new Map();
   private tileStatusListeners: TileStatusCallback[] = [];
+  private idleResolvers: (() => void)[] = [];
 
   private viewer: Cesium.Viewer;
   private portalEntityManager: PortalEntityManager;
@@ -191,6 +192,41 @@ export class TileRequestManager {
   }
 
   /**
+   * Waits for the system to become idle.
+   *
+   * @return A promise that resolves when the system is idle.
+   */
+  public waitForIdle(): Promise<void> {
+    if (this.isIdle()) return Promise.resolve();
+
+    return new Promise((resolve) => {
+      this.idleResolvers.push(resolve);
+    });
+  }
+
+  /**
+   * Checks if the system is idle by verifying that there are no active requests and no queued tiles.
+   *
+   * @return {boolean} - Returns true if the system is idle, false otherwise.
+   */
+  private isIdle(): boolean {
+    return this.activeRequestCount === 0 && this.queuedTiles.size === 0;
+  }
+
+  /**
+   * Resolves all pending idle waiters by invoking their respective resolution functions.
+   * This method checks if the current state is idle, and if so, it retrieves and executes all queued resolver functions.
+   *
+   * @return {void}
+   */
+  private resolveIdleWaiters(): void {
+    if (!this.isIdle()) return;
+
+    const resolvers = this.idleResolvers.splice(0);
+    resolvers.forEach((resolve) => resolve());
+  }
+
+  /**
    * Sets the status of a tile identified by a given key and runs callbacks.
    *
    * @param key - The unique identifier for the tile whose status is to be set.
@@ -217,6 +253,7 @@ export class TileRequestManager {
 
     if (this.queuedTiles.size === 0) {
       logManager.info("TileRequestManager", "Loaded");
+      this.resolveIdleWaiters();
       return;
     }
 
@@ -259,7 +296,7 @@ export class TileRequestManager {
       });
     } finally {
       this.activeRequestCount--;
-      this.processQueue().then();
+      this.processQueue().then(() => this.resolveIdleWaiters());
     }
   }
 

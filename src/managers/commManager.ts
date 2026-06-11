@@ -74,7 +74,7 @@ export class CommManager {
     faction: new Map(),
     alerts: new Map(),
   };
-  private callbacks: (() => void)[] = [() => {}];
+  private callbacks: (() => void)[] = [];
 
   constructor(viewer: Cesium.Viewer) {
     this.viewer = viewer;

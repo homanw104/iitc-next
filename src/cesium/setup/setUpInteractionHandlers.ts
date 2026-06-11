@@ -4,7 +4,6 @@
 
 import * as Cesium from "cesium";
 import { ScreenSpaceEventType } from "cesium";
-import type { LayerManager } from "../../managers/layerManager.ts";
 import type { PortalEntityManager } from "../../managers/portalEntityManager.ts";
 import type { PortalHistoryEntityManager } from "../../managers/portalHistoryEntityManager.ts";
 import type { ScoutHistoryEntityManager } from "../../managers/scoutHistoryEntityManager.ts";
@@ -22,7 +21,6 @@ export function setUpInteractionHandlers(
   viewer: Cesium.Viewer,
   container: HTMLElement,
   portalDetailPaneController: PortalDetailPaneController,
-  layerManager: LayerManager,
   portalEntityManager: PortalEntityManager,
   portalHistoryEntityManager: PortalHistoryEntityManager,
   scoutHistoryEntityManager: ScoutHistoryEntityManager,
@@ -50,7 +48,6 @@ export function setUpInteractionHandlers(
       viewer,
       container,
       portalDetailPaneController,
-      layerManager,
       portalEntityManager,
       portalHistoryEntityManager,
       scoutHistoryEntityManager,
