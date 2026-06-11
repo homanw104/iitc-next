@@ -1,3 +1,7 @@
+/**
+ * Configures Cesium camera controls for IITC's custom gesture handling.
+ */
+
 import * as Cesium from "cesium";
 
 export function configureCameraControls(viewer: Cesium.Viewer): void {

@@ -5,7 +5,7 @@ import { CommManager } from "../managers/commManager";
 import { logManager } from "../managers/logManager";
 import CommDetailPane from "../components/CommDetailPane/CommDetailPane";
 
-export class CommDetailPaneUI {
+export class CommDetailPaneController {
   private readonly viewer: Viewer;
   private readonly commManager: CommManager;
 

@@ -1,13 +1,13 @@
 import { safeWindow } from "../utils/window";
 import { logManager } from "../managers/logManager";
 import { createCoreManagers, exposeCoreManagers } from "../core/coreManagers";
-import { mountCoreUi } from "../core/coreUi";
+import { mountCoreControllersAndUI } from "../core/coreControllers.ts";
 import { createCesiumContainer } from "../cesium/setup/createCesiumContainer";
 import { initCesiumViewer } from "../cesium/setup/initCesiumViewer";
-import { setInitialView } from "../cesium/setup/setInitialView";
-import { setupTileUpdateWhenMove } from "../cesium/setup/setupTileUpdateWhenMove.ts";
-import { configureCameraControls } from "../cesium/interaction/configureCameraControls";
-import { setupInteractionHandlers } from "../cesium/interaction/setupInteractionHandlers";
+import { restoreLastView } from "../cesium/setup/restoreLastView.ts";
+import { setUpTileUpdateWhenMove } from "../cesium/setup/setUpTileUpdateWhenMove.ts";
+import { configureCameraControls } from "../cesium/setup/configureCameraControls.ts";
+import { setUpInteractionHandlers } from "../cesium/setup/setUpInteractionHandlers.ts";
 
 export default function loadCesiumViewer(): void {
   logManager.debug("CesiumViewer", "Loading");
@@ -15,24 +15,22 @@ export default function loadCesiumViewer(): void {
   const container = createCesiumContainer();
   const viewer = initCesiumViewer(container.id);
 
-  setInitialView(viewer);
+  restoreLastView(viewer);
 
   const managers = createCoreManagers(viewer, container);
-  const {
-    layerManager,
-    portalEntityManager,
-    portalHistoryEntityManager,
-    scoutHistoryEntityManager,
-    tileRequestManager,
-  } = managers;
+  const layerManager = managers.layerManager;
+  const portalEntityManager = managers.portalEntityManager;
+  const portalHistoryEntityManager = managers.portalHistoryEntityManager;
+  const scoutHistoryEntityManager = managers.scoutHistoryEntityManager;
+  const tileRequestManager = managers.tileRequestManager;
 
   // Expose managers to the global iitc object
   if (safeWindow) exposeCoreManagers(safeWindow.iitc, viewer, managers);
 
   // Mount core UI and get portal details UI and portal data in state
-  const { portalDetailUI, state } = mountCoreUi(viewer, container, managers);
+  const { portalDetailPaneController, state } = mountCoreControllersAndUI(viewer, container, managers);
 
-  setupInteractionHandlers(viewer, container, portalDetailUI, layerManager, portalEntityManager, portalHistoryEntityManager, scoutHistoryEntityManager, state);
-  setupTileUpdateWhenMove(viewer, tileRequestManager);
+  setUpInteractionHandlers(viewer, container, portalDetailPaneController, layerManager, portalEntityManager, portalHistoryEntityManager, scoutHistoryEntityManager, state);
+  setUpTileUpdateWhenMove(viewer, tileRequestManager);
   configureCameraControls(viewer);
 }

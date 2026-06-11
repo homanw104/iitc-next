@@ -1,3 +1,7 @@
+/**
+ * Creates the fixed full-screen DOM container that hosts the Cesium viewer.
+ */
+
 export function createCesiumContainer(): HTMLDivElement {
   const container = document.createElement("div");
   container.id = "cesium-container";

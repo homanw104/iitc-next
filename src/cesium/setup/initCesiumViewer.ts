@@ -1,3 +1,7 @@
+/**
+ * Initializes the Cesium viewer and base imagery configuration.
+ */
+
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import * as Cesium from "cesium";
 import { AmapMercatorTilingScheme } from "../../utils/map";

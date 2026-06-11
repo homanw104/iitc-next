@@ -1,12 +1,17 @@
+/**
+ * Handles portal picking and detail display updates from Cesium interactions.
+ */
+
 import * as Cesium from "cesium";
-import type { LayerManager } from "../../managers/layerManager";
-import { getPortalLayerId } from "../../managers/portalEntityManager";
-import type { PortalEntityManager } from "../../managers/portalEntityManager";
-import type { PortalHistoryEntityManager } from "../../managers/portalHistoryEntityManager";
-import type { ScoutHistoryEntityManager } from "../../managers/scoutHistoryEntityManager";
-import PortalDetailBar from "../../components/PortalDetailBar/PortalDetailBar";
-import type { PortalDetailPaneUI } from "../../interface/PortalDetailPaneUI";
-import type { PortalDetailState } from "../../core/coreUi";
+import type { LayerManager } from "../../../managers/layerManager";
+import { getPortalLayerId } from "../../../managers/portalEntityManager";
+import type { PortalEntityManager } from "../../../managers/portalEntityManager";
+import type { PortalHistoryEntityManager } from "../../../managers/portalHistoryEntityManager";
+import type { ScoutHistoryEntityManager } from "../../../managers/scoutHistoryEntityManager";
+import PortalDetailBar from "../../../components/PortalDetailBar/PortalDetailBar";
+import type { PortalDetailPaneController } from "../../../controllers/PortalDetailPaneController.tsx";
+import type { PortalDetailState } from "../../../core/coreControllers.ts";
+import type { InteractionGestureState } from "../state/interactionGestureState";
 
 export interface PortalSelectionState {
   isPortalDetailLoading: boolean;
@@ -14,23 +19,20 @@ export interface PortalSelectionState {
   lastPortalEntity?: Cesium.Entity;
 }
 
-export interface PortalSelectionGestureState {
-  hasJustDoubleTapped: boolean;
-  isDuringTheTap: boolean;
-  hasJustPinched: boolean;
-  isPinching: boolean;
-  lastTapTime: number;
-}
+export type PortalSelectionGestureState = Pick<
+  InteractionGestureState,
+  "hasJustDoubleTapped" | "isDuringTheTap" | "hasJustPinched" | "isPinching" | "lastTapTime"
+>;
 
 interface HandlePortalSelectionOptions {
   viewer: Cesium.Viewer;
   container: HTMLElement;
-  portalDetailUI: PortalDetailPaneUI;
+  portalDetailPaneController: PortalDetailPaneController;
   layerManager: LayerManager;
   portalEntityManager: PortalEntityManager;
   portalHistoryEntityManager: PortalHistoryEntityManager;
   scoutHistoryEntityManager: ScoutHistoryEntityManager;
-  state: PortalDetailState;
+  interfaceState: PortalDetailState;
   selectionState: PortalSelectionState;
   gestureState: PortalSelectionGestureState;
   doubleTapThreshold: number;
@@ -47,12 +49,12 @@ function isPortalDisplaySuppressed(gestureState: PortalSelectionGestureState): b
 export function handlePortalSelection({
   viewer,
   container,
-  portalDetailUI,
+  portalDetailPaneController,
   layerManager,
   portalEntityManager,
   portalHistoryEntityManager,
   scoutHistoryEntityManager,
-  state,
+  interfaceState,
   selectionState,
   gestureState,
   doubleTapThreshold,
@@ -78,10 +80,10 @@ export function handlePortalSelection({
 
     setTimeout(() => {
       if (isPortalDisplaySuppressed(gestureState)) return;
-      state.lastPortalData = portalData;
-      state.portalDetailBar?.remove();
-      state.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailUI, data: portalData }));
-      portalDetailUI.updateDetailPane(portalData);
+      interfaceState.lastPortalData = portalData;
+      interfaceState.portalDetailBar?.remove();
+      interfaceState.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailPaneController: portalDetailPaneController, data: portalData }));
+      portalDetailPaneController.updateDetailPane(portalData);
     }, doubleTapThreshold);
 
     selectionState.isPortalDetailLoading = true;
@@ -97,10 +99,10 @@ export function handlePortalSelection({
         const layerId = getPortalLayerId(freshData);
         const source = layerManager.getOrCreateSourceAndFilter(layerId);
         viewer.selectedEntity = source.entities.getById(`portal-${portalGuid}`);
-        state.lastPortalData = freshData;
-        state.portalDetailBar?.remove();
-        state.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailUI, data: freshData }));
-        portalDetailUI.updateDetailPane(freshData);
+        interfaceState.lastPortalData = freshData;
+        interfaceState.portalDetailBar?.remove();
+        interfaceState.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailPaneController: portalDetailPaneController, data: freshData }));
+        portalDetailPaneController.updateDetailPane(freshData);
         portalHistoryEntityManager.addOrUpdateHistoryHalo(freshData);
         scoutHistoryEntityManager.addOrUpdateScoutControlHalo(freshData);
       }, Math.max(0, gestureState.lastTapTime + doubleTapThreshold - Date.now()));
@@ -112,10 +114,10 @@ export function handlePortalSelection({
       if (isPortalDisplaySuppressed(gestureState)) return;
 
       viewer.selectedEntity = undefined;
-      state.lastPortalData = null;
-      state.portalDetailBar?.remove();
-      state.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailUI, msg: state.lastLogMsg }));
-      portalDetailUI.removeDetailPane();
+      interfaceState.lastPortalData = null;
+      interfaceState.portalDetailBar?.remove();
+      interfaceState.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailPaneController: portalDetailPaneController, msg: interfaceState.lastLogMsg }));
+      portalDetailPaneController.removeDetailPane();
     }, doubleTapThreshold);
   }
 }

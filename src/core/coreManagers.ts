@@ -1,3 +1,7 @@
+/**
+ * Creates and exposes the core managers that coordinate IITC runtime behavior.
+ */
+
 import * as Cesium from "cesium";
 import type { IITCCore } from "../types/iitc";
 import { CommManager } from "../managers/commManager";

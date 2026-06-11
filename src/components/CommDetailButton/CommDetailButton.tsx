@@ -1,8 +1,8 @@
 import { h } from "../../utils/dom";
-import { CommDetailPaneUI } from "../../interface/CommDetailPaneUI";
+import { CommDetailPaneController } from "../../controllers/CommDetailPaneController.tsx";
 
-const CommDetailButton = ({ commDetailPaneUI }: {
-  commDetailPaneUI: CommDetailPaneUI,
+const CommDetailButton = ({ commDetailPaneController }: {
+  commDetailPaneController: CommDetailPaneController,
 }): HTMLElement => {
   return (
     <div
@@ -19,7 +19,7 @@ const CommDetailButton = ({ commDetailPaneUI }: {
         type="button"
         title="COMM"
         className="cesium-button cesium-toolbar-button"
-        onClick={() => commDetailPaneUI.togglePane()}
+        onClick={() => commDetailPaneController.togglePane()}
         style={{
           display: "flex",
           alignItems: "center",

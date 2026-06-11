@@ -1,7 +1,7 @@
 import { LayerManager } from "../managers/layerManager";
 import LayerChooserPane from "../components/LayerChooserPane/LayerChooserPane";
 
-export class LayerChooserPaneUI {
+export class LayerChooserPaneController {
   private readonly container: HTMLElement;
   private readonly layerManager: LayerManager;
   private layerChooserPane: HTMLElement | null = null;

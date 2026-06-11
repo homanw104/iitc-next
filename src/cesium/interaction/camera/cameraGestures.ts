@@ -1,4 +1,20 @@
+/**
+ * Camera math helpers for custom globe pan and zoom gestures.
+ */
+
 import * as Cesium from "cesium";
+
+function getCameraUpForDirection(direction: Cesium.Cartesian3, previousUp: Cesium.Cartesian3): Cesium.Cartesian3 {
+  const right = Cesium.Cartesian3.cross(direction, previousUp, new Cesium.Cartesian3());
+
+  if (Cesium.Cartesian3.equalsEpsilon(right, Cesium.Cartesian3.ZERO, Cesium.Math.EPSILON14)) {
+    Cesium.Cartesian3.mostOrthogonalAxis(direction, right);
+  }
+
+  Cesium.Cartesian3.normalize(right, right);
+  const up = Cesium.Cartesian3.cross(right, direction, new Cesium.Cartesian3());
+  return Cesium.Cartesian3.normalize(up, up);
+}
 
 export function panCameraByOrbitingGlobe(
   camera: Cesium.Camera,
@@ -20,18 +36,6 @@ export function panCameraByOrbitingGlobe(
 
   Cesium.Cartesian3.normalize(axis, axis);
   camera.rotate(axis, Cesium.Math.acosClamped(dot));
-}
-
-function getCameraUpForDirection(direction: Cesium.Cartesian3, previousUp: Cesium.Cartesian3): Cesium.Cartesian3 {
-  const right = Cesium.Cartesian3.cross(direction, previousUp, new Cesium.Cartesian3());
-
-  if (Cesium.Cartesian3.equalsEpsilon(right, Cesium.Cartesian3.ZERO, Cesium.Math.EPSILON14)) {
-    Cesium.Cartesian3.mostOrthogonalAxis(direction, right);
-  }
-
-  Cesium.Cartesian3.normalize(right, right);
-  const up = Cesium.Cartesian3.cross(right, direction, new Cesium.Cartesian3());
-  return Cesium.Cartesian3.normalize(up, up);
 }
 
 export function zoomCameraAroundGlobePoint(camera: Cesium.Camera, center: Cesium.Cartesian3, amount: number): void {

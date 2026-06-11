@@ -4,7 +4,7 @@ import GameDetailPane from "../components/GameDetailPane/GameDetailPane";
 import PluginDetailPane from "../components/PluginDetailPane/PluginDetailPane";
 import RedeemResultPane from "../components/RedeemResultPane/RedeemResultPane";
 
-export class GameDetailPaneUI {
+export class GameDetailPaneController {
   private gameDetailPane: HTMLElement | null = null;
   private pluginDetailPane: HTMLElement | null = null;
   private redeemResultPane: HTMLElement | null = null;

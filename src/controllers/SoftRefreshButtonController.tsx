@@ -2,7 +2,7 @@ import * as Cesium from "cesium";
 import { TileRequestManager } from "../managers/tileRequestManager";
 import { calculateTileKeys } from "../utils/viewer";
 
-export class SoftRefreshUI {
+export class SoftRefreshButtonController {
   private readonly viewer: Cesium.Viewer;
   private readonly tileRequestManager: TileRequestManager;
 

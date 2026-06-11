@@ -1,16 +1,16 @@
 import { h } from "../../utils/dom";
 import { getTeamColor } from "../../utils/color";
 import { PortalData } from "../../types/ingress";
-import { PortalDetailPaneUI } from "../../interface/PortalDetailPaneUI";
+import { PortalDetailPaneController } from "../../controllers/PortalDetailPaneController.tsx";
 
-const PortalDetailBar = ({ portalDetailUI, data, msg }: {
-  portalDetailUI: PortalDetailPaneUI,
+const PortalDetailBar = ({ portalDetailPaneController, data, msg }: {
+  portalDetailPaneController: PortalDetailPaneController,
   data?: PortalData,
   msg?: string,
 }): HTMLElement => {
   return (
     <div
-      onClick={() => portalDetailUI.toggleDetailPane(data)}
+      onClick={() => portalDetailPaneController.toggleDetailPane(data)}
       style={{
         position: "absolute",
         left: "5px",
