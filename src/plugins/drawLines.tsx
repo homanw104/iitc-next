@@ -15,6 +15,7 @@ const LAYER_NAME = "Draw Lines";
 const STORAGE_KEY = "iitc-next-draw-lines";
 const PREVIEW_COLOR = "#cc823f";
 const LINE_COLOR = "#fa8525";
+const LINE_WIDTH = 3;
 const LINE_MARKER_SIZE_PX = 12;
 const LINE_MARKER_FILL_COLOR = "#ffffff";
 const LINE_MARKER_BORDER_COLOR = "#4a4a4a";
@@ -296,8 +297,8 @@ class DrawLinesPlugin {
     this.dataSource.entities.add({
       polyline: {
         positions: this.currentLine,
-        material: Cesium.Color.fromCssColorString(LINE_COLOR).withAlpha(0.7),
-        width: 3,
+        material: Cesium.Color.fromCssColorString(LINE_COLOR).withAlpha(0.8),
+        width: LINE_WIDTH,
       }
     });
 
@@ -462,8 +463,8 @@ class DrawLinesPlugin {
       this.currentLineEntity = this.dataSource.entities.add({
         polyline: {
           positions: new Cesium.CallbackProperty(() => this.currentLine, false),
-          material: Cesium.Color.fromCssColorString(PREVIEW_COLOR).withAlpha(0.7),
-          width: 3,
+          material: Cesium.Color.fromCssColorString(PREVIEW_COLOR).withAlpha(0.8),
+          width: LINE_WIDTH,
         }
       });
     }
@@ -677,8 +678,8 @@ class DrawLinesPlugin {
                 name,
                 polyline: {
                   positions: positions,
-                  material: Cesium.Color.fromCssColorString(LINE_COLOR).withAlpha(0.7),
-                  width: 3,
+                  material: Cesium.Color.fromCssColorString(LINE_COLOR).withAlpha(0.8),
+                  width: LINE_WIDTH,
                 }
               }));
             }
