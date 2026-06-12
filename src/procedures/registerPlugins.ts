@@ -13,4 +13,5 @@ export default async function registerPlugins() {
   await import("../plugins/playerActivity.tsx");
   await import("../plugins/drawLines.tsx");
   await import("../plugins/crossLines.tsx");
+  await import("../plugins/doneLines.tsx");
 }
