@@ -21,10 +21,10 @@ export default defineConfig(
     },
     rules: {
       "semi": ["error", "always"],
-      "quotes": ["error", "double", { "allowTemplateLiterals": true }]
+      "quotes": ["error", "double", { "allowTemplateLiterals": true }],
     }
   },
   {
-    ignores: ["dist/", "old/"]
+    ignores: ["dist/", "old/", "android/", "ios/"],
   },
 );
