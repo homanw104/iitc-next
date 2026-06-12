@@ -15,6 +15,14 @@ const LAYER_NAME = "Draw Lines";
 const STORAGE_KEY = "iitc-next-draw-lines";
 const PREVIEW_COLOR = "#cc823f";
 const LINE_COLOR = "#fa8525";
+const TOUCH_GESTURE_MOVE_THRESHOLD_PX = 8;
+const TOUCH_GESTURE_IGNORE_MS = 450;
+const TOUCH_EVENT_OPTIONS: AddEventListenerOptions = { capture: true, passive: true };
+
+interface TouchStartPosition {
+  x: number;
+  y: number;
+}
 
 class DrawLinesPlugin {
   public id = "draw-lines";
@@ -41,6 +49,9 @@ class DrawLinesPlugin {
   private currentLine: Cesium.Cartesian3[] | undefined;
   private currentLineEntity: Cesium.Entity | undefined;
   private dataSource: Cesium.DataSource | undefined;
+  private touchStartPositions = new Map<number, TouchStartPosition>();
+  private isTouchGestureInProgress = false;
+  private ignoreTouchGestureUntil = 0;
 
   public init() {
     if (safeWindow) {
@@ -125,9 +136,12 @@ class DrawLinesPlugin {
       }
     };
     this.viewer.selectedEntityChanged.addEventListener(this.selectedEntityChangedListener);
+    this.bindTouchGestureEvents();
 
     // LEFT_CLICK: start/finish/delete line
     this.handler.setInputAction((event: Cesium.ScreenSpaceEventHandler.PositionedEvent) => {
+      if (this.shouldIgnoreTouchGesture()) return;
+
       if (this.isDrawing) {
         const pos = this.resolvePosition(event.position);
         if (pos) {
@@ -145,6 +159,8 @@ class DrawLinesPlugin {
 
     // MOUSE_MOVE: update preview or update pointer shape
     this.handler.setInputAction((event: Cesium.ScreenSpaceEventHandler.MotionEvent) => {
+      if (this.shouldIgnoreTouchGesture()) return;
+
       if (this.isDrawing) {
         const pos = this.resolvePosition(event.endPosition);
         if (pos) {
@@ -169,6 +185,7 @@ class DrawLinesPlugin {
   }
 
   private unbindEvents() {
+    this.unbindTouchGestureEvents();
     this.handler?.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_CLICK);
     this.handler?.removeInputAction(Cesium.ScreenSpaceEventType.MOUSE_MOVE);
     this.handler?.removeInputAction(Cesium.ScreenSpaceEventType.RIGHT_CLICK);
@@ -176,6 +193,82 @@ class DrawLinesPlugin {
       this.viewer?.selectedEntityChanged.removeEventListener(this.selectedEntityChangedListener);
       this.selectedEntityChangedListener = undefined;
     }
+  }
+
+  private bindTouchGestureEvents() {
+    const canvas = this.viewer?.scene.canvas;
+    if (!canvas) return;
+
+    canvas.addEventListener("touchstart", this.handleTouchStart, TOUCH_EVENT_OPTIONS);
+    canvas.addEventListener("touchmove", this.handleTouchMove, TOUCH_EVENT_OPTIONS);
+    canvas.addEventListener("touchend", this.handleTouchEnd, TOUCH_EVENT_OPTIONS);
+    canvas.addEventListener("touchcancel", this.handleTouchEnd, TOUCH_EVENT_OPTIONS);
+  }
+
+  private unbindTouchGestureEvents() {
+    const canvas = this.viewer?.scene.canvas;
+    if (!canvas) return;
+
+    canvas.removeEventListener("touchstart", this.handleTouchStart, TOUCH_EVENT_OPTIONS);
+    canvas.removeEventListener("touchmove", this.handleTouchMove, TOUCH_EVENT_OPTIONS);
+    canvas.removeEventListener("touchend", this.handleTouchEnd, TOUCH_EVENT_OPTIONS);
+    canvas.removeEventListener("touchcancel", this.handleTouchEnd, TOUCH_EVENT_OPTIONS);
+    this.touchStartPositions.clear();
+    this.isTouchGestureInProgress = false;
+    this.ignoreTouchGestureUntil = 0;
+  }
+
+  private handleTouchStart = (event: TouchEvent) => {
+    for (const touch of Array.from(event.changedTouches)) {
+      this.touchStartPositions.set(touch.identifier, {
+        x: touch.clientX,
+        y: touch.clientY,
+      });
+    }
+
+    if (event.touches.length > 1) this.markTouchGesture();
+  };
+
+  private handleTouchMove = (event: TouchEvent) => {
+    if (event.touches.length > 1) {
+      this.markTouchGesture();
+      return;
+    }
+
+    for (const touch of Array.from(event.changedTouches)) {
+      const start = this.touchStartPositions.get(touch.identifier);
+      if (!start) continue;
+
+      const dx = touch.clientX - start.x;
+      const dy = touch.clientY - start.y;
+      if (Math.sqrt(dx * dx + dy * dy) > TOUCH_GESTURE_MOVE_THRESHOLD_PX) {
+        this.markTouchGesture();
+        return;
+      }
+    }
+  };
+
+  private handleTouchEnd = (event: TouchEvent) => {
+    for (const touch of Array.from(event.changedTouches)) {
+      this.touchStartPositions.delete(touch.identifier);
+    }
+
+    if (event.touches.length === 0) {
+      this.touchStartPositions.clear();
+      if (this.isTouchGestureInProgress) {
+        this.ignoreTouchGestureUntil = Date.now() + TOUCH_GESTURE_IGNORE_MS;
+      }
+      this.isTouchGestureInProgress = false;
+    }
+  };
+
+  private markTouchGesture() {
+    this.isTouchGestureInProgress = true;
+    this.ignoreTouchGestureUntil = Date.now() + TOUCH_GESTURE_IGNORE_MS;
+  }
+
+  private shouldIgnoreTouchGesture(): boolean {
+    return this.isTouchGestureInProgress || Date.now() < this.ignoreTouchGestureUntil;
   }
 
   private startLine(pos: Cesium.Cartesian3) {
