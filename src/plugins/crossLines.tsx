@@ -16,8 +16,8 @@ const DRAW_LINES_LAYER_NAME = "Draw Lines";
 const CROSS_LINES_LAYER_NAME = "Cross Lines";
 const LINK_LAYER_NAMES = ["links-enlightened", "links-resistance", "links-machina", "links-neutral"];
 const HIGHLIGHT_COLOR = "#ff0000";
-const HIGHLIGHT_WIDTH = 3;
-const DASH_LENGTH = 12;
+const HIGHLIGHT_WIDTH = 4;
+const DASH_LENGTH = 16;
 const EPSILON = 1e-10;
 
 interface Point {
@@ -61,8 +61,11 @@ class CrossLinesPlugin {
 
     this.drawLinesSource = this.layerManager.getOrCreateSourceAndFilter(DRAW_LINES_LAYER_NAME);
     this.highlightSource = this.layerManager.getOrCreateSourceAndFilter(CROSS_LINES_LAYER_NAME);
+    const layerManager = this.layerManager;
     this.viewer.dataSources.dataSourceAdded.addEventListener(this.dataSourceAddedListener);
     this.viewer.dataSources.dataSourceRemoved.addEventListener(this.dataSourceRemovedListener);
+    this.trackSource(this.drawLinesSource);
+    LINK_LAYER_NAMES.forEach(name => this.trackSource(layerManager.getOrCreateSourceAndFilter(name)));
     this.forEachDataSource(source => this.trackSource(source));
     this.scheduleUpdate();
   }
@@ -144,7 +147,7 @@ class CrossLinesPlugin {
           positions: positions.slice(0, 2),
           width: HIGHLIGHT_WIDTH,
           material: new Cesium.PolylineDashMaterialProperty({
-            color: Cesium.Color.fromCssColorString(HIGHLIGHT_COLOR).withAlpha(0.95),
+            color: Cesium.Color.fromCssColorString(HIGHLIGHT_COLOR).withAlpha(1),
             dashLength: DASH_LENGTH,
           }),
           arcType: Cesium.ArcType.GEODESIC,
