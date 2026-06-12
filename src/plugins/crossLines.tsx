@@ -231,7 +231,7 @@ const register = () => {
   if (safeWindow && safeWindow.iitc && safeWindow.iitc.pluginManager) {
     safeWindow.iitc.pluginManager.registerPlugin(new CrossLinesPlugin());
   } else {
-    setTimeout(register, 3000);
+    setTimeout(register, 1000);
   }
 };
 

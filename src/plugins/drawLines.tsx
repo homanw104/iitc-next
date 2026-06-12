@@ -15,6 +15,10 @@ const LAYER_NAME = "Draw Lines";
 const STORAGE_KEY = "iitc-next-draw-lines";
 const PREVIEW_COLOR = "#cc823f";
 const LINE_COLOR = "#fa8525";
+const LINE_MARKER_SIZE_PX = 12;
+const LINE_MARKER_FILL_COLOR = "#ffffff";
+const LINE_MARKER_BORDER_COLOR = "#4a4a4a";
+const LINE_MARKER_TIMEOUT_MS = 400;
 const TOUCH_GESTURE_MOVE_THRESHOLD_PX = 8;
 const TOUCH_GESTURE_IGNORE_MS = 450;
 const TOUCH_EVENT_OPTIONS: AddEventListenerOptions = { capture: true, passive: true };
@@ -48,6 +52,10 @@ class DrawLinesPlugin {
   private handler: Cesium.ScreenSpaceEventHandler | undefined;
   private currentLine: Cesium.Cartesian3[] | undefined;
   private currentLineEntity: Cesium.Entity | undefined;
+  private lineMarkerImage: string | undefined;
+  private lineStartMarkerEntity: Cesium.Entity | undefined;
+  private lineEndMarkerEntity: Cesium.Entity | undefined;
+  private lineMarkerRemovalTimeout: ReturnType<typeof setTimeout> | undefined;
   private dataSource: Cesium.DataSource | undefined;
   private touchStartPositions = new Map<number, TouchStartPosition>();
   private isTouchGestureInProgress = false;
@@ -123,6 +131,8 @@ class DrawLinesPlugin {
     this.isDrawing = false;
     this.isDeleting = false;
     this.isLineStarted = false;
+
+    this.removeLineMarkers();
   }
 
   private bindEvents() {
@@ -179,8 +189,7 @@ class DrawLinesPlugin {
 
     // RIGHT_CLICK: cancel line
     this.handler.setInputAction(() => {
-      if (!this.isDrawing) return;
-      if (this.isLineStarted) this.cancelLine();
+      this.cancelLine();
     }, Cesium.ScreenSpaceEventType.RIGHT_CLICK);
   }
 
@@ -274,6 +283,8 @@ class DrawLinesPlugin {
   private startLine(pos: Cesium.Cartesian3) {
     this.currentLine = [pos];
     this.isLineStarted = true;
+    this.removeLineMarkers();
+    this.showLineMarker("start", pos);
     this.renderPreview(pos);
   }
 
@@ -296,12 +307,15 @@ class DrawLinesPlugin {
     safeLocalStorage.setItem(STORAGE_KEY, kml);
 
     this.removePreview();
+    this.showLineMarker("end", pos);
+    this.scheduleLineMarkersRemoval();
     this.currentLine = undefined;
     this.isLineStarted = false;
   }
 
   private cancelLine() {
     this.removePreview();
+    this.removeLineMarkers();
     this.currentLine = undefined;
     this.isLineStarted = false;
   }
@@ -320,9 +334,9 @@ class DrawLinesPlugin {
   }
 
   private clearLines(): void {
-    if (!this.interfaceManager) throw new Error("InterfaceManager is missing");
-    if (!this.dataSource) throw new Error("draw-lines: source is undefined");
-    if (!this.viewer) throw new Error("Viewer is missing");
+    if (!this.interfaceManager) throw new Error("draw-lines: InterfaceManager is missing");
+    if (!this.dataSource) throw new Error("draw-lines: dataSource is undefined");
+    if (!this.viewer) throw new Error("draw-lines: Viewer is missing");
 
     if (this.isDrawing) this.toggleDrawing();
     if (this.isDeleting) this.toggleDeleting();
@@ -460,18 +474,93 @@ class DrawLinesPlugin {
   private removePreview() {
     if (!this.viewer) throw new Error("draw-lines: viewer is undefined");
     if (!this.dataSource) throw new Error("draw-lines: data source is undefined");
-    if (!this.currentLineEntity) throw new Error("draw-lines: current line entity is undefined");
 
-    this.dataSource.entities.remove(this.currentLineEntity);
+    if (this.currentLineEntity) this.dataSource.entities.remove(this.currentLineEntity);
     this.currentLineEntity = undefined;
 
     this.viewer.scene.requestRender();
   }
 
+  private showLineMarker(marker: "start" | "end", pos: Cesium.Cartesian3) {
+    if (!this.viewer) throw new Error("draw-lines: viewer is undefined");
+
+    if (!this.lineMarkerImage) this.lineMarkerImage = this.createLineMarkerImage();
+
+    const existingMarker = marker === "start" ? this.lineStartMarkerEntity : this.lineEndMarkerEntity;
+    if (existingMarker) {
+      existingMarker.position = new Cesium.ConstantPositionProperty(pos);
+    } else {
+      const entity = this.viewer.entities.add({
+        position: pos,
+        billboard: {
+          image: this.lineMarkerImage,
+          width: LINE_MARKER_SIZE_PX,
+          height: LINE_MARKER_SIZE_PX,
+          horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+          verticalOrigin: Cesium.VerticalOrigin.CENTER,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+      });
+
+      if (marker === "start") {
+        this.lineStartMarkerEntity = entity;
+      } else {
+        this.lineEndMarkerEntity = entity;
+      }
+    }
+
+    this.viewer.scene.requestRender();
+  }
+
+  private removeLineMarkers() {
+    if (!this.viewer) throw new Error("draw-lines: viewer is undefined");
+
+    this.cancelLineMarkersRemoval();
+    if (this.lineStartMarkerEntity) this.viewer.entities.remove(this.lineStartMarkerEntity);
+    if (this.lineEndMarkerEntity) this.viewer.entities.remove(this.lineEndMarkerEntity);
+    this.lineStartMarkerEntity = undefined;
+    this.lineEndMarkerEntity = undefined;
+    this.viewer.scene.requestRender();
+  }
+
+  private scheduleLineMarkersRemoval() {
+    this.cancelLineMarkersRemoval();
+    this.lineMarkerRemovalTimeout = setTimeout(() => {
+      this.lineMarkerRemovalTimeout = undefined;
+      this.removeLineMarkers();
+    }, LINE_MARKER_TIMEOUT_MS);
+  }
+
+  private cancelLineMarkersRemoval() {
+    if (this.lineMarkerRemovalTimeout === undefined) return;
+
+    clearTimeout(this.lineMarkerRemovalTimeout);
+    this.lineMarkerRemovalTimeout = undefined;
+  }
+
+  private createLineMarkerImage(): string {
+    const canvas = document.createElement("canvas");
+    canvas.width = LINE_MARKER_SIZE_PX;
+    canvas.height = LINE_MARKER_SIZE_PX;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("draw-lines: marker canvas context is undefined");
+
+    ctx.fillStyle = LINE_MARKER_FILL_COLOR;
+    ctx.fillRect(0, 0, LINE_MARKER_SIZE_PX, LINE_MARKER_SIZE_PX);
+    ctx.strokeStyle = LINE_MARKER_BORDER_COLOR;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(0.5, 0.5, LINE_MARKER_SIZE_PX - 1, LINE_MARKER_SIZE_PX - 1);
+
+    return canvas.toDataURL();
+  }
+
   private toggleDrawing() {
     this.isDrawing = !this.isDrawing;
-    this.isDeleting = false;
-    if (this.currentLine) this.cancelLine();
+    this.cancelLine();
+    if (this.isDeleting) {
+      this.isDeleting = false;
+    }
     if (this.drawLinesButtonEl) this.drawLinesButtonEl.style.borderColor = this.isDrawing ? "#21ee21" : "#444444";
     if (this.drawLinesButtonEl) this.drawLinesButtonEl.style.boxShadow = this.isDrawing ? "rgb(255, 255, 255) 0px 0px 8px 0px, rgb(255, 255, 255) 0px 0px 8px 0px" : "none";
     if (this.deleteLinesButtonEl) this.deleteLinesButtonEl.style.borderColor = "#444444";
@@ -483,7 +572,10 @@ class DrawLinesPlugin {
 
   private toggleDeleting() {
     this.isDeleting = !this.isDeleting;
-    this.isDrawing = false;
+    if (this.isDrawing) {
+      this.isDrawing = false;
+      this.cancelLine();
+    }
     if (this.deleteLinesButtonEl) this.deleteLinesButtonEl.style.borderColor = this.isDeleting ? "#21ee21" : "#444444";
     if (this.deleteLinesButtonEl) this.deleteLinesButtonEl.style.boxShadow = this.isDeleting ? "rgb(255, 255, 255) 0px 0px 8px 0px, rgb(255, 255, 255) 0px 0px 8px 0px" : "none";
     if (this.drawLinesButtonEl) this.drawLinesButtonEl.style.borderColor = "#444444";
@@ -795,7 +887,7 @@ const register = () => {
   if (safeWindow && safeWindow.iitc && safeWindow.iitc.pluginManager) {
     safeWindow.iitc.pluginManager.registerPlugin(new DrawLinesPlugin());
   } else {
-    setTimeout(register, 3000);
+    setTimeout(register, 1000);
   }
 };
 
