@@ -16,7 +16,7 @@ const STORAGE_KEY = "iitc-next-draw-lines";
 const PREVIEW_COLOR = "#cc823f";
 const LINE_COLOR = "#fa8525";
 
-class DrawLines {
+class DrawLinesPlugin {
   public id = "draw-lines";
   public name = "Draw Lines";
   public description = "This plugin enables you to draw lines on the map.";
@@ -700,7 +700,7 @@ const ConfirmPane = ({ msg, onConfirm, onCancel }: {
 
 const register = () => {
   if (safeWindow && safeWindow.iitc && safeWindow.iitc.pluginManager) {
-    safeWindow.iitc.pluginManager.registerPlugin(new DrawLines());
+    safeWindow.iitc.pluginManager.registerPlugin(new DrawLinesPlugin());
   } else {
     setTimeout(register, 3000);
   }
