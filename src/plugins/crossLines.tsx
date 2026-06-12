@@ -212,24 +212,18 @@ class CrossLinesPlugin {
     const cdA = this.orientation(c, d, a);
     const cdB = this.orientation(c, d, b);
 
-    if (abC * abD < 0 && cdA * cdB < 0) return true;
-    if (Math.abs(abC) <= EPSILON && this.isOnSegment(a, c, b)) return true;
-    if (Math.abs(abD) <= EPSILON && this.isOnSegment(a, d, b)) return true;
-    if (Math.abs(cdA) <= EPSILON && this.isOnSegment(c, a, d)) return true;
-    if (Math.abs(cdB) <= EPSILON && this.isOnSegment(c, b, d)) return true;
-
-    return false;
+    return this.sign(abC) * this.sign(abD) < 0 &&
+      this.sign(cdA) * this.sign(cdB) < 0;
   }
 
   private orientation(a: Point, b: Point, c: Point): number {
     return (b.lng - a.lng) * (c.lat - a.lat) - (b.lat - a.lat) * (c.lng - a.lng);
   }
 
-  private isOnSegment(a: Point, b: Point, c: Point): boolean {
-    return b.lng >= Math.min(a.lng, c.lng) - EPSILON &&
-      b.lng <= Math.max(a.lng, c.lng) + EPSILON &&
-      b.lat >= Math.min(a.lat, c.lat) - EPSILON &&
-      b.lat <= Math.max(a.lat, c.lat) + EPSILON;
+  private sign(value: number): number {
+    if (Math.abs(value) <= EPSILON) return 0;
+
+    return value > 0 ? 1 : -1;
   }
 }
 
