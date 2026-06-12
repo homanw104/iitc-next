@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.3.0
+
+* Added cross lines plugin
+* Added done lines plugin
+* Added markers when drawing lines
+* Added app icons
+* Draw lines plugin now ignores touch gestures
+* Fixed portal detail pane not showing details
+
 ## 1.2.0
 
 * Improved performance
