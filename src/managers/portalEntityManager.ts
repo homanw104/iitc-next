@@ -209,23 +209,29 @@ export function parsePortal(ent: RawEntity): PortalData {
 
   if (data.length >= 18) {
     if (data[14]) {
-      portal.mods = (data[14] as any[]).map((m: any): PortalMod | null => {
-        if (!m) return null;
+      portal.mods = (data[14] as unknown[]).map((m): PortalMod | null => {
+        if (!Array.isArray(m)) return null;
         return {
-          owner: m[0],
-          name: m[1],
-          rarity: m[2],
-          stats: m[3],
+          owner: m[0] as string,
+          name: m[1] as string,
+          rarity: m[2] as string,
+          stats: m[3] as Record<string, string>,
         };
       });
-      portal.resonators = (data[15] as any[]).map((r: any): PortalResonator | null => {
-        if (!r) return null;
+    }
+
+    if (data[15]) {
+      portal.resonators = (data[15] as unknown[]).map((r): PortalResonator | null => {
+        if (!Array.isArray(r)) return null;
         return {
-          owner: r[0],
-          level: r[1],
-          energy: r[2],
+          owner: r[0] as string,
+          level: r[1] as number,
+          energy: r[2] as number,
         };
       });
+    }
+
+    if (data[16]) {
       portal.owner = data[16] as string | undefined;
     }
 

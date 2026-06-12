@@ -3,7 +3,7 @@
  */
 
 export interface InteractionGestureState {
-  lastTapTime: number;
+  pendingSingleTapTime: number | null;
   isDuringTheTap: boolean;
   hasJustDoubleTapped: boolean;
   isPinching: boolean;
@@ -13,7 +13,7 @@ export interface InteractionGestureState {
 
 export function createInteractionGestureState(): InteractionGestureState {
   return {
-    lastTapTime: 0,
+    pendingSingleTapTime: null,
     isDuringTheTap: false,
     hasJustDoubleTapped: false,
     isPinching: false,

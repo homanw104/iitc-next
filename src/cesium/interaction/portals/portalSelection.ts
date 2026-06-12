@@ -19,7 +19,7 @@ export interface PortalSelectionState {
 
 export type PortalSelectionGestureState = Pick<
   InteractionGestureState,
-  "hasJustDoubleTapped" | "isDuringTheTap" | "hasJustPinched" | "isPinching" | "lastTapTime"
+  "hasJustDoubleTapped" | "isDuringTheTap" | "hasJustPinched" | "isPinching"
 >;
 
 interface HandlePortalSelectionOptions {
@@ -56,6 +56,7 @@ export function handlePortalSelection({
   doubleTapThreshold,
   position,
 }: HandlePortalSelectionOptions): void {
+  const displayPortalDetailAfter = Date.now() + doubleTapThreshold;
   const pickedObjects = viewer.scene.drillPick(position);
   const portalEntity = pickedObjects.find(
     (o) =>
@@ -73,8 +74,10 @@ export function handlePortalSelection({
     const portalGuid = portalEntity.id.substring(7);
     const portalData = portalEntityManager.getPortalData(portalGuid);
     if (!portalData) return;
+    let hasRenderedFreshPortalData = false;
 
     setTimeout(() => {
+      if (hasRenderedFreshPortalData) return;
       if (isPortalDisplaySuppressed(gestureState)) return;
       interfaceState.lastPortalData = portalData;
       interfaceState.portalDetailBar?.remove();
@@ -93,6 +96,7 @@ export function handlePortalSelection({
         const freshData = portalEntityManager.getPortalData(portalGuid);
 
         if (freshData) {
+          hasRenderedFreshPortalData = true;
           viewer.selectedEntity = portalEntityManager.getPortalEntity(portalGuid);
           interfaceState.lastPortalData = freshData;
           interfaceState.portalDetailBar?.remove();
@@ -101,7 +105,7 @@ export function handlePortalSelection({
           portalHistoryEntityManager.addOrUpdateHistoryHalo(freshData);
           scoutHistoryEntityManager.addOrUpdateScoutControlHalo(freshData);
         }
-      }, Math.max(0, gestureState.lastTapTime + doubleTapThreshold - Date.now()));
+      }, Math.max(0, displayPortalDetailAfter - Date.now()));
     }).finally(() => {
       selectionState.isPortalDetailLoading = false;
     });

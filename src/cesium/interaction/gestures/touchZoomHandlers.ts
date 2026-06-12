@@ -41,9 +41,9 @@ export function createTouchZoomHandlers(
       inertiaResetTimeoutId = null;
     }
 
-    if (now - gestureState.lastTapTime < doubleTapThreshold) {
+    if (gestureState.pendingSingleTapTime !== null && now - gestureState.pendingSingleTapTime < doubleTapThreshold) {
       isDuringTheSecondTap = true;
-      gestureState.lastTapTime = 0;
+      gestureState.pendingSingleTapTime = null;
       gestureState.hasJustDoubleTapped = true;
       controller.enableInputs = false;
 
@@ -54,7 +54,7 @@ export function createTouchZoomHandlers(
       revertHasJustDoubleTappedTimeoutId = setTimeout(() => gestureState.hasJustDoubleTapped = false, doubleTapThreshold * 2);
     } else {
       isDuringTheSecondTap = false;
-      gestureState.lastTapTime = now;
+      gestureState.pendingSingleTapTime = now;
       gestureState.hasJustDoubleTapped = false;
       controller.enableInputs = true;
     }
