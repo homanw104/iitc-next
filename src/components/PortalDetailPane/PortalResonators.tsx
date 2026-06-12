@@ -10,11 +10,11 @@ const PortalResonators = ({ data, teamColorHex }: { data: PortalData, teamColorH
       gridRowGap: "4px",
       fontSize: "12px",
     }}>
-      {Array.from({ length: 4 }).map((_, i) => {
-        const idx1 = i * 2;
-        const idx2 = i * 2 + 1;
-        const r1 = data.resonators?.[idx1];
-        const r2 = data.resonators?.[idx2];
+      {Array.from({ length: 4 }, (_, i) => {
+        const i1 = i * 2;
+        const i2 = i * 2 + 1;
+        const r1 = data.resonators === undefined ? undefined : data.resonators[i1] === undefined ? null : data.resonators[i1];
+        const r2 = data.resonators === undefined ? undefined : data.resonators[i2] === undefined ? null : data.resonators[i2];
         return (
           <Fragment key={i}>
             <div style={{
@@ -25,7 +25,7 @@ const PortalResonators = ({ data, teamColorHex }: { data: PortalData, teamColorH
               whiteSpace: "nowrap",
               color: r1 ? teamColorHex : "#555"
             }}>
-              {r1?.owner || "empty slot"}
+              {r1 === undefined ? "unknown" : r1 === null ? "empty slot" : r1.owner}
             </div>
             <div style={{
               padding: "8px 6px",

@@ -4,7 +4,7 @@ import { PortalData } from "../../types/ingress";
 const PortalMods = ({ data, teamColorHex }: { data: PortalData, teamColorHex: string }) => (
   <div style={{ alignSelf: "stretch" }}>
     <div style={{ display: "flex", flexDirection: "row", alignItems: "stretch", justifyContent: "flex-start", gap: "4px" }}>
-      {Array.from({ length: 4 }).map((_, i) => {
+      {Array.from({ length: 4 }, (_, i) => {
         const mod = data.mods?.[i];
         return (
           <div
@@ -18,7 +18,7 @@ const PortalMods = ({ data, teamColorHex }: { data: PortalData, teamColorHex: st
               border: mod ? "1px solid #555" : "1px dashed #444",
             }}
           >
-            {mod == null ? mod == undefined ? (
+            {mod === undefined ? (
               <div style={{
                 display: "flex",
                 flexDirection: "column",
@@ -36,7 +36,7 @@ const PortalMods = ({ data, teamColorHex }: { data: PortalData, teamColorHex: st
                   Loading
                 </div>
               </div>
-            ) : (
+            ) : mod === null ? (
               <div style={{
                 display: "flex",
                 flexDirection: "column",
