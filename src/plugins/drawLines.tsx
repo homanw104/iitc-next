@@ -599,11 +599,17 @@ class DrawLinesPlugin {
     if (!this.viewer) throw new Error("draw-lines: viewer is undefined");
 
     const picked = this.viewer.scene.pick(position);
-    if (snap && picked && picked.id instanceof Cesium.Entity && picked.id.id.startsWith("portal")) {
-      return picked.id.position.getValue();
-    } else {
-      return this.viewer.camera.pickEllipsoid(position, this.viewer.scene.globe.ellipsoid);
+    if (snap && picked && picked.id instanceof Cesium.Entity) {
+      if (
+        picked.id.id.startsWith("portal") ||
+        picked.id === this.lineStartMarkerEntity ||
+        picked.id === this.lineEndMarkerEntity
+      ) {
+        return picked.id.position.getValue();
+      }
     }
+
+    return this.viewer.camera.pickEllipsoid(position, this.viewer.scene.globe.ellipsoid);
   }
 
   private writeLinesToKml(entities: Cesium.Entity[]): string {
