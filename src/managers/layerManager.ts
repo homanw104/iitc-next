@@ -38,6 +38,7 @@ export class LayerManager {
     this.filterState.set("portals", true);
     this.filterState.set("links", true);
     this.filterState.set("fields", true);
+    this.filterState.set("label-portals", true);
     this.filterState.set("history", false);
     this.filterState.set("scout-control", false);
     this.filterState.set("history-reverse", false);
@@ -200,6 +201,10 @@ export class LayerManager {
         const levelVisible = this.filterState.get(`level-${l}`) !== false;
         this.setSourceVisible(`portals-l${l}-${t}`, teamVisible && levelVisible);
       });
+
+      // Portal labels
+      const portalLabelsVisible = this.filterState.get("label-portals") !== false;
+      this.setSourceVisible(`label-portal-${t}`, teamVisible && portalLabelsVisible);
 
       // Placeholders
       const placeholdersVisible = this.filterState.get("portals-placeholder") !== false;

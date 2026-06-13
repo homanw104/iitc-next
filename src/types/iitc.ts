@@ -9,6 +9,7 @@ import { LayerManager } from "../managers/layerManager";
 import { PortalEntityManager } from "../managers/portalEntityManager";
 import { LinkEntityManager } from "../managers/linkEntityManager";
 import { FieldEntityManager } from "../managers/fieldEntityManager";
+import { PortalLabelEntityManager } from "../managers/portalLabelEntityManager";
 import { PortalHistoryEntityManager } from "../managers/portalHistoryEntityManager";
 import { ScoutHistoryEntityManager } from "../managers/scoutHistoryEntityManager";
 import { TileRequestManager } from "../managers/tileRequestManager";
@@ -33,6 +34,7 @@ export interface IITCCore {
   portalEntityManager?: PortalEntityManager;
   linkEntityManager?: LinkEntityManager;
   fieldEntityManager?: FieldEntityManager;
+  portalLabelEntityManager?: PortalLabelEntityManager;
   portalHistoryEntityManager?: PortalHistoryEntityManager;
   scoutHistoryEntityManager?: ScoutHistoryEntityManager;
   tileRequestManager?: TileRequestManager;

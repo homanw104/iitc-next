@@ -8,6 +8,7 @@ import { restoreLastView } from "../cesium/setup/restoreLastView.ts";
 import { setUpTileUpdateWhenMove } from "../cesium/setup/setUpTileUpdateWhenMove.ts";
 import { configureCameraControls } from "../cesium/setup/configureCameraControls.ts";
 import { setUpInteractionHandlers } from "../cesium/setup/setUpInteractionHandlers.ts";
+import { setUpClampedPortalRefresh } from "../cesium/setup/setUpClampedPortalRefresh.ts";
 
 export default function loadCesiumViewer(): void {
   logManager.debug("CesiumViewer", "Loading");
@@ -19,6 +20,7 @@ export default function loadCesiumViewer(): void {
 
   const managers = createCoreManagers(viewer, container);
   const portalEntityManager = managers.portalEntityManager;
+  const portalLabelEntityManager = managers.portalLabelEntityManager;
   const portalHistoryEntityManager = managers.portalHistoryEntityManager;
   const scoutHistoryEntityManager = managers.scoutHistoryEntityManager;
   const tileRequestManager = managers.tileRequestManager;
@@ -30,6 +32,7 @@ export default function loadCesiumViewer(): void {
   const { portalDetailPaneController, state } = mountCoreControllersAndUI(viewer, container, managers);
 
   setUpInteractionHandlers(viewer, container, portalDetailPaneController, portalEntityManager, portalHistoryEntityManager, scoutHistoryEntityManager, state);
+  setUpClampedPortalRefresh(viewer, portalEntityManager, portalLabelEntityManager, tileRequestManager);
   setUpTileUpdateWhenMove(viewer, tileRequestManager);
   configureCameraControls(viewer);
 }

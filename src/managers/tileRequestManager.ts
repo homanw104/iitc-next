@@ -10,6 +10,7 @@ import { logManager } from "./logManager";
 import { PortalEntityManager, parsePortal } from "./portalEntityManager";
 import { LinkEntityManager, parseLink } from "./linkEntityManager";
 import { FieldEntityManager, parseField } from "./fieldEntityManager";
+import { PortalLabelEntityManager } from "./portalLabelEntityManager";
 import { PortalHistoryEntityManager } from "./portalHistoryEntityManager";
 import { ScoutHistoryEntityManager } from "./scoutHistoryEntityManager";
 
@@ -127,6 +128,7 @@ export class TileRequestManager {
 
   private viewer: Cesium.Viewer;
   private portalEntityManager: PortalEntityManager;
+  private portalLabelEntityManager: PortalLabelEntityManager;
   private portalHistoryEntityManager: PortalHistoryEntityManager;
   private scoutHistoryEntityManager: ScoutHistoryEntityManager;
   private linkEntityManager: LinkEntityManager;
@@ -135,6 +137,7 @@ export class TileRequestManager {
   constructor(
     viewer: Cesium.Viewer,
     portalEntityManager: PortalEntityManager,
+    portalLabelEntityManager: PortalLabelEntityManager,
     portalHistoryEntityManager: PortalHistoryEntityManager,
     scoutHistoryEntityManager: ScoutHistoryEntityManager,
     linkEntityManager: LinkEntityManager,
@@ -142,6 +145,7 @@ export class TileRequestManager {
   ) {
     this.viewer = viewer;
     this.portalEntityManager = portalEntityManager;
+    this.portalLabelEntityManager = portalLabelEntityManager;
     this.portalHistoryEntityManager = portalHistoryEntityManager;
     this.scoutHistoryEntityManager = scoutHistoryEntityManager;
     this.linkEntityManager = linkEntityManager;
@@ -281,6 +285,7 @@ export class TileRequestManager {
         const viewRect = this.viewer.camera.computeViewRectangle(this.viewer.scene.globe.ellipsoid);
         if (!viewRect) return;
         this.portalEntityManager.removePortalInView(viewRect);
+        this.portalLabelEntityManager.removeLabelInView(viewRect);
         this.portalHistoryEntityManager.removeHistoryHaloInView(viewRect);
         this.scoutHistoryEntityManager.removeScoutControlHaloInView(viewRect);
         this.linkEntityManager.removeLinkInView(viewRect);
@@ -346,6 +351,7 @@ export class TileRequestManager {
         entitiesFound += tileData.gameEntities.length;
         const { portals, links, fields } = parseTileEntities(tileData.gameEntities);
         portals.forEach((p) => this.portalEntityManager.addOrUpdatePortal(p));
+        portals.forEach((p) => this.portalLabelEntityManager.addOrUpdateLabel(p));
         portals.forEach((p) => this.portalHistoryEntityManager.addOrUpdateHistoryHalo(p));
         portals.forEach((p) => this.scoutHistoryEntityManager.addOrUpdateScoutControlHalo(p));
         links.forEach((l) => this.linkEntityManager.addOrUpdateLink(l));
