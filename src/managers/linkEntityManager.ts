@@ -77,6 +77,8 @@ export class LinkEntityManager {
         width: 2,
         material: getTeamColor(data.team).withAlpha(0.7),
         arcType: Cesium.ArcType.GEODESIC,
+        clampToGround: true,
+        zIndex: 10,
       },
       properties: {
         selectable: false,
@@ -110,6 +112,8 @@ export class LinkEntityManager {
         data.dLngE6 / 1e6, data.dLatE6 / 1e6
       ]));
       entity.polyline.material = new Cesium.ColorMaterialProperty(getTeamColor(data.team).withAlpha(0.7));
+      entity.polyline.clampToGround = new Cesium.ConstantProperty(true);
+      entity.polyline.zIndex = new Cesium.ConstantProperty(10);
     }
   }
 }
