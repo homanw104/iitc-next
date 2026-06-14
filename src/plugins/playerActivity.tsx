@@ -33,8 +33,8 @@ interface PlayerActivity {
   timestamp: number;
   weight: number;
   portalName: string;
-  lat: number;
-  lng: number;
+  latE6: number;
+  lngE6: number;
 }
 
 class PlayerActivityPlugin {
@@ -47,12 +47,14 @@ class PlayerActivityPlugin {
   private layerManager: IITCCore["layerManager"] = safeWindow ? safeWindow.iitc?.layerManager : undefined;
   private interfaceManager: IITCCore["interfaceManager"] = safeWindow ? safeWindow.iitc?.interfaceManager : undefined;
   private commManager: IITCCore["commManager"] = safeWindow ? safeWindow.iitc?.commManager : undefined;
+  private entityPositionManager: IITCCore["entityPositionManager"] = safeWindow ? safeWindow.iitc?.entityPositionManager : undefined;
 
   private dataSourceEnl: Cesium.CustomDataSource = new Cesium.CustomDataSource("player-activity-enl");
   private dataSourceRes: Cesium.CustomDataSource = new Cesium.CustomDataSource("player-activity-res");
   private playerLocations: Map<string, Cesium.Entity> = new Map();
   private playerPaths: Map<string, Cesium.Entity> = new Map();
   private onReceiveCommMsgCallback: () => void = () => {};
+  private onEntityPositionChangedCallback: (latE6: number, lngE6: number, position: Cesium.Cartesian3) => void = () => {};
 
   private tooltipEl: HTMLElement | null = null;
   private hoverHandler: Cesium.ScreenSpaceEventHandler | undefined;
@@ -66,15 +68,17 @@ class PlayerActivityPlugin {
       this.layerManager = iitc.layerManager;
       this.interfaceManager = iitc.interfaceManager;
       this.commManager = iitc.commManager;
+      this.entityPositionManager = iitc.entityPositionManager;
     }
 
-    if (!this.viewer || !this.layerManager || !this.interfaceManager || !this.logManager || !this.commManager) {
+    if (!this.viewer || !this.layerManager || !this.interfaceManager || !this.logManager || !this.commManager || !this.entityPositionManager) {
       console.warn("[WARN][PlayerActivityPlugin] IITC Next core components missing", {
         viewer: !!this.viewer,
         logManager: !!this.logManager,
         layerManager: !!this.layerManager,
         interfaceManager: !!this.interfaceManager,
-        commManager: !!this.commManager
+        commManager: !!this.commManager,
+        entityPositionManager: !!this.entityPositionManager,
       });
       return;
     }
@@ -91,11 +95,23 @@ class PlayerActivityPlugin {
 
     this.onReceiveCommMsgCallback = () => this.updatePlayerActivity();
     this.commManager.setOnReceiveMsgCallback(this.onReceiveCommMsgCallback);
+    this.onEntityPositionChangedCallback = (latE6, lngE6, position) => {
+      this.playerLocations.forEach((entity) => {
+        const activities: PlayerActivity[] | undefined = entity.properties?.activities?.getValue();
+        const lastActivity = activities?.[activities.length - 1];
+        if (lastActivity?.latE6 === latE6 && lastActivity?.lngE6 === lngE6) {
+          entity.position = new Cesium.ConstantPositionProperty(position);
+        }
+      });
+      this.viewer?.scene.requestRender();
+    };
+    this.entityPositionManager.setOnPositionChangedCallback(this.onEntityPositionChangedCallback);
     this.updatePlayerActivity();
   }
 
   public deinit() {
     this.commManager?.unsetOnReceiveMsgCallback(this.onReceiveCommMsgCallback);
+    this.entityPositionManager?.unsetOnPositionChangedCallback(this.onEntityPositionChangedCallback);
     this.layerManager?.removeSourceAndFilter("Player Activity Enl");
     this.layerManager?.removeSourceAndFilter("Player Activity Res");
     this.playerLocations.clear();
@@ -144,8 +160,8 @@ class PlayerActivityPlugin {
               timestamp: activity.timestamp,
               weight: activity.weight,
               portalName: activity.portalName,
-              lat: activity.lat,
-              lng: activity.lng,
+              latE6: activity.latE6,
+              lngE6: activity.lngE6,
             };
           });
           allPlayersLastActivities.sort((a, b) => b.timestamp - a.timestamp);
@@ -231,8 +247,8 @@ class PlayerActivityPlugin {
           timestamp: lastActivity.timestamp,
           weight: lastActivity.weight,
           portalName: lastActivity.portalName,
-          lat: lastActivity.lat,
-          lng: lastActivity.lng,
+          latE6: lastActivity.latE6,
+          lngE6: lastActivity.lngE6,
         };
       });
 
@@ -249,14 +265,12 @@ class PlayerActivityPlugin {
       cluster.label.verticalOrigin = Cesium.VerticalOrigin.CENTER;
       cluster.label.horizontalOrigin = playerActivities[0].team === "ENLIGHTENED" ? Cesium.HorizontalOrigin.LEFT : Cesium.HorizontalOrigin.RIGHT;
       cluster.label.pixelOffset = playerActivities[0].team === "ENLIGHTENED" ? new Cesium.Cartesian2(25, 0) : new Cesium.Cartesian2(-25, 0);
-      cluster.label.eyeOffset = new Cesium.Cartesian3(0, 0, -3);
       cluster.label.fillColor = getTeamColor(playerActivities[0].team);
       cluster.label.outlineColor = Cesium.Color.BLACK;
       cluster.label.outlineWidth = 6;
       cluster.label.style = Cesium.LabelStyle.FILL_AND_OUTLINE;
       cluster.billboard.show = true;
       cluster.billboard.image = this.buildCanvas()?.toDataURL() || "";
-      cluster.billboard.eyeOffset = new Cesium.Cartesian3(0, 0, -2);
     });
   }
 
@@ -292,8 +306,8 @@ class PlayerActivityPlugin {
           timestamp: timestamp,
           weight: 1,
           portalName: portal.name,
-          lat: portal.latE6 / 1e6,
-          lng: portal.lngE6 / 1e6,
+          latE6: portal.latE6,
+          lngE6: portal.lngE6,
         };
 
         const activities = playerActivities.get(player.name) || [];
@@ -310,8 +324,8 @@ class PlayerActivityPlugin {
             timestamp: existing.timestamp,
             weight: existing.weight + 1,
             portalName: existing.portalName,
-            lat: (existing.lat * existing.weight + activity.lat) / (existing.weight + 1),
-            lng: (existing.lng * existing.weight + activity.lng) / (existing.weight + 1),
+            latE6: Math.round((existing.latE6 * existing.weight + activity.latE6) / (existing.weight + 1)),
+            lngE6: Math.round((existing.lngE6 * existing.weight + activity.lngE6) / (existing.weight + 1)),
           };
         } else {
           // Push the activity into the list
@@ -330,7 +344,8 @@ class PlayerActivityPlugin {
   private renderPlayerLocations(playerActivities: Map<string, PlayerActivity[]>): void {
     playerActivities.forEach((activities, playerName) => {
       const lastActivity = activities[activities.length - 1];
-      const lastPosition = Cesium.Cartesian3.fromDegrees(lastActivity.lng, lastActivity.lat);
+      const lastPosition = this.entityPositionManager?.getPosition(lastActivity);
+      if (!lastPosition) return;
 
       let source: CustomDataSource;
       if (lastActivity.team === "ENLIGHTENED") source = this.dataSourceEnl;
@@ -352,10 +367,12 @@ class PlayerActivityPlugin {
             outlineColor: Cesium.Color.BLACK,
             outlineWidth: 6,
             style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+            heightReference: Cesium.HeightReference.NONE,
             disableDepthTestDistance: Number.POSITIVE_INFINITY,
           },
           billboard: {
             image: this.buildCanvas(),
+            heightReference: Cesium.HeightReference.NONE,
             disableDepthTestDistance: Number.POSITIVE_INFINITY,
           },
           properties: {
@@ -389,7 +406,7 @@ class PlayerActivityPlugin {
     playerActivities.forEach((activities, playerName) => {
       const lastActivity = activities[activities.length - 1];
       const coordinates: number[] = [];
-      activities.map(a => coordinates.push(a.lng, a.lat, 3));
+      activities.forEach(a => coordinates.push(a.lngE6 / 1e6, a.latE6 / 1e6, 3));
 
       const positions = Cesium.Cartesian3.fromDegreesArrayHeights(coordinates);
 
@@ -403,6 +420,7 @@ class PlayerActivityPlugin {
         entity = source.entities.add({
           polyline: {
             positions: positions,
+            clampToGround: true,
             width: 3,
             material: new Cesium.PolylineDashMaterialProperty({
               color: Cesium.Color.fromCssColorString("#E130DE").withAlpha(0.9),
