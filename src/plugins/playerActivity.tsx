@@ -90,21 +90,14 @@ class PlayerActivityPlugin {
 
     this.dataSourceEnl = this.layerManager.getOrCreateSourceAndFilter("Player Activity Enl");
     this.dataSourceRes = this.layerManager.getOrCreateSourceAndFilter("Player Activity Res");
+    this.layerManager.setLayerRenderOnTop("Player Activity Enl", true);
+    this.layerManager.setLayerRenderOnTop("Player Activity Res", true);
     this.setUpDataSource(this.dataSourceEnl);
     this.setUpDataSource(this.dataSourceRes);
 
     this.onReceiveCommMsgCallback = () => this.updatePlayerActivity();
     this.commManager.setOnReceiveMsgCallback(this.onReceiveCommMsgCallback);
-    this.onEntityPositionChangedCallback = (latE6, lngE6, position) => {
-      this.playerLocations.forEach((entity) => {
-        const activities: PlayerActivity[] | undefined = entity.properties?.activities?.getValue();
-        const lastActivity = activities?.[activities.length - 1];
-        if (lastActivity?.latE6 === latE6 && lastActivity?.lngE6 === lngE6) {
-          entity.position = new Cesium.ConstantPositionProperty(position);
-        }
-      });
-      this.viewer?.scene.requestRender();
-    };
+    this.onEntityPositionChangedCallback = (latE6, lngE6, position) => this.updatePlayerActivityEntityPosition(latE6, lngE6, position);
     this.entityPositionManager.setOnPositionChangedCallback(this.onEntityPositionChangedCallback);
     this.updatePlayerActivity();
   }
@@ -338,8 +331,21 @@ class PlayerActivityPlugin {
 
     this.renderPlayerLocations(playerActivities);
     this.renderPlayerPaths(playerActivities);
+    this.layerManager?.moveLayerToTop("Player Activity Enl");
+    this.layerManager?.moveLayerToTop("Player Activity Res");
     this.viewer?.scene.requestRender();
-  };
+  }
+
+  private updatePlayerActivityEntityPosition(latE6: number, lngE6: number, position: Cesium.Cartesian3): void {
+    this.playerLocations.forEach((entity) => {
+      const activities: PlayerActivity[] | undefined = entity.properties?.activities?.getValue();
+      const lastActivity = activities?.[activities.length - 1];
+      if (lastActivity?.latE6 === latE6 && lastActivity?.lngE6 === lngE6) {
+        entity.position = new Cesium.ConstantPositionProperty(position);
+      }
+    });
+    this.viewer?.scene.requestRender();
+  }
 
   private renderPlayerLocations(playerActivities: Map<string, PlayerActivity[]>): void {
     playerActivities.forEach((activities, playerName) => {
