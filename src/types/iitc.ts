@@ -6,6 +6,7 @@ import * as Cesium from "cesium";
 import { LogManager } from "../managers/logManager";
 import { PluginManager } from "../managers/pluginManager";
 import { LayerManager } from "../managers/layerManager";
+import { EntityPositionManager } from "../managers/entityPositionManager";
 import { PortalEntityManager } from "../managers/portalEntityManager";
 import { LinkEntityManager } from "../managers/linkEntityManager";
 import { FieldEntityManager } from "../managers/fieldEntityManager";
@@ -31,6 +32,7 @@ export interface IITCCore {
   logManager?: LogManager;
   pluginManager?: PluginManager;
   layerManager?: LayerManager;
+  entityPositionManager?: EntityPositionManager;
   portalEntityManager?: PortalEntityManager;
   linkEntityManager?: LinkEntityManager;
   fieldEntityManager?: FieldEntityManager;

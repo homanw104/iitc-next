@@ -4,28 +4,31 @@
 
 import * as Cesium from "cesium";
 import type { IITCCore } from "../types/iitc";
-import { CommManager } from "../managers/commManager";
-import { DebugTileEntityManager } from "../managers/debugTileEntityManager";
-import { FieldEntityManager } from "../managers/fieldEntityManager";
-import { InterfaceManager } from "../managers/interfaceManager";
 import { LayerManager } from "../managers/layerManager";
-import { LinkEntityManager } from "../managers/linkEntityManager";
+import { EntityPositionManager } from "../managers/entityPositionManager";
 import { PortalEntityManager } from "../managers/portalEntityManager";
-import { PortalHistoryEntityManager } from "../managers/portalHistoryEntityManager";
 import { PortalLabelEntityManager } from "../managers/portalLabelEntityManager";
-import { RedeemManager } from "../managers/redeemManager";
-import { ScoreManager } from "../managers/scoreManager";
+import { PortalHistoryEntityManager } from "../managers/portalHistoryEntityManager";
 import { ScoutHistoryEntityManager } from "../managers/scoutHistoryEntityManager";
+import { LinkEntityManager } from "../managers/linkEntityManager";
+import { FieldEntityManager } from "../managers/fieldEntityManager";
+import { DebugTileEntityManager } from "../managers/debugTileEntityManager";
 import { TileRequestManager } from "../managers/tileRequestManager";
+import { CommManager } from "../managers/commManager";
+import { ScoreManager } from "../managers/scoreManager";
+import { RedeemManager } from "../managers/redeemManager";
+import { InterfaceManager } from "../managers/interfaceManager";
 
 export interface CoreManagers {
   layerManager: LayerManager;
+  entityPositionManager: EntityPositionManager;
   portalEntityManager: PortalEntityManager;
   portalLabelEntityManager: PortalLabelEntityManager;
   portalHistoryEntityManager: PortalHistoryEntityManager;
   scoutHistoryEntityManager: ScoutHistoryEntityManager;
   linkEntityManager: LinkEntityManager;
   fieldEntityManager: FieldEntityManager;
+  debugTileEntityManager: DebugTileEntityManager;
   tileRequestManager: TileRequestManager;
   commManager: CommManager;
   scoreManager: ScoreManager;
@@ -35,10 +38,11 @@ export interface CoreManagers {
 
 export function createCoreManagers(viewer: Cesium.Viewer, container: HTMLElement): CoreManagers {
   const layerManager = new LayerManager(viewer);
-  const portalEntityManager = new PortalEntityManager(layerManager);
-  const portalLabelEntityManager = new PortalLabelEntityManager(layerManager);
-  const portalHistoryEntityManager = new PortalHistoryEntityManager(layerManager);
-  const scoutHistoryEntityManager = new ScoutHistoryEntityManager(layerManager);
+  const entityPositionManager = new EntityPositionManager(viewer);
+  const portalEntityManager = new PortalEntityManager(layerManager, entityPositionManager);
+  const portalLabelEntityManager = new PortalLabelEntityManager(layerManager, entityPositionManager);
+  const portalHistoryEntityManager = new PortalHistoryEntityManager(layerManager, entityPositionManager);
+  const scoutHistoryEntityManager = new ScoutHistoryEntityManager(layerManager, entityPositionManager);
   const linkEntityManager = new LinkEntityManager(layerManager, portalEntityManager);
   const fieldEntityManager = new FieldEntityManager(layerManager, portalEntityManager);
   const debugTileEntityManager = new DebugTileEntityManager(viewer, layerManager);
@@ -52,12 +56,14 @@ export function createCoreManagers(viewer: Cesium.Viewer, container: HTMLElement
 
   return {
     layerManager,
+    entityPositionManager,
     portalEntityManager,
     portalLabelEntityManager,
     portalHistoryEntityManager,
     scoutHistoryEntityManager,
     linkEntityManager,
     fieldEntityManager,
+    debugTileEntityManager,
     tileRequestManager,
     commManager,
     scoreManager,
@@ -69,7 +75,7 @@ export function createCoreManagers(viewer: Cesium.Viewer, container: HTMLElement
 export function exposeCoreManagers(iitc: IITCCore, viewer: Cesium.Viewer, managers: CoreManagers): void {
   iitc.viewer = viewer;
   iitc.layerManager = managers.layerManager;
-  iitc.interfaceManager = managers.interfaceManager;
+  iitc.entityPositionManager = managers.entityPositionManager;
   iitc.portalEntityManager = managers.portalEntityManager;
   iitc.portalLabelEntityManager = managers.portalLabelEntityManager;
   iitc.portalHistoryEntityManager = managers.portalHistoryEntityManager;
@@ -77,7 +83,8 @@ export function exposeCoreManagers(iitc: IITCCore, viewer: Cesium.Viewer, manage
   iitc.linkEntityManager = managers.linkEntityManager;
   iitc.fieldEntityManager = managers.fieldEntityManager;
   iitc.tileRequestManager = managers.tileRequestManager;
+  iitc.commManager = managers.commManager;
   iitc.scoreManager = managers.scoreManager;
   iitc.redeemManager = managers.redeemManager;
-  iitc.commManager = managers.commManager;
+  iitc.interfaceManager = managers.interfaceManager;
 }

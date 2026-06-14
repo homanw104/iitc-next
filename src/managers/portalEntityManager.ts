@@ -7,27 +7,11 @@ import { PortalData, PortalLevel, PortalMod, PortalResonator, RawEntity } from "
 import { getTeamColor } from "../utils/color";
 import { LayerManager } from "./layerManager";
 import { apiRequest } from "../utils/network";
+import { EntityPositionManager } from "./entityPositionManager";
 
 interface PortalDetailsResponse {
   result: unknown[];
 }
-
-interface InternalBillboard {
-  position?: Cesium.Cartesian3;
-  _clampedPosition?: Cesium.Cartesian3;
-  _updateClamping?: () => void;
-}
-
-interface InternalBillboardCollection {
-  get(index: number): InternalBillboard | undefined;
-}
-
-interface InternalEntityCluster {
-  _billboardCollection?: InternalBillboardCollection;
-  _collectionIndicesByEntity?: Record<string, { billboardIndex?: number }>;
-}
-
-const portalImageCache = new Map<string, string>();
 
 export class PortalRequest {
   public portalGuid: string;
@@ -59,7 +43,15 @@ export class PortalRequest {
 export class PortalEntityManager {
   private portals: Map<string, { data: PortalData; entity: Cesium.Entity }> = new Map();
 
-  constructor(private layerManager: LayerManager) {}
+  constructor(private layerManager: LayerManager, private entityPositionManager: EntityPositionManager) {
+    this.entityPositionManager.setOnPositionChangedCallback((latE6, lngE6, position) => {
+      this.portals.forEach(({ data, entity }) => {
+        if (data.latE6 === latE6 && data.lngE6 === lngE6) {
+          entity.position = new Cesium.ConstantPositionProperty(position);
+        }
+      });
+    });
+  }
 
   public addOrUpdatePortal(data: PortalData): void {
     const existing = this.portals.get(data.guid);
@@ -106,52 +98,25 @@ export class PortalEntityManager {
     return this.portals.get(guid)?.entity;
   }
 
-  public getPortalVisualPosition(guid: string): Cesium.Cartesian3 | undefined {
-    const portalInfo = this.portals.get(guid);
-    if (!portalInfo) return undefined;
-
-    const layerId = getPortalLayerId(portalInfo.data);
-    const source = this.layerManager.getOrCreateSourceAndFilter(layerId);
-
-    // Access internal properties to get the billboard index
-    const cluster = source.clustering as unknown as InternalEntityCluster;
-    const billboardIndex = cluster._collectionIndicesByEntity?.[`portal-${guid}`]?.billboardIndex;
-    if (billboardIndex === undefined) return undefined;
-
-    // Access internal properties to get and share the clamped position
-    const billboard = cluster._billboardCollection?.get(billboardIndex);
-    const position = billboard?._clampedPosition ?? billboard?.position;
-    if (position === undefined) return undefined;
-
-    return Cesium.Cartesian3.clone(position);
-  }
-
   public getPortalDataByCoordinates(latE6: number, lngE6: number): PortalData | undefined {
     return Array.from(this.portals.values()).find(({ data }) =>
       data.latE6 === latE6 && data.lngE6 === lngE6
     )?.data;
   }
 
-  public refreshClampedPortalGraphics(): void {
-    this.portals.forEach(({ data, entity }) => {
-      entity.position = new Cesium.ConstantPositionProperty(getPortalPosition(data));
-      if (entity.billboard) {
-        entity.billboard.heightReference = new Cesium.ConstantProperty(Cesium.HeightReference.CLAMP_TO_GROUND);
-      }
-    });
-  }
-
   private createPortalEntity(data: PortalData): Cesium.Entity {
     const layerId = getPortalLayerId(data);
     return this.layerManager.getOrCreateSourceAndFilter(layerId).entities.add({
       id: `portal-${data.guid}`,
-      position: getPortalPosition(data),
-      billboard: {
-        image: getPortalBillboardImage(data.team),
-        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
-        horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-        verticalOrigin: Cesium.VerticalOrigin.CENTER,
+      position: this.entityPositionManager.getPosition(data),
+      point: {
+        pixelSize: 16,
+        heightReference: Cesium.HeightReference.NONE,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
         scaleByDistance: new Cesium.NearFarScalar(1e1, 1.0, 2e4, 0.125),
+        color: getTeamColor(data.team),
+        outlineColor: Cesium.Color.BLACK,
+        outlineWidth: 1,
       },
       properties: {
         selectable: true,
@@ -183,41 +148,13 @@ export class PortalEntityManager {
   }
 
   private updatePortalEntity(entity: Cesium.Entity, data: PortalData): void {
-    if (entity.billboard) {
-      entity.billboard.image = new Cesium.ConstantProperty(getPortalBillboardImage(data.team));
+    entity.position = new Cesium.ConstantPositionProperty(this.entityPositionManager.getPosition(data));
+    if (entity.point) {
+      entity.point.color = new Cesium.ConstantProperty(getTeamColor(data.team));
+      entity.point.heightReference = new Cesium.ConstantProperty(Cesium.HeightReference.NONE);
+      entity.point.disableDepthTestDistance = new Cesium.ConstantProperty(Number.POSITIVE_INFINITY);
     }
   }
-}
-
-/**
- * Converts geographic coordinates to a Cartesian3 position for use in Cesium.
- *
- * @param {PortalData} data - An object containing the longitude and latitude in micro-degrees (e6 format).
- * @return {Cesium.Cartesian3} The Cartesian3 representation of the given geographic coordinates.
- */
-function getPortalPosition(data: PortalData): Cesium.Cartesian3 {
-  return Cesium.Cartesian3.fromDegrees(data.lngE6 / 1e6, data.latE6 / 1e6);
-}
-
-/**
- * Retrieves an SVG image URL for a given team's billboard.
- *
- * @param team - The team identifier for which to get the billboard image.
- * @return A string representing the data URI of the SVG image.
- */
-function getPortalBillboardImage(team: PortalData["team"]): string {
-  let image = portalImageCache.get(team);
-  if (image) return image;
-
-  const fillColor = getTeamColor(team).toCssHexString();
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
-      <circle cx="12" cy="12" r="10" fill="${fillColor}" stroke="black" stroke-width="1.8"/>
-    </svg>
-  `.trim();
-  image = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-  portalImageCache.set(team, image);
-  return image;
 }
 
 /**

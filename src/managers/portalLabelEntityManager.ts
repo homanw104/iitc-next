@@ -5,6 +5,7 @@
 import * as Cesium from "cesium";
 import { PortalData } from "../types/ingress";
 import { LayerManager } from "./layerManager";
+import { EntityPositionManager } from "./entityPositionManager";
 
 const LABEL_FONT = "12px sans-serif";
 const LABEL_PADDING_X = 4;
@@ -17,7 +18,15 @@ const labelImageCache = new Map<string, HTMLCanvasElement>();
 export class PortalLabelEntityManager {
   private labels: Map<string, { data: PortalData; entity: Cesium.Entity }> = new Map();
 
-  constructor(private layerManager: LayerManager) {}
+  constructor(private layerManager: LayerManager, private entityPositionManager: EntityPositionManager) {
+    this.entityPositionManager.setOnPositionChangedCallback((latE6, lngE6, position) => {
+      this.labels.forEach(({ data, entity }) => {
+        if (data.latE6 === latE6 && data.lngE6 === lngE6) {
+          entity.position = new Cesium.ConstantPositionProperty(position);
+        }
+      });
+    });
+  }
 
   public addOrUpdateLabel(data: PortalData): void {
     if (!data.title) {
@@ -43,12 +52,7 @@ export class PortalLabelEntityManager {
   }
 
   public removeLabel(guid: string): void {
-    const labelInfo = this.labels.get(guid);
-    if (!labelInfo) return;
-
-    const layerId = getPortalLabelLayerId(labelInfo.data);
-    this.layerManager.getOrCreateSourceAndFilter(layerId).entities.remove(labelInfo.entity);
-    this.labels.delete(guid);
+    this.removeLabelEntity(guid);
   }
 
   public removeLabelInView(viewRect: Cesium.Rectangle): void {
@@ -62,32 +66,18 @@ export class PortalLabelEntityManager {
         }
       }
     });
-    toRemove.forEach(guid => this.removeLabel(guid));
-  }
-
-  public refreshClampedLabelGraphics(getPortalVisualPosition: (guid: string) => Cesium.Cartesian3 | undefined): void {
-    this.labels.forEach(({ data, entity }) => {
-      if (entity.billboard) {
-        const portalVisualPosition = getPortalVisualPosition(data.guid);
-        if (portalVisualPosition) {
-          entity.position = new Cesium.ConstantPositionProperty(portalVisualPosition);
-          entity.billboard.heightReference = new Cesium.ConstantProperty(Cesium.HeightReference.NONE);
-        } else {
-          entity.position = new Cesium.ConstantPositionProperty(getPortalLabelPosition(data));
-          entity.billboard.heightReference = new Cesium.ConstantProperty(Cesium.HeightReference.CLAMP_TO_GROUND);
-        }
-      }
-    });
+    toRemove.forEach(guid => this.removeLabelEntity(guid));
   }
 
   private createLabelEntity(data: PortalData): Cesium.Entity {
     const layerId = getPortalLabelLayerId(data);
     return this.layerManager.getOrCreateSourceAndFilter(layerId).entities.add({
       id: `label-portal-${data.guid}`,
-      position: getPortalLabelPosition(data),
+      position: this.entityPositionManager.getPosition(data),
       billboard: {
         image: getPortalLabelImage(data),
-        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+        heightReference: Cesium.HeightReference.NONE,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
         horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
         verticalOrigin: Cesium.VerticalOrigin.CENTER,
         pixelOffset: new Cesium.Cartesian2(0, LABEL_PIXEL_OFFSET_Y),
@@ -99,20 +89,27 @@ export class PortalLabelEntityManager {
     });
   }
 
+  private removeLabelEntity(guid: string): void {
+    const labelInfo = this.labels.get(guid);
+    if (!labelInfo) return;
+
+    const layerId = getPortalLabelLayerId(labelInfo.data);
+    this.layerManager.getOrCreateSourceAndFilter(layerId).entities.remove(labelInfo.entity);
+    this.labels.delete(guid);
+  }
+
   private updateLabelEntity(entity: Cesium.Entity, data: PortalData): void {
-    entity.position = new Cesium.ConstantPositionProperty(getPortalLabelPosition(data));
+    entity.position = new Cesium.ConstantPositionProperty(this.entityPositionManager.getPosition(data));
     if (entity.billboard) {
       entity.billboard.image = new Cesium.ConstantProperty(getPortalLabelImage(data));
+      entity.billboard.heightReference = new Cesium.ConstantProperty(Cesium.HeightReference.NONE);
+      entity.billboard.disableDepthTestDistance = new Cesium.ConstantProperty(Number.POSITIVE_INFINITY);
     }
   }
 }
 
-export function getPortalLabelLayerId(data: PortalData): string {
+function getPortalLabelLayerId(data: PortalData): string {
   return `label-portal-${data.team.toLowerCase()}`;
-}
-
-function getPortalLabelPosition(data: PortalData): Cesium.Cartesian3 {
-  return Cesium.Cartesian3.fromDegrees(data.lngE6 / 1e6, data.latE6 / 1e6);
 }
 
 function getPortalLabelImage(data: PortalData): HTMLCanvasElement {
