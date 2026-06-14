@@ -151,7 +151,7 @@ class CrossLinesPlugin {
             dashLength: DASH_LENGTH,
           }),
           arcType: Cesium.ArcType.GEODESIC,
-          clampToGround: false,
+          clampToGround: true,
         },
         properties: {
           selectable: false,

@@ -299,6 +299,7 @@ class DrawLinesPlugin {
         positions: this.currentLine,
         material: Cesium.Color.fromCssColorString(LINE_COLOR).withAlpha(0.8),
         width: LINE_WIDTH,
+        clampToGround: true,
       }
     });
 
@@ -465,6 +466,7 @@ class DrawLinesPlugin {
           positions: new Cesium.CallbackProperty(() => this.currentLine, false),
           material: Cesium.Color.fromCssColorString(PREVIEW_COLOR).withAlpha(0.8),
           width: LINE_WIDTH,
+          clampToGround: true,
         }
       });
     }
@@ -497,6 +499,7 @@ class DrawLinesPlugin {
           image: this.lineMarkerImage,
           width: LINE_MARKER_SIZE_PX,
           height: LINE_MARKER_SIZE_PX,
+          heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
           horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
           verticalOrigin: Cesium.VerticalOrigin.CENTER,
           disableDepthTestDistance: Number.POSITIVE_INFINITY,
@@ -680,6 +683,7 @@ class DrawLinesPlugin {
                   positions: positions,
                   material: Cesium.Color.fromCssColorString(LINE_COLOR).withAlpha(0.8),
                   width: LINE_WIDTH,
+                  clampToGround: true,
                 }
               }));
             }
