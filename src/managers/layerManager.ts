@@ -10,11 +10,94 @@ import { logManager } from "./logManager";
 const FILTER_STATES_STORAGE_KEY = "iitc-next-filter-states";
 const PLUGIN_FILTER_STATES_STORAGE_KEY = "iitc-next-plugin-filter-states";
 
+class Layer {
+  public source: Cesium.CustomDataSource;
+  public collection: Cesium.PrimitiveCollection;
+  public groundCollection: Cesium.PrimitiveCollection;
+  private display: Cesium.DataSourceDisplay;
+  private readonly removeListener: () => void;
+  private readonly removeCollectionListener: () => void;
+  private isDestroyed: boolean = false;
+  private renderOnTop: boolean = false;
+
+  constructor(private viewer: Cesium.Viewer, name: string) {
+    this.source = new Cesium.CustomDataSource(name);
+    this.collection = new Cesium.PrimitiveCollection();
+    this.groundCollection = new Cesium.PrimitiveCollection();
+    this.viewer.scene.primitives.add(this.collection);
+    this.viewer.scene.groundPrimitives.add(this.groundCollection);
+    this.installRenderOnTopHook(this.collection);
+
+    const dataSourceCollection = new Cesium.DataSourceCollection();
+    dataSourceCollection.add(this.source).then();
+
+    // Redirect primitive addition to our own collection
+    const sceneProxy = new Proxy(this.viewer.scene, {
+      get: (target, prop, receiver) => {
+        if (prop === "primitives") return this.collection;
+        if (prop === "groundPrimitives") return this.groundCollection;
+        return Reflect.get(target, prop, receiver);
+      }
+    });
+
+    this.display = new Cesium.DataSourceDisplay({
+      scene: sceneProxy,
+      dataSourceCollection: dataSourceCollection
+    });
+
+    const updateCallback = () => {
+      if (this.isDestroyed || this.viewer.isDestroyed()) return;
+      this.display.update(this.viewer.clock.currentTime);
+    };
+    this.removeListener = this.viewer.scene.preRender.addEventListener(updateCallback);
+
+    // Ensure we render when entities change
+    this.removeCollectionListener = this.source.entities.collectionChanged.addEventListener(() => {
+      if (this.isDestroyed || this.viewer.isDestroyed()) return;
+      this.viewer.scene.requestRender();
+    });
+  }
+
+  private installRenderOnTopHook(collection: Cesium.PrimitiveCollection): void {
+    const collectionWithUpdate = collection as PrimitiveCollectionWithUpdate;
+    const originalUpdate = collectionWithUpdate.update.bind(collectionWithUpdate);
+
+    collectionWithUpdate.update = (frameState: LayerFrameState) => {
+      const firstLayerCommand = frameState.commandList.length;
+      originalUpdate(frameState);
+
+      if (!this.renderOnTop || !frameState.passes?.render || frameState.passes.pick) return;
+
+      for (let i = firstLayerCommand; i < frameState.commandList.length; i++) {
+        const command = frameState.commandList[i];
+        command.renderState = getNoDepthRenderState(command.renderState);
+      }
+    };
+  }
+
+  public setRenderOnTop(enabled: boolean): void {
+    this.renderOnTop = enabled;
+  }
+
+  public destroy() {
+    if (this.isDestroyed) return;
+    this.isDestroyed = true;
+
+    if (this.removeListener) this.removeListener();
+    if (this.removeCollectionListener) this.removeCollectionListener();
+
+    this.display.destroy();
+    this.viewer.scene.primitives.remove(this.collection);
+    this.viewer.scene.groundPrimitives.remove(this.groundCollection);
+  }
+}
+
 export class LayerManager {
-  private viewer: Cesium.Viewer;
+  private readonly viewer: Cesium.Viewer;
+  private readonly topLayerOrder: string[] = [];
 
   // Maps sourceVisibility keys to Cesium Sources (layers)
-  private sources: Map<string, Cesium.CustomDataSource> = new Map();
+  private sources: Map<string, Layer> = new Map();
 
   // Granular controls (portals-l8-enlightened, portals-placeholder-resistance, etc.)
   private sourceVisibility: Map<string, boolean> = new Map();
@@ -35,10 +118,10 @@ export class LayerManager {
     TEAMS.forEach(t => this.filterState.set(`team-${t.toLowerCase()}`, true));
     PORTAL_LEVELS.forEach(l => this.filterState.set(`level-${l}`, true));
     this.filterState.set("portals-placeholder", true);
+    this.filterState.set("portals-label", true);
     this.filterState.set("portals", true);
     this.filterState.set("links", true);
     this.filterState.set("fields", true);
-    this.filterState.set("label-portals", true);
     this.filterState.set("history", false);
     this.filterState.set("scout-control", false);
     this.filterState.set("history-reverse", false);
@@ -97,6 +180,7 @@ export class LayerManager {
       if (type === "portals") {
         PORTAL_LEVELS.forEach(l => this.filterState.set(`level-${l}`, enabled));
         this.filterState.set("portals-placeholder", enabled);
+        this.filterState.set("portals-label", enabled);
       }
       this.filterState.set(type, enabled);
     } else {
@@ -111,7 +195,8 @@ export class LayerManager {
       if (type === "portals") {
         const allLevels = PORTAL_LEVELS.every(l => this.filterState.get(`level-${l}`) !== false);
         const placeholder = this.filterState.get("portals-placeholder") !== false;
-        return allLevels && placeholder;
+        const label = this.filterState.get("portals-label") !== false;
+        return allLevels && placeholder && label;
       }
       return this.filterState.get(type) !== false;
     } else {
@@ -124,6 +209,7 @@ export class LayerManager {
       if (type === "portals") {
         const states = PORTAL_LEVELS.map(l => this.filterState.get(`level-${l}`) !== false);
         states.push(this.filterState.get("portals-placeholder") !== false);
+        states.push(this.filterState.get("portals-label") !== false);
         const visibleCount = states.filter(v => v).length;
         return visibleCount > 0 && visibleCount < states.length;
       }
@@ -134,16 +220,16 @@ export class LayerManager {
   }
 
   public getOrCreateSourceAndFilter(name: string): Cesium.CustomDataSource {
-    let source = this.sources.get(name);
-    if (!source) {
-      source = new Cesium.CustomDataSource(name);
+    let layer = this.sources.get(name);
+    if (!layer) {
+      layer = new Layer(this.viewer, name);
       // Apply saved visibility or default to true
-      source.show = this.sourceVisibility.has(name)
+      layer.source.show = this.sourceVisibility.has(name)
         ? this.sourceVisibility.get(name)!
         : true;
 
-      this.sources.set(name, source);
-      this.viewer.dataSources.add(source).then();
+      this.sources.set(name, layer);
+      this.applyTopLayerOrder();
     }
 
     // Create the filter as well if it's a plugin layer
@@ -152,14 +238,15 @@ export class LayerManager {
       this.saveState();
     }
 
-    return source;
+    return layer.source;
   }
 
   public removeSourceAndFilter(name: string): void {
-    const source = this.sources.get(name);
-    if (source) {
-      this.viewer.dataSources.remove(source);
+    const layer = this.sources.get(name);
+    if (layer) {
+      layer.destroy();
       this.sources.delete(name);
+      this.removeFromTopLayerOrder(name);
       this.viewer.scene.requestRender();
     }
 
@@ -173,11 +260,40 @@ export class LayerManager {
 
   public setSourceVisible(name: string, visible: boolean): void {
     this.sourceVisibility.set(name, visible);
-    const source = this.sources.get(name);
-    if (source) {
-      source.show = visible;
+    const layer = this.sources.get(name);
+    if (layer) {
+      layer.source.show = visible;
       this.viewer.scene.requestRender();
     }
+  }
+
+  public moveLayerToTop(name: string): void {
+    this.removeFromTopLayerOrder(name);
+    this.topLayerOrder.push(name);
+    this.applyTopLayerOrder();
+  }
+
+  public setLayerRenderOnTop(name: string, enabled: boolean): void {
+    const layer = this.sources.get(name);
+    if (!layer) return;
+
+    layer.setRenderOnTop(enabled);
+    this.viewer.scene.requestRender();
+  }
+
+  private removeFromTopLayerOrder(name: string): void {
+    const existingIndex = this.topLayerOrder.indexOf(name);
+    if (existingIndex !== -1) this.topLayerOrder.splice(existingIndex, 1);
+  }
+
+  private applyTopLayerOrder(): void {
+    this.topLayerOrder.forEach((layerName) => {
+      const layer = this.sources.get(layerName);
+      if (!layer) return;
+      this.viewer.scene.primitives.raiseToTop(layer.collection);
+      this.viewer.scene.groundPrimitives.raiseToTop(layer.groundCollection);
+    });
+    this.viewer.scene.requestRender();
   }
 
   private isBuiltInSource(name: string): boolean {
@@ -203,8 +319,8 @@ export class LayerManager {
       });
 
       // Portal labels
-      const portalLabelsVisible = this.filterState.get("label-portals") !== false;
-      this.setSourceVisible(`label-portal-${t}`, teamVisible && portalLabelsVisible);
+      const portalLabelsVisible = this.filterState.get("portals-label") !== false;
+      this.setSourceVisible(`portals-label-${t}`, teamVisible && portalLabelsVisible);
 
       // Placeholders
       const placeholdersVisible = this.filterState.get("portals-placeholder") !== false;
@@ -248,4 +364,51 @@ export class LayerManager {
 
     this.viewer.scene.requestRender();
   }
+}
+
+interface LayerRenderCommand {
+  renderState: unknown;
+}
+
+interface LayerFrameState {
+  commandList: LayerRenderCommand[];
+  passes?: {
+    render?: boolean;
+    pick?: boolean;
+  };
+}
+
+type PrimitiveCollectionWithUpdate = Cesium.PrimitiveCollection & {
+  update: (frameState: LayerFrameState) => void;
+};
+
+type CesiumWithPrivateRenderer = typeof Cesium & {
+  RenderState?: {
+    fromCache: (renderState: Record<string, unknown>) => unknown;
+  };
+};
+
+const noDepthRenderStateCache = new WeakMap<object, unknown>();
+
+function getNoDepthRenderState(renderState: unknown): unknown {
+  const renderStateFactory = (Cesium as CesiumWithPrivateRenderer).RenderState;
+  if (!renderStateFactory || !isObject(renderState)) return undefined;
+
+  const cached = noDepthRenderStateCache.get(renderState);
+  if (cached) return cached;
+
+  const noDepthRenderState = renderStateFactory.fromCache({
+    ...renderState,
+    depthTest: {
+      ...(isObject(renderState.depthTest) ? renderState.depthTest : {}),
+      enabled: false,
+    },
+  });
+
+  noDepthRenderStateCache.set(renderState, noDepthRenderState);
+  return noDepthRenderState;
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }

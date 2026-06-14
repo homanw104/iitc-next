@@ -151,8 +151,6 @@ export class PortalEntityManager {
     entity.position = new Cesium.ConstantPositionProperty(this.entityPositionManager.getPosition(data));
     if (entity.point) {
       entity.point.color = new Cesium.ConstantProperty(getTeamColor(data.team));
-      entity.point.heightReference = new Cesium.ConstantProperty(Cesium.HeightReference.NONE);
-      entity.point.disableDepthTestDistance = new Cesium.ConstantProperty(Number.POSITIVE_INFINITY);
     }
   }
 }

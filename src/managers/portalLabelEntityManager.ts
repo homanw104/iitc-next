@@ -72,7 +72,7 @@ export class PortalLabelEntityManager {
   private createLabelEntity(data: PortalData): Cesium.Entity {
     const layerId = getPortalLabelLayerId(data);
     return this.layerManager.getOrCreateSourceAndFilter(layerId).entities.add({
-      id: `label-portal-${data.guid}`,
+      id: `label-${data.guid}`,
       position: this.entityPositionManager.getPosition(data),
       billboard: {
         image: getPortalLabelImage(data),
@@ -109,7 +109,7 @@ export class PortalLabelEntityManager {
 }
 
 function getPortalLabelLayerId(data: PortalData): string {
-  return `label-portal-${data.team.toLowerCase()}`;
+  return `portals-label-${data.team.toLowerCase()}`;
 }
 
 function getPortalLabelImage(data: PortalData): HTMLCanvasElement {
