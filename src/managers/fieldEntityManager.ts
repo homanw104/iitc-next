@@ -8,6 +8,8 @@ import { getTeamColor } from "../utils/color";
 import { LayerManager } from "./layerManager";
 import { PortalEntityManager } from "./portalEntityManager";
 
+const FIELD_HEIGHT = 0;
+
 export class FieldEntityManager {
   private fields: Map<string, { data: FieldData; entity: Cesium.Entity }> = new Map();
 
@@ -66,10 +68,10 @@ export class FieldEntityManager {
       id: `field-${data.guid}`,
       polygon: {
         hierarchy: new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray(points)),
+        height: FIELD_HEIGHT,
         heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
         material: getTeamColor(data.team).withAlpha(0.2),
         outline: false,
-        zIndex: 0,
       },
       properties: {
         selectable: false,
@@ -99,9 +101,9 @@ export class FieldEntityManager {
     if (entity.polygon) {
       const points = data.points.flatMap(p => [p.lngE6 / 1e6, p.latE6 / 1e6]);
       entity.polygon.hierarchy = new Cesium.ConstantProperty(new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray(points)));
+      entity.polygon.height = new Cesium.ConstantProperty(FIELD_HEIGHT);
       entity.polygon.heightReference = new Cesium.ConstantProperty(Cesium.HeightReference.CLAMP_TO_GROUND);
       entity.polygon.material = new Cesium.ColorMaterialProperty(getTeamColor(data.team).withAlpha(0.2));
-      entity.polygon.zIndex = new Cesium.ConstantProperty(0);
     }
   }
 }
