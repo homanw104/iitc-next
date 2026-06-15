@@ -295,6 +295,7 @@ class DrawLinesPlugin {
 
     this.renderPreview(pos);  // Ensure this.currentLine has two vertices
     this.dataSource.entities.add({
+      id: `draw-line-${crypto.randomUUID()}`,
       polyline: {
         positions: this.currentLine,
         material: Cesium.Color.fromCssColorString(LINE_COLOR).withAlpha(0.8),
@@ -493,7 +494,7 @@ class DrawLinesPlugin {
     if (existingMarker) {
       existingMarker.position = new Cesium.ConstantPositionProperty(pos);
     } else {
-      const entity = this.viewer.entities.add({
+      const entity = this.dataSource?.entities.add({
         position: pos,
         billboard: {
           image: this.lineMarkerImage,
@@ -520,8 +521,8 @@ class DrawLinesPlugin {
     if (!this.viewer) throw new Error("draw-lines: viewer is undefined");
 
     this.cancelLineMarkersRemoval();
-    if (this.lineStartMarkerEntity) this.viewer.entities.remove(this.lineStartMarkerEntity);
-    if (this.lineEndMarkerEntity) this.viewer.entities.remove(this.lineEndMarkerEntity);
+    if (this.lineStartMarkerEntity) this.dataSource?.entities.remove(this.lineStartMarkerEntity);
+    if (this.lineEndMarkerEntity) this.dataSource?.entities.remove(this.lineEndMarkerEntity);
     this.lineStartMarkerEntity = undefined;
     this.lineEndMarkerEntity = undefined;
     this.viewer.scene.requestRender();
@@ -617,7 +618,7 @@ class DrawLinesPlugin {
   }
 
   private writeLinesToKml(entities: Cesium.Entity[]): string {
-    const placemarks = entities.map((entity) => {
+    const placemarks = entities.filter(e => e.id.startsWith("draw-line")).map((entity) => {
       const positions: Cesium.Cartesian3[] = entity.polyline?.positions?.getValue(Cesium.JulianDate.now());
       const cartographic: Cesium.Cartographic[] = positions.map(pos => Cesium.Cartographic.fromCartesian(pos));
       const coordinatesString = cartographic.map(c =>

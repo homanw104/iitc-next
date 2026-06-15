@@ -262,7 +262,7 @@ export class LayerManager {
     return Array.from(this.pluginFilterState).filter(([name]) => this.overlayLayers.has(name));
   }
 
-  public getOrCreateDataSourceLayer(name: string): Cesium.CustomDataSource {
+  public getOrCreateDataSourceLayer(name: string): Cesium.DataSource {
     let source = this.dataSources.get(name);
     if (!source) {
       source = new Cesium.CustomDataSource(name);
@@ -279,7 +279,7 @@ export class LayerManager {
     return source;
   }
 
-  public getOrCreateOverlayLayer(name: string): Cesium.CustomDataSource {
+  public getOrCreateOverlayLayer(name: string): Cesium.DataSource {
     let layer = this.overlayLayers.get(name);
     if (!layer) {
       layer = new OverlayLayer(this.viewer, name, this.getLayerVisibility(name));
