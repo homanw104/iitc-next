@@ -6,6 +6,7 @@ import * as Cesium from "cesium";
 import { PortalData } from "../types/ingress";
 import { LayerManager } from "./layerManager";
 import { EntityPositionManager } from "./entityPositionManager";
+import { PORTAL_DISABLE_DEPTH_TEST_DISTANCE } from "./portalEntityManager.ts";
 
 const LABEL_FONT = "12px sans-serif";
 const LABEL_PADDING_X = 4;
@@ -77,7 +78,7 @@ export class PortalLabelEntityManager {
       billboard: {
         image: getPortalLabelImage(data),
         heightReference: Cesium.HeightReference.NONE,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        disableDepthTestDistance: PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
         horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
         verticalOrigin: Cesium.VerticalOrigin.CENTER,
         pixelOffset: new Cesium.Cartesian2(0, LABEL_PIXEL_OFFSET_Y),
@@ -103,7 +104,7 @@ export class PortalLabelEntityManager {
     if (entity.billboard) {
       entity.billboard.image = new Cesium.ConstantProperty(getPortalLabelImage(data));
       entity.billboard.heightReference = new Cesium.ConstantProperty(Cesium.HeightReference.NONE);
-      entity.billboard.disableDepthTestDistance = new Cesium.ConstantProperty(Number.POSITIVE_INFINITY);
+      entity.billboard.disableDepthTestDistance = new Cesium.ConstantProperty(PORTAL_DISABLE_DEPTH_TEST_DISTANCE);
     }
   }
 }

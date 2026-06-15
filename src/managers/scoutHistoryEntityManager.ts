@@ -6,6 +6,7 @@ import * as Cesium from "cesium";
 import { PortalData } from "../types/ingress";
 import { LayerManager } from "./layerManager";
 import { EntityPositionManager } from "./entityPositionManager";
+import { PORTAL_DISABLE_DEPTH_TEST_DISTANCE } from "./portalEntityManager.ts";
 
 interface ScoutControlHaloInfo {
   data: PortalData;
@@ -77,7 +78,7 @@ export class ScoutHistoryEntityManager {
         outlineWidth: 4,
         scaleByDistance: new Cesium.NearFarScalar(1e1, 1.0, 2e4, 0.125),
         heightReference: Cesium.HeightReference.NONE,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        disableDepthTestDistance: PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
       },
     });
   }
@@ -87,7 +88,7 @@ export class ScoutHistoryEntityManager {
     if (entity.point) {
       entity.point.outlineColor = new Cesium.ConstantProperty(color);
       entity.point.heightReference = new Cesium.ConstantProperty(Cesium.HeightReference.NONE);
-      entity.point.disableDepthTestDistance = new Cesium.ConstantProperty(Number.POSITIVE_INFINITY);
+      entity.point.disableDepthTestDistance = new Cesium.ConstantProperty(PORTAL_DISABLE_DEPTH_TEST_DISTANCE);
     }
   }
 

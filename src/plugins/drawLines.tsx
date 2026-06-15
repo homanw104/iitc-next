@@ -503,7 +503,7 @@ class DrawLinesPlugin {
           heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
           horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
           verticalOrigin: Cesium.VerticalOrigin.CENTER,
-          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          disableDepthTestDistance: 2e4,
         },
       });
 

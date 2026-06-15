@@ -9,6 +9,8 @@ import { LayerManager } from "./layerManager";
 import { apiRequest } from "../utils/network";
 import { EntityPositionManager } from "./entityPositionManager";
 
+export const PORTAL_DISABLE_DEPTH_TEST_DISTANCE = 2e4;
+
 interface PortalDetailsResponse {
   result: unknown[];
 }
@@ -112,7 +114,7 @@ export class PortalEntityManager {
       point: {
         pixelSize: 16,
         heightReference: Cesium.HeightReference.NONE,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        disableDepthTestDistance: PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
         scaleByDistance: new Cesium.NearFarScalar(1e1, 1.0, 2e4, 0.125),
         color: getTeamColor(data.team),
         outlineColor: Cesium.Color.BLACK,
