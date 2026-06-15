@@ -1,11 +1,15 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+## 1.4.0
+
+* Clamped everything to the ground
+* Everything is rendered correctly with terrain on
+* Highlight Draw Lines and Delete Lines icon when they are active
 
 ## 1.3.0
 
-* Added cross lines plugin
-* Added done lines plugin
+* Added Cross Lines plugin
+* Added Done Lines plugin
 * Added markers when drawing lines
 * Added app icons
 * Draw lines plugin now ignores touch gestures
