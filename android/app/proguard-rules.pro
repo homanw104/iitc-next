@@ -5,17 +5,29 @@
 # For more details, see
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Keep line numbers for more useful stack traces in Google Play Console
+-keepattributes SourceFile,LineNumberTable
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Preserve JavaScript Interface methods
+-keepattributes JavascriptInterface
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Keep our native interfaces used by WebView
+-keep class world.homans.iitcnext.IITCNativeInterface { *; }
+
+# Capacitor rules (if not already included by the library)
+-keep @com.getcapacitor.annotation.CapacitorPlugin public class * {
+    @com.getcapacitor.annotation.PermissionCallback <methods>;
+    @com.getcapacitor.annotation.ActivityCallback <methods>;
+    @com.getcapacitor.annotation.Permission <methods>;
+    @com.getcapacitor.PluginMethod public <methods>;
+}
+-keep public class * extends com.getcapacitor.Plugin { *; }
+
+# Cordova plugins rules
+-keep public class * extends org.apache.cordova.* {
+    public <methods>;
+    public <fields>;
+}
