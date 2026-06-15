@@ -16,7 +16,6 @@ type DataSourceDisplayWithCollections = Cesium.DataSourceDisplay & {
 };
 
 interface LayerRenderCommand {
-  pass: unknown;
   renderState: unknown;
 }
 
@@ -33,9 +32,6 @@ type PrimitiveCollectionWithUpdate = {
 };
 
 type CesiumWithPrivateRenderer = typeof Cesium & {
-  Pass?: {
-    OVERLAY: unknown;
-  };
   RenderState?: {
     fromCache: (renderState: Record<string, unknown>) => unknown;
   };
@@ -46,7 +42,7 @@ class OverlayLayer {
   private readonly dataSourceCollection = new Cesium.DataSourceCollection();
   private readonly display: Cesium.DataSourceDisplay;
   private readonly ready: Promise<Cesium.DataSource>;
-  private readonly removePreRenderListener: () => void;
+  private readonly removeClockListener: () => void;
   private readonly removeCollectionListener: () => void;
   private isDestroyed: boolean = false;
 
@@ -69,9 +65,9 @@ class OverlayLayer {
       this.raiseToTop();
     });
 
-    this.removePreRenderListener = this.viewer.scene.preRender.addEventListener(() => {
+    this.removeClockListener = this.viewer.clock.onTick.addEventListener((clock) => {
       if (this.isDestroyed || this.viewer.isDestroyed()) return;
-      this.display.update(this.viewer.clock.currentTime);
+      this.display.update(clock.currentTime);
     });
 
     this.removeCollectionListener = this.source.entities.collectionChanged.addEventListener(() => {
@@ -101,7 +97,6 @@ class OverlayLayer {
 
       for (let i = firstCommand; i < frameState.commandList.length; i++) {
         const command = frameState.commandList[i];
-        command.pass = (Cesium as CesiumWithPrivateRenderer).Pass?.OVERLAY ?? command.pass;
         command.renderState = getNoDepthRenderState(command.renderState);
       }
     };
@@ -124,7 +119,7 @@ class OverlayLayer {
     if (this.isDestroyed) return;
     this.isDestroyed = true;
 
-    this.removePreRenderListener();
+    this.removeClockListener();
     this.removeCollectionListener();
     this.display.destroy();
     this.dataSourceCollection.remove(this.source, true);

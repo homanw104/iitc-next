@@ -260,8 +260,10 @@ class PlayerActivityPlugin {
       cluster.label.outlineColor = Cesium.Color.BLACK;
       cluster.label.outlineWidth = 6;
       cluster.label.style = Cesium.LabelStyle.FILL_AND_OUTLINE;
+      cluster.label.disableDepthTestDistance = Number.POSITIVE_INFINITY;
       cluster.billboard.show = true;
       cluster.billboard.image = this.buildCanvas()?.toDataURL() || "";
+      cluster.billboard.disableDepthTestDistance = Number.POSITIVE_INFINITY;
     });
   }
 
