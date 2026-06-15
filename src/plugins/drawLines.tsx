@@ -566,10 +566,16 @@ class DrawLinesPlugin {
     if (this.isDeleting) {
       this.isDeleting = false;
     }
-    if (this.drawLinesButtonEl) this.drawLinesButtonEl.style.borderColor = this.isDrawing ? "#21ee21" : "#444444";
-    if (this.drawLinesButtonEl) this.drawLinesButtonEl.style.boxShadow = this.isDrawing ? "rgb(255, 255, 255) 0px 0px 8px 0px, rgb(255, 255, 255) 0px 0px 8px 0px" : "none";
-    if (this.deleteLinesButtonEl) this.deleteLinesButtonEl.style.borderColor = "#444444";
-    if (this.deleteLinesButtonEl) this.deleteLinesButtonEl.style.boxShadow = "none";
+    if (this.drawLinesButtonEl) {
+      this.drawLinesButtonEl.style.background = this.isDrawing ? "#4389bb" : "#303336";
+      this.drawLinesButtonEl.style.borderColor = this.isDrawing ? "#21ee21" : "#444444";
+      this.drawLinesButtonEl.style.boxShadow = this.isDrawing ? "rgb(255, 255, 255) 0px 0px 8px 0px, rgb(255, 255, 255) 0px 0px 8px 0px" : "none";
+    }
+    if (this.deleteLinesButtonEl) {
+      this.deleteLinesButtonEl.style.background = "#303336";
+      this.deleteLinesButtonEl.style.borderColor = "#444444";
+      this.deleteLinesButtonEl.style.boxShadow = "none";
+    }
 
     // Ensure the pointer is back to default on touch devices
     if (this.viewer) this.viewer.scene.canvas.style.cursor = "default";
@@ -581,10 +587,16 @@ class DrawLinesPlugin {
       this.isDrawing = false;
       this.cancelLine();
     }
-    if (this.deleteLinesButtonEl) this.deleteLinesButtonEl.style.borderColor = this.isDeleting ? "#21ee21" : "#444444";
-    if (this.deleteLinesButtonEl) this.deleteLinesButtonEl.style.boxShadow = this.isDeleting ? "rgb(255, 255, 255) 0px 0px 8px 0px, rgb(255, 255, 255) 0px 0px 8px 0px" : "none";
-    if (this.drawLinesButtonEl) this.drawLinesButtonEl.style.borderColor = "#444444";
-    if (this.drawLinesButtonEl) this.drawLinesButtonEl.style.boxShadow = "none";
+    if (this.deleteLinesButtonEl) {
+      this.deleteLinesButtonEl.style.background = this.isDeleting ? "#4389bb" : "#303336";
+      this.deleteLinesButtonEl.style.borderColor = this.isDeleting ? "#21ee21" : "#444444";
+      this.deleteLinesButtonEl.style.boxShadow = this.isDeleting ? "rgb(255, 255, 255) 0px 0px 8px 0px, rgb(255, 255, 255) 0px 0px 8px 0px" : "none";
+    }
+    if (this.drawLinesButtonEl) {
+      this.drawLinesButtonEl.style.background = "#303336";
+      this.drawLinesButtonEl.style.borderColor = "#444444";
+      this.drawLinesButtonEl.style.boxShadow = "none";
+    }
 
     // Ensure the pointer is back to default on touch devices
     if (this.viewer) this.viewer.scene.canvas.style.cursor = "default";
