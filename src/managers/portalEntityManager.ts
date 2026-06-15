@@ -65,8 +65,8 @@ export class PortalEntityManager {
         const oldLayerId = getPortalLayerId(existing.data);
         const newLayerId = getPortalLayerId(data);
         if (oldLayerId !== newLayerId) {
-          this.layerManager.getOrCreateSourceAndFilter(oldLayerId).entities.remove(existing.entity);
-          this.layerManager.getOrCreateSourceAndFilter(newLayerId).entities.add(existing.entity);
+          this.layerManager.getOrCreateDataSourceLayer(oldLayerId).entities.remove(existing.entity);
+          this.layerManager.getOrCreateDataSourceLayer(newLayerId).entities.add(existing.entity);
         }
         this.updatePortalEntity(existing.entity, data);
         existing.data = data;
@@ -106,7 +106,7 @@ export class PortalEntityManager {
 
   private createPortalEntity(data: PortalData): Cesium.Entity {
     const layerId = getPortalLayerId(data);
-    return this.layerManager.getOrCreateSourceAndFilter(layerId).entities.add({
+    return this.layerManager.getOrCreateDataSourceLayer(layerId).entities.add({
       id: `portal-${data.guid}`,
       position: this.entityPositionManager.getPosition(data),
       point: {
@@ -128,7 +128,7 @@ export class PortalEntityManager {
     const portalInfo = this.portals.get(guid);
     if (portalInfo) {
       const layerId = getPortalLayerId(portalInfo.data);
-      this.layerManager.getOrCreateSourceAndFilter(layerId).entities.remove(portalInfo.entity);
+      this.layerManager.getOrCreateDataSourceLayer(layerId).entities.remove(portalInfo.entity);
       this.portals.delete(guid);
     }
   }

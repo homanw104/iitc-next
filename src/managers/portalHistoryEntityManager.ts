@@ -78,7 +78,7 @@ export class PortalHistoryEntityManager {
   private createHistoryHaloEntity(data: PortalData, reverse: boolean, color: Cesium.Color): Cesium.Entity {
     const sourceId = reverse ? "history-visited-captured-reverse" : "history-visited-captured";
     const idSuffix = reverse ? "history-halo-reverse" : "history-halo";
-    return this.layerManager.getOrCreateSourceAndFilter(sourceId).entities.add({
+    return this.layerManager.getOrCreateDataSourceLayer(sourceId).entities.add({
       id: `portal-${data.guid}-${idSuffix}`,
       position: this.entityPositionManager.getPosition(data),
       point: {
@@ -110,7 +110,7 @@ export class PortalHistoryEntityManager {
     if (!entity) return;
 
     const sourceId = reverse ? "history-visited-captured-reverse" : "history-visited-captured";
-    this.layerManager.getOrCreateSourceAndFilter(sourceId).entities.remove(entity);
+    this.layerManager.getOrCreateDataSourceLayer(sourceId).entities.remove(entity);
     if (reverse) info.reverseEntity = undefined;
     else info.entity = undefined;
   }

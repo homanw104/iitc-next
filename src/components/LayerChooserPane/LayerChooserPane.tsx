@@ -8,6 +8,8 @@ const LayerChooserPane = ({ layerManager, onToggle }: {
   layerManager: LayerManager;
   onToggle: (id: string, checked: boolean) => void;
 }): HTMLElement => {
+  const pluginFilters = layerManager.getPluginFilters();
+
   return (
     <div
       style={{
@@ -64,8 +66,8 @@ const LayerChooserPane = ({ layerManager, onToggle }: {
       <LayerSection name="Debug" />
       <LayerCheckbox label="Debug Tiles" id="debug-tiles" layerManager={layerManager} onToggle={onToggle} />
 
-      {layerManager.pluginFilterStates.size > 0 && <LayerSection name="Plugins" />}
-      {Array.from(layerManager.pluginFilterStates.entries()).map(([id]) => (
+      {pluginFilters.length > 0 && <LayerSection name="Plugins" />}
+      {pluginFilters.map(([id]) => (
         <LayerCheckbox label={id} id={id} layerManager={layerManager} onToggle={onToggle} />
       ))}
     </div>

@@ -36,7 +36,7 @@ export class DebugTileEntityManager {
       const entity = this.createTileEntity(key, status);
       if (entity) {
         this.tileEntities.set(key, entity);
-        const source = this.layerManager.getOrCreateSourceAndFilter(this.layerId);
+        const source = this.layerManager.getOrCreateDataSourceLayer(this.layerId);
         source.entities.add(entity);
         this.updateTileEntity(entity, status); // Handle immediate removal if status is already loaded/error
       }
@@ -116,13 +116,13 @@ export class DebugTileEntityManager {
   private updateTileEntity(entity: Cesium.Entity, status: TileStatus): void {
     const color = this.getStatusColor(status);
     if (entity.rectangle) {
-      entity.rectangle.outlineColor = new Cesium.ConstantProperty(color) as any;
-      entity.rectangle.material = new Cesium.ColorMaterialProperty(color.withAlpha(0.1)) as any;
+      entity.rectangle.outlineColor = new Cesium.ConstantProperty(color);
+      entity.rectangle.material = new Cesium.ColorMaterialProperty(color.withAlpha(0.1));
     }
 
     if (status === "loaded" || status === "error") {
       setTimeout(() => {
-        const source = this.layerManager.getOrCreateSourceAndFilter(this.layerId);
+        const source = this.layerManager.getOrCreateDataSourceLayer(this.layerId);
         source.entities.remove(entity);
         // Find and remove from map
         for (const [key, ent] of this.tileEntities.entries()) {

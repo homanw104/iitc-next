@@ -39,8 +39,8 @@ export class PortalLabelEntityManager {
       const oldLayerId = getPortalLabelLayerId(existing.data);
       const newLayerId = getPortalLabelLayerId(data);
       if (oldLayerId !== newLayerId) {
-        this.layerManager.getOrCreateSourceAndFilter(oldLayerId).entities.remove(existing.entity);
-        this.layerManager.getOrCreateSourceAndFilter(newLayerId).entities.add(existing.entity);
+        this.layerManager.getOrCreateDataSourceLayer(oldLayerId).entities.remove(existing.entity);
+        this.layerManager.getOrCreateDataSourceLayer(newLayerId).entities.add(existing.entity);
       }
       this.updateLabelEntity(existing.entity, data);
       existing.data = data;
@@ -71,7 +71,7 @@ export class PortalLabelEntityManager {
 
   private createLabelEntity(data: PortalData): Cesium.Entity {
     const layerId = getPortalLabelLayerId(data);
-    return this.layerManager.getOrCreateSourceAndFilter(layerId).entities.add({
+    return this.layerManager.getOrCreateDataSourceLayer(layerId).entities.add({
       id: `label-${data.guid}`,
       position: this.entityPositionManager.getPosition(data),
       billboard: {
@@ -94,7 +94,7 @@ export class PortalLabelEntityManager {
     if (!labelInfo) return;
 
     const layerId = getPortalLabelLayerId(labelInfo.data);
-    this.layerManager.getOrCreateSourceAndFilter(layerId).entities.remove(labelInfo.entity);
+    this.layerManager.getOrCreateDataSourceLayer(layerId).entities.remove(labelInfo.entity);
     this.labels.delete(guid);
   }
 

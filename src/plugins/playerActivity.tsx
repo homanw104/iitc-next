@@ -88,10 +88,8 @@ class PlayerActivityPlugin {
     this.setUpTooltipElement();
     this.setUpHoverAction();
 
-    this.dataSourceEnl = this.layerManager.getOrCreateSourceAndFilter("Player Activity Enl");
-    this.dataSourceRes = this.layerManager.getOrCreateSourceAndFilter("Player Activity Res");
-    this.layerManager.setLayerRenderOnTop("Player Activity Enl", true);
-    this.layerManager.setLayerRenderOnTop("Player Activity Res", true);
+    this.dataSourceEnl = this.layerManager.getOrCreateOverlayLayer("Player Activity Enl");
+    this.dataSourceRes = this.layerManager.getOrCreateOverlayLayer("Player Activity Res");
     this.setUpDataSource(this.dataSourceEnl);
     this.setUpDataSource(this.dataSourceRes);
 
@@ -105,8 +103,8 @@ class PlayerActivityPlugin {
   public deinit() {
     this.commManager?.unsetOnReceiveMsgCallback(this.onReceiveCommMsgCallback);
     this.entityPositionManager?.unsetOnPositionChangedCallback(this.onEntityPositionChangedCallback);
-    this.layerManager?.removeSourceAndFilter("Player Activity Enl");
-    this.layerManager?.removeSourceAndFilter("Player Activity Res");
+    this.layerManager?.removeOverlayLayer("Player Activity Enl");
+    this.layerManager?.removeOverlayLayer("Player Activity Res");
     this.playerLocations.clear();
     this.playerPaths.clear();
     this.unsetHoverAction();
@@ -331,8 +329,6 @@ class PlayerActivityPlugin {
 
     this.renderPlayerLocations(playerActivities);
     this.renderPlayerPaths(playerActivities);
-    this.layerManager?.moveLayerToTop("Player Activity Enl");
-    this.layerManager?.moveLayerToTop("Player Activity Res");
     this.viewer?.scene.requestRender();
   }
 

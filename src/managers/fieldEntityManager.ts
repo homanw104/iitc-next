@@ -30,8 +30,8 @@ export class FieldEntityManager {
         const oldLayerId = getFieldLayerId(existing.data);
         const newLayerId = getFieldLayerId(data);
         if (oldLayerId !== newLayerId) {
-          this.layerManager.getOrCreateSourceAndFilter(oldLayerId).entities.remove(existing.entity);
-          this.layerManager.getOrCreateSourceAndFilter(newLayerId).entities.add(existing.entity);
+          this.layerManager.getOrCreateDataSourceLayer(oldLayerId).entities.remove(existing.entity);
+          this.layerManager.getOrCreateDataSourceLayer(newLayerId).entities.add(existing.entity);
         }
         this.updateFieldEntity(existing.entity, data);
         existing.data = data;
@@ -48,7 +48,7 @@ export class FieldEntityManager {
     const fieldInfo = this.fields.get(guid);
     if (fieldInfo) {
       const layerId = getFieldLayerId(fieldInfo.data);
-      this.layerManager.getOrCreateSourceAndFilter(layerId).entities.remove(fieldInfo.entity);
+      this.layerManager.getOrCreateDataSourceLayer(layerId).entities.remove(fieldInfo.entity);
       this.fields.delete(guid);
       return true;
     }
@@ -62,7 +62,7 @@ export class FieldEntityManager {
   private createFieldEntity(data: FieldData): Cesium.Entity {
     const layerId = getFieldLayerId(data);
     const points = data.points.flatMap(p => [p.lngE6 / 1e6, p.latE6 / 1e6]);
-    return this.layerManager.getOrCreateSourceAndFilter(layerId).entities.add({
+    return this.layerManager.getOrCreateDataSourceLayer(layerId).entities.add({
       id: `field-${data.guid}`,
       polygon: {
         hierarchy: new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray(points)),

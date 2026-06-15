@@ -10,108 +10,144 @@ import { logManager } from "./logManager";
 const FILTER_STATES_STORAGE_KEY = "iitc-next-filter-states";
 const PLUGIN_FILTER_STATES_STORAGE_KEY = "iitc-next-plugin-filter-states";
 
-class Layer {
+type DataSourceDisplayWithCollections = Cesium.DataSourceDisplay & {
+  _primitives: Cesium.PrimitiveCollection;
+  _groundPrimitives: Cesium.PrimitiveCollection;
+};
+
+interface LayerRenderCommand {
+  pass: unknown;
+  renderState: unknown;
+}
+
+interface LayerFrameState {
+  commandList: LayerRenderCommand[];
+  passes?: {
+    render?: boolean;
+    pick?: boolean;
+  };
+}
+
+type PrimitiveCollectionWithUpdate = {
+  update: (frameState: LayerFrameState) => void;
+};
+
+type CesiumWithPrivateRenderer = typeof Cesium & {
+  Pass?: {
+    OVERLAY: unknown;
+  };
+  RenderState?: {
+    fromCache: (renderState: Record<string, unknown>) => unknown;
+  };
+};
+
+class OverlayLayer {
   public source: Cesium.CustomDataSource;
-  public collection: Cesium.PrimitiveCollection;
-  public groundCollection: Cesium.PrimitiveCollection;
-  private display: Cesium.DataSourceDisplay;
-  private readonly removeListener: () => void;
+  private readonly dataSourceCollection = new Cesium.DataSourceCollection();
+  private readonly display: Cesium.DataSourceDisplay;
+  private readonly ready: Promise<Cesium.DataSource>;
+  private readonly removePreRenderListener: () => void;
   private readonly removeCollectionListener: () => void;
   private isDestroyed: boolean = false;
-  private renderOnTop: boolean = false;
 
-  constructor(private viewer: Cesium.Viewer, name: string) {
+  constructor(private viewer: Cesium.Viewer, name: string, visible: boolean) {
     this.source = new Cesium.CustomDataSource(name);
-    this.collection = new Cesium.PrimitiveCollection();
-    this.groundCollection = new Cesium.PrimitiveCollection();
-    this.viewer.scene.primitives.add(this.collection);
-    this.viewer.scene.groundPrimitives.add(this.groundCollection);
-    this.installRenderOnTopHook(this.collection);
-
-    const dataSourceCollection = new Cesium.DataSourceCollection();
-    dataSourceCollection.add(this.source).then();
-
-    // Redirect primitive addition to our own collection
-    const sceneProxy = new Proxy(this.viewer.scene, {
-      get: (target, prop, receiver) => {
-        if (prop === "primitives") return this.collection;
-        if (prop === "groundPrimitives") return this.groundCollection;
-        return Reflect.get(target, prop, receiver);
-      }
-    });
-
+    this.source.show = visible;
+    this.ready = this.dataSourceCollection.add(this.source);
     this.display = new Cesium.DataSourceDisplay({
-      scene: sceneProxy,
-      dataSourceCollection: dataSourceCollection
+      scene: this.viewer.scene,
+      dataSourceCollection: this.dataSourceCollection,
     });
 
-    const updateCallback = () => {
+    this.installOverlayHooks();
+
+    this.ready.then(() => {
+      if (this.isDestroyed) {
+        this.dataSourceCollection.remove(this.source, true);
+        return;
+      }
+      this.raiseToTop();
+    });
+
+    this.removePreRenderListener = this.viewer.scene.preRender.addEventListener(() => {
       if (this.isDestroyed || this.viewer.isDestroyed()) return;
       this.display.update(this.viewer.clock.currentTime);
-    };
-    this.removeListener = this.viewer.scene.preRender.addEventListener(updateCallback);
+    });
 
-    // Ensure we render when entities change
     this.removeCollectionListener = this.source.entities.collectionChanged.addEventListener(() => {
       if (this.isDestroyed || this.viewer.isDestroyed()) return;
       this.viewer.scene.requestRender();
     });
   }
 
-  private installRenderOnTopHook(collection: Cesium.PrimitiveCollection): void {
-    const collectionWithUpdate = collection as PrimitiveCollectionWithUpdate;
-    const originalUpdate = collectionWithUpdate.update.bind(collectionWithUpdate);
+  public setVisible(visible: boolean): void {
+    this.source.show = visible;
+  }
 
-    collectionWithUpdate.update = (frameState: LayerFrameState) => {
-      const firstLayerCommand = frameState.commandList.length;
+  private installOverlayHooks(): void {
+    const collections = this.display as DataSourceDisplayWithCollections;
+    this.installOverlayHook(collections._primitives as unknown as PrimitiveCollectionWithUpdate);
+    this.installOverlayHook(collections._groundPrimitives as unknown as PrimitiveCollectionWithUpdate);
+  }
+
+  private installOverlayHook(collection: PrimitiveCollectionWithUpdate): void {
+    const originalUpdate = collection.update.bind(collection);
+
+    collection.update = (frameState: LayerFrameState) => {
+      const firstCommand = frameState.commandList.length;
       originalUpdate(frameState);
 
-      if (!this.renderOnTop || !frameState.passes?.render || frameState.passes.pick) return;
+      if (!frameState.passes?.render || frameState.passes.pick) return;
 
-      for (let i = firstLayerCommand; i < frameState.commandList.length; i++) {
+      for (let i = firstCommand; i < frameState.commandList.length; i++) {
         const command = frameState.commandList[i];
+        command.pass = (Cesium as CesiumWithPrivateRenderer).Pass?.OVERLAY ?? command.pass;
         command.renderState = getNoDepthRenderState(command.renderState);
       }
     };
   }
 
-  public setRenderOnTop(enabled: boolean): void {
-    this.renderOnTop = enabled;
+  public raiseToTop(): void {
+    if (this.isDestroyed || this.viewer.isDestroyed()) return;
+
+    const collections = this.display as DataSourceDisplayWithCollections;
+    if (this.viewer.scene.primitives.contains(collections._primitives)) {
+      this.viewer.scene.primitives.raiseToTop(collections._primitives);
+    }
+    if (this.viewer.scene.groundPrimitives.contains(collections._groundPrimitives)) {
+      this.viewer.scene.groundPrimitives.raiseToTop(collections._groundPrimitives);
+    }
+    this.viewer.scene.requestRender();
   }
 
-  public destroy() {
+  public destroy(): void {
     if (this.isDestroyed) return;
     this.isDestroyed = true;
 
-    if (this.removeListener) this.removeListener();
-    if (this.removeCollectionListener) this.removeCollectionListener();
-
+    this.removePreRenderListener();
+    this.removeCollectionListener();
     this.display.destroy();
-    this.viewer.scene.primitives.remove(this.collection);
-    this.viewer.scene.groundPrimitives.remove(this.groundCollection);
+    this.dataSourceCollection.remove(this.source, true);
   }
 }
 
 export class LayerManager {
-  private readonly viewer: Cesium.Viewer;
-  private readonly topLayerOrder: string[] = [];
+  // Built-in layers like portals and links use normal dataSources
+  private dataSources: Map<string, Cesium.DataSource> = new Map();
 
-  // Maps sourceVisibility keys to Cesium Sources (layers)
-  private sources: Map<string, Layer> = new Map();
+  // Overlay layers use custom OverlayLayer and are mostly used by plugins
+  private overlayLayers: Map<string, OverlayLayer> = new Map();
 
-  // Granular controls (portals-l8-enlightened, portals-placeholder-resistance, etc.)
-  private sourceVisibility: Map<string, boolean> = new Map();
+  // Master layer visibility settings that are shown in the layer detail pane
+  private layerVisibility: Map<string, boolean> = new Map();
 
-  // Upper level controls (portals, links, fields)
+  // Fine-grained filter controls that separate each portal-level-faction pair, etc.
   private filterState: Map<string, boolean> = new Map();
+  private pluginFilterState: Map<string, boolean> = new Map();
 
-  // Plugin-specific controls (e.g. "Player activity Res", which will be shown in layer chooser)
-  public pluginFilterStates: Map<string, boolean> = new Map();
-
-  constructor(viewer: Cesium.Viewer) {
-    this.viewer = viewer;
+  constructor(private readonly viewer: Cesium.Viewer) {
     this.loadDefaults();
-    this.loadState().then();
+    this.loadStorageState();
   }
 
   private loadDefaults() {
@@ -130,7 +166,7 @@ export class LayerManager {
     this.applyFilters();
   }
 
-  private async loadState() {
+  private loadStorageState() {
     const stored = safeLocalStorage.getItem(FILTER_STATES_STORAGE_KEY);
     const pluginStored = safeLocalStorage.getItem(PLUGIN_FILTER_STATES_STORAGE_KEY);
 
@@ -138,12 +174,16 @@ export class LayerManager {
       try {
         const states = JSON.parse(stored);
         if (Array.isArray(states)) {
-          this.filterState = new Map(states);
+          states.forEach(([name, enabled]) => {
+            if (typeof name === "string" && typeof enabled === "boolean") {
+              this.filterState.set(name, enabled);
+            }
+          });
           logManager.debug("LayerManager", `Loaded ${states.length} filters from storage.`);
         }
       } catch (e) {
         logManager.error("LayerManager", "Failed to load filters from storage", e);
-        this.removeState();
+        this.removeStorageState();
       }
     }
 
@@ -151,26 +191,30 @@ export class LayerManager {
       try {
         const states = JSON.parse(pluginStored);
         if (Array.isArray(states)) {
-          this.pluginFilterStates = new Map(states);
+          states.forEach(([name, enabled]) => {
+            if (typeof name === "string" && typeof enabled === "boolean") {
+              this.pluginFilterState.set(name, enabled);
+            }
+          });
           logManager.debug("PluginManager", `Loaded ${states.length} plugin filters from storage.`);
         }
       } catch (e) {
         logManager.error("LayerManager", "Failed to load plugin filter states from storage", e);
-        this.removeState();
+        this.removeStorageState();
       }
     }
 
     this.applyFilters();
   }
 
-  private saveState() {
+  private saveStorageState() {
     const states = Array.from(this.filterState);
-    const pluginStates = Array.from(this.pluginFilterStates);
+    const pluginStates = Array.from(this.pluginFilterState);
     safeLocalStorage.setItem(FILTER_STATES_STORAGE_KEY, JSON.stringify(states));
     safeLocalStorage.setItem(PLUGIN_FILTER_STATES_STORAGE_KEY, JSON.stringify(pluginStates));
   }
 
-  private removeState() {
+  private removeStorageState() {
     safeLocalStorage.removeItem(FILTER_STATES_STORAGE_KEY);
     safeLocalStorage.removeItem(PLUGIN_FILTER_STATES_STORAGE_KEY);
   }
@@ -184,10 +228,10 @@ export class LayerManager {
       }
       this.filterState.set(type, enabled);
     } else {
-      this.pluginFilterStates.set(type, enabled);
+      this.pluginFilterState.set(type, enabled);
     }
     this.applyFilters();
-    this.saveState();
+    this.saveStorageState();
   }
 
   public isFilterEnabled(type: string): boolean {
@@ -200,7 +244,7 @@ export class LayerManager {
       }
       return this.filterState.get(type) !== false;
     } else {
-      return this.pluginFilterStates.get(type) !== false;
+      return this.pluginFilterState.get(type) !== false;
     }
   }
 
@@ -219,90 +263,71 @@ export class LayerManager {
     }
   }
 
-  public getOrCreateSourceAndFilter(name: string): Cesium.CustomDataSource {
-    let layer = this.sources.get(name);
-    if (!layer) {
-      layer = new Layer(this.viewer, name);
-      // Apply saved visibility or default to true
-      layer.source.show = this.sourceVisibility.has(name)
-        ? this.sourceVisibility.get(name)!
-        : true;
+  public getPluginFilters(): Array<[string, boolean]> {
+    return Array.from(this.pluginFilterState).filter(([name]) => this.overlayLayers.has(name));
+  }
 
-      this.sources.set(name, layer);
-      this.applyTopLayerOrder();
+  public getOrCreateDataSourceLayer(name: string): Cesium.CustomDataSource {
+    let source = this.dataSources.get(name);
+    if (!source) {
+      source = new Cesium.CustomDataSource(name);
+      source.show = this.getLayerVisibility(name);
+      source.entities.collectionChanged.addEventListener(() => {
+        if (!this.viewer.isDestroyed()) this.viewer.scene.requestRender();
+      });
+
+      // Ensure overlay layers are always on top
+      this.viewer.dataSources.add(source).then(() => this.overlayLayers.forEach(layer => layer.raiseToTop()));
+      this.dataSources.set(name, source);
     }
 
-    // Create the filter as well if it's a plugin layer
-    if (!this.isBuiltInSource(name) && !this.pluginFilterStates.has(name)) {
-      this.pluginFilterStates.set(name, true);
-      this.saveState();
+    return source;
+  }
+
+  public getOrCreateOverlayLayer(name: string): Cesium.CustomDataSource {
+    let layer = this.overlayLayers.get(name);
+    if (!layer) {
+      layer = new OverlayLayer(this.viewer, name, this.getLayerVisibility(name));
+      this.overlayLayers.set(name, layer);
+      this.overlayLayers.forEach(layer => layer.raiseToTop());
+    }
+
+    if (!this.pluginFilterState.has(name)) {
+      this.pluginFilterState.set(name, true);
+      this.saveStorageState();
     }
 
     return layer.source;
   }
 
-  public removeSourceAndFilter(name: string): void {
-    const layer = this.sources.get(name);
+  public removeOverlayLayer(name: string): void {
+    const layer = this.overlayLayers.get(name);
     if (layer) {
       layer.destroy();
-      this.sources.delete(name);
-      this.removeFromTopLayerOrder(name);
-      this.viewer.scene.requestRender();
+      this.overlayLayers.delete(name);
     }
 
-    // Delete the filter as well if it's a plugin layer
-    if (!this.isBuiltInSource(name) && this.pluginFilterStates.has(name)) {
-      this.pluginFilterStates.delete(name);
-      this.sourceVisibility.delete(name);
-      this.saveState();
+    if (this.pluginFilterState.has(name)) {
+      this.pluginFilterState.delete(name);
+      this.layerVisibility.delete(name);
+      this.saveStorageState();
     }
   }
 
-  public setSourceVisible(name: string, visible: boolean): void {
-    this.sourceVisibility.set(name, visible);
-    const layer = this.sources.get(name);
-    if (layer) {
-      layer.source.show = visible;
-      this.viewer.scene.requestRender();
-    }
-  }
-
-  public moveLayerToTop(name: string): void {
-    this.removeFromTopLayerOrder(name);
-    this.topLayerOrder.push(name);
-    this.applyTopLayerOrder();
-  }
-
-  public setLayerRenderOnTop(name: string, enabled: boolean): void {
-    const layer = this.sources.get(name);
-    if (!layer) return;
-
-    layer.setRenderOnTop(enabled);
+  private setLayerVisibility(name: string, visible: boolean): void {
+    this.layerVisibility.set(name, visible);
+    const dataSource = this.dataSources.get(name);
+    if (dataSource) dataSource.show = visible;
+    const pluginLayer = this.overlayLayers.get(name);
+    if (pluginLayer) pluginLayer.setVisible(visible);
     this.viewer.scene.requestRender();
   }
 
-  private removeFromTopLayerOrder(name: string): void {
-    const existingIndex = this.topLayerOrder.indexOf(name);
-    if (existingIndex !== -1) this.topLayerOrder.splice(existingIndex, 1);
-  }
-
-  private applyTopLayerOrder(): void {
-    this.topLayerOrder.forEach((layerName) => {
-      const layer = this.sources.get(layerName);
-      if (!layer) return;
-      this.viewer.scene.primitives.raiseToTop(layer.collection);
-      this.viewer.scene.groundPrimitives.raiseToTop(layer.groundCollection);
-    });
-    this.viewer.scene.requestRender();
-  }
-
-  private isBuiltInSource(name: string): boolean {
-    // Built-in sources have different names for filter and source
-    return this.sourceVisibility.has(name) && !this.pluginFilterStates.has(name);
+  private getLayerVisibility(name: string): boolean {
+    return this.layerVisibility.get(name) !== false;
   }
 
   private isBuiltInFilter(filterName: string): boolean {
-    // filterState is exclusive to built-in filters
     return this.filterState.has(filterName);
   }
 
@@ -315,84 +340,62 @@ export class LayerManager {
       // Portals
       PORTAL_LEVELS.forEach(l => {
         const levelVisible = this.filterState.get(`level-${l}`) !== false;
-        this.setSourceVisible(`portals-l${l}-${t}`, teamVisible && levelVisible);
+        this.setLayerVisibility(`portals-l${l}-${t}`, teamVisible && levelVisible);
       });
 
       // Portal labels
       const portalLabelsVisible = this.filterState.get("portals-label") !== false;
-      this.setSourceVisible(`portals-label-${t}`, teamVisible && portalLabelsVisible);
+      this.setLayerVisibility(`portals-label-${t}`, teamVisible && portalLabelsVisible);
 
       // Placeholders
       const placeholdersVisible = this.filterState.get("portals-placeholder") !== false;
-      this.setSourceVisible(`portals-placeholder-${t}`, teamVisible && placeholdersVisible);
+      this.setLayerVisibility(`portals-placeholder-${t}`, teamVisible && placeholdersVisible);
 
       // Links
       const linksVisible = this.filterState.get("links") !== false;
-      this.setSourceVisible(`links-${t}`, teamVisible && linksVisible);
+      this.setLayerVisibility(`links-${t}`, teamVisible && linksVisible);
 
       // Fields
       const fieldsVisible = this.filterState.get("fields") !== false;
-      this.setSourceVisible(`fields-${t}`, teamVisible && fieldsVisible);
+      this.setLayerVisibility(`fields-${t}`, teamVisible && fieldsVisible);
     });
 
     // History
     const historyVisible = this.filterState.get("history") !== false;
-    this.setSourceVisible("history-visited-captured", historyVisible);
+    this.setLayerVisibility("history-visited-captured", historyVisible);
 
     // History Reverse
     const historyReverseVisible = this.filterState.get("history-reverse") !== false;
-    this.setSourceVisible("history-visited-captured-reverse", historyReverseVisible);
+    this.setLayerVisibility("history-visited-captured-reverse", historyReverseVisible);
 
     // Scout Control History
     const scoutControlVisible = this.filterState.get("scout-control") !== false;
-    this.setSourceVisible("history-scout-control", scoutControlVisible);
+    this.setLayerVisibility("history-scout-control", scoutControlVisible);
 
     // Scout Control Reverse
     const scoutControlReverseVisible = this.filterState.get("scout-control-reverse") !== false;
-    this.setSourceVisible("history-scout-control-reverse", scoutControlReverseVisible);
+    this.setLayerVisibility("history-scout-control-reverse", scoutControlReverseVisible);
 
     // Debug tiles
     const debugTilesVisible = this.filterState.get("debug-tiles") !== false;
-    this.setSourceVisible("debug-tiles", debugTilesVisible);
+    this.setLayerVisibility("debug-tiles", debugTilesVisible);
 
-    // Plugins (filter name should be the same as the layer name)
-    const pluginFilters = this.pluginFilterStates.keys();
+    // Plugins
+    const pluginFilters = this.pluginFilterState.keys();
     for (const filter of pluginFilters) {
-      const pluginFilterVisible = this.pluginFilterStates.get(filter) !== false;
-      this.setSourceVisible(filter, pluginFilterVisible);
+      const pluginFilterVisible = this.pluginFilterState.get(filter) !== false;
+      this.setLayerVisibility(filter, pluginFilterVisible);
     }
 
     this.viewer.scene.requestRender();
   }
 }
 
-interface LayerRenderCommand {
-  renderState: unknown;
-}
-
-interface LayerFrameState {
-  commandList: LayerRenderCommand[];
-  passes?: {
-    render?: boolean;
-    pick?: boolean;
-  };
-}
-
-type PrimitiveCollectionWithUpdate = Cesium.PrimitiveCollection & {
-  update: (frameState: LayerFrameState) => void;
-};
-
-type CesiumWithPrivateRenderer = typeof Cesium & {
-  RenderState?: {
-    fromCache: (renderState: Record<string, unknown>) => unknown;
-  };
-};
-
 const noDepthRenderStateCache = new WeakMap<object, unknown>();
 
 function getNoDepthRenderState(renderState: unknown): unknown {
   const renderStateFactory = (Cesium as CesiumWithPrivateRenderer).RenderState;
-  if (!renderStateFactory || !isObject(renderState)) return undefined;
+  if (!renderStateFactory || !isObject(renderState)) return renderState;
 
   const cached = noDepthRenderStateCache.get(renderState);
   if (cached) return cached;

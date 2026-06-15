@@ -67,7 +67,7 @@ export class ScoutHistoryEntityManager {
   private createScoutControlHaloEntity(data: PortalData, reverse: boolean, color: Cesium.Color): Cesium.Entity {
     const sourceId = reverse ? "history-scout-control-reverse" : "history-scout-control";
     const idSuffix = reverse ? "scout-halo-reverse" : "scout-halo";
-    return this.layerManager.getOrCreateSourceAndFilter(sourceId).entities.add({
+    return this.layerManager.getOrCreateDataSourceLayer(sourceId).entities.add({
       id: `portal-${data.guid}-${idSuffix}`,
       position: this.entityPositionManager.getPosition(data),
       point: {
@@ -99,7 +99,7 @@ export class ScoutHistoryEntityManager {
     if (!entity) return;
 
     const sourceId = reverse ? "history-scout-control-reverse" : "history-scout-control";
-    this.layerManager.getOrCreateSourceAndFilter(sourceId).entities.remove(entity);
+    this.layerManager.getOrCreateDataSourceLayer(sourceId).entities.remove(entity);
     if (reverse) info.reverseEntity = undefined;
     else info.entity = undefined;
   }
