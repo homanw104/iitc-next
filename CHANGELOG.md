@@ -65,7 +65,7 @@
 * Added game detail pane
 * Improved soft reload logic by removing tiles in view
 * Improved copy intel link functionality
-* Fixed hardcoded useragent when logging in
+* Fixed the hardcoded useragent when logging in
 
 ## 1.0.0
 

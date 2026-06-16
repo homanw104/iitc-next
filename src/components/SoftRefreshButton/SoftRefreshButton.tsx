@@ -19,7 +19,7 @@ const SoftRefreshButton = ({ softRefreshButtonController }: {
       <button
         type="button"
         className="cesium-button cesium-toolbar-button"
-        title="Layer Chooser"
+        title="Soft Refresh"
         onClick={() => softRefreshButtonController.refreshView()}
       >
         <svg class="cesium-svgPath-svg" viewBox="0 -960 960 960" width="30" height="30" fill="currentColor">
