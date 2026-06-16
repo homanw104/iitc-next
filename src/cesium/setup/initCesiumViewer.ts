@@ -97,7 +97,7 @@ export function initCesiumViewer(container: string): Cesium.Viewer {
 
   // Other options for the camera and scene to improve visual quality and performance
   viewer.scene.logarithmicDepthBuffer = true;
-  viewer.scene.globe.showGroundAtmosphere = false;      // Turn off to improve performance
+  viewer.scene.globe.showGroundAtmosphere = true;
   viewer.scene.globe.baseColor = Cesium.Color.BLACK;
   viewer.scene.highDynamicRange = true;
   viewer.scene.msaaSamples = 4;
