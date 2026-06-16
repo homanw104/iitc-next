@@ -5,7 +5,7 @@
 import { apiRequest } from "../utils/network";
 import { logManager } from "./logManager";
 import * as Cesium from "cesium";
-import type { Team } from "../types/ingress";
+import type { Channel, Team } from "../types/ingress";
 
 const MIN_COMM_BOUNDS_KM = 10;
 const MIN_KM_PER_DEGREE = 110.574;
@@ -185,7 +185,7 @@ export class CommManager {
     this.callbacks = this.callbacks.filter(cb => cb !== callback);
   }
 
-  public getMessages(channel: string, calcBounds: boolean = true): CommResponseItem[] {
+  public getMessages(channel: Channel, calcBounds: boolean = true): CommResponseItem[] {
     const channelMessages = Array.from(this.messages[channel]?.values() || []);
     const bounds = this.getBounds();
     if (bounds && calcBounds) {
@@ -193,7 +193,8 @@ export class CommManager {
         const portalMarkup = m[2].plext.markup.find((markup) => {
           return markup[0] === "PORTAL";
         });
-        if (portalMarkup) {
+        const plextType = m[2].plext.plextType;
+        if (portalMarkup && plextType !== "SYSTEM_NARROWCAST") {
           const data = portalMarkup[1];
           if (data.latE6 !== undefined && data.lngE6 !== undefined) {
             return (
@@ -203,8 +204,9 @@ export class CommManager {
               data.lngE6 <= bounds.maxLngE6
             );
           }
+        } else {
+          return true;  // System message with no coordinates or alerts (SYSTEM_NARROWCAST), etc.
         }
-        return true;  // System message with no coordinates or another type
       }).sort((a, b) => a[1] - b[1]);
     } else {
       return channelMessages.sort((a, b) => a[1] - b[1]);
