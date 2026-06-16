@@ -28,17 +28,6 @@ public class IITCPopupHandler extends BridgeWebChromeClient {
     }
 
     @Override
-    public void onProgressChanged(WebView view, int newProgress) {
-        super.onProgressChanged(view, newProgress);
-        if (newProgress == 100) {
-            String url = view.getUrl();
-            if (url != null && url.contains("intel.ingress.com") && !url.contains("/login") && !url.contains("/signinhandler")) {
-                view.evaluateJavascript(activity.getScriptInjector().getInjectionJs(), null);
-            }
-        }
-    }
-
-    @Override
     public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
         callback.invoke(origin, true, false);
     }
@@ -85,6 +74,8 @@ public class IITCPopupHandler extends BridgeWebChromeClient {
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 if (url.contains("intel.ingress.com") && !url.contains("auth")) {
+                    CookieManager.getInstance().flush();
+                    activity.getBridge().getWebView().loadUrl(url);
                     dismissPopup();
                 }
             }

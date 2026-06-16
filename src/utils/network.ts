@@ -15,6 +15,13 @@ export function setApiVersion(version: string): void {
 }
 
 /**
+ * Returns the API version currently used for requests.
+ */
+export function getApiVersion(): string | undefined {
+  return apiVersion;
+}
+
+/**
  * Sends a POST request to the Ingress API.
  * 
  * @param action The API action (e.g., 'getEntities').

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.4.2
+
+* Fixed tiles not loading when the user login for the first time
+* Signed the app bundle for Android
+
 ## 1.4.0
 
 * Clamped everything to the ground

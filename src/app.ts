@@ -14,7 +14,12 @@ import initPlugins from "./procedures/initPlugins";
 import { getPlayerInfo } from "./utils/player";
 import "./types/iitc.ts";
 
+let initStarted = false;
+
 const init = async () => {
+  if (initStarted) return;
+  initStarted = true;
+
   // Initialize and shadow storage if needed
   await safeLocalStorage.initialize();
   safeLocalStorage.shadow();
@@ -30,7 +35,10 @@ const init = async () => {
   extractPlayerInfo();
 
   // Halt if user isn't logged in
-  if (!getPlayerInfo()) return;
+  if (!getPlayerInfo()) {
+    initStarted = false;
+    return;
+  }
 
   // Unload the original intel map
   unloadOriginalIntelMap();

@@ -14,7 +14,7 @@ public class ScriptInjector {
     private String cesiumCss = "https://cdn.jsdelivr.net/npm/cesium@latest/Build/Cesium/Widgets/widgets.css";
     private String systemJs = "https://cdn.jsdelivr.net/npm/systemjs@6.15.1/dist/system.min.js";
     private String systemNamedRegister = "https://cdn.jsdelivr.net/npm/systemjs@6.15.1/dist/extras/named-register.min.js";
-    private String scriptVersion = "1.4.0";
+    private String scriptVersion = "1.4.2";
     private String scriptName = "iitc-next";
 
     private String userScript;
