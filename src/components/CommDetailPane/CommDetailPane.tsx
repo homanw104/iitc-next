@@ -15,6 +15,7 @@ import CommFetchLatestButton from "./CommFetchLatestButton";
 import CommLoadingIndicator from "./CommLoadingIndicator";
 import CommMessage from "./CommMessage";
 import CommTab from "./CommTab";
+import CommDateDivider from "./CommDateDivider.tsx";
 
 const CommDetailPane = ({
   viewer,
@@ -59,8 +60,36 @@ const CommDetailPane = ({
   onMessageDivsRef: (el: HTMLElement) => void;
   onScroll: (e: Event) => void;
 }) => {
-  const messages = commManager.getMessages(channel);
   let textInput: HTMLInputElement | null = null;
+  let lastDateStr: string | null = null;
+
+  const messages = commManager.getMessages(channel);
+  const messageList: JSX.Element[] = [];
+
+  for (const message of messages) {
+    const dateStr = new Date(message[1]).toLocaleDateString([], { day: "numeric", month: "short" });
+    if (dateStr !== lastDateStr) {
+      messageList.push(
+        <CommDateDivider timeStr={dateStr} />
+      );
+    }
+    lastDateStr = dateStr;
+
+    messageList.push(
+      <CommMessage
+        message={message}
+        viewer={viewer}
+        portalEntityManager={portalEntityManager}
+        tileRequestManager={tileRequestManager}
+        portalHistoryEntityManager={portalHistoryEntityManager}
+        scoutHistoryEntityManager={scoutHistoryEntityManager}
+        portalDetailPaneController={portalDetailPaneController}
+        portalDetailState={portalDetailState}
+        container={container}
+        channel={channel}
+      />
+    );
+  }
 
   const tabs: { id: Channel; label: string }[] = [
     { id: "all", label: "ALL" },
@@ -117,20 +146,7 @@ const CommDetailPane = ({
       >
         <CommLoadingIndicator onRef={onLoadingDivRef} />
         <div style={{ minHeight: "100%" }}>
-          {messages.map((message) => (
-            <CommMessage
-              message={message}
-              viewer={viewer}
-              portalEntityManager={portalEntityManager}
-              tileRequestManager={tileRequestManager}
-              portalHistoryEntityManager={portalHistoryEntityManager}
-              scoutHistoryEntityManager={scoutHistoryEntityManager}
-              portalDetailPaneController={portalDetailPaneController}
-              portalDetailState={portalDetailState}
-              container={container}
-              channel={channel}
-            />
-          ))}
+          {messageList}
         </div>
         <CommFetchLatestButton
           onClick={onFetchLatestClick}

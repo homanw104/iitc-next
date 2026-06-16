@@ -77,12 +77,7 @@ const CommMessage = ({
   const timestamp = message[1];
   const plext = message[2].plext;
   const dateObj = new Date(timestamp);
-  let timeStr: string;
-  if (dateObj.toDateString() === new Date(Date.now()).toDateString()) {
-    timeStr = dateObj.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  } else {
-    timeStr = dateObj.toLocaleDateString([], { day: "numeric", month: "short" });
-  }
+  const timeStr = dateObj.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
   return (
     <div style={{ margin: "4px 0px", display: "flex", flexDirection: "row" }}>
