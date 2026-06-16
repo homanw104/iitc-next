@@ -51,6 +51,69 @@ async function selectLoadedPortal(
   }
 }
 
+function handleOnClick(
+  data: { latE6?: number; lngE6?: number },
+  viewer: Viewer,
+  container: HTMLElement,
+  portalEntityManager: PortalEntityManager,
+  portalHistoryEntityManager: PortalHistoryEntityManager,
+  scoutHistoryEntityManager: ScoutHistoryEntityManager,
+  tileRequestManager: TileRequestManager,
+  portalDetailPaneController: PortalDetailPaneController,
+  portalDetailState: PortalDetailState,
+): void {
+  if (data.latE6 !== undefined && data.lngE6 !== undefined) {
+    const latE6 = data.latE6;
+    const lngE6 = data.lngE6;
+    const requestId = ++latestPortalSelectionRequest;
+    const cachedSelectionPromise = selectLoadedPortal(
+      viewer,
+      container,
+      portalEntityManager,
+      portalHistoryEntityManager,
+      scoutHistoryEntityManager,
+      portalDetailPaneController,
+      portalDetailState,
+      latE6,
+      lngE6,
+      requestId
+    );
+    viewer.camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(lngE6 / 1e6, latE6 / 1e6, 8e2),
+      duration: 1.5,
+      complete: () => {
+        cachedSelectionPromise.then(async (selectionHandled) => {
+          if (selectionHandled) return;
+
+          // Cancel selection if there's another selection in flight
+          if (requestId !== latestPortalSelectionRequest) return;
+
+          // Explicitly request tiles here to avoid race condition
+          const tileKeys = calculateTileKeys(viewer);
+          if (tileKeys.length > 0) tileRequestManager.addTiles(tileKeys);
+          await tileRequestManager.waitForIdle();
+
+          // Cancel selection if there's another selection in flight
+          if (requestId !== latestPortalSelectionRequest) return;
+
+          await selectLoadedPortal(
+            viewer,
+            container,
+            portalEntityManager,
+            portalHistoryEntityManager,
+            scoutHistoryEntityManager,
+            portalDetailPaneController,
+            portalDetailState,
+            latE6,
+            lngE6,
+            requestId
+          );
+        });
+      },
+    });
+  }
+}
+
 const CommMessage = ({
   message,
   viewer,
@@ -89,70 +152,33 @@ const CommMessage = ({
       </div>
       <div style={{ fontSize: "12px", paddingBottom: "2px", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
         {plext.markup.map(([type, data]) => {
-          let color = "white";
-          if (data.team === "ENLIGHTENED") color = getTeamColor("ENLIGHTENED").toCssColorString();
-          else if (data.team === "RESISTANCE") color = getTeamColor("RESISTANCE").toCssColorString();
-          else if (data.team === "MACHINA") color = getTeamColor("MACHINA").toCssColorString();
-          else if (data.team === "NEUTRAL" && data.plain === "_̶̱̍_̴̳͉̆̈́M̷͔̤͒Ą̷̍C̴̼̕ͅH̶̹͕̼̾Ḭ̵̇̾̓N̵̺͕͒̀̍Ä̴̞̰́_̴̦̀͆̓_̷̣̈́") color = getTeamColor("MACHINA").toCssColorString();
+          let teamColor = "white";
+          if (data.team === "ENLIGHTENED") teamColor = getTeamColor("ENLIGHTENED").toCssColorString();
+          else if (data.team === "RESISTANCE") teamColor = getTeamColor("RESISTANCE").toCssColorString();
+          else if (data.team === "MACHINA") teamColor = getTeamColor("MACHINA").toCssColorString();
+          else if (data.team === "NEUTRAL" && data.plain === "_̶̱̍_̴̳͉̆̈́M̷͔̤͒Ą̷̍C̴̼̕ͅH̶̹͕̼̾Ḭ̵̇̾̓N̵̺͕͒̀̍Ä̴̞̰́_̴̦̀͆̓_̷̣̈́") teamColor = getTeamColor("MACHINA").toCssColorString();
 
           if (type === "PLAYER" || type === "SENDER") {
-            return <span style={{ color, fontWeight: "bold", marginRight: "3px" }}>{data.plain}</span>;
+            return <span style={{ color: teamColor, fontWeight: "bold", marginRight: "3px" }}>{data.plain}</span>;
           } else if (type === "PORTAL") {
             return (
               <span
-                style={{ color: "#bbb", cursor: "pointer", textDecoration: "underline" }}
-                onClick={() => {
-                  if (data.latE6 !== undefined && data.lngE6 !== undefined) {
-                    const latE6 = data.latE6;
-                    const lngE6 = data.lngE6;
-                    const requestId = ++latestPortalSelectionRequest;
-                    const cachedSelectionPromise = selectLoadedPortal(
-                      viewer,
-                      container,
-                      portalEntityManager,
-                      portalHistoryEntityManager,
-                      scoutHistoryEntityManager,
-                      portalDetailPaneController,
-                      portalDetailState,
-                      latE6,
-                      lngE6,
-                      requestId
-                    );
-                    viewer.camera.flyTo({
-                      destination: Cesium.Cartesian3.fromDegrees(lngE6 / 1e6, latE6 / 1e6, 8e2),
-                      duration: 1.5,
-                      complete: () => {
-                        cachedSelectionPromise.then(async (selectionHandled) => {
-                          if (selectionHandled) return;
-
-                          // Cancel selection if there's another selection in flight
-                          if (requestId !== latestPortalSelectionRequest) return;
-
-                          // Explicitly request tiles here to avoid race condition
-                          const tileKeys = calculateTileKeys(viewer);
-                          if (tileKeys.length > 0) tileRequestManager.addTiles(tileKeys);
-                          await tileRequestManager.waitForIdle();
-
-                          // Cancel selection if there's another selection in flight
-                          if (requestId !== latestPortalSelectionRequest) return;
-
-                          await selectLoadedPortal(
-                            viewer,
-                            container,
-                            portalEntityManager,
-                            portalHistoryEntityManager,
-                            scoutHistoryEntityManager,
-                            portalDetailPaneController,
-                            portalDetailState,
-                            latE6,
-                            lngE6,
-                            requestId
-                          );
-                        });
-                      },
-                    });
-                  }
+                style={{
+                  color: plext.plextType === "SYSTEM_NARROWCAST" ? "#d8ad4c" : "#bbb",
+                  cursor: "pointer",
+                  textDecoration: "underline"
                 }}
+                onClick={() => handleOnClick(
+                  data,
+                  viewer,
+                  container,
+                  portalEntityManager,
+                  portalHistoryEntityManager,
+                  scoutHistoryEntityManager,
+                  tileRequestManager,
+                  portalDetailPaneController,
+                  portalDetailState
+                )}
               >
                 {data.plain}
               </span>
@@ -164,7 +190,11 @@ const CommMessage = ({
               return;
             }
           } else {
-            return <span style={{ color: color }}>{data.plain}</span>;
+            return <span style={{
+              color: plext.plextType === "SYSTEM_NARROWCAST" ? "#d8ad4c" : "#fff"
+            }}>
+              {data.plain}
+            </span>;
           }
         })}
       </div>

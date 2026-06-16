@@ -21,7 +21,7 @@ export class CommDetailPaneController {
   private readonly portalDetailPaneController: PortalDetailPaneController;
   private readonly portalDetailState: PortalDetailState;
 
-  private container: HTMLElement;
+  private readonly container: HTMLElement;
   private pane: HTMLElement | null = null;
   private loadingDiv: HTMLElement | null = null;
   private messageDivs: HTMLElement | null = null;
