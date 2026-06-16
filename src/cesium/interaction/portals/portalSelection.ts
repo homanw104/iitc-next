@@ -6,10 +6,10 @@ import * as Cesium from "cesium";
 import type { PortalEntityManager } from "../../../managers/portalEntityManager";
 import type { PortalHistoryEntityManager } from "../../../managers/portalHistoryEntityManager";
 import type { ScoutHistoryEntityManager } from "../../../managers/scoutHistoryEntityManager";
-import PortalDetailBar from "../../../components/PortalDetailBar/PortalDetailBar";
 import type { PortalDetailPaneController } from "../../../controllers/PortalDetailPaneController.tsx";
 import type { PortalDetailState } from "../../../core/coreControllers.ts";
 import type { InteractionGestureState } from "../state/interactionGestureState";
+import PortalDetailBar from "../../../components/PortalDetailBar/PortalDetailBar";
 
 export interface PortalSelectionState {
   isPortalDetailLoading: boolean;
@@ -19,7 +19,7 @@ export interface PortalSelectionState {
 
 export type PortalSelectionGestureState = Pick<
   InteractionGestureState,
-  "hasJustDoubleTapped" | "isDuringTheTap" | "hasJustPinched" | "isPinching"
+  "hasJustDoubleTapped" | "isDuringTheTap" | "hasJustPinched" | "isPinching" | "hasJustMoved"
 >;
 
 interface HandlePortalSelectionOptions {
@@ -40,7 +40,8 @@ function isPortalDisplaySuppressed(gestureState: PortalSelectionGestureState): b
   return gestureState.hasJustDoubleTapped ||
     gestureState.isDuringTheTap ||
     gestureState.hasJustPinched ||
-    gestureState.isPinching;
+    gestureState.isPinching ||
+    gestureState.hasJustMoved;
 }
 
 export function handlePortalSelection({

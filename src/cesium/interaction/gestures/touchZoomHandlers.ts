@@ -23,6 +23,7 @@ export function createTouchZoomHandlers(
   let isDuringTheSecondTap = false;
   let hasMovedDuringTheSecondTap = false;
   let inertiaResetTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  let revertHasJustMovedTimeoutId: ReturnType<typeof setTimeout> | null = null;
   let revertHasJustDoubleTappedTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
   const handleTouchStart = () => {
@@ -61,8 +62,6 @@ export function createTouchZoomHandlers(
   };
 
   const handleDrag = (event: Cesium.ScreenSpaceEventHandler.MotionEvent) => {
-    if (!isDuringTheSecondTap) return;
-
     const now = Date.now();
     const dt = now - lastMoveTime;
     const dx = event.endPosition.x - event.startPosition.x;
@@ -71,19 +70,29 @@ export function createTouchZoomHandlers(
 
     const movement = Math.sqrt(dx * dx + dy * dy);
     totalMovementLength += movement;
-    if (totalMovementLength > 4) hasMovedDuringTheSecondTap = true;
 
-    viewer.scene.screenSpaceCameraController.inertiaSpin = 0.0;
-    viewer.scene.screenSpaceCameraController.inertiaTranslate = 0.0;
-
-    if (dt > 0) {
-      const currentVelocity = dy / dt;
-      zoomVelocity = zoomVelocity * 0.4 + currentVelocity * 0.6;
+    if (totalMovementLength > 4) gestureState.hasJustMoved = true;
+    if (revertHasJustMovedTimeoutId) {
+      clearTimeout(revertHasJustMovedTimeoutId);
+      revertHasJustMovedTimeoutId = null;
     }
+    revertHasJustMovedTimeoutId = setTimeout(() => gestureState.hasJustMoved = false, doubleTapThreshold);
 
-    const height = viewer.camera.positionCartographic.height;
-    const zoomFactor = height * 0.003;
-    viewer.camera.zoomIn(dy * zoomFactor);
+    if (isDuringTheSecondTap) {
+      if (totalMovementLength > 4) hasMovedDuringTheSecondTap = true;
+
+      viewer.scene.screenSpaceCameraController.inertiaSpin = 0.0;
+      viewer.scene.screenSpaceCameraController.inertiaTranslate = 0.0;
+
+      if (dt > 0) {
+        const currentVelocity = dy / dt;
+        zoomVelocity = zoomVelocity * 0.4 + currentVelocity * 0.6;
+      }
+
+      const height = viewer.camera.positionCartographic.height;
+      const zoomFactor = height * 0.003;
+      viewer.camera.zoomIn(dy * zoomFactor);
+    }
   };
 
   const handleTouchEnd = (event: Cesium.ScreenSpaceEventHandler.PositionedEvent) => {

@@ -5,6 +5,7 @@
 export interface InteractionGestureState {
   pendingSingleTapTime: number | null;
   isDuringTheTap: boolean;
+  hasJustMoved: boolean;
   hasJustDoubleTapped: boolean;
   isPinching: boolean;
   hasJustPinched: boolean;
@@ -14,6 +15,7 @@ export interface InteractionGestureState {
 export function createInteractionGestureState(): InteractionGestureState {
   return {
     pendingSingleTapTime: null,
+    hasJustMoved: false,
     isDuringTheTap: false,
     hasJustDoubleTapped: false,
     isPinching: false,
