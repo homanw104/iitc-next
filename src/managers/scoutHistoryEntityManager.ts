@@ -72,7 +72,7 @@ export class ScoutHistoryEntityManager {
       id: `portal-${data.guid}-${idSuffix}`,
       position: this.entityPositionManager.getPosition(data),
       point: {
-        pixelSize: 24,
+        pixelSize: 16,
         color: Cesium.Color.TRANSPARENT,
         outlineColor: color,
         outlineWidth: 4,

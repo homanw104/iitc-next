@@ -9,6 +9,12 @@ import { logManager } from "./logManager";
 
 const FILTER_STATES_STORAGE_KEY = "iitc-next-filter-states";
 const PLUGIN_FILTER_STATES_STORAGE_KEY = "iitc-next-plugin-filter-states";
+const MUTUALLY_EXCLUSIVE_HISTORY_FILTERS = [
+  "history",
+  "history-reverse",
+  "scout-control",
+  "scout-control-reverse",
+];
 
 type DataSourceDisplayWithCollections = Cesium.DataSourceDisplay & {
   _primitives: Cesium.PrimitiveCollection;
@@ -199,6 +205,7 @@ export class LayerManager {
       }
     }
 
+    this.normalizeMutuallyExclusiveFilters();
     this.applyFilters();
   }
 
@@ -220,6 +227,9 @@ export class LayerManager {
         PORTAL_LEVELS.forEach(l => this.filterState.set(`level-${l}`, enabled));
         this.filterState.set("portals-placeholder", enabled);
         this.filterState.set("portals-label", enabled);
+      }
+      if (enabled && MUTUALLY_EXCLUSIVE_HISTORY_FILTERS.includes(type)) {
+        MUTUALLY_EXCLUSIVE_HISTORY_FILTERS.forEach(filter => this.filterState.set(filter, false));
       }
       this.filterState.set(type, enabled);
     } else {
@@ -324,6 +334,21 @@ export class LayerManager {
 
   private isBuiltInFilter(filterName: string): boolean {
     return this.filterState.has(filterName);
+  }
+
+  private normalizeMutuallyExclusiveFilters(): void {
+    let enabledFilter: string | null = null;
+
+    MUTUALLY_EXCLUSIVE_HISTORY_FILTERS.forEach(filter => {
+      if (this.filterState.get(filter) !== true) return;
+
+      // Enable the first previously enabled filter only
+      if (enabledFilter) {
+        this.filterState.set(filter, false);
+      } else {
+        enabledFilter = filter;
+      }
+    });
   }
 
   private applyFilters(): void {
