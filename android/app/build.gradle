@@ -10,6 +10,11 @@ def appVersionCode = appVersionParts[0] * 10000 + appVersionParts[1] * 100 + app
 android {
     namespace = "world.homans.iitcnext"
     compileSdk = libs.versions.compileSdk.get().toInteger()
+
+    buildFeatures {
+        buildConfig true
+    }
+
     defaultConfig {
         applicationId "world.homans.iitcnext"
         minSdkVersion rootProject.ext.minSdkVersion
