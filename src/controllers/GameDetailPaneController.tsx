@@ -3,6 +3,7 @@ import { ScoreManager } from "../managers/scoreManager";
 import GameDetailPane from "../components/panes/GameDetailPane/GameDetailPane";
 import PluginDetailPane from "../components/panes/PluginDetailPane/PluginDetailPane";
 import SettingsDetailPane from "../components/panes/SettingsDetailPane/SettingsDetailPane";
+import LoggingDetailPane from "../components/panes/LoggingDetailPane/LoggingDetailPane";
 import AboutDetailPane from "../components/panes/AboutDetailPane/AboutDetailPane";
 import RedeemResultPane from "../components/panes/RedeemResultPane/RedeemResultPane";
 
@@ -10,6 +11,7 @@ export class GameDetailPaneController {
   private gameDetailPane: HTMLElement | null = null;
   private pluginDetailPane: HTMLElement | null = null;
   private settingsDetailPane: HTMLElement | null = null;
+  private loggingDetailPane: HTMLElement | null = null;
   private aboutDetailPane: HTMLElement | null = null;
   private redeemResultPane: HTMLElement | null = null;
   private readonly container: HTMLElement;
@@ -33,6 +35,10 @@ export class GameDetailPaneController {
     }
     if (this.settingsDetailPane) {
       this.closeSettingsDetailPane();
+      return;
+    }
+    if (this.loggingDetailPane) {
+      this.closeLoggingDetailPane();
       return;
     }
     if (this.aboutDetailPane) {
@@ -63,6 +69,13 @@ export class GameDetailPaneController {
     }
   }
 
+  private closeLoggingDetailPane() {
+    if (this.loggingDetailPane) {
+      this.loggingDetailPane.remove();
+      this.loggingDetailPane = null;
+    }
+  }
+
   private closeAboutDetailPane() {
     if (this.aboutDetailPane) {
       this.aboutDetailPane.remove();
@@ -81,6 +94,7 @@ export class GameDetailPaneController {
     this.closeGameDetailPane();
     this.closePluginDetailPane();
     this.closeSettingsDetailPane();
+    this.closeLoggingDetailPane();
     this.closeAboutDetailPane();
     this.gameDetailPane = container.appendChild(GameDetailPane({
       scoreManager: this.scoreManager,
@@ -113,6 +127,7 @@ export class GameDetailPaneController {
     this.closeGameDetailPane();
     this.closePluginDetailPane();
     this.closeSettingsDetailPane();
+    this.closeLoggingDetailPane();
     this.closeAboutDetailPane();
     this.pluginDetailPane = container.appendChild(PluginDetailPane({
       onBack: () => this.showSettingsDetailPane(container),
@@ -123,11 +138,25 @@ export class GameDetailPaneController {
   private showSettingsDetailPane(container: HTMLElement) {
     this.closeGameDetailPane();
     this.closePluginDetailPane();
+    this.closeLoggingDetailPane();
     this.closeAboutDetailPane();
     this.settingsDetailPane = container.appendChild(SettingsDetailPane({
       onBack: () => this.showGameDetailPane(container),
       onClose: () => this.closeSettingsDetailPane(),
+      onShowLoggingDetail: () => this.showLoggingDetailPane(container),
       onShowPluginDetail: () => this.showPluginDetailPane(container),
+    }));
+  }
+
+  private showLoggingDetailPane(container: HTMLElement) {
+    this.closeGameDetailPane();
+    this.closePluginDetailPane();
+    this.closeSettingsDetailPane();
+    this.closeLoggingDetailPane();
+    this.closeAboutDetailPane();
+    this.loggingDetailPane = container.appendChild(LoggingDetailPane({
+      onBack: () => this.showSettingsDetailPane(container),
+      onClose: () => this.closeLoggingDetailPane(),
     }));
   }
 
@@ -135,6 +164,7 @@ export class GameDetailPaneController {
     this.closeGameDetailPane();
     this.closePluginDetailPane();
     this.closeSettingsDetailPane();
+    this.closeLoggingDetailPane();
     this.aboutDetailPane = container.appendChild(AboutDetailPane({
       onBack: () => this.showGameDetailPane(container),
       onClose: () => this.closeAboutDetailPane()

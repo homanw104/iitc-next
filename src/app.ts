@@ -5,10 +5,11 @@
 import { safeWindow } from "./utils/window";
 import { safeLocalStorage } from "./utils/storage";
 import setUpLogManager from "./procedures/setUpLogManager";
+import setUpSettingsManager from "./procedures/setUpSettingsManager.ts";
 import extractPlayerInfo from "./procedures/extractPlayerInfo";
 import extractVersionString from "./procedures/extractVersionString";
-import loadCesiumViewer from "./procedures/loadCesiumViewer";
 import unloadOriginalIntelMap from "./procedures/unloadOriginalIntelMap";
+import loadCesiumViewer from "./procedures/loadCesiumViewer";
 import setUpPluginManager from "./procedures/registerPlugins";
 import initPlugins from "./procedures/initPlugins";
 import { getPlayerInfo } from "./utils/player";
@@ -29,6 +30,9 @@ const init = async () => {
 
   // Set up logging for this app
   setUpLogManager();
+
+  // Load settings
+  setUpSettingsManager();
 
   // Extract data from the original intel map
   extractVersionString();

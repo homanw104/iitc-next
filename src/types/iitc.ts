@@ -4,6 +4,7 @@
 
 import * as Cesium from "cesium";
 import { LogManager } from "../managers/logManager";
+import { SettingsManager } from "../managers/settingsManager";
 import { PluginManager } from "../managers/pluginManager";
 import { LayerManager } from "../managers/layerManager";
 import { EntityPositionManager } from "../managers/entityPositionManager";
@@ -31,6 +32,7 @@ export interface IITCPlugin {
 export interface IITCCore {
   viewer?: Cesium.Viewer;
   logManager?: LogManager;
+  settingsManager?: SettingsManager;
   pluginManager?: PluginManager;
   layerManager?: LayerManager;
   entityPositionManager?: EntityPositionManager;
