@@ -14,14 +14,14 @@ const GameDetailPane = ({
   redeemManager,
   onClose,
   onRedeemSuccess,
-  onShowPluginDetail,
+  onShowSettingsDetail,
   onShowAboutDetail,
 }: {
   scoreManager: ScoreManager,
   redeemManager: RedeemManager,
   onClose: () => void,
   onRedeemSuccess: (result: string) => void,
-  onShowPluginDetail: () => void,
+  onShowSettingsDetail: () => void,
   onShowAboutDetail: () => void,
 }) => {
   const player = getPlayerInfo();
@@ -54,7 +54,7 @@ const GameDetailPane = ({
       <PlayerStatus player={player} />
       <GameScore scoreManager={scoreManager} />
       <GameRedeem redeemManager={redeemManager} onRedeemSuccess={onRedeemSuccess} />
-      <GameDetailButtonBar onShowPluginDetail={onShowPluginDetail} onShowAboutDetail={onShowAboutDetail} />
+      <GameDetailButtonBar onShowSettingsDetail={onShowSettingsDetail} onShowAboutDetail={onShowAboutDetail} />
     </div>
   ) as HTMLElement;
 };

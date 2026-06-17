@@ -1,21 +1,21 @@
 import { h } from "../../../utils/dom.ts";
 
-const GameDetailButtonBar = ({ onShowPluginDetail, onShowAboutDetail }: {
-  onShowPluginDetail: () => void,
+const GameDetailButtonBar = ({ onShowSettingsDetail, onShowAboutDetail }: {
+  onShowSettingsDetail: () => void,
   onShowAboutDetail: () => void,
 }) => {
   return (
     <div style={{ marginTop: "20px", marginBottom: "10px", display: "flex", justifyContent: "space-between", gap: "8px" }}>
       <div style={{ display: "flex", gap: "12px" }}>
         <a
-          id="plugins"
+          id="settings"
           style={{
             color: "#6088ff",
             cursor: "pointer",
           }}
-          onClick={() => onShowPluginDetail()}
+          onClick={() => onShowSettingsDetail()}
         >
-          Plugins
+          Settings
         </a>
         <a
           id="about"

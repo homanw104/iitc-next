@@ -2,12 +2,14 @@ import { RedeemManager } from "../managers/redeemManager";
 import { ScoreManager } from "../managers/scoreManager";
 import GameDetailPane from "../components/panes/GameDetailPane/GameDetailPane";
 import PluginDetailPane from "../components/panes/PluginDetailPane/PluginDetailPane";
+import SettingsDetailPane from "../components/panes/SettingsDetailPane/SettingsDetailPane";
 import AboutDetailPane from "../components/panes/AboutDetailPane/AboutDetailPane";
 import RedeemResultPane from "../components/panes/RedeemResultPane/RedeemResultPane";
 
 export class GameDetailPaneController {
   private gameDetailPane: HTMLElement | null = null;
   private pluginDetailPane: HTMLElement | null = null;
+  private settingsDetailPane: HTMLElement | null = null;
   private aboutDetailPane: HTMLElement | null = null;
   private redeemResultPane: HTMLElement | null = null;
   private readonly container: HTMLElement;
@@ -29,6 +31,10 @@ export class GameDetailPaneController {
       this.closePluginDetailPane();
       return;
     }
+    if (this.settingsDetailPane) {
+      this.closeSettingsDetailPane();
+      return;
+    }
     if (this.aboutDetailPane) {
       this.closeAboutDetailPane();
       return;
@@ -47,6 +53,13 @@ export class GameDetailPaneController {
     if (this.pluginDetailPane) {
       this.pluginDetailPane.remove();
       this.pluginDetailPane = null;
+    }
+  }
+
+  private closeSettingsDetailPane() {
+    if (this.settingsDetailPane) {
+      this.settingsDetailPane.remove();
+      this.settingsDetailPane = null;
     }
   }
 
@@ -71,7 +84,7 @@ export class GameDetailPaneController {
       redeemManager: this.redeemManager,
       onClose: () => this.closeGameDetailPane(),
       onRedeemSuccess: (msg) => this.showRedeemResultPane(container, msg),
-      onShowPluginDetail: () => this.showPluginDetailPane(container),
+      onShowSettingsDetail: () => this.showSettingsDetailPane(container),
       onShowAboutDetail: () => this.showAboutDetailPane(container),
     }));
 
@@ -85,7 +98,7 @@ export class GameDetailPaneController {
             redeemManager: this.redeemManager,
             onClose: () => this.closeGameDetailPane(),
             onRedeemSuccess: (msg) => this.showRedeemResultPane(container, msg),
-            onShowPluginDetail: () => this.showPluginDetailPane(container),
+            onShowSettingsDetail: () => this.showSettingsDetailPane(container),
             onShowAboutDetail: () => this.showAboutDetailPane(container),
           }));
         }
@@ -95,13 +108,26 @@ export class GameDetailPaneController {
 
   private showPluginDetailPane(container: HTMLElement) {
     this.closeGameDetailPane();
+    this.closePluginDetailPane();
+    this.closeSettingsDetailPane();
     this.closeAboutDetailPane();
     this.pluginDetailPane = container.appendChild(PluginDetailPane({ onClose: () => this.closePluginDetailPane() }));
+  }
+
+  private showSettingsDetailPane(container: HTMLElement) {
+    this.closeGameDetailPane();
+    this.closePluginDetailPane();
+    this.closeAboutDetailPane();
+    this.settingsDetailPane = container.appendChild(SettingsDetailPane({
+      onClose: () => this.closeSettingsDetailPane(),
+      onShowPluginDetail: () => this.showPluginDetailPane(container),
+    }));
   }
 
   private showAboutDetailPane(container: HTMLElement) {
     this.closeGameDetailPane();
     this.closePluginDetailPane();
+    this.closeSettingsDetailPane();
     this.aboutDetailPane = container.appendChild(AboutDetailPane({ onClose: () => this.closeAboutDetailPane() }));
   }
 
