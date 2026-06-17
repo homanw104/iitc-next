@@ -86,9 +86,6 @@ export interface TileParams {
 export type TileStatus = "queued" | "requested" | "loaded" | "error";
 export type TileStatusCallback = (key: string, status: TileStatus) => void;
 
-/**
- * TileRequest class for managing a single request for a group of tiles.
- */
 export class TileRequest {
   public tileKeys: string[];
   public active: boolean = false;
@@ -116,9 +113,6 @@ export class TileRequest {
   }
 }
 
-/**
- * TileRequestManager class for managing multiple TileRequests.
- */
 export class TileRequestManager {
   private activeRequestCount: number = 0;
   private queuedTiles: Set<string> = new Set();
@@ -138,12 +132,6 @@ export class TileRequestManager {
     private fieldEntityManager: FieldEntityManager,
   ) {}
 
-  /**
-   * Adds a list of tile keys to the queue for processing.
-   *
-   * @param tileKeys - An array of string keys representing the tiles to be added.
-   * @param refreshExisting - A flag indicating whether to refresh existing tiles.
-   */
   public addTiles(tileKeys: string[], refreshExisting: boolean = false): void {
     logManager.debug("TileRequestManager", `Adding ${tileKeys.length} tiles to queue`);
     let skippedCount = 0;
@@ -172,20 +160,10 @@ export class TileRequestManager {
     this.processQueue().then();
   }
 
-  /**
-   * Registers a callback to be notified when a tile's status changes.
-   *
-   * @param callback - The function to call with the tile key and new status.
-   */
   public onTileStatusChange(callback: TileStatusCallback): void {
     this.tileStatusListeners.push(callback);
   }
 
-  /**
-   * Waits for the system to become idle.
-   *
-   * @return A promise that resolves when the system is idle.
-   */
   public waitForIdle(): Promise<void> {
     if (this.isIdle()) return Promise.resolve();
 
@@ -194,21 +172,10 @@ export class TileRequestManager {
     });
   }
 
-  /**
-   * Checks if the system is idle by verifying that there are no active requests and no queued tiles.
-   *
-   * @return {boolean} - Returns true if the system is idle, false otherwise.
-   */
   private isIdle(): boolean {
     return this.activeRequestCount === 0 && this.queuedTiles.size === 0;
   }
 
-  /**
-   * Resolves all pending idle waiters by invoking their respective resolution functions.
-   * This method checks if the current state is idle, and if so, it retrieves and executes all queued resolver functions.
-   *
-   * @return {void}
-   */
   private resolveIdleWaiters(): void {
     if (!this.isIdle()) return;
 
@@ -216,25 +183,11 @@ export class TileRequestManager {
     resolvers.forEach((resolve) => resolve());
   }
 
-  /**
-   * Sets the status of a tile identified by a given key and runs callbacks.
-   *
-   * @param key - The unique identifier for the tile whose status is to be set.
-   * @param status - The new status to assign to the tile.
-   */
   private setTileStatus(key: string, status: TileStatus): void {
     this.tileStatuses.set(key, status);
     this.tileStatusListeners.forEach((cb) => cb(key, status));
   }
 
-  /**
-   * Processes the tile queue by sending requests for tiles up to the maximum allowed concurrent requests.
-   * If the active request count has reached the limit or there are no tiles in the queue, it returns immediately.
-   * Otherwise, it dequeues a batch of tiles, sends them as a request, and handles the response or error accordingly.
-   * After processing, it recursively calls itself to process any remaining tiles in the queue.
-   *
-   * @return {Promise<void>} - A promise that resolves when the tile processing is complete or no more tiles are available to process.
-   */
   private async processQueue(refreshExisting: boolean = false): Promise<void> {
     if (this.activeRequestCount >= MAX_REQUESTS) {
       logManager.info("TileRequestManager", `Max request count (${MAX_REQUESTS}) reached`);
@@ -292,12 +245,6 @@ export class TileRequestManager {
     }
   }
 
-  /**
-   * Handles the response from a tile request.
-   *
-   * @param response - The unknown response object to be processed.
-   * @param tileKeys - An array of tile keys used to access specific data within the response.
-   */
   private handleResponse(response: unknown, tileKeys: string[]): void {
     const data = response as TileResponse;
     if (!data || !data.result) {
@@ -352,12 +299,6 @@ export class TileRequestManager {
   }
 }
 
-/**
- * Retrieves tile parameters for a given map zoom level.
- *
- * @param {number} zoom - The zoom level for which to retrieve tile parameters.
- * @return {TileParams} An object containing the tile parameters for the specified zoom level.
- */
 export function getMapZoomTileParameters(zoom: number): TileParams {
   // Clamp zoom to [0, max supported zoom]
   const maxZoom = DEFAULT_ZOOM_TO_TILES_PER_EDGE.length - 1;
@@ -372,13 +313,6 @@ export function getMapZoomTileParameters(zoom: number): TileParams {
   };
 }
 
-/**
- * Determines the data zoom level for a given map zoom level. This function adjusts the zoom level for
- * data requests based on various factors to optimize caching performance and server load.
- *
- * @param zoom - The current map zoom level.
- * @returns The adjusted zoom level for data requests.
- */
 export function getDataZoomForMapZoom(zoom: number): number {
   // Handle invalid or too small zoom levels
   if (isNaN(zoom) || zoom < 3) {
@@ -408,32 +342,11 @@ export function getDataZoomForMapZoom(zoom: number): number {
   return zoom;
 }
 
-/**
- * Converts a longitude to a tile index.
- *
- * @param lng - The longitude value to convert.
- * @param params - An object containing parameters required for the conversion:
- *   tilesPerEdge - The total number of tiles along one edge of the map.
- *
- * @return The tile X index corresponding to the provided longitude and map parameters.
- */
 export function lngToTileIndex(lng: number, params: TileParams): number {
   const x = Math.floor(((lng + 180) / 360) * params.tilesPerEdge);
   return Math.max(0, Math.min(params.tilesPerEdge - 1, x));
 }
 
-/**
- * Converts a latitude to a tile index (Y coordinate) using the Web Mercator projection.
- *
- * This implementation follows the Slippy Map tiling system rules used by Ingress Intel.
- * At latitude 0, it returns tilesPerEdge / 2.
- *
- * @param lat - The latitude value to convert. Clamped to approximately -85.05 to 85.05 degrees.
- * @param params - An object containing parameters required for the conversion:
- *   tilesPerEdge - The total number of tiles along one edge of the map.
- *
- * @return The tile Y index corresponding to the given latitude.
- */
 export function latToTileIndex(lat: number, params: TileParams): number {
   // Clamp latitude to the range supported by Web Mercator to avoid math errors at the poles.
   const clampedLat = Math.max(-85.05112878, Math.min(85.05112878, lat));
@@ -442,47 +355,19 @@ export function latToTileIndex(lat: number, params: TileParams): number {
   return Math.max(0, Math.min(params.tilesPerEdge - 1, y));
 }
 
-/**
- * Converts a tile Y index back to latitude.
- *
- * @param y - The tile Y index.
- * @param params - Tile parameters including tilesPerEdge.
- * @returns The latitude in degrees.
- */
 export function tileToLat(y: number, params: TileParams): number {
   const n = Math.PI - (2 * Math.PI * y) / params.tilesPerEdge;
   return (180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
 }
 
-/**
- * Converts a tile X index back to longitude.
- *
- * @param x - The tile X index.
- * @param params - Tile parameters including tilesPerEdge.
- * @returns The longitude in degrees.
- */
 export function tileToLng(x: number, params: TileParams): number {
   return (x / params.tilesPerEdge) * 360 - 180;
 }
 
-/**
- * Converts geographic coordinates to a tile ID based on the provided parameters.
- *
- * @param params - An object containing zoom level and other relevant parameters for tiling.
- * @param x - The X index of the tile.
- * @param y - The Y index of the tile.
- * @returns A string representing the unique tile ID.
- */
 export function generateTileKey(params: TileParams, x: number, y: number): string {
   return `${params.zoom}_${x}_${y}_${params.level}_8_100`;
 }
 
-/**
- * Parses an array of raw entities into categorized data structures.
- *
- * @param entities - An array of raw entity objects to be parsed.
- * @returns An object containing arrays of parsed portal, link, and field data.
- */
 export function parseTileEntities(entities: RawEntity[]): ParsedEntities {
   const portals: PortalData[] = [];
   const links: LinkData[] = [];

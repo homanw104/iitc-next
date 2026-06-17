@@ -118,23 +118,11 @@ export class LinkEntityManager {
   }
 }
 
-/**
- * Retrieves a link layer ID based on the provided team information.
- *
- * @param {LinkData} data - An object containing team details.
- * @return {string} A formatted string representing the link layer ID.
- */
-export function getLinkLayerId(data: LinkData): string {
+function getLinkLayerId(data: LinkData): string {
   const team = data.team.toLowerCase();
   return `links-${team}`;
 }
 
-/**
- * Parses a raw entity into a structured LinkData object.
- *
- * @param ent - An array representing the raw entity with structured information.
- * @returns A LinkData object containing parsed information from the raw entity.
- */
 export function parseLink(ent: RawEntity): LinkData {
   const [guid, timestamp, data] = ent;
   const teamCode = data[1] as string;

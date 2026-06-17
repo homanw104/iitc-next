@@ -15,9 +15,6 @@ export class PluginManager {
 
   private initialized = false;
 
-  /**
-   * Initializes the PluginManager by loading the stored state.
-   */
   public async initialize() {
     if (this.initialized) return;
     await this.loadState();
@@ -100,7 +97,7 @@ export class PluginManager {
         plugin.deinit();
         this.initializedPlugins.delete(pluginId);
         logManager.info("PluginManager", `Disabled plugin ${plugin.name}`);
-      } catch (e) {
+      } catch {
         logManager.error("PluginManager", `Failed to deinit plugin ${plugin.name}: Reload needed`);
       }
     } else if (plugin) {

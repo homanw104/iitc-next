@@ -125,26 +125,11 @@ function createFieldHierarchy(points: number[]): Cesium.PolygonHierarchy {
   return new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray(points));
 }
 
-/**
- * Generates a field layer ID based on the provided team data.
- *
- * @param {FieldData} data - The data object containing the team information.
- * @returns {string} The generated field layer ID in the format 'fields-teamName'.
- */
-export function getFieldLayerId(data: FieldData): string {
+function getFieldLayerId(data: FieldData): string {
   const team = data.team.toLowerCase();
   return `fields-${team}`;
 }
 
-/**
- * Parses a raw entity into structured FieldData.
- *
- * @param ent - The raw entity to be parsed, expected to be an array where the first element is a GUID (string),
- *              the second element is a timestamp (number), and the third element is an array containing team data
- *              and point data.
- *
- * @return A structured FieldData object with properties for guid, timestamp, team, and points.
- */
 export function parseField(ent: RawEntity): FieldData {
   const [guid, timestamp, data] = ent;
   const teamCode = data[1] as string;

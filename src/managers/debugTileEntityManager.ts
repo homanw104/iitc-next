@@ -7,10 +7,6 @@ import * as Cesium from "cesium";
 import { TileStatus, getMapZoomTileParameters, tileToLat, tileToLng } from "./tileRequestManager";
 import { LayerManager } from "./layerManager";
 
-/**
- * Manages the visualization of tiles for debugging purposes.
- * It shows rectangles on the map representing the tiles being loaded.
- */
 export class DebugTileEntityManager {
   private viewer: Cesium.Viewer;
   private layerManager: LayerManager;
@@ -22,12 +18,6 @@ export class DebugTileEntityManager {
     this.layerManager = entityManager;
   }
 
-  /**
-   * Updates or creates a debug entity for the given tile key and status.
-   *
-   * @param key - The unique identifier for the tile.
-   * @param status - The current status of the tile.
-   */
   public updateTile(key: string, status: TileStatus): void {
     const existing = this.tileEntities.get(key);
     if (existing) {
@@ -44,13 +34,6 @@ export class DebugTileEntityManager {
     this.viewer.scene.requestRender();
   }
 
-  /**
-   * Creates a Cesium entity (rectangle) for a tile.
-   *
-   * @param key - The tile key to parse for coordinates.
-   * @param status - The initial status of the tile.
-   * @returns A Cesium entity representing the tile, or undefined if parsing fails.
-   */
   private createTileEntity(key: string, status: TileStatus): Cesium.Entity | undefined {
     const parts = key.split("_");
     if (parts.length < 3) return undefined;
@@ -84,7 +67,7 @@ export class DebugTileEntityManager {
     finalWest = normalizeLng(finalWest);
     finalEast = normalizeLng(finalEast);
 
-    const color = this.getStatusColor(status);
+    const color = getStatusColor(status);
 
     return new Cesium.Entity({
       rectangle: {
@@ -107,14 +90,8 @@ export class DebugTileEntityManager {
     });
   }
 
-  /**
-   * Updates an existing Cesium entity with a new status color.
-   *
-   * @param entity - The entity to update.
-   * @param status - The new status of the tile.
-   */
   private updateTileEntity(entity: Cesium.Entity, status: TileStatus): void {
-    const color = this.getStatusColor(status);
+    const color = getStatusColor(status);
     if (entity.rectangle) {
       entity.rectangle.outlineColor = new Cesium.ConstantProperty(color);
       entity.rectangle.material = new Cesium.ColorMaterialProperty(color.withAlpha(0.1));
@@ -135,25 +112,19 @@ export class DebugTileEntityManager {
       }, 2000);
     }
   }
+}
 
-  /**
-   * Maps a tile status to a Cesium color.
-   *
-   * @param status - The tile status.
-   * @returns The corresponding Cesium color.
-   */
-  private getStatusColor(status: TileStatus): Cesium.Color {
-    switch (status) {
-      case "queued":
-        return Cesium.Color.LIGHTGRAY;
-      case "requested":
-        return Cesium.Color.DARKSALMON;
-      case "loaded":
-        return Cesium.Color.GREENYELLOW;
-      case "error":
-        return Cesium.Color.RED;
-      default:
-        return Cesium.Color.WHITE;
-    }
+function getStatusColor(status: TileStatus): Cesium.Color {
+  switch (status) {
+    case "queued":
+      return Cesium.Color.LIGHTGRAY;
+    case "requested":
+      return Cesium.Color.DARKSALMON;
+    case "loaded":
+      return Cesium.Color.GREENYELLOW;
+    case "error":
+      return Cesium.Color.RED;
+    default:
+      return Cesium.Color.WHITE;
   }
 }
