@@ -8,7 +8,7 @@ import { getTeamColor } from "../utils/color";
 import { LayerManager } from "./layerManager";
 import { PortalEntityManager } from "./portalEntityManager";
 
-const FIELD_HEIGHT = 0;
+const FIELD_Z_INDEX = 0;
 
 export class FieldEntityManager {
   private fields: Map<string, { data: FieldData; entity: Cesium.Entity }> = new Map();
@@ -67,11 +67,11 @@ export class FieldEntityManager {
     return this.layerManager.getOrCreateDataSourceLayer(layerId).entities.add({
       id: `field-${data.guid}`,
       polygon: {
-        hierarchy: new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray(points)),
-        height: FIELD_HEIGHT,
-        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+        hierarchy: createFieldHierarchy(points),
         material: getTeamColor(data.team).withAlpha(0.2),
         outline: false,
+        classificationType: Cesium.ClassificationType.TERRAIN,
+        zIndex: FIELD_Z_INDEX,
       },
       properties: {
         selectable: false,
@@ -100,12 +100,29 @@ export class FieldEntityManager {
   private updateFieldEntity(entity: Cesium.Entity, data: FieldData): void {
     if (entity.polygon) {
       const points = data.points.flatMap(p => [p.lngE6 / 1e6, p.latE6 / 1e6]);
-      entity.polygon.hierarchy = new Cesium.ConstantProperty(new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray(points)));
-      entity.polygon.height = new Cesium.ConstantProperty(FIELD_HEIGHT);
-      entity.polygon.heightReference = new Cesium.ConstantProperty(Cesium.HeightReference.CLAMP_TO_GROUND);
+      entity.polygon.hierarchy = new Cesium.ConstantProperty(createFieldHierarchy(points));
+      entity.polygon.height = undefined;
+      entity.polygon.heightReference = undefined;
+      entity.polygon.extrudedHeight = undefined;
+      entity.polygon.extrudedHeightReference = undefined;
       entity.polygon.material = new Cesium.ColorMaterialProperty(getTeamColor(data.team).withAlpha(0.2));
+      entity.polygon.classificationType = new Cesium.ConstantProperty(Cesium.ClassificationType.TERRAIN);
+      entity.polygon.zIndex = new Cesium.ConstantProperty(FIELD_Z_INDEX);
     }
   }
+}
+
+/**
+ * Creates a field hierarchy from an array of points represented in degrees.
+ *
+ * @param points - An array of numbers representing the longitude and latitude pairs in degrees.
+ *                 The array should be in the format [longitude1, latitude1, longitude2, latitude2, ...].
+ *                 The number of elements must be even, as each point requires a longitude and latitude pair.
+ *
+ * @return A new Cesium.PolygonHierarchy object created from the provided points.
+ */
+function createFieldHierarchy(points: number[]): Cesium.PolygonHierarchy {
+  return new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray(points));
 }
 
 /**
