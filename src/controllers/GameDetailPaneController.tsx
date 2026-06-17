@@ -79,6 +79,9 @@ export class GameDetailPaneController {
 
   private showGameDetailPane(container: HTMLElement) {
     this.closeGameDetailPane();
+    this.closePluginDetailPane();
+    this.closeSettingsDetailPane();
+    this.closeAboutDetailPane();
     this.gameDetailPane = container.appendChild(GameDetailPane({
       scoreManager: this.scoreManager,
       redeemManager: this.redeemManager,
@@ -111,7 +114,10 @@ export class GameDetailPaneController {
     this.closePluginDetailPane();
     this.closeSettingsDetailPane();
     this.closeAboutDetailPane();
-    this.pluginDetailPane = container.appendChild(PluginDetailPane({ onClose: () => this.closePluginDetailPane() }));
+    this.pluginDetailPane = container.appendChild(PluginDetailPane({
+      onBack: () => this.showSettingsDetailPane(container),
+      onClose: () => this.closePluginDetailPane(),
+    }));
   }
 
   private showSettingsDetailPane(container: HTMLElement) {
@@ -119,6 +125,7 @@ export class GameDetailPaneController {
     this.closePluginDetailPane();
     this.closeAboutDetailPane();
     this.settingsDetailPane = container.appendChild(SettingsDetailPane({
+      onBack: () => this.showGameDetailPane(container),
       onClose: () => this.closeSettingsDetailPane(),
       onShowPluginDetail: () => this.showPluginDetailPane(container),
     }));
@@ -128,7 +135,10 @@ export class GameDetailPaneController {
     this.closeGameDetailPane();
     this.closePluginDetailPane();
     this.closeSettingsDetailPane();
-    this.aboutDetailPane = container.appendChild(AboutDetailPane({ onClose: () => this.closeAboutDetailPane() }));
+    this.aboutDetailPane = container.appendChild(AboutDetailPane({
+      onBack: () => this.showGameDetailPane(container),
+      onClose: () => this.closeAboutDetailPane()
+    }));
   }
 
   private showRedeemResultPane(container: HTMLElement, msg: string) {

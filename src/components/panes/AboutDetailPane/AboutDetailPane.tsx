@@ -1,10 +1,12 @@
 import { h } from "../../../utils/dom.ts";
 import AboutDetailButtonBar from "./AboutDetailButtonBar.tsx";
 import CloseButton from "../../atoms/CloseButton/CloseButton.tsx";
+import BackButton from "../../atoms/BackButton/BackButton.tsx";
 
 const APP_VERSION = "1.4.2";
 
-const AboutDetailPane = ({ onClose }: {
+const AboutDetailPane = ({ onBack, onClose }: {
+  onBack: () => void,
   onClose: () => void,
 }) => {
   return (
@@ -31,7 +33,10 @@ const AboutDetailPane = ({ onClose }: {
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2px" }}>
         <span style={{ fontSize: "24px", fontWeight: "bold" }}>About IITC Next</span>
-        <CloseButton onClose={onClose} />
+        <div style={{ display: "flex", alignItems: "center", gap: "24px" }}>
+          <BackButton onClick={onBack} />
+          <CloseButton onClose={onClose} />
+        </div>
       </div>
 
       <div style={{ color: "#aaa" }}>

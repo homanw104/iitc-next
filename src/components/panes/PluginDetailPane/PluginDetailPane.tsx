@@ -1,8 +1,10 @@
 import { h } from "../../../utils/dom.ts";
 import { pluginManager } from "../../../managers/pluginManager.ts";
+import BackButton from "../../atoms/BackButton/BackButton.tsx";
 import CloseButton from "../../atoms/CloseButton/CloseButton.tsx";
 
-const PluginDetailPane = ({ onClose }: {
+const PluginDetailPane = ({ onBack, onClose }: {
+  onBack: () => void,
   onClose: () => void,
 }) => {
   const plugins = pluginManager.getPlugins();
@@ -31,7 +33,10 @@ const PluginDetailPane = ({ onClose }: {
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
         <span style={{ fontSize: "24px", fontWeight: "bold" }}>Plugins</span>
-        <CloseButton onClose={onClose} />
+        <div style={{ display: "flex", alignItems: "center", gap: "24px" }}>
+          <BackButton onClick={onBack} />
+          <CloseButton onClose={onClose} />
+        </div>
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>

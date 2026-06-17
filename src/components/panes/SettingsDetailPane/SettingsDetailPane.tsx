@@ -1,11 +1,14 @@
 import { h } from "../../../utils/dom.ts";
+import BackButton from "../../atoms/BackButton/BackButton.tsx";
 import CloseButton from "../../atoms/CloseButton/CloseButton.tsx";
 import RightArrowIcon from "./RightArrowIcon.tsx";
 
 const SettingsDetailPane = ({
+  onBack,
   onClose,
   onShowPluginDetail,
 }: {
+  onBack: () => void,
   onClose: () => void,
   onShowPluginDetail: () => void,
 }) => {
@@ -33,7 +36,10 @@ const SettingsDetailPane = ({
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
         <span style={{ fontSize: "24px", fontWeight: "bold" }}>Settings</span>
-        <CloseButton onClose={onClose} />
+        <div style={{ display: "flex", alignItems: "center", gap: "24px" }}>
+          <BackButton onClick={onBack} />
+          <CloseButton onClose={onClose} />
+        </div>
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
