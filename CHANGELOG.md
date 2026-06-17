@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.5.0
+
+* Added about panel
+* Added settings panel
+* Added logging and export settings
+* Added refresh interval settings
+* Added close and back buttons to game detail panes
+* Improved performance showing portal labels
+* Improved performance zooming in and out
+* Fixed player's latest activity showing at the wrong end
+* Fixed the player activity trail by disabling detection on fields and links destruction
+
 ## 1.4.2
 
 * Fixed tiles not loading when the user login for the first time
