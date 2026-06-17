@@ -1,5 +1,5 @@
 /**
- * Manage billboard-backed portal label entities.
+ * Manage Cesium label-backed portal label entities.
  */
 
 import * as Cesium from "cesium";
@@ -9,13 +9,8 @@ import { EntityPositionManager } from "./entityPositionManager";
 import { PORTAL_DISABLE_DEPTH_TEST_DISTANCE } from "./portalEntityManager.ts";
 
 const LABEL_FONT = "12px sans-serif";
-const LABEL_PADDING_X = 4;
-const LABEL_PADDING_Y = 3;
-const LABEL_PIXEL_OFFSET_Y = -20;
-const LABEL_MAX_WIDTH = 240;
-
-const labelImageCache = new Map<string, HTMLCanvasElement>();
-
+const LABEL_PIXEL_OFFSET_Y = -12;
+const LABEL_MAX_LINE_LENGTH = 24;
 export class PortalLabelEntityManager {
   private labels: Map<string, { data: PortalData; entity: Cesium.Entity }> = new Map();
 
@@ -75,12 +70,18 @@ export class PortalLabelEntityManager {
     return this.layerManager.getOrCreateDataSourceLayer(layerId).entities.add({
       id: `label-${data.guid}`,
       position: this.entityPositionManager.getPosition(data),
-      billboard: {
-        image: getPortalLabelImage(data),
+      label: {
+        text: wrapLabelText(data.title || ""),
+        font: LABEL_FONT,
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        fillColor: Cesium.Color.WHITE,
+        outlineColor: Cesium.Color.BLACK,
+        outlineWidth: 4,
+        showBackground: false,
         heightReference: Cesium.HeightReference.NONE,
         disableDepthTestDistance: PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
         horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-        verticalOrigin: Cesium.VerticalOrigin.CENTER,
+        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
         pixelOffset: new Cesium.Cartesian2(0, LABEL_PIXEL_OFFSET_Y),
         translucencyByDistance: new Cesium.NearFarScalar(6e2, 1.0, 8e2, 0.0),
       },
@@ -101,10 +102,10 @@ export class PortalLabelEntityManager {
 
   private updateLabelEntity(entity: Cesium.Entity, data: PortalData): void {
     entity.position = new Cesium.ConstantPositionProperty(this.entityPositionManager.getPosition(data));
-    if (entity.billboard) {
-      entity.billboard.image = new Cesium.ConstantProperty(getPortalLabelImage(data));
-      entity.billboard.heightReference = new Cesium.ConstantProperty(Cesium.HeightReference.NONE);
-      entity.billboard.disableDepthTestDistance = new Cesium.ConstantProperty(PORTAL_DISABLE_DEPTH_TEST_DISTANCE);
+    if (entity.label) {
+      entity.label.text = new Cesium.ConstantProperty(wrapLabelText(data.title || ""));
+      entity.label.heightReference = new Cesium.ConstantProperty(Cesium.HeightReference.NONE);
+      entity.label.disableDepthTestDistance = new Cesium.ConstantProperty(PORTAL_DISABLE_DEPTH_TEST_DISTANCE);
     }
   }
 }
@@ -113,34 +114,41 @@ function getPortalLabelLayerId(data: PortalData): string {
   return `portals-label-${data.team.toLowerCase()}`;
 }
 
-function getPortalLabelImage(data: PortalData): HTMLCanvasElement {
-  const text = data.title || "";
-  const cacheKey = text;
-  const cached = labelImageCache.get(cacheKey);
-  if (cached) return cached;
+function wrapLabelText(text: string): string {
+  const trimmedText = text.trim();
+  if (trimmedText.length <= LABEL_MAX_LINE_LENGTH) return trimmedText;
 
-  const canvas = document.createElement("canvas");
-  const context = canvas.getContext("2d");
-  if (!context) return canvas;
+  const words = trimmedText.split(/\s+/);
+  if (words.length === 1) return chunkText(trimmedText).join("\n");
 
-  context.font = LABEL_FONT;
-  const textWidth = Math.min(Math.ceil(context.measureText(text).width), LABEL_MAX_WIDTH);
-  canvas.width = textWidth + LABEL_PADDING_X * 2;
-  canvas.height = 18 + LABEL_PADDING_Y * 2;
+  const lines: string[] = [];
+  let line = "";
+  words.forEach((word) => {
+    const candidate = line ? `${line} ${word}` : word;
+    if (candidate.length <= LABEL_MAX_LINE_LENGTH) {
+      line = candidate;
+      return;
+    }
 
-  context.font = LABEL_FONT;
-  context.textBaseline = "middle";
-  context.textAlign = "center";
-  context.lineJoin = "round";
-  context.strokeStyle = "black";
-  context.lineWidth = 4;
-  context.fillStyle = "white";
+    if (line) lines.push(line);
+    if (word.length <= LABEL_MAX_LINE_LENGTH) {
+      line = word;
+      return;
+    }
 
-  const x = canvas.width / 2;
-  const y = canvas.height / 2;
-  context.strokeText(text, x, y, textWidth);
-  context.fillText(text, x, y, textWidth);
+    const chunks = chunkText(word);
+    lines.push(...chunks.slice(0, -1));
+    line = chunks[chunks.length - 1] || "";
+  });
 
-  labelImageCache.set(cacheKey, canvas);
-  return canvas;
+  if (line) lines.push(line);
+  return lines.join("\n");
+}
+
+function chunkText(text: string): string[] {
+  const chunks: string[] = [];
+  for (let index = 0; index < text.length; index += LABEL_MAX_LINE_LENGTH) {
+    chunks.push(text.slice(index, index + LABEL_MAX_LINE_LENGTH));
+  }
+  return chunks;
 }
