@@ -4,15 +4,23 @@
 
 import { defineConfig } from "vite";
 import monkey, { cdn } from "vite-plugin-monkey";
+import { readFileSync } from "node:fs";
+
+const packageJson = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")) as {
+  version: string,
+};
 
 export default defineConfig({
+  define: {
+    __IITC_NEXT_VERSION__: JSON.stringify(packageJson.version),
+  },
   plugins: [
     monkey({
       entry: "src/app.ts",
       userscript: {
         name: "iitc-next",
         author: "Homan",
-        version: "1.4.2",
+        version: packageJson.version,
         description: "IITC Next",
         namespace: "npm/vite-plugin-monkey",
         match: ["https://intel.ingress.com/*"],

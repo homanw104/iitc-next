@@ -3,8 +3,6 @@ import AboutDetailButtonBar from "./AboutDetailButtonBar.tsx";
 import CloseButton from "../../atoms/CloseButton/CloseButton.tsx";
 import BackButton from "../../atoms/BackButton/BackButton.tsx";
 
-const APP_VERSION = "1.4.2";
-
 const AboutDetailPane = ({ onBack, onClose }: {
   onBack: () => void,
   onClose: () => void,
@@ -40,7 +38,7 @@ const AboutDetailPane = ({ onBack, onClose }: {
       </div>
 
       <div style={{ color: "#aaa" }}>
-        Version {APP_VERSION}
+        Version {__IITC_NEXT_VERSION__}
       </div>
 
       <div style={{ marginTop: "20px" }}>

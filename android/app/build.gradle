@@ -1,4 +1,11 @@
+import groovy.json.JsonSlurper
+
 apply plugin: 'com.android.application'
+
+def packageJson = new JsonSlurper().parse(rootProject.file('../package.json'))
+def appVersionName = packageJson.version as String
+def appVersionParts = appVersionName.tokenize('.').collect { it.toInteger() }
+def appVersionCode = appVersionParts[0] * 10000 + appVersionParts[1] * 100 + appVersionParts[2]
 
 android {
     namespace = "world.homans.iitcnext"
@@ -7,8 +14,8 @@ android {
         applicationId "world.homans.iitcnext"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 10402
-        versionName "1.4.2"
+        versionCode appVersionCode
+        versionName appVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
