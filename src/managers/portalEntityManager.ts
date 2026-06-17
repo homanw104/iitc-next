@@ -10,6 +10,7 @@ import { apiRequest } from "../utils/network";
 import { EntityPositionManager } from "./entityPositionManager";
 
 export const PORTAL_DISABLE_DEPTH_TEST_DISTANCE = 2e4;
+const PORTAL_OCCLUDED_ALPHA = 0.34;
 
 interface PortalDetailsResponse {
   result: unknown[];
@@ -43,13 +44,14 @@ export class PortalRequest {
 }
 
 export class PortalEntityManager {
-  private portals: Map<string, { data: PortalData; entity: Cesium.Entity }> = new Map();
+  private portals: Map<string, { data: PortalData; entity: Cesium.Entity; occlusionEntity: Cesium.Entity }> = new Map();
 
   constructor(private layerManager: LayerManager, private entityPositionManager: EntityPositionManager) {
     this.entityPositionManager.setOnPositionChangedCallback((latE6, lngE6, position) => {
-      this.portals.forEach(({ data, entity }) => {
+      this.portals.forEach(({ data, entity, occlusionEntity }) => {
         if (data.latE6 === latE6 && data.lngE6 === lngE6) {
           entity.position = new Cesium.ConstantPositionProperty(position);
+          occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
         }
       });
     });
@@ -68,16 +70,18 @@ export class PortalEntityManager {
         const newLayerId = getPortalLayerId(data);
         if (oldLayerId !== newLayerId) {
           this.layerManager.getOrCreateDataSourceLayer(oldLayerId).entities.remove(existing.entity);
+          this.layerManager.getOrCreateDataSourceLayer(oldLayerId).entities.remove(existing.occlusionEntity);
+          this.layerManager.getOrCreateDataSourceLayer(newLayerId).entities.add(existing.occlusionEntity);
           this.layerManager.getOrCreateDataSourceLayer(newLayerId).entities.add(existing.entity);
         }
-        this.updatePortalEntity(existing.entity, data);
+        this.updatePortalEntity(existing.entity, existing.occlusionEntity, data);
         existing.data = data;
       }
       return;
     }
 
-    const portalEntity = this.createPortalEntity(data);
-    this.portals.set(data.guid, { data, entity: portalEntity });
+    const { entity, occlusionEntity } = this.createPortalEntities(data);
+    this.portals.set(data.guid, { data, entity, occlusionEntity });
   }
 
   public removePortalInView(viewRect: Cesium.Rectangle): void {
@@ -106,15 +110,34 @@ export class PortalEntityManager {
     )?.data;
   }
 
-  private createPortalEntity(data: PortalData): Cesium.Entity {
+  private createPortalEntities(data: PortalData): { entity: Cesium.Entity; occlusionEntity: Cesium.Entity } {
     const layerId = getPortalLayerId(data);
-    return this.layerManager.getOrCreateDataSourceLayer(layerId).entities.add({
-      id: `portal-${data.guid}`,
-      position: this.entityPositionManager.getPosition(data),
+    const entities = this.layerManager.getOrCreateDataSourceLayer(layerId).entities;
+    const position = this.entityPositionManager.getPosition(data);
+    const occlusionEntity = entities.add({
+      id: `portal-${data.guid}-occluded`,
+      position,
       point: {
         pixelSize: 16,
         heightReference: Cesium.HeightReference.NONE,
         disableDepthTestDistance: PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
+        scaleByDistance: new Cesium.NearFarScalar(1e1, 1.0, 2e4, 0.125),
+        color: getTeamColor(data.team).withAlpha(PORTAL_OCCLUDED_ALPHA),
+        outlineColor: Cesium.Color.BLACK.withAlpha(PORTAL_OCCLUDED_ALPHA),
+        outlineWidth: 1,
+      },
+      properties: {
+        selectable: false,
+      },
+    });
+
+    const entity = entities.add({
+      id: `portal-${data.guid}`,
+      position,
+      point: {
+        pixelSize: 16,
+        heightReference: Cesium.HeightReference.NONE,
+        disableDepthTestDistance: 0,
         scaleByDistance: new Cesium.NearFarScalar(1e1, 1.0, 2e4, 0.125),
         color: getTeamColor(data.team),
         outlineColor: Cesium.Color.BLACK,
@@ -124,6 +147,7 @@ export class PortalEntityManager {
         selectable: true,
       },
     });
+    return { entity, occlusionEntity };
   }
 
   private removePortalEntity(guid: string): void {
@@ -131,6 +155,7 @@ export class PortalEntityManager {
     if (portalInfo) {
       const layerId = getPortalLayerId(portalInfo.data);
       this.layerManager.getOrCreateDataSourceLayer(layerId).entities.remove(portalInfo.entity);
+      this.layerManager.getOrCreateDataSourceLayer(layerId).entities.remove(portalInfo.occlusionEntity);
       this.portals.delete(guid);
     }
   }
@@ -149,10 +174,20 @@ export class PortalEntityManager {
     toRemove.forEach(guid => this.removePortalEntity(guid));
   }
 
-  private updatePortalEntity(entity: Cesium.Entity, data: PortalData): void {
-    entity.position = new Cesium.ConstantPositionProperty(this.entityPositionManager.getPosition(data));
+  private updatePortalEntity(entity: Cesium.Entity, occlusionEntity: Cesium.Entity, data: PortalData): void {
+    const position = this.entityPositionManager.getPosition(data);
+    entity.position = new Cesium.ConstantPositionProperty(position);
+    occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
     if (entity.point) {
       entity.point.color = new Cesium.ConstantProperty(getTeamColor(data.team));
+      entity.point.heightReference = new Cesium.ConstantProperty(Cesium.HeightReference.NONE);
+      entity.point.disableDepthTestDistance = new Cesium.ConstantProperty(0);
+    }
+    if (occlusionEntity.point) {
+      occlusionEntity.point.color = new Cesium.ConstantProperty(getTeamColor(data.team).withAlpha(PORTAL_OCCLUDED_ALPHA));
+      occlusionEntity.point.outlineColor = new Cesium.ConstantProperty(Cesium.Color.BLACK.withAlpha(PORTAL_OCCLUDED_ALPHA));
+      occlusionEntity.point.heightReference = new Cesium.ConstantProperty(Cesium.HeightReference.NONE);
+      occlusionEntity.point.disableDepthTestDistance = new Cesium.ConstantProperty(PORTAL_DISABLE_DEPTH_TEST_DISTANCE);
     }
   }
 }

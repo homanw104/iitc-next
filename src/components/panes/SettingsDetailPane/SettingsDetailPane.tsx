@@ -1,4 +1,5 @@
 import { h } from "../../../utils/dom.ts";
+import { settingsManager } from "../../../managers/settingsManager.ts";
 import BackButton from "../../atoms/BackButton/BackButton.tsx";
 import CloseButton from "../../atoms/CloseButton/CloseButton.tsx";
 import RightArrowIcon from "./RightArrowIcon.tsx";
@@ -46,6 +47,34 @@ const SettingsDetailPane = ({
         </div>
       </div>
 
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          padding: "8px",
+          backgroundColor: "rgba(255, 255, 255, 0.05)",
+          borderRadius: "4px",
+        }}
+      >
+        <div>
+          <div style={{ fontWeight: "bold" }}>Use Google 3D Tiles</div>
+          <div style={{ fontSize: "12px", color: "#aaa" }}>Restart is required to take effect.</div>
+        </div>
+        <input
+          type="checkbox"
+          checked={settingsManager.getUseGoogle3dTiles()}
+          onClick={(e: Event) => {
+            const target = e.target as HTMLInputElement;
+            settingsManager.setUseGoogle3dTiles(target.checked);
+          }}
+          style={{
+            width: "20px",
+            height: "20px",
+            cursor: "pointer",
+          }}
+        />
+      </div>
       <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
         <div
           style={{

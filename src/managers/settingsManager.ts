@@ -7,6 +7,9 @@ export interface Settings {
   logging: {
     recordLogs: boolean;
   };
+  map: {
+    useGoogle3dTiles: boolean;
+  };
   refresh: {
     intervalMs: RefreshIntervalMs;
   };
@@ -17,6 +20,9 @@ export type RefreshIntervalMs = null | 10000 | 30000 | 60000 | 300000 | 600000 |
 const DEFAULT_SETTINGS: Settings = {
   logging: {
     recordLogs: false,
+  },
+  map: {
+    useGoogle3dTiles: false,
   },
   refresh: {
     intervalMs: null,
@@ -45,6 +51,15 @@ export class SettingsManager {
     this.saveState();
   }
 
+  public getUseGoogle3dTiles(): boolean {
+    return this.settings.map.useGoogle3dTiles;
+  }
+
+  public setUseGoogle3dTiles(useGoogle3dTiles: boolean): void {
+    this.settings.map.useGoogle3dTiles = useGoogle3dTiles;
+    this.saveState();
+  }
+
   public getRefreshIntervalMs(): RefreshIntervalMs {
     return this.settings.refresh.intervalMs;
   }
@@ -63,6 +78,9 @@ export class SettingsManager {
       this.settings = {
         logging: {
           recordLogs: parsed.logging?.recordLogs ?? DEFAULT_SETTINGS.logging.recordLogs,
+        },
+        map: {
+          useGoogle3dTiles: parsed.map?.useGoogle3dTiles ?? DEFAULT_SETTINGS.map.useGoogle3dTiles,
         },
         refresh: {
           intervalMs: this.normalizeRefreshIntervalMs(parsed.refresh?.intervalMs),

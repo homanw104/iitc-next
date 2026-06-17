@@ -5,6 +5,7 @@ import { EntityPositionManager } from "./entityPositionManager.ts";
 import { PORTAL_DISABLE_DEPTH_TEST_DISTANCE } from "./portalEntityManager.ts";
 
 const AP1_ORNAMENT_SIZE = 16;
+const AP1_ORNAMENT_HOLLOW_SIZE = 8;
 const CANVAS_DIMENSION = AP1_ORNAMENT_SIZE * 2;
 
 const ornamentImageCache = new Map<string, HTMLCanvasElement>();
@@ -119,6 +120,12 @@ function getOrnamentImage(data: PortalData): HTMLCanvasElement {
     context.beginPath();
     context.arc(CANVAS_DIMENSION / 2, CANVAS_DIMENSION / 2, AP1_ORNAMENT_SIZE, 0, 2 * Math.PI);
     context.fill();
+
+    context.globalCompositeOperation = "destination-out";
+    context.beginPath();
+    context.arc(CANVAS_DIMENSION / 2, CANVAS_DIMENSION / 2, AP1_ORNAMENT_HOLLOW_SIZE, 0, 2 * Math.PI);
+    context.fill();
+    context.globalCompositeOperation = "source-over";
   }
 
   ornamentImageCache.set(cacheKey, canvas);

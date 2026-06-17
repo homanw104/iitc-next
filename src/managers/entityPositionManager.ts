@@ -4,6 +4,10 @@
 
 import * as Cesium from "cesium";
 import { logManager } from "./logManager";
+import { settingsManager } from "./settingsManager";
+
+const GOOGLE_GROUND_TERRAIN_SAMPLE_LEVEL = 11;
+const GOOGLE_GROUND_TERRAIN_COPENSATION_METER = 1;
 
 export interface EntityCoordinates {
   latE6: number;
@@ -19,10 +23,13 @@ interface EntityPositionEntry extends EntityCoordinates {
 
 export class EntityPositionManager {
   private readonly entries = new Map<string, EntityPositionEntry>();
-  private callbacks: EntityPositionCallback[] = [];
+  private readonly useGoogle3dTiles = settingsManager.getUseGoogle3dTiles();
   private readonly queuedKeys = new Set<string>();
+  private callbacks: EntityPositionCallback[] = [];
   private samplingScheduled = false;
   private version = 0;
+
+  private static googleGroundTerrainProviderPromise: Promise<Cesium.TerrainProvider> | null = null;
 
   constructor(private readonly viewer: Cesium.Viewer) {}
 
@@ -84,9 +91,14 @@ export class EntityPositionManager {
       .filter((entry): entry is EntityPositionEntry => !!entry && entry.requestedVersion === requestVersion);
     if (entries.length === 0) return;
 
-    const terrainProvider = this.viewer.terrainProvider;
     const cartographics = entries.map((entry) => Cesium.Cartographic.fromDegrees(entry.lngE6 / 1e6, entry.latE6 / 1e6));
 
+    if (this.useGoogle3dTiles) {
+      this.sampleGoogleGroundPositions(entries, cartographics, requestVersion);
+      return;
+    }
+
+    const terrainProvider = this.viewer.terrainProvider;
     if (!terrainProvider.availability) {
       entries.forEach((entry, index) => this.updateFromRenderedTerrain(entry, cartographics[index], requestVersion));
       return;
@@ -106,6 +118,25 @@ export class EntityPositionManager {
       });
   }
 
+  private sampleGoogleGroundPositions(entries: EntityPositionEntry[], cartographics: Cesium.Cartographic[], requestVersion: number): void {
+    EntityPositionManager.getGoogleGroundTerrainProvider()
+      .then((terrainProvider) => Cesium.sampleTerrain(terrainProvider, GOOGLE_GROUND_TERRAIN_SAMPLE_LEVEL, cartographics))
+      .then((sampledPositions) => {
+        if (requestVersion !== this.version) return;
+        entries.forEach((entry, index) => {
+          const sampled = sampledPositions[index];
+          const height = GOOGLE_GROUND_TERRAIN_COPENSATION_METER + (sampled.height ?? 0);
+          this.updateEntry(entry, getTerrainPosition(sampled.longitude, sampled.latitude, height));
+        });
+      })
+      .catch((error) => {
+        logManager.warn("EntityPositionManager", "Failed to sample coarse ground height", error);
+        entries.forEach((entry, index) => {
+          this.updateEntry(entry, getTerrainPosition(cartographics[index].longitude, cartographics[index].latitude, 0));
+        });
+      });
+  }
+
   private updateFromRenderedTerrain(entry: EntityPositionEntry, cartographic: Cesium.Cartographic, requestVersion: number): void {
     if (requestVersion !== this.version) return;
 
@@ -119,6 +150,19 @@ export class EntityPositionManager {
     entry.position = position;
     this.callbacks.forEach(callback => callback(entry.latE6, entry.lngE6, position));
     this.viewer.scene.requestRender();
+  }
+
+  private static getGoogleGroundTerrainProvider(): Promise<Cesium.TerrainProvider> {
+    if (!this.googleGroundTerrainProviderPromise) {
+      this.googleGroundTerrainProviderPromise = Cesium.createWorldTerrainAsync({
+        requestVertexNormals: false,
+        requestWaterMask: false,
+      });
+      this.googleGroundTerrainProviderPromise.catch(() => {
+        this.googleGroundTerrainProviderPromise = null;
+      });
+    }
+    return this.googleGroundTerrainProviderPromise;
   }
 }
 

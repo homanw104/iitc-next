@@ -5,6 +5,8 @@
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import * as Cesium from "cesium";
 import { AmapMercatorTilingScheme } from "../../utils/map";
+import { logManager } from "../../managers/logManager";
+import { settingsManager } from "../../managers/settingsManager";
 
 // Tell Cesium where to find its assets (Images, Workers, etc.).
 // Since we use the CDN for the main library, we should also use it for assets.
@@ -15,6 +17,7 @@ window.CESIUM_BASE_URL = "https://cdn.jsdelivr.net/npm/cesium@1.142.0/Build/Cesi
 Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJkZGViN2YzNC1hYzgyLTQ2ZTQtYTEyMS0wZGYwOTY2ZWJiMzEiLCJpZCI6NDM1NTgyLCJzdWIiOiJob21hbncxMDQiLCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoiSUlUQyBOZXh0IiwiaWF0IjoxNzc5NTY3OTg4fQ.YBXp3trSarnjwb9R2G5sU57DC0VbI0iCJrZv7TyuZFk";
 
 export function initCesiumViewer(container: string): Cesium.Viewer {
+  const useGoogle3dTiles = settingsManager.getUseGoogle3dTiles();
   const gaodeSatelliteViewModel = new Cesium.ProviderViewModel({
     name: "Gaode Satellite",
     iconUrl: Cesium.buildModuleUrl("Widgets/Images/ImageryProviders/bingAerial.png"),
@@ -54,6 +57,7 @@ export function initCesiumViewer(container: string): Cesium.Viewer {
     navigationHelpButton: false,
     fullscreenButton: false,
     infoBox: false,
+    geocoder: useGoogle3dTiles ? Cesium.IonGeocodeProviderType.GOOGLE : false,
     requestRenderMode: true,
     maximumRenderTimeChange: Infinity,
   });
@@ -99,10 +103,16 @@ export function initCesiumViewer(container: string): Cesium.Viewer {
   viewer.scene.logarithmicDepthBuffer = true;
   viewer.scene.globe.showGroundAtmosphere = true;
   viewer.scene.globe.baseColor = Cesium.Color.BLACK;
+  viewer.scene.globe.show = !useGoogle3dTiles;
   viewer.scene.highDynamicRange = true;
   viewer.scene.msaaSamples = 4;
   viewer.resolutionScale = 1.5;
   viewer.scene.postProcessStages.fxaa.enabled = false;  // No need if msaa is enabled. Turn off to improve performance
+
+  if (useGoogle3dTiles) {
+    applyGoogle3dTilesRenderSettings(viewer);
+    addGoogle3dTiles(viewer).then();
+  }
 
   // Remove the credits widget
   const credits = document.querySelector(".cesium-widget-credits") as HTMLElement;
@@ -111,4 +121,50 @@ export function initCesiumViewer(container: string): Cesium.Viewer {
   }
 
   return viewer;
+}
+
+async function addGoogle3dTiles(viewer: Cesium.Viewer): Promise<void> {
+  try {
+    const tileset = await Cesium.createGooglePhotorealistic3DTileset({
+      onlyUsingWithGoogleGeocoder: true,
+    }, {
+      maximumScreenSpaceError: 32,
+      cacheBytes: 256 * 1024 * 1024,
+      maximumCacheOverflowBytes: 128 * 1024 * 1024,
+      cullWithChildrenBounds: true,
+      dynamicScreenSpaceError: true,
+      dynamicScreenSpaceErrorDensity: 4.0e-4,
+      dynamicScreenSpaceErrorFactor: 32,
+      dynamicScreenSpaceErrorHeightFalloff: 0.25,
+      foveatedScreenSpaceError: true,
+      foveatedConeSize: 0.15,
+      foveatedMinimumScreenSpaceErrorRelaxation: 16,
+      foveatedTimeDelay: 0.5,
+      skipLevelOfDetail: true,
+      baseScreenSpaceError: 1024,
+      skipScreenSpaceErrorFactor: 16,
+      skipLevels: 1,
+      immediatelyLoadDesiredLevelOfDetail: false,
+      loadSiblings: false,
+      enableCollision: false,
+    });
+    viewer.scene.primitives.add(tileset);
+    viewer.scene.requestRender();
+    logManager.debug("CesiumViewer", "Google Photorealistic 3D Tiles enabled");
+  } catch (error) {
+    logManager.error("CesiumViewer", "Failed to load Google Photorealistic 3D Tiles", error);
+    viewer.scene.globe.show = true;
+    viewer.scene.requestRender();
+  }
+}
+
+function applyGoogle3dTilesRenderSettings(viewer: Cesium.Viewer): void {
+  viewer.scene.highDynamicRange = false;
+  viewer.scene.msaaSamples = 1;
+  viewer.resolutionScale = 1;
+  viewer.scene.postProcessStages.fxaa.enabled = true;
+  viewer.scene.globe.showGroundAtmosphere = false;
+  viewer.scene.fog.enabled = true;
+  viewer.scene.fog.density = 0.001;
+  viewer.scene.screenSpaceCameraController.enableCollisionDetection = false;
 }
