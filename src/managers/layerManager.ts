@@ -282,9 +282,7 @@ export class LayerManager {
     if (!source) {
       source = new Cesium.CustomDataSource(name);
       source.show = this.getLayerVisibility(name);
-      source.entities.collectionChanged.addEventListener(() => {
-        this.requestRender();
-      });
+      source.entities.collectionChanged.addEventListener(() => this.requestSceneRender());
 
       // Ensure overlay layers are always on top
       this.viewer.dataSources.add(source).then(() => this.overlayLayers.forEach(layer => layer.raiseToTop()));
@@ -334,14 +332,14 @@ export class LayerManager {
     const pluginLayer = this.overlayLayers.get(name);
     if (pluginLayer) pluginLayer.setVisible(visible);
 
-    if (previousVisible !== visible) this.requestRender();
+    if (previousVisible !== visible) this.requestVisibilityRender();
   }
 
   private getLayerVisibility(name: string): boolean {
     return this.layerVisibility.get(name) !== false;
   }
 
-  private requestRender(): void {
+  private requestVisibilityRender(): void {
     if (this.viewer.isDestroyed()) return;
     if (this.pendingRenderFrame !== null) return;
 
@@ -354,6 +352,11 @@ export class LayerManager {
       this.viewer.dataSourceDisplay.update(this.viewer.clock.currentTime);
       this.viewer.scene.requestRender();
     });
+  }
+
+  private requestSceneRender(): void {
+    // Entity collection changes already notify Cesium's visualizers; they only need a frame in request-render mode.
+    if (!this.viewer.isDestroyed()) this.viewer.scene.requestRender();
   }
 
   private isBuiltInFilter(filterName: string): boolean {
