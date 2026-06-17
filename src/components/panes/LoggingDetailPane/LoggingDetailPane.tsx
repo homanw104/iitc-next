@@ -22,7 +22,7 @@ const LoggingDetailPane = ({ onBack, onClose }: {
 }) => {
   const updateStatus = (el: HTMLElement | null) => {
     if (!el) return;
-    el.textContent = settingsManager.isLogRecordingEnabled() ? "Recording enabled" : "Recording disabled";
+    el.textContent = settingsManager.getLogRecordingEnabled() ? "Recording enabled" : "Recording disabled";
   };
   let statusEl: HTMLElement | null = null;
 
@@ -80,7 +80,7 @@ const LoggingDetailPane = ({ onBack, onClose }: {
           </div>
           <input
             type="checkbox"
-            checked={settingsManager.isLogRecordingEnabled()}
+            checked={settingsManager.getLogRecordingEnabled()}
             onClick={(e: Event) => {
               const target = e.target as HTMLInputElement;
               settingsManager.setLogRecordingEnabled(target.checked);

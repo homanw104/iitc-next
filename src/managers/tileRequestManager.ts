@@ -7,6 +7,7 @@ import { apiRequest } from "../utils/network";
 import { FieldData, LinkData, PortalData, RawEntity, TileResponse } from "../types/ingress";
 import { ParsedEntities } from "../types/map";
 import { logManager } from "./logManager";
+import { settingsManager, type RefreshIntervalMs } from "./settingsManager";
 import { PortalEntityManager, parsePortal } from "./portalEntityManager";
 import { LinkEntityManager, parseLink } from "./linkEntityManager";
 import { FieldEntityManager, parseField } from "./fieldEntityManager";
@@ -14,6 +15,7 @@ import { PortalLabelEntityManager } from "./portalLabelEntityManager";
 import { PortalOrnamentEntityManager } from "./portalOrnamentEntityManager.ts";
 import { PortalHistoryEntityManager } from "./portalHistoryEntityManager";
 import { ScoutHistoryEntityManager } from "./scoutHistoryEntityManager";
+import { calculateTileKeys } from "../utils/viewer";
 
 /**
  * Defines the number of tiles per edge to zoom into at each level of detail.
@@ -120,6 +122,7 @@ export class TileRequestManager {
   private tileStatuses: Map<string, TileStatus> = new Map();
   private tileStatusListeners: TileStatusCallback[] = [];
   private idleResolvers: (() => void)[] = [];
+  private refreshIntervalId: number | null = null;
 
   constructor(
     private viewer: Cesium.Viewer,
@@ -130,7 +133,38 @@ export class TileRequestManager {
     private scoutHistoryEntityManager: ScoutHistoryEntityManager,
     private linkEntityManager: LinkEntityManager,
     private fieldEntityManager: FieldEntityManager,
-  ) {}
+  ) {
+    this.updateRefreshInterval(settingsManager.getRefreshIntervalMs());
+  }
+
+  public refreshView(): void {
+    const tileKeys = calculateTileKeys(this.viewer);
+
+    if (tileKeys.length > 0) {
+      this.removeTiles(tileKeys);
+      this.addTiles(tileKeys, true);
+    }
+  }
+
+  public getRefreshIntervalMs(): RefreshIntervalMs {
+    return settingsManager.getRefreshIntervalMs();
+  }
+
+  public setRefreshIntervalMs(intervalMs: RefreshIntervalMs): void {
+    settingsManager.setRefreshIntervalMs(intervalMs);
+    this.updateRefreshInterval(intervalMs);
+  }
+
+  private updateRefreshInterval(intervalMs: RefreshIntervalMs): void {
+    if (this.refreshIntervalId !== null) {
+      window.clearInterval(this.refreshIntervalId);
+      this.refreshIntervalId = null;
+    }
+
+    if (intervalMs === null) return;
+
+    this.refreshIntervalId = window.setInterval(() => this.refreshView(), intervalMs);
+  }
 
   public addTiles(tileKeys: string[], refreshExisting: boolean = false): void {
     logManager.debug("TileRequestManager", `Adding ${tileKeys.length} tiles to queue`);

@@ -36,10 +36,10 @@ export function mountCoreControllersAndUI(viewer: Cesium.Viewer, container: HTML
     portalDetailBar: null,
   };
 
-  const softRefreshButtonController = new SoftRefreshButtonController(viewer, managers.tileRequestManager);
+  const softRefreshButtonController = new SoftRefreshButtonController(managers.tileRequestManager);
   const layerChooserPaneController = new LayerChooserPaneController(container, managers.layerManager);
   const portalDetailPaneController = new PortalDetailPaneController(container);
-  const gameDetailPaneController = new GameDetailPaneController(container, managers.scoreManager, managers.redeemManager);
+  const gameDetailPaneController = new GameDetailPaneController(container, managers.scoreManager, managers.redeemManager, managers.tileRequestManager);
   const commDetailPaneController = new CommDetailPaneController(
     viewer,
     container,

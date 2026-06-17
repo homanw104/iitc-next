@@ -6,11 +6,13 @@ import RightArrowIcon from "./RightArrowIcon.tsx";
 const SettingsDetailPane = ({
   onBack,
   onClose,
+  onShowRefreshIntervalDetail,
   onShowLoggingDetail,
   onShowPluginDetail,
 }: {
   onBack: () => void,
   onClose: () => void,
+  onShowRefreshIntervalDetail: () => void,
   onShowLoggingDetail: () => void,
   onShowPluginDetail: () => void,
 }) => {
@@ -45,6 +47,24 @@ const SettingsDetailPane = ({
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: "8px",
+            backgroundColor: "rgba(255, 255, 255, 0.05)",
+            borderRadius: "4px",
+            cursor: "pointer",
+          }}
+          onClick={() => onShowRefreshIntervalDetail()}
+        >
+          <div>
+            <div style={{ fontWeight: "bold" }}>Refresh interval</div>
+            <div style={{ fontSize: "12px", color: "#aaa" }}>Choose how often the current view refreshes.</div>
+          </div>
+          <RightArrowIcon />
+        </div>
         <div
           style={{
             display: "flex",

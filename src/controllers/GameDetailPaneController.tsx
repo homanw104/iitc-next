@@ -1,9 +1,11 @@
 import { RedeemManager } from "../managers/redeemManager";
 import { ScoreManager } from "../managers/scoreManager";
+import { TileRequestManager } from "../managers/tileRequestManager";
 import GameDetailPane from "../components/panes/GameDetailPane/GameDetailPane";
 import PluginDetailPane from "../components/panes/PluginDetailPane/PluginDetailPane";
 import SettingsDetailPane from "../components/panes/SettingsDetailPane/SettingsDetailPane";
 import LoggingDetailPane from "../components/panes/LoggingDetailPane/LoggingDetailPane";
+import RefreshIntervalDetailPane from "../components/panes/RefreshIntervalDetailPane/RefreshIntervalDetailPane";
 import AboutDetailPane from "../components/panes/AboutDetailPane/AboutDetailPane";
 import RedeemResultPane from "../components/panes/RedeemResultPane/RedeemResultPane";
 
@@ -12,16 +14,19 @@ export class GameDetailPaneController {
   private pluginDetailPane: HTMLElement | null = null;
   private settingsDetailPane: HTMLElement | null = null;
   private loggingDetailPane: HTMLElement | null = null;
+  private refreshIntervalDetailPane: HTMLElement | null = null;
   private aboutDetailPane: HTMLElement | null = null;
   private redeemResultPane: HTMLElement | null = null;
   private readonly container: HTMLElement;
   private readonly scoreManager: ScoreManager;
   private readonly redeemManager: RedeemManager;
+  private readonly tileRequestManager: TileRequestManager;
 
-  constructor(container: HTMLElement, scoreManager: ScoreManager, redeemManager: RedeemManager) {
+  constructor(container: HTMLElement, scoreManager: ScoreManager, redeemManager: RedeemManager, tileRequestManager: TileRequestManager) {
     this.container = container;
     this.scoreManager = scoreManager;
     this.redeemManager = redeemManager;
+    this.tileRequestManager = tileRequestManager;
   }
 
   public toggleGameDetailPane() {
@@ -39,6 +44,10 @@ export class GameDetailPaneController {
     }
     if (this.loggingDetailPane) {
       this.closeLoggingDetailPane();
+      return;
+    }
+    if (this.refreshIntervalDetailPane) {
+      this.closeRefreshIntervalDetailPane();
       return;
     }
     if (this.aboutDetailPane) {
@@ -76,6 +85,13 @@ export class GameDetailPaneController {
     }
   }
 
+  private closeRefreshIntervalDetailPane() {
+    if (this.refreshIntervalDetailPane) {
+      this.refreshIntervalDetailPane.remove();
+      this.refreshIntervalDetailPane = null;
+    }
+  }
+
   private closeAboutDetailPane() {
     if (this.aboutDetailPane) {
       this.aboutDetailPane.remove();
@@ -95,6 +111,7 @@ export class GameDetailPaneController {
     this.closePluginDetailPane();
     this.closeSettingsDetailPane();
     this.closeLoggingDetailPane();
+    this.closeRefreshIntervalDetailPane();
     this.closeAboutDetailPane();
     this.gameDetailPane = container.appendChild(GameDetailPane({
       scoreManager: this.scoreManager,
@@ -128,6 +145,7 @@ export class GameDetailPaneController {
     this.closePluginDetailPane();
     this.closeSettingsDetailPane();
     this.closeLoggingDetailPane();
+    this.closeRefreshIntervalDetailPane();
     this.closeAboutDetailPane();
     this.pluginDetailPane = container.appendChild(PluginDetailPane({
       onBack: () => this.showSettingsDetailPane(container),
@@ -139,10 +157,12 @@ export class GameDetailPaneController {
     this.closeGameDetailPane();
     this.closePluginDetailPane();
     this.closeLoggingDetailPane();
+    this.closeRefreshIntervalDetailPane();
     this.closeAboutDetailPane();
     this.settingsDetailPane = container.appendChild(SettingsDetailPane({
       onBack: () => this.showGameDetailPane(container),
       onClose: () => this.closeSettingsDetailPane(),
+      onShowRefreshIntervalDetail: () => this.showRefreshIntervalDetailPane(container),
       onShowLoggingDetail: () => this.showLoggingDetailPane(container),
       onShowPluginDetail: () => this.showPluginDetailPane(container),
     }));
@@ -153,10 +173,25 @@ export class GameDetailPaneController {
     this.closePluginDetailPane();
     this.closeSettingsDetailPane();
     this.closeLoggingDetailPane();
+    this.closeRefreshIntervalDetailPane();
     this.closeAboutDetailPane();
     this.loggingDetailPane = container.appendChild(LoggingDetailPane({
       onBack: () => this.showSettingsDetailPane(container),
       onClose: () => this.closeLoggingDetailPane(),
+    }));
+  }
+
+  private showRefreshIntervalDetailPane(container: HTMLElement) {
+    this.closeGameDetailPane();
+    this.closePluginDetailPane();
+    this.closeSettingsDetailPane();
+    this.closeLoggingDetailPane();
+    this.closeRefreshIntervalDetailPane();
+    this.closeAboutDetailPane();
+    this.refreshIntervalDetailPane = container.appendChild(RefreshIntervalDetailPane({
+      tileRequestManager: this.tileRequestManager,
+      onBack: () => this.showSettingsDetailPane(container),
+      onClose: () => this.closeRefreshIntervalDetailPane(),
     }));
   }
 
@@ -165,6 +200,7 @@ export class GameDetailPaneController {
     this.closePluginDetailPane();
     this.closeSettingsDetailPane();
     this.closeLoggingDetailPane();
+    this.closeRefreshIntervalDetailPane();
     this.aboutDetailPane = container.appendChild(AboutDetailPane({
       onBack: () => this.showGameDetailPane(container),
       onClose: () => this.closeAboutDetailPane()
