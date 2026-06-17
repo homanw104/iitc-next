@@ -282,7 +282,9 @@ export class LayerManager {
     if (!source) {
       source = new Cesium.CustomDataSource(name);
       source.show = this.getLayerVisibility(name);
-      source.entities.collectionChanged.addEventListener(() => this.requestSceneRender());
+
+      // Unknown effect - Disabled for performance to avoid lag when zooming in and out
+      // source.entities.collectionChanged.addEventListener(() => this.viewer.scene.requestRender());
 
       // Ensure overlay layers are always on top
       this.viewer.dataSources.add(source).then(() => this.overlayLayers.forEach(layer => layer.raiseToTop()));
@@ -352,11 +354,6 @@ export class LayerManager {
       this.viewer.dataSourceDisplay.update(this.viewer.clock.currentTime);
       this.viewer.scene.requestRender();
     });
-  }
-
-  private requestSceneRender(): void {
-    // Entity collection changes already notify Cesium's visualizers; they only need a frame in request-render mode.
-    if (!this.viewer.isDestroyed()) this.viewer.scene.requestRender();
   }
 
   private isBuiltInFilter(filterName: string): boolean {
