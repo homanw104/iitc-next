@@ -1,5 +1,5 @@
 import { LayerManager } from "../managers/layerManager";
-import LayerChooserPane from "../components/LayerChooserPane/LayerChooserPane";
+import LayerChooserPane from "../components/panes/LayerChooserPane/LayerChooserPane";
 
 export class LayerChooserPaneController {
   private readonly container: HTMLElement;

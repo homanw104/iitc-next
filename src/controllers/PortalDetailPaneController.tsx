@@ -1,5 +1,5 @@
 import { PortalData } from "../types/ingress";
-import PortalDetailPane from "../components/PortalDetailPane/PortalDetailPane";
+import PortalDetailPane from "../components/panes/PortalDetailPane/PortalDetailPane";
 
 export class PortalDetailPaneController {
   private readonly container: HTMLElement;

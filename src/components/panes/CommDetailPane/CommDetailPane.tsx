@@ -1,0 +1,178 @@
+import { Viewer } from "cesium";
+import { h } from "../../../utils/dom.ts";
+import { Channel } from "../../../types/ingress.ts";
+import { CommManager } from "../../../managers/commManager.ts";
+import { PortalEntityManager } from "../../../managers/portalEntityManager.ts";
+import { PortalHistoryEntityManager } from "../../../managers/portalHistoryEntityManager.ts";
+import { ScoutHistoryEntityManager } from "../../../managers/scoutHistoryEntityManager.ts";
+import { TileRequestManager } from "../../../managers/tileRequestManager.ts";
+import type { PortalDetailPaneController } from "../../../controllers/PortalDetailPaneController.tsx";
+import type { PortalDetailState } from "../../../core/coreControllers.ts";
+import CommSendButton from "./CommSendButton.tsx";
+import CommCloseButton from "./CommCloseButton.tsx";
+import CommTextInput from "./CommTextInput.tsx";
+import CommFetchLatestButton from "./CommFetchLatestButton.tsx";
+import CommLoadingIndicator from "./CommLoadingIndicator.tsx";
+import CommMessage from "./CommMessage.tsx";
+import CommTab from "./CommTab.tsx";
+import CommDateDivider from "./CommDateDivider.tsx";
+
+const CommDetailPane = ({
+  viewer,
+  commManager,
+  portalEntityManager,
+  tileRequestManager,
+  portalHistoryEntityManager,
+  scoutHistoryEntityManager,
+  portalDetailPaneController,
+  portalDetailState,
+  container,
+  channel,
+  isFetchingNew,
+  onTabClick,
+  onCloseClick,
+  onFetchLatestClick,
+  onSendMessage,
+  onInputFocus,
+  onInputBlur,
+  onLoadingDivRef,
+  onMessageDivsRef,
+  onScroll,
+}: {
+  viewer: Viewer;
+  commManager: CommManager;
+  portalEntityManager: PortalEntityManager;
+  tileRequestManager: TileRequestManager;
+  portalHistoryEntityManager: PortalHistoryEntityManager;
+  scoutHistoryEntityManager: ScoutHistoryEntityManager;
+  portalDetailPaneController: PortalDetailPaneController;
+  portalDetailState: PortalDetailState;
+  container: HTMLElement;
+  channel: Channel;
+  isFetchingNew: boolean;
+  onTabClick: (tab: Channel) => void;
+  onCloseClick: () => void;
+  onFetchLatestClick: () => void;
+  onSendMessage: (message: string) => void;
+  onInputFocus: () => void;
+  onInputBlur: () => void;
+  onLoadingDivRef: (el: HTMLElement) => void;
+  onMessageDivsRef: (el: HTMLElement) => void;
+  onScroll: (e: Event) => void;
+}) => {
+  let textInput: HTMLInputElement | null = null;
+  let lastDateStr: string | null = null;
+
+  const messages = commManager.getMessages(channel);
+  const messageList: JSX.Element[] = [];
+
+  for (const message of messages) {
+    const dateStr = new Date(message[1]).toLocaleDateString([], { day: "numeric", month: "short" });
+    if (dateStr !== lastDateStr) {
+      messageList.push(
+        <CommDateDivider timeStr={dateStr} />
+      );
+    }
+    lastDateStr = dateStr;
+
+    messageList.push(
+      <CommMessage
+        message={message}
+        viewer={viewer}
+        portalEntityManager={portalEntityManager}
+        tileRequestManager={tileRequestManager}
+        portalHistoryEntityManager={portalHistoryEntityManager}
+        scoutHistoryEntityManager={scoutHistoryEntityManager}
+        portalDetailPaneController={portalDetailPaneController}
+        portalDetailState={portalDetailState}
+        container={container}
+        channel={channel}
+      />
+    );
+  }
+
+  const tabs: { id: Channel; label: string }[] = [
+    { id: "all", label: "ALL" },
+    { id: "faction", label: "FACTION" },
+    { id: "alerts", label: "ALERTS" },
+  ];
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        bottom: "41px",
+        right: "5px",
+        margin: "2px 3px",
+        width: "600px",
+        height: "500px",
+        maxWidth: "calc(100% - 18px - 24px)",
+        maxHeight: "calc(100% - 16px - 24px)",
+        display: "flex",
+        flexDirection: "column",
+        padding: "12px",
+        backgroundColor: "rgba(42, 42, 42, 0.9)",
+        border: "1px solid #555",
+        borderRadius: "4.2px",
+        color: "white",
+        zIndex: "10015",
+      }}
+    >
+      <div
+        className="comm-tabs"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          borderBottom: "1px solid #555",
+        }}
+      >
+        <div style={{ display: "flex", gap: "10px" }}>
+          {tabs.map((tab) => (
+            <CommTab
+              id={tab.id}
+              label={tab.label}
+              isActive={channel === tab.id}
+              onClick={onTabClick}
+            />
+          ))}
+        </div>
+        <CommCloseButton onClick={onCloseClick} />
+      </div>
+      <div
+        ref={onMessageDivsRef}
+        onScroll={onScroll}
+        style={{ flex: 1, overflowY: "auto", paddingRight: "5px", position: "relative" }}
+      >
+        <CommLoadingIndicator onRef={onLoadingDivRef} />
+        <div style={{ minHeight: "100%" }}>
+          {messageList}
+        </div>
+        <CommFetchLatestButton
+          onClick={onFetchLatestClick}
+          isLoading={isFetchingNew}
+        />
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", height: "8px", borderTop: "1px solid #555" }} />
+      <form
+        onSubmit={(e: Event) => e.preventDefault()}
+        style={{ display: "flex", gap: "8px" }}
+      >
+        <CommTextInput
+          onRef={(el) => (textInput = el)}
+          onSend={onSendMessage}
+          onFocus={onInputFocus}
+          onBlur={onInputBlur}
+        />
+        <CommSendButton onClick={() => {
+          if (textInput && textInput.value) {
+            onSendMessage(textInput.value);
+            textInput.value = "";
+          }
+        }} />
+      </form>
+    </div>
+  ) as HTMLElement;
+};
+
+export default CommDetailPane;

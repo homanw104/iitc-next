@@ -11,7 +11,7 @@ import type { ScoutHistoryEntityManager } from "../../../managers/scoutHistoryEn
 import type { PortalDetailPaneController } from "../../../controllers/PortalDetailPaneController.tsx";
 import type { PortalDetailState } from "../../../core/coreControllers.ts";
 import type { InteractionGestureState } from "../state/interactionGestureState";
-import PortalDetailBar from "../../../components/PortalDetailBar/PortalDetailBar";
+import PortalDetailBar from "../../../components/buttons/PortalDetailBar/PortalDetailBar";
 
 export interface PortalSelectionState {
   isPortalDetailLoading: boolean;

@@ -4,12 +4,12 @@
 
 import type * as Cesium from "cesium";
 import type { PortalData } from "../types/ingress";
-import GameDetailButton from "../components/GameDetailButton/GameDetailButton";
-import GetLocationButton from "../components/GetLocationButton/GetLocationButton";
-import SoftRefreshButton from "../components/SoftRefreshButton/SoftRefreshButton";
-import CommDetailButton from "../components/CommDetailButton/CommDetailButton";
-import LayerChooserButton from "../components/LayerChooserButton/LayerChooserButton";
-import PortalDetailBar from "../components/PortalDetailBar/PortalDetailBar";
+import GameDetailButton from "../components/buttons/GameDetailButton/GameDetailButton";
+import GetLocationButton from "../components/buttons/GetLocationButton/GetLocationButton";
+import SoftRefreshButton from "../components/buttons/SoftRefreshButton/SoftRefreshButton";
+import CommDetailButton from "../components/buttons/CommDetailButton/CommDetailButton";
+import LayerChooserButton from "../components/buttons/LayerChooserButton/LayerChooserButton";
+import PortalDetailBar from "../components/buttons/PortalDetailBar/PortalDetailBar";
 import { CommDetailPaneController } from "../controllers/CommDetailPaneController.tsx";
 import { GameDetailPaneController } from "../controllers/GameDetailPaneController.tsx";
 import { PortalDetailPaneController } from "../controllers/PortalDetailPaneController.tsx";

@@ -7,7 +7,7 @@ import { PortalHistoryEntityManager } from "../managers/portalHistoryEntityManag
 import { ScoutHistoryEntityManager } from "../managers/scoutHistoryEntityManager";
 import { TileRequestManager } from "../managers/tileRequestManager";
 import { logManager } from "../managers/logManager";
-import CommDetailPane from "../components/CommDetailPane/CommDetailPane";
+import CommDetailPane from "../components/panes/CommDetailPane/CommDetailPane";
 import type { PortalDetailPaneController } from "./PortalDetailPaneController.tsx";
 import type { PortalDetailState } from "../core/coreControllers";
 

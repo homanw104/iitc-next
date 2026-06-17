@@ -1,12 +1,14 @@
 import { RedeemManager } from "../managers/redeemManager";
 import { ScoreManager } from "../managers/scoreManager";
-import GameDetailPane from "../components/GameDetailPane/GameDetailPane";
-import PluginDetailPane from "../components/PluginDetailPane/PluginDetailPane";
-import RedeemResultPane from "../components/RedeemResultPane/RedeemResultPane";
+import GameDetailPane from "../components/panes/GameDetailPane/GameDetailPane";
+import PluginDetailPane from "../components/panes/PluginDetailPane/PluginDetailPane";
+import AboutDetailPane from "../components/panes/AboutDetailPane/AboutDetailPane";
+import RedeemResultPane from "../components/panes/RedeemResultPane/RedeemResultPane";
 
 export class GameDetailPaneController {
   private gameDetailPane: HTMLElement | null = null;
   private pluginDetailPane: HTMLElement | null = null;
+  private aboutDetailPane: HTMLElement | null = null;
   private redeemResultPane: HTMLElement | null = null;
   private readonly container: HTMLElement;
   private readonly scoreManager: ScoreManager;
@@ -27,6 +29,10 @@ export class GameDetailPaneController {
       this.closePluginDetailPane();
       return;
     }
+    if (this.aboutDetailPane) {
+      this.closeAboutDetailPane();
+      return;
+    }
     this.showGameDetailPane(this.container);
   }
 
@@ -44,6 +50,13 @@ export class GameDetailPaneController {
     }
   }
 
+  private closeAboutDetailPane() {
+    if (this.aboutDetailPane) {
+      this.aboutDetailPane.remove();
+      this.aboutDetailPane = null;
+    }
+  }
+
   private closeRedeemResultPane() {
     if (this.redeemResultPane) {
       this.redeemResultPane.remove();
@@ -56,8 +69,10 @@ export class GameDetailPaneController {
     this.gameDetailPane = container.appendChild(GameDetailPane({
       scoreManager: this.scoreManager,
       redeemManager: this.redeemManager,
+      onClose: () => this.closeGameDetailPane(),
       onRedeemSuccess: (msg) => this.showRedeemResultPane(container, msg),
       onShowPluginDetail: () => this.showPluginDetailPane(container),
+      onShowAboutDetail: () => this.showAboutDetailPane(container),
     }));
 
     // Fetch score if there's no score
@@ -65,11 +80,13 @@ export class GameDetailPaneController {
       this.scoreManager.fetchGameScore().then(() => {
         if (this.gameDetailPane) {
           this.closeGameDetailPane();
-          container.appendChild(GameDetailPane({
+          this.gameDetailPane = container.appendChild(GameDetailPane({
             scoreManager: this.scoreManager,
             redeemManager: this.redeemManager,
+            onClose: () => this.closeGameDetailPane(),
             onRedeemSuccess: (msg) => this.showRedeemResultPane(container, msg),
             onShowPluginDetail: () => this.showPluginDetailPane(container),
+            onShowAboutDetail: () => this.showAboutDetailPane(container),
           }));
         }
       });
@@ -78,7 +95,14 @@ export class GameDetailPaneController {
 
   private showPluginDetailPane(container: HTMLElement) {
     this.closeGameDetailPane();
+    this.closeAboutDetailPane();
     this.pluginDetailPane = container.appendChild(PluginDetailPane({ onClose: () => this.closePluginDetailPane() }));
+  }
+
+  private showAboutDetailPane(container: HTMLElement) {
+    this.closeGameDetailPane();
+    this.closePluginDetailPane();
+    this.aboutDetailPane = container.appendChild(AboutDetailPane({ onClose: () => this.closeAboutDetailPane() }));
   }
 
   private showRedeemResultPane(container: HTMLElement, msg: string) {
