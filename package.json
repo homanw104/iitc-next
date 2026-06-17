@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:plugins": "jiti ./build-plugins.ts",
-    "build:sync:version": "node scripts/sync-version.mjs",
+    "build:plugins": "jiti scripts/build-plugins.ts",
+    "build:sync:version": "jiti scripts/sync-version.ts",
     "preview": "vite preview",
     "lint": "eslint .",
     "cap:sync": "cap sync",
