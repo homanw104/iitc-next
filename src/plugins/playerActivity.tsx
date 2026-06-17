@@ -276,6 +276,10 @@ class PlayerActivityPlugin {
       const timestamp = msg[1];
       const plext = msg[2].plext;
 
+      // Omit link and field destruction as we cannot distinguish the destroyed end
+      const msgPattern = /.*(Your Link|destroyed the).*/;
+      if (msgPattern.test(plext.text)) return;
+
       for (let i = 0; i < plext.markup.length; i++) {
         const markup = plext.markup[i] as PlextMark;
         if (markup[0] === "PLAYER") {
