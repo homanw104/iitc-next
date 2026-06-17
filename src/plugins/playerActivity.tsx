@@ -144,7 +144,8 @@ class PlayerActivityPlugin {
           // Multiplayer activities
           const allPlayersLastActivities: PlayerActivity[] = entity.map(e => {
             const specificPlayerActivities: PlayerActivity[] = e.properties?.activities.getValue();
-            const activity: PlayerActivity = specificPlayerActivities[0];
+            const activity = this.getLatestActivity(specificPlayerActivities);
+            if (!activity) return null;
             return {
               name: activity.name,
               team: activity.team,
@@ -154,7 +155,8 @@ class PlayerActivityPlugin {
               latE6: activity.latE6,
               lngE6: activity.lngE6,
             };
-          });
+          }).filter((activity): activity is PlayerActivity => !!activity);
+          if (allPlayersLastActivities.length === 0) return;
           allPlayersLastActivities.sort((a, b) => b.timestamp - a.timestamp);
           const table = (
             <table>
@@ -177,16 +179,18 @@ class PlayerActivityPlugin {
         } else if (!Array.isArray(entity) && entity.id.startsWith("player-activity")) {
           // Single player activities
           const activities: PlayerActivity[] = entity.properties?.activities.getValue();
-          activities.sort((a, b) => b.timestamp - a.timestamp);
+          const newestActivities = [...activities].sort((a, b) => b.timestamp - a.timestamp);
+          const latestActivity = newestActivities[0];
+          if (!latestActivity) return;
           const table = (
             <table>
               <thead>
                 <tr>
-                  <th style={{ textAlign: "left" }}>{activities[0].name}</th>
+                  <th style={{ textAlign: "left" }}>{latestActivity.name}</th>
                 </tr>
               </thead>
               <tbody>
-                {activities.slice(0, 6).map(activity => {
+                {newestActivities.slice(0, 6).map(activity => {
                   return (
                     <tr style={{ fontSize: "12px" }}>
                       <td style={{ paddingRight: "8px" }}>{activity.portalName}</td>
@@ -198,7 +202,7 @@ class PlayerActivityPlugin {
             </table>
           ) as HTMLElement;
           if (!this.tooltipEl) return;
-          this.styleTooltipElement(table, activities, movement);
+          this.styleTooltipElement(table, newestActivities, movement);
         } else {
           // Hover out
           if (!this.tooltipEl) return;
@@ -231,7 +235,8 @@ class PlayerActivityPlugin {
       const maxPlayers = 2;
       const playerActivities: PlayerActivity[] = clusteredEntities.map(e => {
         const specificPlayerActivities: PlayerActivity[] = e.properties?.activities.getValue();
-        const lastActivity: PlayerActivity = specificPlayerActivities[specificPlayerActivities.length - 1];
+        const lastActivity = this.getLatestActivity(specificPlayerActivities);
+        if (!lastActivity) return null;
         return {
           name: lastActivity.name,
           team: lastActivity.team,
@@ -241,7 +246,9 @@ class PlayerActivityPlugin {
           latE6: lastActivity.latE6,
           lngE6: lastActivity.lngE6,
         };
-      });
+      }).filter((activity): activity is PlayerActivity => !!activity);
+      if (playerActivities.length === 0) return;
+      playerActivities.sort((a, b) => b.timestamp - a.timestamp);
 
       const visiblePlayerNames = playerActivities.slice(0, maxPlayers).map(p => p.name).join("\n");
       const remainingPlayers = playerActivities.length - maxPlayers;
@@ -341,7 +348,7 @@ class PlayerActivityPlugin {
   private updatePlayerActivityEntityPosition(latE6: number, lngE6: number, position: Cesium.Cartesian3): void {
     this.playerLocations.forEach((entity) => {
       const activities: PlayerActivity[] | undefined = entity.properties?.activities?.getValue();
-      const lastActivity = activities?.[activities.length - 1];
+      const lastActivity = this.getLatestActivity(activities);
       if (lastActivity?.latE6 === latE6 && lastActivity?.lngE6 === lngE6) {
         entity.position = new Cesium.ConstantPositionProperty(position);
       }
@@ -351,7 +358,8 @@ class PlayerActivityPlugin {
 
   private renderPlayerLocations(playerActivities: Map<string, PlayerActivity[]>): void {
     playerActivities.forEach((activities, playerName) => {
-      const lastActivity = activities[activities.length - 1];
+      const lastActivity = this.getLatestActivity(activities);
+      if (!lastActivity) return;
       const lastPosition = this.entityPositionManager?.getPosition(lastActivity);
       if (!lastPosition) return;
 
@@ -412,7 +420,8 @@ class PlayerActivityPlugin {
 
   private renderPlayerPaths(playerActivities: Map<string, PlayerActivity[]>): void {
     playerActivities.forEach((activities, playerName) => {
-      const lastActivity = activities[activities.length - 1];
+      const lastActivity = this.getLatestActivity(activities);
+      if (!lastActivity) return;
       const coordinates: number[] = [];
       activities.forEach(a => coordinates.push(a.lngE6 / 1e6, a.latE6 / 1e6, 3));
 
@@ -519,6 +528,13 @@ class PlayerActivityPlugin {
     const hourStr = hours === 0 ? "" : hours === 1 ? "1 hr" : hours > 1 ? hours + (" hrs") : "";
     const minutesStr = minutes === 0 ? "0 min" : minutes === 1 ? "1 min" : minutes > 1 ? minutes + (" mins") : "";
     return `${hourStr} ${minutesStr} ago`;
+  }
+
+  private getLatestActivity(activities: PlayerActivity[] | undefined): PlayerActivity | undefined {
+    return activities?.reduce<PlayerActivity | undefined>((latest, activity) => {
+      if (!latest || activity.timestamp > latest.timestamp) return activity;
+      return latest;
+    }, undefined);
   }
 
   private styleTooltipElement(table: HTMLElement, activities: PlayerActivity[], movement: Cesium.ScreenSpaceEventHandler.MotionEvent ): void {
