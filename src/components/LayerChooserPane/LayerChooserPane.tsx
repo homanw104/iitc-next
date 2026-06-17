@@ -44,6 +44,7 @@ const LayerChooserPane = ({ layerManager, onToggle }: {
       <LayerSection name="Entities" />
       <LayerCheckbox label="Portals" id="portals" layerManager={layerManager} onToggle={onToggle} />
       <LayerCheckbox label="Labels" id="portals-label" layerManager={layerManager} onToggle={onToggle} indent={1} />
+      <LayerCheckbox label="Ornaments" id="portals-ornament" layerManager={layerManager} onToggle={onToggle} indent={1} />
       <LayerCheckbox label="Placeholders" id="portals-placeholder" layerManager={layerManager} onToggle={onToggle} indent={1} />
       {Array.from({ length: 8 }, (_, i) => (
         <LayerCheckbox

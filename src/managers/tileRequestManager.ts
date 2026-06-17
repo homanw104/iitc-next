@@ -11,6 +11,7 @@ import { PortalEntityManager, parsePortal } from "./portalEntityManager";
 import { LinkEntityManager, parseLink } from "./linkEntityManager";
 import { FieldEntityManager, parseField } from "./fieldEntityManager";
 import { PortalLabelEntityManager } from "./portalLabelEntityManager";
+import { PortalOrnamentEntityManager } from "./portalOrnamentEntityManager.ts";
 import { PortalHistoryEntityManager } from "./portalHistoryEntityManager";
 import { ScoutHistoryEntityManager } from "./scoutHistoryEntityManager";
 
@@ -126,31 +127,16 @@ export class TileRequestManager {
   private tileStatusListeners: TileStatusCallback[] = [];
   private idleResolvers: (() => void)[] = [];
 
-  private viewer: Cesium.Viewer;
-  private portalEntityManager: PortalEntityManager;
-  private portalLabelEntityManager: PortalLabelEntityManager;
-  private portalHistoryEntityManager: PortalHistoryEntityManager;
-  private scoutHistoryEntityManager: ScoutHistoryEntityManager;
-  private linkEntityManager: LinkEntityManager;
-  private fieldEntityManager: FieldEntityManager;
-
   constructor(
-    viewer: Cesium.Viewer,
-    portalEntityManager: PortalEntityManager,
-    portalLabelEntityManager: PortalLabelEntityManager,
-    portalHistoryEntityManager: PortalHistoryEntityManager,
-    scoutHistoryEntityManager: ScoutHistoryEntityManager,
-    linkEntityManager: LinkEntityManager,
-    fieldEntityManager: FieldEntityManager,
-  ) {
-    this.viewer = viewer;
-    this.portalEntityManager = portalEntityManager;
-    this.portalLabelEntityManager = portalLabelEntityManager;
-    this.portalHistoryEntityManager = portalHistoryEntityManager;
-    this.scoutHistoryEntityManager = scoutHistoryEntityManager;
-    this.linkEntityManager = linkEntityManager;
-    this.fieldEntityManager = fieldEntityManager;
-  }
+    private viewer: Cesium.Viewer,
+    private portalEntityManager: PortalEntityManager,
+    private portalLabelEntityManager: PortalLabelEntityManager,
+    private portalOrnamentEntityManager: PortalOrnamentEntityManager,
+    private portalHistoryEntityManager: PortalHistoryEntityManager,
+    private scoutHistoryEntityManager: ScoutHistoryEntityManager,
+    private linkEntityManager: LinkEntityManager,
+    private fieldEntityManager: FieldEntityManager,
+  ) {}
 
   /**
    * Adds a list of tile keys to the queue for processing.
@@ -286,6 +272,7 @@ export class TileRequestManager {
         if (!viewRect) return;
         this.portalEntityManager.removePortalInView(viewRect);
         this.portalLabelEntityManager.removeLabelInView(viewRect);
+        this.portalOrnamentEntityManager.removeOrnamentInView(viewRect);
         this.portalHistoryEntityManager.removeHistoryHaloInView(viewRect);
         this.scoutHistoryEntityManager.removeScoutControlHaloInView(viewRect);
         this.linkEntityManager.removeLinkInView(viewRect);
@@ -352,6 +339,7 @@ export class TileRequestManager {
         const { portals, links, fields } = parseTileEntities(tileData.gameEntities);
         portals.forEach((p) => this.portalEntityManager.addOrUpdatePortal(p));
         portals.forEach((p) => this.portalLabelEntityManager.addOrUpdateLabel(p));
+        portals.forEach((p) => this.portalOrnamentEntityManager.addOrUpdateOrnament(p));
         portals.forEach((p) => this.portalHistoryEntityManager.addOrUpdateHistoryHalo(p));
         portals.forEach((p) => this.scoutHistoryEntityManager.addOrUpdateScoutControlHalo(p));
         links.forEach((l) => this.linkEntityManager.addOrUpdateLink(l));

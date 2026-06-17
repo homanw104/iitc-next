@@ -5,13 +5,15 @@
 import * as Cesium from "cesium";
 import { ScreenSpaceEventType } from "cesium";
 import type { PortalEntityManager } from "../../managers/portalEntityManager.ts";
+import type { PortalLabelEntityManager } from "../../managers/portalLabelEntityManager.ts";
+import type { PortalOrnamentEntityManager } from "../../managers/portalOrnamentEntityManager.ts";
 import type { PortalHistoryEntityManager } from "../../managers/portalHistoryEntityManager.ts";
 import type { ScoutHistoryEntityManager } from "../../managers/scoutHistoryEntityManager.ts";
 import type { PortalDetailPaneController } from "../../controllers/PortalDetailPaneController.tsx";
 import type { PortalDetailState } from "../../core/coreControllers.ts";
+import type { PortalSelectionState } from "../interaction/portals/portalSelection.ts";
 import { createInteractionGestureState } from "../interaction/state/interactionGestureState.ts";
 import { handlePortalSelection } from "../interaction/portals/portalSelection.ts";
-import type { PortalSelectionState } from "../interaction/portals/portalSelection.ts";
 import { createPinchGestureHandlers } from "../interaction/gestures/pinchGestureHandlers.ts";
 import { createTouchZoomHandlers } from "../interaction/gestures/touchZoomHandlers.ts";
 
@@ -22,6 +24,8 @@ export function setUpInteractionHandlers(
   container: HTMLElement,
   portalDetailPaneController: PortalDetailPaneController,
   portalEntityManager: PortalEntityManager,
+  portalLabelEntityManager: PortalLabelEntityManager,
+  portalOrnamentEntityManager: PortalOrnamentEntityManager,
   portalHistoryEntityManager: PortalHistoryEntityManager,
   scoutHistoryEntityManager: ScoutHistoryEntityManager,
   portalDetailState: PortalDetailState,
@@ -49,6 +53,8 @@ export function setUpInteractionHandlers(
       container,
       portalDetailPaneController,
       portalEntityManager,
+      portalLabelEntityManager,
+      portalOrnamentEntityManager,
       portalHistoryEntityManager,
       scoutHistoryEntityManager,
       interfaceState: portalDetailState,

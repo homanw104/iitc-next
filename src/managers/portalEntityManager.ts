@@ -163,7 +163,7 @@ export class PortalEntityManager {
  * @param {PortalData} data - An object containing team, level, and isPlaceholder properties.
  * @returns {string} The generated portal layer ID.
  */
-export function getPortalLayerId(data: PortalData): string {
+function getPortalLayerId(data: PortalData): string {
   const team = data.team.toLowerCase();
   const level = data.level ?? 0;
   if (data.isPlaceholder || level === 0) {
@@ -198,6 +198,9 @@ export function parsePortal(ent: RawEntity): PortalData {
     portal.resCount = data[6] as number;
     portal.image = data[7] as string;
     portal.title = data[8] as string;
+    if (Array.isArray(data[9])) {
+      portal.ornaments = data[9] as string[];
+    }
   }
 
   if (data.length >= 18) {
@@ -227,16 +230,16 @@ export function parsePortal(ent: RawEntity): PortalData {
     if (data[16]) {
       portal.owner = data[16] as string | undefined;
     }
+  }
 
-    if (data.length >= 19) {
-      const historyBitArray = (data[18] as number) || 0;
-      portal.history = {
-        _raw: historyBitArray,
-        visited: !!(historyBitArray & 1),
-        captured: !!(historyBitArray & 2),
-        scoutControlled: !!(historyBitArray & 4),
-      };
-    }
+  if (data.length >= 19) {
+    const historyBitArray = (data[18] as number) || 0;
+    portal.history = {
+      _raw: historyBitArray,
+      visited: !!(historyBitArray & 1),
+      captured: !!(historyBitArray & 2),
+      scoutControlled: !!(historyBitArray & 4),
+    };
   }
 
   return portal;

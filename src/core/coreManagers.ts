@@ -8,6 +8,7 @@ import { LayerManager } from "../managers/layerManager";
 import { EntityPositionManager } from "../managers/entityPositionManager";
 import { PortalEntityManager } from "../managers/portalEntityManager";
 import { PortalLabelEntityManager } from "../managers/portalLabelEntityManager";
+import { PortalOrnamentEntityManager } from "../managers/portalOrnamentEntityManager.ts";
 import { PortalHistoryEntityManager } from "../managers/portalHistoryEntityManager";
 import { ScoutHistoryEntityManager } from "../managers/scoutHistoryEntityManager";
 import { LinkEntityManager } from "../managers/linkEntityManager";
@@ -24,6 +25,7 @@ export interface CoreManagers {
   entityPositionManager: EntityPositionManager;
   portalEntityManager: PortalEntityManager;
   portalLabelEntityManager: PortalLabelEntityManager;
+  portalOrnamentEntityManager: PortalOrnamentEntityManager;
   portalHistoryEntityManager: PortalHistoryEntityManager;
   scoutHistoryEntityManager: ScoutHistoryEntityManager;
   linkEntityManager: LinkEntityManager;
@@ -41,12 +43,13 @@ export function createCoreManagers(viewer: Cesium.Viewer, container: HTMLElement
   const entityPositionManager = new EntityPositionManager(viewer);
   const portalEntityManager = new PortalEntityManager(layerManager, entityPositionManager);
   const portalLabelEntityManager = new PortalLabelEntityManager(layerManager, entityPositionManager);
+  const portalOrnamentEntityManager = new PortalOrnamentEntityManager(layerManager, entityPositionManager);
   const portalHistoryEntityManager = new PortalHistoryEntityManager(layerManager, entityPositionManager);
   const scoutHistoryEntityManager = new ScoutHistoryEntityManager(layerManager, entityPositionManager);
   const linkEntityManager = new LinkEntityManager(layerManager, portalEntityManager);
   const fieldEntityManager = new FieldEntityManager(layerManager, portalEntityManager);
   const debugTileEntityManager = new DebugTileEntityManager(viewer, layerManager);
-  const tileRequestManager = new TileRequestManager(viewer, portalEntityManager, portalLabelEntityManager, portalHistoryEntityManager, scoutHistoryEntityManager, linkEntityManager, fieldEntityManager);
+  const tileRequestManager = new TileRequestManager(viewer, portalEntityManager, portalLabelEntityManager, portalOrnamentEntityManager, portalHistoryEntityManager, scoutHistoryEntityManager, linkEntityManager, fieldEntityManager);
   const commManager = new CommManager(viewer);
   const scoreManager = new ScoreManager();
   const redeemManager = new RedeemManager();
@@ -59,6 +62,7 @@ export function createCoreManagers(viewer: Cesium.Viewer, container: HTMLElement
     entityPositionManager,
     portalEntityManager,
     portalLabelEntityManager,
+    portalOrnamentEntityManager,
     portalHistoryEntityManager,
     scoutHistoryEntityManager,
     linkEntityManager,
@@ -78,6 +82,7 @@ export function exposeCoreManagers(iitc: IITCCore, viewer: Cesium.Viewer, manage
   iitc.entityPositionManager = managers.entityPositionManager;
   iitc.portalEntityManager = managers.portalEntityManager;
   iitc.portalLabelEntityManager = managers.portalLabelEntityManager;
+  iitc.portalOrnamentEntityManager = managers.portalOrnamentEntityManager;
   iitc.portalHistoryEntityManager = managers.portalHistoryEntityManager;
   iitc.scoutHistoryEntityManager = managers.scoutHistoryEntityManager;
   iitc.linkEntityManager = managers.linkEntityManager;

@@ -23,6 +23,7 @@ export interface PortalData {
   resCount?: number;
   image?: string;
   title?: string;
+  ornaments?: string[];
   timestamp: number;
   isPlaceholder?: boolean;
   mods?: (PortalMod | null)[];

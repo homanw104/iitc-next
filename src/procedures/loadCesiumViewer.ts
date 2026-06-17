@@ -21,6 +21,8 @@ export default function loadCesiumViewer(): void {
   const managers = createCoreManagers(viewer, container);
   const entityPositionManager = managers.entityPositionManager;
   const portalEntityManager = managers.portalEntityManager;
+  const portalLabelEntityManager = managers.portalLabelEntityManager;
+  const portalOrnamentEntityManager = managers.portalOrnamentEntityManager;
   const portalHistoryEntityManager = managers.portalHistoryEntityManager;
   const scoutHistoryEntityManager = managers.scoutHistoryEntityManager;
   const tileRequestManager = managers.tileRequestManager;
@@ -31,7 +33,7 @@ export default function loadCesiumViewer(): void {
   // Mount core UI and get portal details UI and portal data in state
   const { portalDetailPaneController, state } = mountCoreControllersAndUI(viewer, container, managers);
 
-  setUpInteractionHandlers(viewer, container, portalDetailPaneController, portalEntityManager, portalHistoryEntityManager, scoutHistoryEntityManager, state);
+  setUpInteractionHandlers(viewer, container, portalDetailPaneController, portalEntityManager, portalLabelEntityManager, portalOrnamentEntityManager, portalHistoryEntityManager, scoutHistoryEntityManager, state);
   setUpEntityPositionRefresh(viewer, entityPositionManager);
   setUpTileUpdateWhenMove(viewer, tileRequestManager);
   configureCameraControls(viewer);

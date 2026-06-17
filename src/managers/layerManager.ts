@@ -145,6 +145,7 @@ export class LayerManager {
   // Fine-grained filter controls that separate each portal-level-faction pair, etc.
   private filterState: Map<string, boolean> = new Map();
   private pluginFilterState: Map<string, boolean> = new Map();
+  private pendingRenderFrame: number | null = null;
 
   constructor(private readonly viewer: Cesium.Viewer) {
     this.loadDefaults();
@@ -156,6 +157,7 @@ export class LayerManager {
     PORTAL_LEVELS.forEach(l => this.filterState.set(`level-${l}`, true));
     this.filterState.set("portals-placeholder", true);
     this.filterState.set("portals-label", true);
+    this.filterState.set("portals-ornament", true);
     this.filterState.set("portals", true);
     this.filterState.set("links", true);
     this.filterState.set("fields", true);
@@ -227,6 +229,7 @@ export class LayerManager {
         PORTAL_LEVELS.forEach(l => this.filterState.set(`level-${l}`, enabled));
         this.filterState.set("portals-placeholder", enabled);
         this.filterState.set("portals-label", enabled);
+        this.filterState.set("portals-ornament", enabled);
       }
       if (enabled && MUTUALLY_EXCLUSIVE_HISTORY_FILTERS.includes(type)) {
         MUTUALLY_EXCLUSIVE_HISTORY_FILTERS.forEach(filter => this.filterState.set(filter, false));
@@ -245,7 +248,8 @@ export class LayerManager {
         const allLevels = PORTAL_LEVELS.every(l => this.filterState.get(`level-${l}`) !== false);
         const placeholder = this.filterState.get("portals-placeholder") !== false;
         const label = this.filterState.get("portals-label") !== false;
-        return allLevels && placeholder && label;
+        const ornament = this.filterState.get("portals-ornament") !== false;
+        return allLevels && placeholder && label && ornament;
       }
       return this.filterState.get(type) !== false;
     } else {
@@ -259,6 +263,7 @@ export class LayerManager {
         const states = PORTAL_LEVELS.map(l => this.filterState.get(`level-${l}`) !== false);
         states.push(this.filterState.get("portals-placeholder") !== false);
         states.push(this.filterState.get("portals-label") !== false);
+        states.push(this.filterState.get("portals-ornament") !== false);
         const visibleCount = states.filter(v => v).length;
         return visibleCount > 0 && visibleCount < states.length;
       }
@@ -278,7 +283,7 @@ export class LayerManager {
       source = new Cesium.CustomDataSource(name);
       source.show = this.getLayerVisibility(name);
       source.entities.collectionChanged.addEventListener(() => {
-        if (!this.viewer.isDestroyed()) this.viewer.scene.requestRender();
+        this.requestRender();
       });
 
       // Ensure overlay layers are always on top
@@ -320,16 +325,35 @@ export class LayerManager {
   }
 
   private setLayerVisibility(name: string, visible: boolean): void {
+    const previousVisible = this.layerVisibility.get(name);
     this.layerVisibility.set(name, visible);
+
     const dataSource = this.dataSources.get(name);
     if (dataSource) dataSource.show = visible;
+
     const pluginLayer = this.overlayLayers.get(name);
     if (pluginLayer) pluginLayer.setVisible(visible);
-    this.viewer.scene.requestRender();
+
+    if (previousVisible !== visible) this.requestRender();
   }
 
   private getLayerVisibility(name: string): boolean {
     return this.layerVisibility.get(name) !== false;
+  }
+
+  private requestRender(): void {
+    if (this.viewer.isDestroyed()) return;
+    if (this.pendingRenderFrame !== null) return;
+
+    // Coalesce filter changes so one checkbox toggle only updates Cesium's data source display once.
+    this.pendingRenderFrame = requestAnimationFrame(() => {
+      this.pendingRenderFrame = null;
+      if (this.viewer.isDestroyed()) return;
+
+      // Force visualizers to consume data source show changes before request-render mode draws.
+      this.viewer.dataSourceDisplay.update(this.viewer.clock.currentTime);
+      this.viewer.scene.requestRender();
+    });
   }
 
   private isBuiltInFilter(filterName: string): boolean {
@@ -366,6 +390,10 @@ export class LayerManager {
       // Portal labels
       const portalLabelsVisible = this.filterState.get("portals-label") !== false;
       this.setLayerVisibility(`portals-label-${t}`, teamVisible && portalLabelsVisible);
+
+      // Portal Ornaments
+      const portalOrnamentsVisible = this.filterState.get("portals-ornament") !== false;
+      this.setLayerVisibility(`portals-ornament-${t}`, teamVisible && portalOrnamentsVisible);
 
       // Placeholders
       const placeholdersVisible = this.filterState.get("portals-placeholder") !== false;

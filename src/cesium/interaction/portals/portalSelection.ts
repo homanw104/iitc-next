@@ -4,6 +4,8 @@
 
 import * as Cesium from "cesium";
 import type { PortalEntityManager } from "../../../managers/portalEntityManager";
+import type { PortalLabelEntityManager } from "../../../managers/portalLabelEntityManager.ts";
+import type { PortalOrnamentEntityManager } from "../../../managers/portalOrnamentEntityManager.ts";
 import type { PortalHistoryEntityManager } from "../../../managers/portalHistoryEntityManager";
 import type { ScoutHistoryEntityManager } from "../../../managers/scoutHistoryEntityManager";
 import type { PortalDetailPaneController } from "../../../controllers/PortalDetailPaneController.tsx";
@@ -27,6 +29,8 @@ interface HandlePortalSelectionOptions {
   container: HTMLElement;
   portalDetailPaneController: PortalDetailPaneController;
   portalEntityManager: PortalEntityManager;
+  portalLabelEntityManager: PortalLabelEntityManager;
+  portalOrnamentEntityManager: PortalOrnamentEntityManager;
   portalHistoryEntityManager: PortalHistoryEntityManager;
   scoutHistoryEntityManager: ScoutHistoryEntityManager;
   interfaceState: PortalDetailState;
@@ -49,6 +53,8 @@ export function handlePortalSelection({
   container,
   portalDetailPaneController,
   portalEntityManager,
+  portalLabelEntityManager,
+  portalOrnamentEntityManager,
   portalHistoryEntityManager,
   scoutHistoryEntityManager,
   interfaceState,
@@ -103,6 +109,8 @@ export function handlePortalSelection({
           interfaceState.portalDetailBar?.remove();
           interfaceState.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailPaneController: portalDetailPaneController, data: freshData }));
           portalDetailPaneController.updateDetailPane(freshData);
+          portalLabelEntityManager.addOrUpdateLabel(freshData);
+          portalOrnamentEntityManager.addOrUpdateOrnament(freshData);
           portalHistoryEntityManager.addOrUpdateHistoryHalo(freshData);
           scoutHistoryEntityManager.addOrUpdateScoutControlHalo(freshData);
         }

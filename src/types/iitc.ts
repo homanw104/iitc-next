@@ -18,6 +18,7 @@ import { ScoreManager } from "../managers/scoreManager";
 import { RedeemManager } from "../managers/redeemManager";
 import { CommManager } from "../managers/commManager";
 import { InterfaceManager } from "../managers/interfaceManager";
+import { PortalOrnamentEntityManager } from "../managers/portalOrnamentEntityManager.ts";
 
 export interface IITCPlugin {
   id: string;
@@ -37,6 +38,7 @@ export interface IITCCore {
   linkEntityManager?: LinkEntityManager;
   fieldEntityManager?: FieldEntityManager;
   portalLabelEntityManager?: PortalLabelEntityManager;
+  portalOrnamentEntityManager?: PortalOrnamentEntityManager;
   portalHistoryEntityManager?: PortalHistoryEntityManager;
   scoutHistoryEntityManager?: ScoutHistoryEntityManager;
   tileRequestManager?: TileRequestManager;
