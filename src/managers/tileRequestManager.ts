@@ -21,7 +21,7 @@ import { setCookie } from "../utils/browser";
 export const HEIGHT_AT_ZOOM_ZERO = 96000000;
 
 // Default tile limit to load
-const MAX_TILES_TO_LOAD = 2000;
+const MAX_TILES_TO_LOAD = 1800;
 
 /**
  * Defines the number of tiles per edge to zoom into at each level of detail.
@@ -335,7 +335,7 @@ export class TileRequestManager {
     }
 
     if (this.queuedTiles.size === 0) {
-      logManager.info("TileRequestManager", "Tiles loaded");
+      logManager.info("TileRequestManager", "Loaded all tiles");
       this.resolveIdleWaiters();
       return;
     }

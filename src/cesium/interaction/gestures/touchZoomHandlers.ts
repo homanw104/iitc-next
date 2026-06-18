@@ -5,6 +5,11 @@
 import * as Cesium from "cesium";
 import type { InteractionGestureState } from "../state/interactionGestureState";
 
+const DRAG_THRESHOLD_PIXELS = 8;
+const DOUBLE_TAP_AND_DRAG_ZOOM_THRESHOLD_PIXELS = 4;
+const ZOOM_VELOCITY_FRICTION_FACTOR = 0.84;
+const RESET_INERTIA_TIMEOUT_MS = 1500;
+
 interface TouchZoomHandlers {
   handleTouchStart: (event: Cesium.ScreenSpaceEventHandler.PositionedEvent) => void;
   handleDrag: (event: Cesium.ScreenSpaceEventHandler.MotionEvent) => void;
@@ -71,7 +76,7 @@ export function createTouchZoomHandlers(
     const movement = Math.sqrt(dx * dx + dy * dy);
     totalMovementLength += movement;
 
-    if (totalMovementLength > 4) gestureState.hasJustMoved = true;
+    if (totalMovementLength > DRAG_THRESHOLD_PIXELS) gestureState.hasJustMoved = true;
     if (revertHasJustMovedTimeoutId) {
       clearTimeout(revertHasJustMovedTimeoutId);
       revertHasJustMovedTimeoutId = null;
@@ -79,7 +84,7 @@ export function createTouchZoomHandlers(
     revertHasJustMovedTimeoutId = setTimeout(() => gestureState.hasJustMoved = false, doubleTapThreshold);
 
     if (isDuringTheSecondTap) {
-      if (totalMovementLength > 4) hasMovedDuringTheSecondTap = true;
+      if (totalMovementLength > DOUBLE_TAP_AND_DRAG_ZOOM_THRESHOLD_PIXELS) hasMovedDuringTheSecondTap = true;
 
       viewer.scene.screenSpaceCameraController.inertiaSpin = 0.0;
       viewer.scene.screenSpaceCameraController.inertiaTranslate = 0.0;
@@ -135,7 +140,7 @@ export function createTouchZoomHandlers(
           const zoomFactor = height * 0.003;
           viewer.camera.zoomIn(dy * zoomFactor);
 
-          zoomVelocity *= 0.84;
+          zoomVelocity *= ZOOM_VELOCITY_FRICTION_FACTOR;
 
           gestureState.momentumRequestId = requestAnimationFrame(animateMomentum);
         };
@@ -151,7 +156,7 @@ export function createTouchZoomHandlers(
       viewer.scene.screenSpaceCameraController.inertiaSpin = 0.9;
       viewer.scene.screenSpaceCameraController.inertiaTranslate = 0.9;
       inertiaResetTimeoutId = null;
-    }, 1500);
+    }, RESET_INERTIA_TIMEOUT_MS);
   };
 
   return {
