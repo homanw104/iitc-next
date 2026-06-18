@@ -11,16 +11,21 @@ const LOG_TAG = "EntityPositionManager";
 // Raise the portal up the 3D tiles a bit
 const GOOGLE_GROUND_TERRAIN_COMPENSATION_METER = 1;
 
+// Inexpensive baseline terrain height before the heavier Google 3D scene-height samples.
+const GOOGLE_WORLD_TERRAIN_SAMPLE_LEVEL = 11;
+const GOOGLE_WORLD_TERRAIN_SAMPLE_BATCH_SIZE = 1024;
+const GOOGLE_WORLD_TERRAIN_BATCH_DELAY_MS = 10;
+
 // Quick height sampling from currently rendered Google 3D Tiles.
 const GOOGLE_RENDERED_SAMPLE_BATCH_SIZE = 256;
 const GOOGLE_RENDERED_SAMPLE_BATCH_DELAY_MS = 50;
 
 // Slower Google 3D Tiles sampling that resolves the best available height and is cached.
-const GOOGLE_MOST_DETAILED_SAMPLE_DELAY_MS = 1500;
+const GOOGLE_MOST_DETAILED_SAMPLE_DELAY_MS = 1000;
 const GOOGLE_MOST_DETAILED_SAMPLE_BATCH_SIZE = 64;
 
-// Three levels of height sampling from the least detailed (cheapest) to the most detailed (resource-intensive)
-type HeightQuality = "ellipsoid" | "rendered" | "mostDetailed";
+// Height quality progresses from the synchronous placeholder to final cached height.
+type HeightQuality = "ellipsoid" | "worldTerrain" | "rendered" | "mostDetailed";
 
 export interface EntityCoordinates {
   latE6: number;
@@ -36,13 +41,14 @@ interface EntityPositionEntry extends EntityCoordinates {
 }
 
 export class EntityPositionManager {
-  private readonly positionEntriesByKey = new Map<string, EntityPositionEntry>();
   private readonly useGoogle3dTiles = settingsManager.getUseGoogle3dTiles();
-  // Tracks only positions that can still improve; idle tile events can skip the full cache once this is empty.
+  private readonly positionEntriesByKey = new Map<string, EntityPositionEntry>();
   private readonly refreshableHeightKeys = new Set<string>();
+  private readonly worldTerrainQueuedKeys = new Set<string>();
   private readonly renderedHeightQueuedKeys = new Set<string>();
   private readonly mostDetailedHeightQueuedKeys = new Set<string>();
   private callbacks: EntityPositionCallback[] = [];
+  private worldTerrainSamplingScheduled = false;
   private renderedHeightSamplingScheduled = false;
   private renderedHeightSamplingTimeout: number | undefined;
   private mostDetailedHeightSamplingInProgress = false;
@@ -50,14 +56,21 @@ export class EntityPositionManager {
   private mostDetailedHeightSamplingTimeout: number | undefined;
   private cameraMoving = false;
   private heightSamplingGeneration = 0;
+  private readonly worldTerrainProviderPromise: Promise<Cesium.TerrainProvider | undefined> | undefined;
 
   constructor(private readonly viewer: Cesium.Viewer) {
     if (!this.useGoogle3dTiles) return;
+
+    this.worldTerrainProviderPromise = Cesium.createWorldTerrainAsync()
+      .catch(() => {
+        return undefined;
+      });
 
     viewer.camera.moveStart.addEventListener(() => {
       this.cameraMoving = true;
       // Any pending scene-height work was based on the old view; ignore it and restart after moveEnd.
       this.heightSamplingGeneration++;
+      this.worldTerrainQueuedKeys.clear();
       this.renderedHeightQueuedKeys.clear();
       this.mostDetailedHeightQueuedKeys.clear();
       this.clearRenderedHeightSamplingTimeout();
@@ -66,6 +79,7 @@ export class EntityPositionManager {
 
     viewer.camera.moveEnd.addEventListener(() => {
       this.cameraMoving = false;
+      this.scheduleWorldTerrainSampling();
       this.scheduleRenderedHeightSampling();
       this.scheduleMostDetailedHeightSampling();
     });
@@ -119,6 +133,7 @@ export class EntityPositionManager {
   public invalidateTerrainPositions(): void {
     this.heightSamplingGeneration++;
     this.refreshableHeightKeys.clear();
+    this.worldTerrainQueuedKeys.clear();
     this.renderedHeightQueuedKeys.clear();
     this.clearRenderedHeightSamplingTimeout();
     this.clearMostDetailedHeightSamplingTimeout();
@@ -142,6 +157,24 @@ export class EntityPositionManager {
 
     // The generation prevents stale async samples from overwriting newer height results.
     entry.heightSamplingVersion = this.heightSamplingGeneration;
+    if (this.useGoogle3dTiles && entry.heightQuality === "ellipsoid") {
+      this.worldTerrainQueuedKeys.add(getEntityPositionKey(entry.latE6, entry.lngE6));
+      this.scheduleWorldTerrainSampling();
+      return;
+    }
+
+    this.queueGoogleRenderedHeightSampling(entry);
+  }
+
+  private scheduleWorldTerrainSampling(): void {
+    if (this.worldTerrainSamplingScheduled) return;
+    if (this.useGoogle3dTiles && this.cameraMoving) return;
+
+    this.worldTerrainSamplingScheduled = true;
+    window.setTimeout(() => this.flushWorldTerrainQueue(), GOOGLE_WORLD_TERRAIN_BATCH_DELAY_MS);
+  }
+
+  private queueGoogleRenderedHeightSampling(entry: EntityPositionEntry): void {
     this.renderedHeightQueuedKeys.add(getEntityPositionKey(entry.latE6, entry.lngE6));
     this.scheduleRenderedHeightSampling();
   }
@@ -186,7 +219,6 @@ export class EntityPositionManager {
     const cartographics = entries.map((entry) => Cesium.Cartographic.fromDegrees(entry.lngE6 / 1e6, entry.latE6 / 1e6));
 
     if (this.useGoogle3dTiles) {
-      // Google 3D heights are sampled in two stages: quick rendered tiles now, detailed tiles later.
       this.sampleGoogleRenderedHeights(entries, cartographics, batchHeightSamplingGeneration);
       if (this.renderedHeightQueuedKeys.size > 0) {
         this.scheduleRenderedHeightSampling(GOOGLE_RENDERED_SAMPLE_BATCH_DELAY_MS);
@@ -211,6 +243,61 @@ export class EntityPositionManager {
       .catch(() => {
         logManager.warn(LOG_TAG, "Terrain height failed");
         entries.forEach((entry, index) => this.updateFromRenderedTerrain(entry, cartographics[index], batchHeightSamplingGeneration));
+      });
+  }
+
+  private flushWorldTerrainQueue(): void {
+    this.worldTerrainSamplingScheduled = false;
+
+    const keys = takeRenderedHeightBatch(this.worldTerrainQueuedKeys, GOOGLE_WORLD_TERRAIN_SAMPLE_BATCH_SIZE);
+    if (keys.length === 0) return;
+
+    const batchHeightSamplingGeneration = this.heightSamplingGeneration;
+    const entries = keys
+      .map((key) => this.positionEntriesByKey.get(key))
+      .filter((entry): entry is EntityPositionEntry => !!entry && entry.heightSamplingVersion === batchHeightSamplingGeneration);
+    if (entries.length === 0) {
+      if (this.worldTerrainQueuedKeys.size > 0) this.scheduleWorldTerrainSampling();
+      return;
+    }
+
+    const cartographics = entries.map((entry) => Cesium.Cartographic.fromDegrees(entry.lngE6 / 1e6, entry.latE6 / 1e6));
+    this.sampleGoogleWorldTerrainHeights(entries, cartographics, batchHeightSamplingGeneration);
+    if (this.worldTerrainQueuedKeys.size > 0) this.scheduleWorldTerrainSampling();
+  }
+
+  private sampleGoogleWorldTerrainHeights(entries: EntityPositionEntry[], cartographics: Cesium.Cartographic[], batchHeightSamplingGeneration: number): void {
+    if (batchHeightSamplingGeneration !== this.heightSamplingGeneration) return;
+
+    const worldTerrainProviderPromise = this.worldTerrainProviderPromise;
+    if (!worldTerrainProviderPromise) {
+      entries.forEach((entry) => this.queueGoogleRenderedHeightSampling(entry));
+      return;
+    }
+
+    worldTerrainProviderPromise
+      .then((terrainProvider) => {
+        if (!terrainProvider) return undefined;
+        return Cesium.sampleTerrain(terrainProvider, GOOGLE_WORLD_TERRAIN_SAMPLE_LEVEL, cartographics);
+      })
+      .then((sampledPositions) => {
+        if (batchHeightSamplingGeneration !== this.heightSamplingGeneration) return;
+
+        sampledPositions?.forEach((sampled, index) => {
+          if (sampled.height === undefined) return;
+
+          this.updateEntry(entries[index], getTerrainPosition(
+            sampled.longitude,
+            sampled.latitude,
+            sampled.height,
+          ), "worldTerrain");
+        });
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (batchHeightSamplingGeneration !== this.heightSamplingGeneration) return;
+
+        entries.forEach((entry) => this.queueGoogleRenderedHeightSampling(entry));
       });
   }
 

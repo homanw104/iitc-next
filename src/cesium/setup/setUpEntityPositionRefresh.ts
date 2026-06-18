@@ -5,7 +5,7 @@
 import * as Cesium from "cesium";
 import type { EntityPositionManager } from "../../managers/entityPositionManager";
 
-const CAMERA_IDLE_REFRESH_DELAY_MS = 500;
+const CAMERA_IDLE_REFRESH_DELAY_MS = 200;
 
 export function setUpEntityPositionRefresh(
   viewer: Cesium.Viewer,
