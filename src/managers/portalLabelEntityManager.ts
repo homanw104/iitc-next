@@ -5,25 +5,21 @@
 import * as Cesium from "cesium";
 import { PortalData } from "../types/ingress";
 import { LayerManager } from "./layerManager";
-import { EntityPositionManager } from "./entityPositionManager";
+import { EntityPositionCallback, EntityPositionManager } from "./entityPositionManager";
 import { PORTAL_DISABLE_DEPTH_TEST_DISTANCE, PORTAL_OCCLUDED_ALPHA } from "./portalEntityManager.ts";
 
 const LABEL_FONT = "12px sans-serif";
 const LABEL_PIXEL_OFFSET_Y = -12;
 const LABEL_MAX_LINE_LENGTH = 24;
 export class PortalLabelEntityManager {
-  private labels: Map<string, { data: PortalData; entity: Cesium.Entity; occlusionEntity: Cesium.Entity }> = new Map();
+  private labels: Map<string, {
+    data: PortalData;
+    entity: Cesium.Entity;
+    occlusionEntity: Cesium.Entity;
+    positionCallback: EntityPositionCallback;
+  }> = new Map();
 
-  constructor(private layerManager: LayerManager, private entityPositionManager: EntityPositionManager) {
-    this.entityPositionManager.setOnPositionChangedCallback((latE6, lngE6, position) => {
-      this.labels.forEach(({ data, entity, occlusionEntity }) => {
-        if (data.latE6 === latE6 && data.lngE6 === lngE6) {
-          entity.position = new Cesium.ConstantPositionProperty(position);
-          occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
-        }
-      });
-    });
-  }
+  constructor(private layerManager: LayerManager, private entityPositionManager: EntityPositionManager) {}
 
   public addOrUpdateLabel(data: PortalData): void {
     if (!data.title) {
@@ -41,13 +37,19 @@ export class PortalLabelEntityManager {
         this.layerManager.getOrCreateDataSourceLayer(newLayerId).entities.add(existing.occlusionEntity);
         this.layerManager.getOrCreateDataSourceLayer(newLayerId).entities.add(existing.entity);
       }
+      this.updateLabelPositionSubscription(existing, data);
       this.updateLabelEntity(existing.entity, existing.occlusionEntity, data);
       existing.data = data;
       return;
     }
 
     const { entity, occlusionEntity } = this.createLabelEntities(data);
-    this.labels.set(data.guid, { data, entity, occlusionEntity });
+    const positionCallback: EntityPositionCallback = (_latE6, _lngE6, position) => {
+      entity.position = new Cesium.ConstantPositionProperty(position);
+      occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
+    };
+    this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, positionCallback);
+    this.labels.set(data.guid, { data, entity, occlusionEntity, positionCallback });
   }
 
   public removeLabel(guid: string): void {
@@ -127,6 +129,7 @@ export class PortalLabelEntityManager {
     const layerId = getPortalLabelLayerId(labelInfo.data);
     this.layerManager.getOrCreateDataSourceLayer(layerId).entities.remove(labelInfo.entity);
     this.layerManager.getOrCreateDataSourceLayer(layerId).entities.remove(labelInfo.occlusionEntity);
+    this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(labelInfo.data, labelInfo.positionCallback);
     this.labels.delete(guid);
   }
 
@@ -146,6 +149,16 @@ export class PortalLabelEntityManager {
       occlusionEntity.label.heightReference = new Cesium.ConstantProperty(Cesium.HeightReference.NONE);
       occlusionEntity.label.disableDepthTestDistance = new Cesium.ConstantProperty(PORTAL_DISABLE_DEPTH_TEST_DISTANCE);
     }
+  }
+
+  private updateLabelPositionSubscription(labelInfo: {
+    data: PortalData;
+    positionCallback: EntityPositionCallback;
+  }, data: PortalData): void {
+    if (labelInfo.data.latE6 === data.latE6 && labelInfo.data.lngE6 === data.lngE6) return;
+
+    this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(labelInfo.data, labelInfo.positionCallback);
+    this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, labelInfo.positionCallback);
   }
 }
 

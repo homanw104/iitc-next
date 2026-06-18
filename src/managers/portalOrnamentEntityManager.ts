@@ -1,7 +1,7 @@
 import * as Cesium from "cesium";
 import { PortalData } from "../types/ingress.ts";
 import { LayerManager } from "./layerManager.ts";
-import { EntityPositionManager } from "./entityPositionManager.ts";
+import { EntityPositionCallback, EntityPositionManager } from "./entityPositionManager.ts";
 import { PORTAL_DISABLE_DEPTH_TEST_DISTANCE, PORTAL_OCCLUDED_ALPHA } from "./portalEntityManager.ts";
 
 const AP1_ORNAMENT_SIZE = 16;
@@ -11,18 +11,14 @@ const CANVAS_DIMENSION = AP1_ORNAMENT_SIZE * 2;
 const ornamentImageCache = new Map<string, HTMLCanvasElement>();
 
 export class PortalOrnamentEntityManager {
-  private ornaments: Map<string, { data: PortalData; entity: Cesium.Entity; occlusionEntity: Cesium.Entity }> = new Map();
+  private ornaments: Map<string, {
+    data: PortalData;
+    entity: Cesium.Entity;
+    occlusionEntity: Cesium.Entity;
+    positionCallback: EntityPositionCallback;
+  }> = new Map();
 
-  constructor(private layerManager: LayerManager, private entityPositionManager: EntityPositionManager) {
-    this.entityPositionManager.setOnPositionChangedCallback((latE6, lngE6, position) => {
-      this.ornaments.forEach(({ data, entity, occlusionEntity }) => {
-        if (data.latE6 === latE6 && data.lngE6 === lngE6) {
-          entity.position = new Cesium.ConstantPositionProperty(position);
-          occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
-        }
-      });
-    });
-  }
+  constructor(private layerManager: LayerManager, private entityPositionManager: EntityPositionManager) {}
 
   public addOrUpdateOrnament(data: PortalData): void {
     if (!data.ornaments?.length) {
@@ -40,13 +36,19 @@ export class PortalOrnamentEntityManager {
         this.layerManager.getOrCreateDataSourceLayer(newLayerId).entities.add(existing.occlusionEntity);
         this.layerManager.getOrCreateDataSourceLayer(newLayerId).entities.add(existing.entity);
       }
+      this.updateOrnamentPositionSubscription(existing, data);
       this.updateOrnamentEntity(existing.entity, existing.occlusionEntity, data);
       existing.data = data;
       return;
     }
 
     const { entity, occlusionEntity } = this.createOrnamentEntities(data);
-    this.ornaments.set(data.guid, { data, entity, occlusionEntity });
+    const positionCallback: EntityPositionCallback = (_latE6, _lngE6, position) => {
+      entity.position = new Cesium.ConstantPositionProperty(position);
+      occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
+    };
+    this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, positionCallback);
+    this.ornaments.set(data.guid, { data, entity, occlusionEntity, positionCallback });
   }
 
   public removeOrnament(guid: string): void {
@@ -124,7 +126,18 @@ export class PortalOrnamentEntityManager {
     const layerId = getPortalOrnamentLayerId(ornamentInfo.data);
     this.layerManager.getOrCreateDataSourceLayer(layerId).entities.remove(ornamentInfo.entity);
     this.layerManager.getOrCreateDataSourceLayer(layerId).entities.remove(ornamentInfo.occlusionEntity);
+    this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(ornamentInfo.data, ornamentInfo.positionCallback);
     this.ornaments.delete(guid);
+  }
+
+  private updateOrnamentPositionSubscription(ornamentInfo: {
+    data: PortalData;
+    positionCallback: EntityPositionCallback;
+  }, data: PortalData): void {
+    if (ornamentInfo.data.latE6 === data.latE6 && ornamentInfo.data.lngE6 === data.lngE6) return;
+
+    this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(ornamentInfo.data, ornamentInfo.positionCallback);
+    this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, ornamentInfo.positionCallback);
   }
 }
 

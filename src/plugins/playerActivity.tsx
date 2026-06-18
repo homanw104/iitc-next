@@ -11,7 +11,8 @@ import { h } from "../utils/dom.ts";
 import { IITCCore } from "../types/iitc";
 import { safeWindow } from "../utils/window";
 import { getTeamColor } from "../utils/color";
-import { PlextMark } from "../managers/commManager";
+import type { PlextMark } from "../managers/commManager";
+import type { EntityCoordinates, EntityPositionCallback } from "../managers/entityPositionManager";
 import "../types/iitc.ts";
 
 type Team = "ENLIGHTENED" | "RESISTANCE" | "MACHINA" | "NEUTRAL";
@@ -53,8 +54,11 @@ class PlayerActivityPlugin {
   private dataSourceRes: Cesium.CustomDataSource = new Cesium.CustomDataSource("player-activity-res");
   private playerLocations: Map<string, Cesium.Entity> = new Map();
   private playerPaths: Map<string, Cesium.Entity> = new Map();
+  private playerPositionSubscriptions: Map<string, {
+    coordinates: EntityCoordinates;
+    callback: EntityPositionCallback;
+  }> = new Map();
   private onReceiveCommMsgCallback: () => void = () => {};
-  private onEntityPositionChangedCallback: (latE6: number, lngE6: number, position: Cesium.Cartesian3) => void = () => {};
 
   private tooltipEl: HTMLElement | null = null;
   private hoverHandler: Cesium.ScreenSpaceEventHandler | undefined;
@@ -95,18 +99,17 @@ class PlayerActivityPlugin {
 
     this.onReceiveCommMsgCallback = () => this.updatePlayerActivity();
     this.commManager.setOnReceiveMsgCallback(this.onReceiveCommMsgCallback);
-    this.onEntityPositionChangedCallback = (latE6, lngE6, position) => this.updatePlayerActivityEntityPosition(latE6, lngE6, position);
-    this.entityPositionManager.setOnPositionChangedCallback(this.onEntityPositionChangedCallback);
     this.updatePlayerActivity();
   }
 
   public deinit() {
+    this.unsetPlayerPositionSubscriptions();
     this.commManager?.unsetOnReceiveMsgCallback(this.onReceiveCommMsgCallback);
-    this.entityPositionManager?.unsetOnPositionChangedCallback(this.onEntityPositionChangedCallback);
     this.layerManager?.removeOverlayLayer("Player Activity Enl");
     this.layerManager?.removeOverlayLayer("Player Activity Res");
     this.playerLocations.clear();
     this.playerPaths.clear();
+    this.playerPositionSubscriptions.clear();
     this.unsetHoverAction();
     this.unsetTooltipElement();
   }
@@ -345,17 +348,6 @@ class PlayerActivityPlugin {
     this.viewer?.scene.requestRender();
   }
 
-  private updatePlayerActivityEntityPosition(latE6: number, lngE6: number, position: Cesium.Cartesian3): void {
-    this.playerLocations.forEach((entity) => {
-      const activities: PlayerActivity[] | undefined = entity.properties?.activities?.getValue();
-      const lastActivity = this.getLatestActivity(activities);
-      if (lastActivity?.latE6 === latE6 && lastActivity?.lngE6 === lngE6) {
-        entity.position = new Cesium.ConstantPositionProperty(position);
-      }
-    });
-    this.viewer?.scene.requestRender();
-  }
-
   private renderPlayerLocations(playerActivities: Map<string, PlayerActivity[]>): void {
     playerActivities.forEach((activities, playerName) => {
       const lastActivity = this.getLatestActivity(activities);
@@ -414,7 +406,37 @@ class PlayerActivityPlugin {
           entity.properties?.activities.setValue(activities as PlayerActivity[]);
         }
       }
+      this.updatePlayerPositionSubscription(playerName, lastActivity, entity);
       this.playerLocations.set(playerName, entity);
+    });
+  }
+
+  private updatePlayerPositionSubscription(playerName: string, coordinates: EntityCoordinates, entity: Cesium.Entity): void {
+    const existing = this.playerPositionSubscriptions.get(playerName);
+    if (existing?.coordinates.latE6 === coordinates.latE6 && existing.coordinates.lngE6 === coordinates.lngE6) return;
+
+    if (existing) {
+      this.entityPositionManager?.unsetOnCoordinatePositionChangedCallback(existing.coordinates, existing.callback);
+    }
+
+    const callback: EntityPositionCallback = (_latE6, _lngE6, position) => {
+      entity.position = new Cesium.ConstantPositionProperty(position);
+      this.viewer?.scene.requestRender();
+    };
+    const subscriptionCoordinates = {
+      latE6: coordinates.latE6,
+      lngE6: coordinates.lngE6,
+    };
+    this.entityPositionManager?.setOnCoordinatePositionChangedCallback(subscriptionCoordinates, callback);
+    this.playerPositionSubscriptions.set(playerName, {
+      coordinates: subscriptionCoordinates,
+      callback,
+    });
+  }
+
+  private unsetPlayerPositionSubscriptions(): void {
+    this.playerPositionSubscriptions.forEach(({ coordinates, callback }) => {
+      this.entityPositionManager?.unsetOnCoordinatePositionChangedCallback(coordinates, callback);
     });
   }
 

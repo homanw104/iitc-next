@@ -5,11 +5,12 @@
 import * as Cesium from "cesium";
 import { PortalData } from "../types/ingress";
 import { LayerManager } from "./layerManager";
-import { EntityPositionManager } from "./entityPositionManager";
+import { EntityPositionCallback, EntityPositionManager } from "./entityPositionManager";
 import { PORTAL_DISABLE_DEPTH_TEST_DISTANCE, PORTAL_OCCLUDED_ALPHA } from "./portalEntityManager.ts";
 
 interface HistoryHaloInfo {
   data: PortalData;
+  positionCallback: EntityPositionCallback;
   entity?: Cesium.Entity;
   occlusionEntity?: Cesium.Entity;
   reverseEntity?: Cesium.Entity;
@@ -19,22 +20,12 @@ interface HistoryHaloInfo {
 export class PortalHistoryEntityManager {
   private historyHalos: Map<string, HistoryHaloInfo> = new Map();
 
-  constructor(private layerManager: LayerManager, private entityPositionManager: EntityPositionManager) {
-    this.entityPositionManager.setOnPositionChangedCallback((latE6, lngE6, position) => {
-      this.historyHalos.forEach(({ data, entity, occlusionEntity, reverseEntity, reverseOcclusionEntity }) => {
-        if (data.latE6 === latE6 && data.lngE6 === lngE6) {
-          if (entity) entity.position = new Cesium.ConstantPositionProperty(position);
-          if (occlusionEntity) occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
-          if (reverseEntity) reverseEntity.position = new Cesium.ConstantPositionProperty(position);
-          if (reverseOcclusionEntity) reverseOcclusionEntity.position = new Cesium.ConstantPositionProperty(position);
-        }
-      });
-    });
-  }
+  constructor(private layerManager: LayerManager, private entityPositionManager: EntityPositionManager) {}
 
   public addOrUpdateHistoryHalo(data: PortalData): void {
     const existing = this.historyHalos.get(data.guid);
     if (existing) {
+      this.updateHistoryHaloPositionSubscription(existing, data);
       if (data.history?.captured && data.history?.visited) {
         const color = Cesium.Color.fromCssColorString("#FF6060");
         this.removeHistoryHaloEntity(data.guid, true);
@@ -77,7 +68,15 @@ export class PortalHistoryEntityManager {
       return;
     }
 
-    const info: HistoryHaloInfo = { data };
+    const info: HistoryHaloInfo = {
+      data,
+      positionCallback: (_latE6, _lngE6, position) => {
+        if (info.entity) info.entity.position = new Cesium.ConstantPositionProperty(position);
+        if (info.occlusionEntity) info.occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
+        if (info.reverseEntity) info.reverseEntity.position = new Cesium.ConstantPositionProperty(position);
+        if (info.reverseOcclusionEntity) info.reverseOcclusionEntity.position = new Cesium.ConstantPositionProperty(position);
+      },
+    };
     if (data.history?.captured && data.history?.visited) {
       const entities = this.createHistoryHaloEntities(data, false, Cesium.Color.fromCssColorString("#FF6060"));
       info.entity = entities.entity;
@@ -95,12 +94,15 @@ export class PortalHistoryEntityManager {
       info.reverseEntity = reverseEntities.entity;
       info.reverseOcclusionEntity = reverseEntities.occlusionEntity;
     }
+    this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, info.positionCallback);
     this.historyHalos.set(data.guid, info);
   }
 
   public removeHistoryHalo(guid: string): void {
+    const info = this.historyHalos.get(guid);
     this.removeHistoryHaloEntity(guid, false);
     this.removeHistoryHaloEntity(guid, true);
+    if (info) this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(info.data, info.positionCallback);
     this.historyHalos.delete(guid);
   }
 
@@ -193,5 +195,12 @@ export class PortalHistoryEntityManager {
       }
     });
     toRemove.forEach(guid => this.removeHistoryHalo(guid));
+  }
+
+  private updateHistoryHaloPositionSubscription(info: HistoryHaloInfo, data: PortalData): void {
+    if (info.data.latE6 === data.latE6 && info.data.lngE6 === data.lngE6) return;
+
+    this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(info.data, info.positionCallback);
+    this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, info.positionCallback);
   }
 }

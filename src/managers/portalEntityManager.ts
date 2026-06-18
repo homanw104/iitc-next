@@ -4,10 +4,10 @@
 
 import * as Cesium from "cesium";
 import { PortalData, PortalLevel, PortalMod, PortalResonator, RawEntity } from "../types/ingress";
-import { getTeamColor } from "../utils/color";
 import { LayerManager } from "./layerManager";
+import { EntityPositionManager, EntityPositionCallback } from "./entityPositionManager";
+import { getTeamColor } from "../utils/color";
 import { apiRequest } from "../utils/network";
-import { EntityPositionManager } from "./entityPositionManager";
 
 export const PORTAL_DISABLE_DEPTH_TEST_DISTANCE = 2e4;
 export const PORTAL_OCCLUDED_ALPHA = 0.3;
@@ -44,18 +44,14 @@ export class PortalRequest {
 }
 
 export class PortalEntityManager {
-  private portals: Map<string, { data: PortalData; entity: Cesium.Entity; occlusionEntity: Cesium.Entity }> = new Map();
+  private portals: Map<string, {
+    data: PortalData;
+    entity: Cesium.Entity;
+    occlusionEntity: Cesium.Entity;
+    positionCallback: EntityPositionCallback;
+  }> = new Map();
 
-  constructor(private layerManager: LayerManager, private entityPositionManager: EntityPositionManager) {
-    this.entityPositionManager.setOnPositionChangedCallback((latE6, lngE6, position) => {
-      this.portals.forEach(({ data, entity, occlusionEntity }) => {
-        if (data.latE6 === latE6 && data.lngE6 === lngE6) {
-          entity.position = new Cesium.ConstantPositionProperty(position);
-          occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
-        }
-      });
-    });
-  }
+  constructor(private layerManager: LayerManager, private entityPositionManager: EntityPositionManager) {}
 
   public addOrUpdatePortal(data: PortalData): void {
     const existing = this.portals.get(data.guid);
@@ -74,6 +70,7 @@ export class PortalEntityManager {
           this.layerManager.getOrCreateDataSourceLayer(newLayerId).entities.add(existing.occlusionEntity);
           this.layerManager.getOrCreateDataSourceLayer(newLayerId).entities.add(existing.entity);
         }
+        this.updatePortalPositionSubscription(existing, data);
         this.updatePortalEntity(existing.entity, existing.occlusionEntity, data);
         existing.data = data;
       }
@@ -81,7 +78,12 @@ export class PortalEntityManager {
     }
 
     const { entity, occlusionEntity } = this.createPortalEntities(data);
-    this.portals.set(data.guid, { data, entity, occlusionEntity });
+    const positionCallback: EntityPositionCallback = (_latE6, _lngE6, position) => {
+      entity.position = new Cesium.ConstantPositionProperty(position);
+      occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
+    };
+    this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, positionCallback);
+    this.portals.set(data.guid, { data, entity, occlusionEntity, positionCallback });
   }
 
   public removePortalInView(viewRect: Cesium.Rectangle): void {
@@ -156,6 +158,7 @@ export class PortalEntityManager {
       const layerId = getPortalLayerId(portalInfo.data);
       this.layerManager.getOrCreateDataSourceLayer(layerId).entities.remove(portalInfo.entity);
       this.layerManager.getOrCreateDataSourceLayer(layerId).entities.remove(portalInfo.occlusionEntity);
+      this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(portalInfo.data, portalInfo.positionCallback);
       this.portals.delete(guid);
     }
   }
@@ -189,6 +192,16 @@ export class PortalEntityManager {
       occlusionEntity.point.heightReference = new Cesium.ConstantProperty(Cesium.HeightReference.NONE);
       occlusionEntity.point.disableDepthTestDistance = new Cesium.ConstantProperty(PORTAL_DISABLE_DEPTH_TEST_DISTANCE);
     }
+  }
+
+  private updatePortalPositionSubscription(portalInfo: {
+    data: PortalData;
+    positionCallback: EntityPositionCallback;
+  }, data: PortalData): void {
+    if (portalInfo.data.latE6 === data.latE6 && portalInfo.data.lngE6 === data.lngE6) return;
+
+    this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(portalInfo.data, portalInfo.positionCallback);
+    this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, portalInfo.positionCallback);
   }
 }
 

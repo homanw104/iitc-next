@@ -47,7 +47,7 @@ export class EntityPositionManager {
   private readonly worldTerrainQueuedKeys = new Set<string>();
   private readonly renderedHeightQueuedKeys = new Set<string>();
   private readonly mostDetailedHeightQueuedKeys = new Set<string>();
-  private callbacks: EntityPositionCallback[] = [];
+  private readonly callbacksByKey = new Map<string, Set<EntityPositionCallback>>();
   private worldTerrainSamplingScheduled = false;
   private renderedHeightSamplingScheduled = false;
   private renderedHeightSamplingTimeout: number | undefined;
@@ -104,12 +104,20 @@ export class EntityPositionManager {
     return entry.position;
   }
 
-  public setOnPositionChangedCallback(callback: EntityPositionCallback): void {
-    this.callbacks.push(callback);
+  public setOnCoordinatePositionChangedCallback(data: EntityCoordinates, callback: EntityPositionCallback): void {
+    const key = getEntityPositionKey(data.latE6, data.lngE6);
+    const callbacks = this.callbacksByKey.get(key) ?? new Set<EntityPositionCallback>();
+    callbacks.add(callback);
+    this.callbacksByKey.set(key, callbacks);
   }
 
-  public unsetOnPositionChangedCallback(callback: EntityPositionCallback): void {
-    this.callbacks = this.callbacks.filter(cb => cb !== callback);
+  public unsetOnCoordinatePositionChangedCallback(data: EntityCoordinates, callback: EntityPositionCallback): void {
+    const key = getEntityPositionKey(data.latE6, data.lngE6);
+    const callbacks = this.callbacksByKey.get(key);
+    if (!callbacks) return;
+
+    callbacks.delete(callback);
+    if (callbacks.size === 0) this.callbacksByKey.delete(key);
   }
 
   public refreshTerrainPositions(): void {
@@ -417,7 +425,7 @@ export class EntityPositionManager {
     if (Cesium.Cartesian3.equals(entry.position, position)) return;
 
     entry.position = position;
-    this.callbacks.forEach(callback => callback(entry.latE6, entry.lngE6, position));
+    this.callbacksByKey.get(key)?.forEach(callback => callback(entry.latE6, entry.lngE6, position));
     this.viewer.scene.requestRender();
   }
 
