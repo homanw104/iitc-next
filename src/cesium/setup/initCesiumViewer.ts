@@ -57,7 +57,7 @@ export function initCesiumViewer(container: string): Cesium.Viewer {
     navigationHelpButton: false,
     fullscreenButton: false,
     infoBox: false,
-    geocoder: useGoogle3dTiles ? Cesium.IonGeocodeProviderType.GOOGLE : false,
+    geocoder: useGoogle3dTiles ? Cesium.IonGeocodeProviderType.GOOGLE : undefined,
     requestRenderMode: true,
     maximumRenderTimeChange: Infinity,
   });
