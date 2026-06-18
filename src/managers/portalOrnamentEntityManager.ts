@@ -84,6 +84,7 @@ export class PortalOrnamentEntityManager {
         horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
         verticalOrigin: Cesium.VerticalOrigin.CENTER,
         scaleByDistance: new Cesium.NearFarScalar(1e1, 1.0, 2e4, 0.125),
+        translucencyByDistance: new Cesium.NearFarScalar(1e1, 1, 2e4, 0.125),
       },
     });
 
