@@ -6,6 +6,7 @@
 import * as Cesium from "cesium";
 import { TileStatus, getMapZoomTileParameters, tileToLat, tileToLng } from "./tileRequestManager";
 import { LayerManager } from "./layerManager";
+import { settingsManager } from "./settingsManager.ts";
 
 const DEBUG_TILE_CLASSIFICATION_TYPE = Cesium.ClassificationType.BOTH;
 
@@ -81,7 +82,7 @@ export class DebugTileEntityManager {
         ),
         fill: true,
         material: color.withAlpha(0.1),
-        outline: true,
+        outline: !settingsManager.getUseGoogle3dTiles(),
         outlineColor: color,
         outlineWidth: 2,
         classificationType: DEBUG_TILE_CLASSIFICATION_TYPE,
