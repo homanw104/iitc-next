@@ -192,12 +192,6 @@ export class PortalEntityManager {
   }
 }
 
-/**
- * Retrieves the portal layer ID based on the provided data.
- *
- * @param {PortalData} data - An object containing team, level, and isPlaceholder properties.
- * @returns {string} The generated portal layer ID.
- */
 function getPortalLayerId(data: PortalData): string {
   const team = data.team.toLowerCase();
   const level = data.level ?? 0;
@@ -207,13 +201,6 @@ function getPortalLayerId(data: PortalData): string {
   return `portals-l${level}-${team}`;
 }
 
-/**
- * Parses a raw entity into a PortalData object.
- *
- * @param ent - An array representing the raw entity, where the first element is the GUID,
- *              the second is the timestamp, and the third is an array of additional data.
- * @return A PortalData object containing the parsed information from the raw entity.
- */
 export function parsePortal(ent: RawEntity): PortalData {
   const [guid, timestamp, data] = ent;
   const teamCode = data[1] as string;

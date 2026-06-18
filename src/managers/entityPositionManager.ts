@@ -6,8 +6,7 @@ import * as Cesium from "cesium";
 import { logManager } from "./logManager";
 import { settingsManager } from "./settingsManager";
 
-const GOOGLE_GROUND_TERRAIN_SAMPLE_LEVEL = 11;
-const GOOGLE_GROUND_TERRAIN_COPENSATION_METER = 1;
+const GOOGLE_GROUND_TERRAIN_COMPENSATION_METER = 1;
 
 export interface EntityCoordinates {
   latE6: number;
@@ -28,8 +27,6 @@ export class EntityPositionManager {
   private callbacks: EntityPositionCallback[] = [];
   private samplingScheduled = false;
   private version = 0;
-
-  private static googleGroundTerrainProviderPromise: Promise<Cesium.TerrainProvider> | null = null;
 
   constructor(private readonly viewer: Cesium.Viewer) {}
 
@@ -119,22 +116,19 @@ export class EntityPositionManager {
   }
 
   private sampleGoogleGroundPositions(entries: EntityPositionEntry[], cartographics: Cesium.Cartographic[], requestVersion: number): void {
-    EntityPositionManager.getGoogleGroundTerrainProvider()
-      .then((terrainProvider) => Cesium.sampleTerrain(terrainProvider, GOOGLE_GROUND_TERRAIN_SAMPLE_LEVEL, cartographics))
-      .then((sampledPositions) => {
-        if (requestVersion !== this.version) return;
-        entries.forEach((entry, index) => {
-          const sampled = sampledPositions[index];
-          const height = GOOGLE_GROUND_TERRAIN_COPENSATION_METER + (sampled.height ?? 0);
-          this.updateEntry(entry, getTerrainPosition(sampled.longitude, sampled.latitude, height));
-        });
-      })
-      .catch((error) => {
-        logManager.warn("EntityPositionManager", "Failed to sample coarse ground height", error);
-        entries.forEach((entry, index) => {
-          this.updateEntry(entry, getTerrainPosition(cartographics[index].longitude, cartographics[index].latitude, 0));
-        });
-      });
+    if (requestVersion !== this.version) return;
+
+    entries.forEach((entry, index) => {
+      const cartographic = cartographics[index];
+      const height = sampleRenderedGoogleHeight(this.viewer.scene, cartographic);
+      if (height === undefined) return;
+
+      this.updateEntry(entry, getTerrainPosition(
+        cartographic.longitude,
+        cartographic.latitude,
+        height + GOOGLE_GROUND_TERRAIN_COMPENSATION_METER,
+      ));
+    });
   }
 
   private updateFromRenderedTerrain(entry: EntityPositionEntry, cartographic: Cesium.Cartographic, requestVersion: number): void {
@@ -151,19 +145,6 @@ export class EntityPositionManager {
     this.callbacks.forEach(callback => callback(entry.latE6, entry.lngE6, position));
     this.viewer.scene.requestRender();
   }
-
-  private static getGoogleGroundTerrainProvider(): Promise<Cesium.TerrainProvider> {
-    if (!this.googleGroundTerrainProviderPromise) {
-      this.googleGroundTerrainProviderPromise = Cesium.createWorldTerrainAsync({
-        requestVertexNormals: false,
-        requestWaterMask: false,
-      });
-      this.googleGroundTerrainProviderPromise.catch(() => {
-        this.googleGroundTerrainProviderPromise = null;
-      });
-    }
-    return this.googleGroundTerrainProviderPromise;
-  }
 }
 
 function getEntityPositionKey(latE6: number, lngE6: number): string {
@@ -176,4 +157,23 @@ function getEllipsoidPosition(latE6: number, lngE6: number): Cesium.Cartesian3 {
 
 function getTerrainPosition(longitude: number, latitude: number, height: number): Cesium.Cartesian3 {
   return Cesium.Cartesian3.fromRadians(longitude, latitude, height);
+}
+
+function sampleRenderedGoogleHeight(scene: Cesium.Scene, cartographic: Cesium.Cartographic): number | undefined {
+  if (scene.sampleHeightSupported) {
+    try {
+      return scene.sampleHeight(cartographic);
+    } catch (error) {
+      logManager.debug("EntityPositionManager", "Failed to sample rendered Google 3D Tiles height", error);
+    }
+  }
+
+  return getRenderedGoogleHeight(scene, cartographic);
+}
+
+function getRenderedGoogleHeight(scene: Cesium.Scene, cartographic: Cesium.Cartographic): number | undefined {
+  const sceneWithGetHeight = scene as Cesium.Scene & {
+    getHeight: (cartographic: Cesium.Cartographic, heightReference?: Cesium.HeightReference) => number | undefined;
+  };
+  return sceneWithGetHeight.getHeight(cartographic, Cesium.HeightReference.CLAMP_TO_3D_TILE);
 }
