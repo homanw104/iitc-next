@@ -11,14 +11,16 @@ export function setUpEntityPositionRefresh(
   viewer: Cesium.Viewer,
   entityPositionManager: EntityPositionManager,
 ): void {
-  let refreshPending = false;
+  let heightRefreshRequested = false;
+  let heightCacheResetRequested = false;
   let cameraMoving = false;
   let idleRefreshTimeout: number | undefined;
-  const watchedTilesets = new WeakSet<Cesium.Cesium3DTileset>();
+  const watchedHeightTilesets = new WeakSet<Cesium.Cesium3DTileset>();
 
-  const scheduleRefresh = () => {
-    refreshPending = true;
-    scheduleIdleRefresh();
+  const requestHeightRefresh = (resetHeightCache = false) => {
+    heightRefreshRequested = true;
+    heightCacheResetRequested = heightCacheResetRequested || resetHeightCache;
+    scheduleIdleHeightRefresh();
   };
 
   const clearIdleRefresh = () => {
@@ -28,13 +30,10 @@ export function setUpEntityPositionRefresh(
     idleRefreshTimeout = undefined;
   };
 
-  const scheduleIdleRefresh = () => {
+  const scheduleIdleHeightRefresh = () => {
     clearIdleRefresh();
 
-    if (cameraMoving) {
-      viewer.scene.requestRender();
-      return;
-    }
+    if (cameraMoving) return;
 
     idleRefreshTimeout = window.setTimeout(() => {
       idleRefreshTimeout = undefined;
@@ -43,10 +42,15 @@ export function setUpEntityPositionRefresh(
   };
 
   viewer.scene.postRender.addEventListener(() => {
-    if (!refreshPending || cameraMoving || idleRefreshTimeout !== undefined) return;
+    if (!heightRefreshRequested || cameraMoving || idleRefreshTimeout !== undefined) return;
 
-    refreshPending = false;
-    entityPositionManager.refreshTerrainPositions();
+    heightRefreshRequested = false;
+    if (heightCacheResetRequested) {
+      heightCacheResetRequested = false;
+      entityPositionManager.invalidateTerrainPositions();
+    } else {
+      entityPositionManager.refreshTerrainPositions();
+    }
     viewer.scene.requestRender();
   });
 
@@ -57,33 +61,33 @@ export function setUpEntityPositionRefresh(
 
   viewer.camera.moveEnd.addEventListener(() => {
     cameraMoving = false;
-    if (refreshPending) scheduleIdleRefresh();
+    if (heightRefreshRequested) scheduleIdleHeightRefresh();
   });
 
   viewer.scene.globe.terrainProviderChanged.addEventListener(() => {
-    scheduleRefresh();
+    requestHeightRefresh(true);
   });
 
   viewer.scene.globe.tileLoadProgressEvent.addEventListener((tilesLoading: number) => {
-    if (tilesLoading === 0) scheduleRefresh();
+    if (tilesLoading === 0) requestHeightRefresh();
   });
 
-  const watchTileset = (primitive: unknown) => {
-    if (!(primitive instanceof Cesium.Cesium3DTileset) || watchedTilesets.has(primitive)) return;
+  const watchHeightTileset = (primitive: unknown) => {
+    if (!(primitive instanceof Cesium.Cesium3DTileset) || watchedHeightTilesets.has(primitive)) return;
 
-    watchedTilesets.add(primitive);
-    scheduleRefresh();
+    watchedHeightTilesets.add(primitive);
+    requestHeightRefresh(true);
 
-    primitive.initialTilesLoaded.addEventListener(scheduleRefresh);
-    primitive.allTilesLoaded.addEventListener(scheduleRefresh);
+    primitive.initialTilesLoaded.addEventListener(() => requestHeightRefresh());
+    primitive.allTilesLoaded.addEventListener(() => requestHeightRefresh());
     primitive.loadProgress.addEventListener((pendingRequests: number, tilesProcessing: number) => {
-      if (pendingRequests === 0 && tilesProcessing === 0) scheduleRefresh();
+      if (pendingRequests === 0 && tilesProcessing === 0) requestHeightRefresh();
     });
   };
 
   for (let i = 0; i < viewer.scene.primitives.length; i++) {
-    watchTileset(viewer.scene.primitives.get(i));
+    watchHeightTileset(viewer.scene.primitives.get(i));
   }
 
-  viewer.scene.primitives.primitiveAdded.addEventListener(watchTileset);
+  viewer.scene.primitives.primitiveAdded.addEventListener(watchHeightTileset);
 }
