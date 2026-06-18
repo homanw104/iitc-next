@@ -13,4 +13,10 @@ export function configureCameraControls(viewer: Cesium.Viewer): void {
   controller.enableLook = true;
   controller.enableRotate = true;
   controller.zoomEventTypes = [Cesium.CameraEventType.WHEEL];
+
+  // Prefer ellipsoid-based drag handling even near the ground. Cesium's default
+  // near-ground terrain pick can fail during main-thread stalls, which makes it
+  // fall back to free-look in the middle of a normal left-drag pan.
+  controller.minimumPickingTerrainHeight = 0;
+  controller.minimumTrackBallHeight = 0;
 }
