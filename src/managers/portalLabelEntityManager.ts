@@ -6,19 +6,20 @@ import * as Cesium from "cesium";
 import { PortalData } from "../types/ingress";
 import { LayerManager } from "./layerManager";
 import { EntityPositionManager } from "./entityPositionManager";
-import { PORTAL_DISABLE_DEPTH_TEST_DISTANCE } from "./portalEntityManager.ts";
+import { PORTAL_DISABLE_DEPTH_TEST_DISTANCE, PORTAL_OCCLUDED_ALPHA } from "./portalEntityManager.ts";
 
 const LABEL_FONT = "12px sans-serif";
 const LABEL_PIXEL_OFFSET_Y = -12;
 const LABEL_MAX_LINE_LENGTH = 24;
 export class PortalLabelEntityManager {
-  private labels: Map<string, { data: PortalData; entity: Cesium.Entity }> = new Map();
+  private labels: Map<string, { data: PortalData; entity: Cesium.Entity; occlusionEntity: Cesium.Entity }> = new Map();
 
   constructor(private layerManager: LayerManager, private entityPositionManager: EntityPositionManager) {
     this.entityPositionManager.setOnPositionChangedCallback((latE6, lngE6, position) => {
-      this.labels.forEach(({ data, entity }) => {
+      this.labels.forEach(({ data, entity, occlusionEntity }) => {
         if (data.latE6 === latE6 && data.lngE6 === lngE6) {
           entity.position = new Cesium.ConstantPositionProperty(position);
+          occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
         }
       });
     });
@@ -36,15 +37,17 @@ export class PortalLabelEntityManager {
       const newLayerId = getPortalLabelLayerId(data);
       if (oldLayerId !== newLayerId) {
         this.layerManager.getOrCreateDataSourceLayer(oldLayerId).entities.remove(existing.entity);
+        this.layerManager.getOrCreateDataSourceLayer(oldLayerId).entities.remove(existing.occlusionEntity);
+        this.layerManager.getOrCreateDataSourceLayer(newLayerId).entities.add(existing.occlusionEntity);
         this.layerManager.getOrCreateDataSourceLayer(newLayerId).entities.add(existing.entity);
       }
-      this.updateLabelEntity(existing.entity, data);
+      this.updateLabelEntity(existing.entity, existing.occlusionEntity, data);
       existing.data = data;
       return;
     }
 
-    const entity = this.createLabelEntity(data);
-    this.labels.set(data.guid, { data, entity });
+    const { entity, occlusionEntity } = this.createLabelEntities(data);
+    this.labels.set(data.guid, { data, entity, occlusionEntity });
   }
 
   public removeLabel(guid: string): void {
@@ -65,17 +68,19 @@ export class PortalLabelEntityManager {
     toRemove.forEach(guid => this.removeLabelEntity(guid));
   }
 
-  private createLabelEntity(data: PortalData): Cesium.Entity {
+  private createLabelEntities(data: PortalData): { entity: Cesium.Entity; occlusionEntity: Cesium.Entity } {
     const layerId = getPortalLabelLayerId(data);
-    return this.layerManager.getOrCreateDataSourceLayer(layerId).entities.add({
-      id: `label-${data.guid}`,
-      position: this.entityPositionManager.getPosition(data),
+    const entities = this.layerManager.getOrCreateDataSourceLayer(layerId).entities;
+    const position = this.entityPositionManager.getPosition(data);
+    const occlusionEntity = entities.add({
+      id: `label-${data.guid}-occluded`,
+      position,
       label: {
         text: wrapLabelText(data.title || ""),
         font: LABEL_FONT,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        fillColor: Cesium.Color.WHITE,
-        outlineColor: Cesium.Color.BLACK,
+        fillColor: Cesium.Color.WHITE.withAlpha(PORTAL_OCCLUDED_ALPHA),
+        outlineColor: Cesium.Color.BLACK.withAlpha(PORTAL_OCCLUDED_ALPHA),
         outlineWidth: 4,
         showBackground: false,
         heightReference: Cesium.HeightReference.NONE,
@@ -89,6 +94,30 @@ export class PortalLabelEntityManager {
         selectable: false,
       },
     });
+
+    const entity = entities.add({
+      id: `label-${data.guid}`,
+      position,
+      label: {
+        text: wrapLabelText(data.title || ""),
+        font: LABEL_FONT,
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        fillColor: Cesium.Color.WHITE,
+        outlineColor: Cesium.Color.BLACK,
+        outlineWidth: 4,
+        showBackground: false,
+        heightReference: Cesium.HeightReference.NONE,
+        disableDepthTestDistance: 0,
+        horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+        pixelOffset: new Cesium.Cartesian2(0, LABEL_PIXEL_OFFSET_Y),
+        translucencyByDistance: new Cesium.NearFarScalar(6e2, 1.0, 8e2, 0.0),
+      },
+      properties: {
+        selectable: false,
+      },
+    });
+    return { entity, occlusionEntity };
   }
 
   private removeLabelEntity(guid: string): void {
@@ -97,15 +126,25 @@ export class PortalLabelEntityManager {
 
     const layerId = getPortalLabelLayerId(labelInfo.data);
     this.layerManager.getOrCreateDataSourceLayer(layerId).entities.remove(labelInfo.entity);
+    this.layerManager.getOrCreateDataSourceLayer(layerId).entities.remove(labelInfo.occlusionEntity);
     this.labels.delete(guid);
   }
 
-  private updateLabelEntity(entity: Cesium.Entity, data: PortalData): void {
-    entity.position = new Cesium.ConstantPositionProperty(this.entityPositionManager.getPosition(data));
+  private updateLabelEntity(entity: Cesium.Entity, occlusionEntity: Cesium.Entity, data: PortalData): void {
+    const position = this.entityPositionManager.getPosition(data);
+    entity.position = new Cesium.ConstantPositionProperty(position);
+    occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
     if (entity.label) {
       entity.label.text = new Cesium.ConstantProperty(wrapLabelText(data.title || ""));
       entity.label.heightReference = new Cesium.ConstantProperty(Cesium.HeightReference.NONE);
-      entity.label.disableDepthTestDistance = new Cesium.ConstantProperty(PORTAL_DISABLE_DEPTH_TEST_DISTANCE);
+      entity.label.disableDepthTestDistance = new Cesium.ConstantProperty(0);
+    }
+    if (occlusionEntity.label) {
+      occlusionEntity.label.text = new Cesium.ConstantProperty(wrapLabelText(data.title || ""));
+      occlusionEntity.label.fillColor = new Cesium.ConstantProperty(Cesium.Color.WHITE.withAlpha(PORTAL_OCCLUDED_ALPHA));
+      occlusionEntity.label.outlineColor = new Cesium.ConstantProperty(Cesium.Color.BLACK.withAlpha(PORTAL_OCCLUDED_ALPHA));
+      occlusionEntity.label.heightReference = new Cesium.ConstantProperty(Cesium.HeightReference.NONE);
+      occlusionEntity.label.disableDepthTestDistance = new Cesium.ConstantProperty(PORTAL_DISABLE_DEPTH_TEST_DISTANCE);
     }
   }
 }

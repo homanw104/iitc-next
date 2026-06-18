@@ -10,7 +10,7 @@ import { apiRequest } from "../utils/network";
 import { EntityPositionManager } from "./entityPositionManager";
 
 export const PORTAL_DISABLE_DEPTH_TEST_DISTANCE = 2e4;
-const PORTAL_OCCLUDED_ALPHA = 0.34;
+export const PORTAL_OCCLUDED_ALPHA = 0.3;
 
 interface PortalDetailsResponse {
   result: unknown[];

@@ -6,12 +6,14 @@ import * as Cesium from "cesium";
 import { PortalData } from "../types/ingress";
 import { LayerManager } from "./layerManager";
 import { EntityPositionManager } from "./entityPositionManager";
-import { PORTAL_DISABLE_DEPTH_TEST_DISTANCE } from "./portalEntityManager.ts";
+import { PORTAL_DISABLE_DEPTH_TEST_DISTANCE, PORTAL_OCCLUDED_ALPHA } from "./portalEntityManager.ts";
 
 interface HistoryHaloInfo {
   data: PortalData;
   entity?: Cesium.Entity;
+  occlusionEntity?: Cesium.Entity;
   reverseEntity?: Cesium.Entity;
+  reverseOcclusionEntity?: Cesium.Entity;
 }
 
 export class PortalHistoryEntityManager {
@@ -19,10 +21,12 @@ export class PortalHistoryEntityManager {
 
   constructor(private layerManager: LayerManager, private entityPositionManager: EntityPositionManager) {
     this.entityPositionManager.setOnPositionChangedCallback((latE6, lngE6, position) => {
-      this.historyHalos.forEach(({ data, entity, reverseEntity }) => {
+      this.historyHalos.forEach(({ data, entity, occlusionEntity, reverseEntity, reverseOcclusionEntity }) => {
         if (data.latE6 === latE6 && data.lngE6 === lngE6) {
           if (entity) entity.position = new Cesium.ConstantPositionProperty(position);
+          if (occlusionEntity) occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
           if (reverseEntity) reverseEntity.position = new Cesium.ConstantPositionProperty(position);
+          if (reverseOcclusionEntity) reverseOcclusionEntity.position = new Cesium.ConstantPositionProperty(position);
         }
       });
     });
@@ -34,20 +38,40 @@ export class PortalHistoryEntityManager {
       if (data.history?.captured && data.history?.visited) {
         const color = Cesium.Color.fromCssColorString("#FF6060");
         this.removeHistoryHaloEntity(data.guid, true);
-        if (existing.entity) this.updateHistoryHaloEntity(existing.entity, data, color);
-        else existing.entity = this.createHistoryHaloEntity(data, false, color);
+        if (existing.entity && existing.occlusionEntity) {
+          this.updateHistoryHaloEntity(existing.entity, existing.occlusionEntity, data, color);
+        } else {
+          const entities = this.createHistoryHaloEntities(data, false, color);
+          existing.entity = entities.entity;
+          existing.occlusionEntity = entities.occlusionEntity;
+        }
       } else if (data.history?.visited) {
         const color = Cesium.Color.fromCssColorString("#FFCE00");
-        if (existing.entity) this.updateHistoryHaloEntity(existing.entity, data, color);
-        else existing.entity = this.createHistoryHaloEntity(data, false, color);
+        if (existing.entity && existing.occlusionEntity) {
+          this.updateHistoryHaloEntity(existing.entity, existing.occlusionEntity, data, color);
+        } else {
+          const entities = this.createHistoryHaloEntities(data, false, color);
+          existing.entity = entities.entity;
+          existing.occlusionEntity = entities.occlusionEntity;
+        }
 
-        if (existing.reverseEntity) this.updateHistoryHaloEntity(existing.reverseEntity, data, color);
-        else existing.reverseEntity = this.createHistoryHaloEntity(data, true, color);
+        if (existing.reverseEntity && existing.reverseOcclusionEntity) {
+          this.updateHistoryHaloEntity(existing.reverseEntity, existing.reverseOcclusionEntity, data, color);
+        } else {
+          const entities = this.createHistoryHaloEntities(data, true, color);
+          existing.reverseEntity = entities.entity;
+          existing.reverseOcclusionEntity = entities.occlusionEntity;
+        }
       } else {
         const color = Cesium.Color.fromCssColorString("#FF6060");
         this.removeHistoryHaloEntity(data.guid, false);
-        if (existing.reverseEntity) this.updateHistoryHaloEntity(existing.reverseEntity, data, color);
-        else existing.reverseEntity = this.createHistoryHaloEntity(data, true, color);
+        if (existing.reverseEntity && existing.reverseOcclusionEntity) {
+          this.updateHistoryHaloEntity(existing.reverseEntity, existing.reverseOcclusionEntity, data, color);
+        } else {
+          const entities = this.createHistoryHaloEntities(data, true, color);
+          existing.reverseEntity = entities.entity;
+          existing.reverseOcclusionEntity = entities.occlusionEntity;
+        }
       }
       existing.data = data;
       return;
@@ -55,13 +79,21 @@ export class PortalHistoryEntityManager {
 
     const info: HistoryHaloInfo = { data };
     if (data.history?.captured && data.history?.visited) {
-      info.entity = this.createHistoryHaloEntity(data, false, Cesium.Color.fromCssColorString("#FF6060"));
+      const entities = this.createHistoryHaloEntities(data, false, Cesium.Color.fromCssColorString("#FF6060"));
+      info.entity = entities.entity;
+      info.occlusionEntity = entities.occlusionEntity;
     } else if (data.history?.visited) {
       const color = Cesium.Color.fromCssColorString("#FFCE00");
-      info.entity = this.createHistoryHaloEntity(data, false, color);
-      info.reverseEntity = this.createHistoryHaloEntity(data, true, color);
+      const entities = this.createHistoryHaloEntities(data, false, color);
+      const reverseEntities = this.createHistoryHaloEntities(data, true, color);
+      info.entity = entities.entity;
+      info.occlusionEntity = entities.occlusionEntity;
+      info.reverseEntity = reverseEntities.entity;
+      info.reverseOcclusionEntity = reverseEntities.occlusionEntity;
     } else {
-      info.reverseEntity = this.createHistoryHaloEntity(data, true, Cesium.Color.fromCssColorString("#FF6060"));
+      const reverseEntities = this.createHistoryHaloEntities(data, true, Cesium.Color.fromCssColorString("#FF6060"));
+      info.reverseEntity = reverseEntities.entity;
+      info.reverseOcclusionEntity = reverseEntities.occlusionEntity;
     }
     this.historyHalos.set(data.guid, info);
   }
@@ -76,12 +108,28 @@ export class PortalHistoryEntityManager {
     this.removeHistoryHaloEntityInView(viewRect);
   }
 
-  private createHistoryHaloEntity(data: PortalData, reverse: boolean, color: Cesium.Color): Cesium.Entity {
+  private createHistoryHaloEntities(data: PortalData, reverse: boolean, color: Cesium.Color): { entity: Cesium.Entity; occlusionEntity: Cesium.Entity } {
     const sourceId = reverse ? "history-visited-captured-reverse" : "history-visited-captured";
     const idSuffix = reverse ? "history-halo-reverse" : "history-halo";
-    return this.layerManager.getOrCreateDataSourceLayer(sourceId).entities.add({
+    const entities = this.layerManager.getOrCreateDataSourceLayer(sourceId).entities;
+    const position = this.entityPositionManager.getPosition(data);
+    const occlusionEntity = entities.add({
+      id: `portal-${data.guid}-${idSuffix}-occluded`,
+      position,
+      point: {
+        pixelSize: 16,
+        color: Cesium.Color.TRANSPARENT,
+        outlineColor: color.withAlpha(PORTAL_OCCLUDED_ALPHA),
+        outlineWidth: 4,
+        scaleByDistance: new Cesium.NearFarScalar(1e1, 1.0, 2e4, 0.125),
+        heightReference: Cesium.HeightReference.NONE,
+        disableDepthTestDistance: PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
+      },
+    });
+
+    const entity = entities.add({
       id: `portal-${data.guid}-${idSuffix}`,
-      position: this.entityPositionManager.getPosition(data),
+      position,
       point: {
         pixelSize: 16,
         color: Cesium.Color.TRANSPARENT,
@@ -89,17 +137,25 @@ export class PortalHistoryEntityManager {
         outlineWidth: 4,
         scaleByDistance: new Cesium.NearFarScalar(1e1, 1.0, 2e4, 0.125),
         heightReference: Cesium.HeightReference.NONE,
-        disableDepthTestDistance: PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
+        disableDepthTestDistance: 0,
       },
     });
+    return { entity, occlusionEntity };
   }
 
-  private updateHistoryHaloEntity(entity: Cesium.Entity, data: PortalData, color: Cesium.Color): void {
-    entity.position = new Cesium.ConstantPositionProperty(this.entityPositionManager.getPosition(data));
+  private updateHistoryHaloEntity(entity: Cesium.Entity, occlusionEntity: Cesium.Entity, data: PortalData, color: Cesium.Color): void {
+    const position = this.entityPositionManager.getPosition(data);
+    entity.position = new Cesium.ConstantPositionProperty(position);
+    occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
     if (entity.point) {
       entity.point.outlineColor = new Cesium.ConstantProperty(color);
       entity.point.heightReference = new Cesium.ConstantProperty(Cesium.HeightReference.NONE);
-      entity.point.disableDepthTestDistance = new Cesium.ConstantProperty(PORTAL_DISABLE_DEPTH_TEST_DISTANCE);
+      entity.point.disableDepthTestDistance = new Cesium.ConstantProperty(0);
+    }
+    if (occlusionEntity.point) {
+      occlusionEntity.point.outlineColor = new Cesium.ConstantProperty(color.withAlpha(PORTAL_OCCLUDED_ALPHA));
+      occlusionEntity.point.heightReference = new Cesium.ConstantProperty(Cesium.HeightReference.NONE);
+      occlusionEntity.point.disableDepthTestDistance = new Cesium.ConstantProperty(PORTAL_DISABLE_DEPTH_TEST_DISTANCE);
     }
   }
 
@@ -108,19 +164,29 @@ export class PortalHistoryEntityManager {
     if (!info) return;
 
     const entity = reverse ? info.reverseEntity : info.entity;
-    if (!entity) return;
+    const occlusionEntity = reverse ? info.reverseOcclusionEntity : info.occlusionEntity;
+    if (!entity && !occlusionEntity) return;
 
     const sourceId = reverse ? "history-visited-captured-reverse" : "history-visited-captured";
-    this.layerManager.getOrCreateDataSourceLayer(sourceId).entities.remove(entity);
-    if (reverse) info.reverseEntity = undefined;
-    else info.entity = undefined;
+    const entities = this.layerManager.getOrCreateDataSourceLayer(sourceId).entities;
+    if (entity) entities.remove(entity);
+    if (occlusionEntity) entities.remove(occlusionEntity);
+    if (reverse) {
+      info.reverseEntity = undefined;
+      info.reverseOcclusionEntity = undefined;
+    } else {
+      info.entity = undefined;
+      info.occlusionEntity = undefined;
+    }
   }
 
   private removeHistoryHaloEntityInView(viewRect: Cesium.Rectangle): void {
     const toRemove: string[] = [];
-    this.historyHalos.forEach(({ entity, reverseEntity }, guid) => {
+    this.historyHalos.forEach(({ entity, occlusionEntity, reverseEntity, reverseOcclusionEntity }, guid) => {
       const position = entity?.position?.getValue(Cesium.JulianDate.now())
-        ?? reverseEntity?.position?.getValue(Cesium.JulianDate.now());
+        ?? occlusionEntity?.position?.getValue(Cesium.JulianDate.now())
+        ?? reverseEntity?.position?.getValue(Cesium.JulianDate.now())
+        ?? reverseOcclusionEntity?.position?.getValue(Cesium.JulianDate.now());
       if (position) {
         const cartographic = Cesium.Cartographic.fromCartesian(position);
         if (Cesium.Rectangle.contains(viewRect, cartographic)) toRemove.push(guid);
