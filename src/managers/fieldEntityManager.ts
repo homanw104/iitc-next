@@ -9,6 +9,7 @@ import { LayerManager } from "./layerManager";
 import { PortalEntityManager } from "./portalEntityManager";
 
 const FIELD_Z_INDEX = 0;
+const FIELD_CLASSIFICATION_TYPE = Cesium.ClassificationType.BOTH;
 
 export class FieldEntityManager {
   private fields: Map<string, { data: FieldData; entity: Cesium.Entity }> = new Map();
@@ -70,7 +71,7 @@ export class FieldEntityManager {
         hierarchy: createFieldHierarchy(points),
         material: getTeamColor(data.team).withAlpha(0.2),
         outline: false,
-        classificationType: Cesium.ClassificationType.TERRAIN,
+        classificationType: FIELD_CLASSIFICATION_TYPE,
         zIndex: FIELD_Z_INDEX,
       },
       properties: {
@@ -106,7 +107,7 @@ export class FieldEntityManager {
       entity.polygon.extrudedHeight = undefined;
       entity.polygon.extrudedHeightReference = undefined;
       entity.polygon.material = new Cesium.ColorMaterialProperty(getTeamColor(data.team).withAlpha(0.2));
-      entity.polygon.classificationType = new Cesium.ConstantProperty(Cesium.ClassificationType.TERRAIN);
+      entity.polygon.classificationType = new Cesium.ConstantProperty(FIELD_CLASSIFICATION_TYPE);
       entity.polygon.zIndex = new Cesium.ConstantProperty(FIELD_Z_INDEX);
     }
   }
