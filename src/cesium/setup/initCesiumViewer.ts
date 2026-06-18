@@ -79,7 +79,7 @@ export function initCesiumViewer(container: string): Cesium.Viewer {
 
   // Constraint the tilt angle
   const controller = viewer.scene.screenSpaceCameraController;
-  controller.maximumTiltAngle = Cesium.Math.toRadians(35);
+  controller.maximumTiltAngle = Cesium.Math.toRadians(90);
 
   // Set available tilt event types
   controller.tiltEventTypes = [

@@ -2,7 +2,6 @@ import * as Cesium from "cesium";
 import { Viewer } from "cesium";
 import { h } from "../../../utils/dom.ts";
 import { getTeamColor } from "../../../utils/color.ts";
-import { calculateTileKeys } from "../../../utils/viewer.ts";
 import { CommResponseItem } from "../../../managers/commManager.ts";
 import { PortalEntityManager } from "../../../managers/portalEntityManager.ts";
 import { PortalHistoryEntityManager } from "../../../managers/portalHistoryEntityManager.ts";
@@ -89,8 +88,7 @@ function handleOnClick(
           if (requestId !== latestPortalSelectionRequest) return;
 
           // Explicitly request tiles here to avoid race condition
-          const tileKeys = calculateTileKeys(viewer);
-          if (tileKeys.length > 0) tileRequestManager.addTiles(tileKeys);
+          tileRequestManager.requestTilesForCurrentView();
           await tileRequestManager.waitForIdle();
 
           // Cancel selection if there's another selection in flight

@@ -45,7 +45,7 @@ export function createPinchGestureHandlers(
   const rotateThreshold = 0.1;
   const tiltThreshold = 3.0;
   const minPitch = Cesium.Math.toRadians(-90);
-  const maxPitch = Cesium.Math.toRadians(-60);
+  const maxPitch = Cesium.Math.toRadians(0);
 
   const handlePinchStart = () => {
     gestureState.isPinching = true;

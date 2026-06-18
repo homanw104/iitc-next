@@ -7,6 +7,8 @@ import * as Cesium from "cesium";
 import { TileStatus, getMapZoomTileParameters, tileToLat, tileToLng } from "./tileRequestManager";
 import { LayerManager } from "./layerManager";
 
+const DEBUG_TILE_CLASSIFICATION_TYPE = Cesium.ClassificationType.BOTH;
+
 export class DebugTileEntityManager {
   private viewer: Cesium.Viewer;
   private layerManager: LayerManager;
@@ -82,7 +84,7 @@ export class DebugTileEntityManager {
         outline: true,
         outlineColor: color,
         outlineWidth: 2,
-        height: 10,   // Slightly above ground to prevent z-fighting
+        classificationType: DEBUG_TILE_CLASSIFICATION_TYPE,
       },
       properties: {
         selectable: false,
@@ -95,6 +97,7 @@ export class DebugTileEntityManager {
     if (entity.rectangle) {
       entity.rectangle.outlineColor = new Cesium.ConstantProperty(color);
       entity.rectangle.material = new Cesium.ColorMaterialProperty(color.withAlpha(0.1));
+      entity.rectangle.classificationType = new Cesium.ConstantProperty(DEBUG_TILE_CLASSIFICATION_TYPE);
     }
 
     if (status === "loaded" || status === "error") {

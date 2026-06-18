@@ -4,7 +4,7 @@
 
 import * as Cesium from "cesium";
 import { getMapPosition } from "../../utils/browser";
-import { HEIGHT_AT_ZOOM_ZERO } from "../../utils/viewer";
+import { HEIGHT_AT_ZOOM_ZERO } from "../../managers/tileRequestManager";
 
 // Storage key to save the base layer info
 const BASE_LAYER_STORAGE_KEY = "iitc-next-base-layer";

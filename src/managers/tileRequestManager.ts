@@ -15,7 +15,13 @@ import { PortalLabelEntityManager } from "./portalLabelEntityManager";
 import { PortalOrnamentEntityManager } from "./portalOrnamentEntityManager.ts";
 import { PortalHistoryEntityManager } from "./portalHistoryEntityManager";
 import { ScoutHistoryEntityManager } from "./scoutHistoryEntityManager";
-import { calculateTileKeys } from "../utils/viewer";
+import { setCookie } from "../utils/browser";
+
+// Height at zoom level 0, shows more tiles if higher
+export const HEIGHT_AT_ZOOM_ZERO = 96000000;
+
+// Default tile limit to load
+const MAX_TILES_TO_LOAD = 2000;
 
 /**
  * Defines the number of tiles per edge to zoom into at each level of detail.
@@ -67,6 +73,15 @@ const MAX_REQUESTS: number = 5;
  * @type {number}
  */
 const TILES_PER_REQUEST: number = 25;
+
+/**
+ * The most horizon-facing pitch allowed when computing the tile to refresh.
+ *
+ * Cesium camera pitch is negative when looking down: -90 degrees is top-down, and
+ * 0 degrees is the horizon. Clamping prevents near-horizon views from producing
+ * an overly broad rectangle.
+ */
+const MAX_VIEW_RECTANGLE_PITCH = Cesium.Math.toRadians(-50);
 
 /**
  * Represents parameters for configuring a tile in a grid or map system.
@@ -123,6 +138,8 @@ export class TileRequestManager {
   private tileStatusListeners: TileStatusCallback[] = [];
   private idleResolvers: (() => void)[] = [];
   private refreshIntervalId: number | null = null;
+  private lastDataZoom: number | undefined;
+  private lastTileKeysCount: number | undefined;
 
   constructor(
     private viewer: Cesium.Viewer,
@@ -138,12 +155,17 @@ export class TileRequestManager {
   }
 
   public refreshView(): void {
-    const tileKeys = calculateTileKeys(this.viewer);
+    const tileKeys = this.calculateTileKeys();
 
     if (tileKeys.length > 0) {
       this.removeTiles(tileKeys);
       this.addTiles(tileKeys, true);
     }
+  }
+
+  public requestTilesForCurrentView(): void {
+    const tileKeys = this.calculateTileKeys();
+    if (tileKeys.length > 0) this.addTiles(tileKeys);
   }
 
   public getRefreshIntervalMs(): RefreshIntervalMs {
@@ -222,6 +244,90 @@ export class TileRequestManager {
     this.tileStatusListeners.forEach((cb) => cb(key, status));
   }
 
+  private calculateTileKeys(): string[] {
+    const camera = this.viewer.camera;
+    const cartographic = camera.positionCartographic;
+    const lat = Cesium.Math.toDegrees(cartographic.latitude);
+    const lng = Cesium.Math.toDegrees(cartographic.longitude);
+    const height = cartographic.height;
+
+    const calculatedZoom = Math.round(Math.log2(HEIGHT_AT_ZOOM_ZERO / height));
+    const mapZoom = isNaN(calculatedZoom) ? 0 : calculatedZoom;
+    const dataZoom = getDataZoomForMapZoom(mapZoom);
+
+    setCookie("ingress.intelmap.lat", lat.toFixed(6));
+    setCookie("ingress.intelmap.lng", lng.toFixed(6));
+    setCookie("ingress.intelmap.zoom", mapZoom.toString());
+
+    const tileParams = getMapZoomTileParameters(dataZoom);
+    const viewRect = this.computeViewRectangle(this.viewer.scene.globe.ellipsoid);
+
+    if (viewRect) {
+      const west = Cesium.Math.toDegrees(viewRect.west);
+      const south = Cesium.Math.toDegrees(viewRect.south);
+      const east = Cesium.Math.toDegrees(viewRect.east);
+      const north = Cesium.Math.toDegrees(viewRect.north);
+
+      const minX = lngToTileIndex(west, tileParams);
+      const maxX = lngToTileIndex(east, tileParams);
+      const minY = latToTileIndex(north, tileParams);
+      const maxY = latToTileIndex(south, tileParams);
+
+      const tileKeys: string[] = [];
+      const tilesPerEdge = tileParams.tilesPerEdge;
+      for (let x = minX; ; x = (x + 1) % tilesPerEdge) {
+        for (let y = minY; y <= maxY; y++) {
+          tileKeys.push(generateTileKey(tileParams, x, y));
+          if (tileKeys.length >= MAX_TILES_TO_LOAD) {
+            logManager.warn("TileRequestManager", "Too many tiles to load, truncating.");
+            break;
+          }
+        }
+        if (x === maxX || tileKeys.length >= MAX_TILES_TO_LOAD) break;
+      }
+      const totalTilesForZoom = tilesPerEdge * tilesPerEdge;
+      if (dataZoom <= 3 && this.lastDataZoom === dataZoom && tileKeys.length === this.lastTileKeysCount) {
+        if (tileKeys.length >= totalTilesForZoom || tileKeys.length >= MAX_TILES_TO_LOAD) {
+          return [];
+        }
+      }
+
+      this.lastDataZoom = dataZoom;
+      this.lastTileKeysCount = tileKeys.length;
+
+      return tileKeys;
+    }
+
+    return [];
+  }
+
+  private computeViewRectangle(
+    ellipsoid: Cesium.Ellipsoid,
+    maxPitch: number = MAX_VIEW_RECTANGLE_PITCH
+  ): Cesium.Rectangle | undefined {
+    const camera = this.viewer.camera;
+    const pitch = Math.min(camera.pitch, maxPitch);
+
+    if (pitch === camera.pitch) {
+      return camera.computeViewRectangle(ellipsoid);
+    }
+
+    const scene = this.viewer.scene;
+    const clampedCamera = new Cesium.Camera(scene);
+    clampedCamera.frustum = camera.frustum.clone();
+    clampedCamera.setView({
+      destination: Cesium.Cartesian3.clone(camera.positionWC),
+      orientation: {
+        heading: camera.heading,
+        pitch,
+        roll: camera.roll,
+      },
+      endTransform: Cesium.Matrix4.clone(camera.transform),
+    });
+
+    return clampedCamera.computeViewRectangle(ellipsoid);
+  }
+
   private async processQueue(refreshExisting: boolean = false): Promise<void> {
     if (this.activeRequestCount >= MAX_REQUESTS) {
       logManager.info("TileRequestManager", `Max request count (${MAX_REQUESTS}) reached`);
@@ -255,7 +361,7 @@ export class TileRequestManager {
       const response = await request.send();
       logManager.debug("TileRequestManager", `Received response for ${tilesToRequest.length} tile${tilesToRequest.length === 1 ? "" : "s"}`);
       if (response && refreshExisting) {
-        const viewRect = this.viewer.camera.computeViewRectangle(this.viewer.scene.globe.ellipsoid);
+        const viewRect = this.computeViewRectangle(this.viewer.scene.globe.ellipsoid);
         if (!viewRect) return;
         this.portalEntityManager.removePortalInView(viewRect);
         this.portalLabelEntityManager.removeLabelInView(viewRect);
