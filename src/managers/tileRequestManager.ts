@@ -335,7 +335,7 @@ export class TileRequestManager {
     }
 
     if (this.queuedTiles.size === 0) {
-      logManager.info("TileRequestManager", "Loaded");
+      logManager.info("TileRequestManager", "Tiles loaded");
       this.resolveIdleWaiters();
       return;
     }

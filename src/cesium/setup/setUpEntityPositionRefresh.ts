@@ -14,10 +14,12 @@ export function setUpEntityPositionRefresh(
   let heightRefreshRequested = false;
   let heightCacheResetRequested = false;
   let cameraMoving = false;
-  let idleRefreshTimeout: number | undefined;
+  let idleRefreshTimeout: ReturnType<typeof setTimeout> | undefined;
   const watchedHeightTilesets = new WeakSet<Cesium.Cesium3DTileset>();
 
   const requestHeightRefresh = (resetHeightCache = false) => {
+    if (!resetHeightCache && !entityPositionManager.hasRefreshableTerrainPositions()) return;
+
     heightRefreshRequested = true;
     heightCacheResetRequested = heightCacheResetRequested || resetHeightCache;
     scheduleIdleHeightRefresh();
@@ -35,7 +37,7 @@ export function setUpEntityPositionRefresh(
 
     if (cameraMoving) return;
 
-    idleRefreshTimeout = window.setTimeout(() => {
+    idleRefreshTimeout = setTimeout(() => {
       idleRefreshTimeout = undefined;
       viewer.scene.requestRender();
     }, CAMERA_IDLE_REFRESH_DELAY_MS);

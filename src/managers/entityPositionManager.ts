@@ -38,6 +38,8 @@ interface EntityPositionEntry extends EntityCoordinates {
 export class EntityPositionManager {
   private readonly positionEntriesByKey = new Map<string, EntityPositionEntry>();
   private readonly useGoogle3dTiles = settingsManager.getUseGoogle3dTiles();
+  // Tracks only positions that can still improve; idle tile events can skip the full cache once this is empty.
+  private readonly refreshableHeightKeys = new Set<string>();
   private readonly renderedHeightQueuedKeys = new Set<string>();
   private readonly mostDetailedHeightQueuedKeys = new Set<string>();
   private callbacks: EntityPositionCallback[] = [];
@@ -54,11 +56,12 @@ export class EntityPositionManager {
 
     viewer.camera.moveStart.addEventListener(() => {
       this.cameraMoving = true;
+      // Any pending scene-height work was based on the old view; ignore it and restart after moveEnd.
       this.heightSamplingGeneration++;
       this.renderedHeightQueuedKeys.clear();
+      this.mostDetailedHeightQueuedKeys.clear();
       this.clearRenderedHeightSamplingTimeout();
       this.clearMostDetailedHeightSamplingTimeout();
-      this.mostDetailedHeightQueuedKeys.clear();
     });
 
     viewer.camera.moveEnd.addEventListener(() => {
@@ -81,6 +84,7 @@ export class EntityPositionManager {
         heightQuality: "ellipsoid",
       };
       this.positionEntriesByKey.set(key, entry);
+      this.refreshableHeightKeys.add(key);
     }
 
     this.queueRenderedHeightSampling(entry);
@@ -96,20 +100,25 @@ export class EntityPositionManager {
   }
 
   public refreshTerrainPositions(): void {
+    // Tile idle events can be noisy; only revisit positions that have not reached most-detailed height.
+    if (this.refreshableHeightKeys.size === 0) return;
+
     this.heightSamplingGeneration++;
-    let queuedCount = 0;
-    this.positionEntriesByKey.forEach((entry) => {
-      if (entry.heightQuality === "mostDetailed") return;
+    Array.from(this.refreshableHeightKeys).forEach((key) => {
+      const entry = this.positionEntriesByKey.get(key);
+      if (!entry || entry.heightQuality === "mostDetailed") {
+        this.refreshableHeightKeys.delete(key);
+        return;
+      }
 
       entry.heightSamplingVersion = -1;
       this.queueRenderedHeightSampling(entry);
-      queuedCount++;
     });
-    logManager.debug(LOG_TAG, `Height refresh: ${queuedCount} queued`);
   }
 
   public invalidateTerrainPositions(): void {
     this.heightSamplingGeneration++;
+    this.refreshableHeightKeys.clear();
     this.renderedHeightQueuedKeys.clear();
     this.clearRenderedHeightSamplingTimeout();
     this.clearMostDetailedHeightSamplingTimeout();
@@ -117,15 +126,21 @@ export class EntityPositionManager {
     this.positionEntriesByKey.forEach((entry) => {
       entry.heightQuality = "ellipsoid";
       entry.heightSamplingVersion = -1;
+      this.refreshableHeightKeys.add(getEntityPositionKey(entry.latE6, entry.lngE6));
       this.queueRenderedHeightSampling(entry);
     });
     logManager.debug(LOG_TAG, "Height cache reset");
+  }
+
+  public hasRefreshableTerrainPositions(): boolean {
+    return this.refreshableHeightKeys.size > 0;
   }
 
   private queueRenderedHeightSampling(entry: EntityPositionEntry): void {
     if (entry.heightQuality === "mostDetailed") return;
     if (entry.heightSamplingVersion === this.heightSamplingGeneration) return;
 
+    // The generation prevents stale async samples from overwriting newer height results.
     entry.heightSamplingVersion = this.heightSamplingGeneration;
     this.renderedHeightQueuedKeys.add(getEntityPositionKey(entry.latE6, entry.lngE6));
     this.scheduleRenderedHeightSampling();
@@ -152,7 +167,7 @@ export class EntityPositionManager {
     this.renderedHeightSamplingTimeout = undefined;
 
     const keys = this.useGoogle3dTiles
-      ? takeKeys(this.renderedHeightQueuedKeys, GOOGLE_RENDERED_SAMPLE_BATCH_SIZE)
+      ? takeRenderedHeightBatch(this.renderedHeightQueuedKeys, GOOGLE_RENDERED_SAMPLE_BATCH_SIZE)
       : Array.from(this.renderedHeightQueuedKeys);
     if (!this.useGoogle3dTiles) this.renderedHeightQueuedKeys.clear();
     if (keys.length === 0) return;
@@ -171,6 +186,7 @@ export class EntityPositionManager {
     const cartographics = entries.map((entry) => Cesium.Cartographic.fromDegrees(entry.lngE6 / 1e6, entry.latE6 / 1e6));
 
     if (this.useGoogle3dTiles) {
+      // Google 3D heights are sampled in two stages: quick rendered tiles now, detailed tiles later.
       this.sampleGoogleRenderedHeights(entries, cartographics, batchHeightSamplingGeneration);
       if (this.renderedHeightQueuedKeys.size > 0) {
         this.scheduleRenderedHeightSampling(GOOGLE_RENDERED_SAMPLE_BATCH_DELAY_MS);
@@ -201,22 +217,20 @@ export class EntityPositionManager {
   private sampleGoogleRenderedHeights(entries: EntityPositionEntry[], cartographics: Cesium.Cartographic[], batchHeightSamplingGeneration: number): void {
     if (batchHeightSamplingGeneration !== this.heightSamplingGeneration) return;
 
-    let sampledCount = 0;
     entries.forEach((entry, index) => {
       const cartographic = cartographics[index];
       const height = sampleRenderedGoogleHeight(this.viewer.scene, cartographic);
       if (height === undefined) return;
 
-      sampledCount++;
       this.updateEntry(entry, getTerrainPosition(
         cartographic.longitude,
         cartographic.latitude,
         height + GOOGLE_GROUND_TERRAIN_COMPENSATION_METER,
       ), "rendered");
     });
-    logManager.debug(LOG_TAG, `Rendered heights: ${sampledCount}/${entries.length}`);
 
     this.queueMostDetailedHeightSampling(entries);
+    this.logQueueStatus();
   }
 
   private updateFromRenderedTerrain(entry: EntityPositionEntry, cartographic: Cesium.Cartographic, batchHeightSamplingGeneration: number): void {
@@ -228,6 +242,14 @@ export class EntityPositionManager {
 
   private updateEntry(entry: EntityPositionEntry, position: Cesium.Cartesian3, heightQuality: HeightQuality): void {
     entry.heightQuality = heightQuality;
+    const key = getEntityPositionKey(entry.latE6, entry.lngE6);
+    // Rendered heights are provisional; most-detailed heights are final until the terrain source changes.
+    if (heightQuality === "mostDetailed") {
+      this.refreshableHeightKeys.delete(key);
+    } else {
+      this.refreshableHeightKeys.add(key);
+    }
+
     if (Cesium.Cartesian3.equals(entry.position, position)) return;
 
     entry.position = position;
@@ -237,10 +259,8 @@ export class EntityPositionManager {
 
   private queueMostDetailedHeightSampling(entries: EntityPositionEntry[]): void {
     if (!this.viewer.scene.sampleHeightSupported) return;
-
     entries.forEach((entry) => {
       if (entry.heightQuality === "mostDetailed") return;
-
       this.mostDetailedHeightQueuedKeys.add(getEntityPositionKey(entry.latE6, entry.lngE6));
     });
     this.scheduleMostDetailedHeightSampling();
@@ -285,37 +305,46 @@ export class EntityPositionManager {
     try {
       mostDetailedSample = this.viewer.scene.sampleHeightMostDetailed(cartographics);
     } catch {
-      logManager.debug(LOG_TAG, "Detailed heights failed");
+      logManager.debug(LOG_TAG, "Detailed heights failed to load");
       return;
     }
 
     this.mostDetailedHeightSamplingInProgress = true;
-    logManager.debug(LOG_TAG, "Detailed heights running");
     mostDetailedSample
       .then((sampledPositions) => {
         if (batchHeightSamplingGeneration !== this.heightSamplingGeneration || this.cameraMoving) return;
 
-        let sampledCount = 0;
         entries.forEach((entry, index) => {
           const sampled = sampledPositions[index];
           if (!sampled || sampled.height === undefined) return;
-
-          sampledCount++;
           this.updateEntry(entry, getTerrainPosition(
             sampled.longitude,
             sampled.latitude,
             sampled.height + GOOGLE_GROUND_TERRAIN_COMPENSATION_METER,
           ), "mostDetailed");
         });
-        logManager.debug(LOG_TAG, `Detailed heights: ${sampledCount}/${entries.length}`);
+
+        this.logQueueStatus();
       })
       .catch(() => {
-        logManager.debug(LOG_TAG, "Detailed heights failed");
+        logManager.debug(LOG_TAG, "Detailed heights failed to load");
       })
       .finally(() => {
         this.mostDetailedHeightSamplingInProgress = false;
         this.scheduleMostDetailedHeightSampling();
       });
+  }
+
+  private logQueueStatus(): void {
+    if (this.renderedHeightQueuedKeys.size > 0 && this.mostDetailedHeightQueuedKeys.size > 0) {
+      logManager.debug(LOG_TAG, `Loading ${this.renderedHeightQueuedKeys.size} rendered heights and ${this.mostDetailedHeightQueuedKeys.size} detailed heights`);
+    } else if (this.renderedHeightQueuedKeys.size > 0) {
+      logManager.debug(LOG_TAG, `Loading ${this.renderedHeightQueuedKeys.size} rendered heights`);
+    } else if (this.mostDetailedHeightQueuedKeys.size > 0) {
+      logManager.debug(LOG_TAG, `Loading ${this.mostDetailedHeightQueuedKeys.size} detailed heights`);
+    } else {
+      logManager.debug(LOG_TAG, "Loaded all terrain positions");
+    }
   }
 }
 
@@ -323,11 +352,14 @@ function getEntityPositionKey(latE6: number, lngE6: number): string {
   return `${latE6},${lngE6}`;
 }
 
-function takeKeys(keys: Set<string>, limit: number): string[] {
+function takeRenderedHeightBatch(
+  queuedHeightKeys: Set<string>,
+  limit: number,
+): string[] {
   const batch: string[] = [];
 
-  for (const key of keys) {
-    keys.delete(key);
+  for (const key of queuedHeightKeys) {
+    queuedHeightKeys.delete(key);
     batch.push(key);
     if (batch.length >= limit) break;
   }
@@ -367,7 +399,7 @@ function sampleRenderedGoogleHeight(scene: Cesium.Scene, cartographic: Cesium.Ca
     try {
       return scene.sampleHeight(cartographic);
     } catch {
-      logManager.debug(LOG_TAG, "Rendered heights failed");
+      logManager.debug(LOG_TAG, "Rendered heights failed to load");
     }
   }
 
