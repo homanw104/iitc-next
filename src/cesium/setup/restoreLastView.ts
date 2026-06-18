@@ -5,19 +5,23 @@
 import * as Cesium from "cesium";
 import { getMapPosition } from "../../utils/browser";
 import { HEIGHT_AT_ZOOM_ZERO } from "../../managers/tileRequestManager";
+import { settingsManager } from "../../managers/settingsManager.ts";
 
 // Storage key to save the base layer info
 const BASE_LAYER_STORAGE_KEY = "iitc-next-base-layer";
 
 export function restoreLastView(viewer: Cesium.Viewer): void {
-  const modelName = localStorage.getItem(BASE_LAYER_STORAGE_KEY);
-  const viewModel = viewer.baseLayerPicker.viewModel.imageryProviderViewModels.find(m => m.name === modelName);
-  if (viewModel) viewer.baseLayerPicker.viewModel.selectedImagery = viewModel;
-  document.querySelectorAll(".cesium-baseLayerPicker-item").forEach((item) => {
-    item.addEventListener("click", () => {
-      localStorage.setItem(BASE_LAYER_STORAGE_KEY, viewer.baseLayerPicker.viewModel.selectedImagery.name);
+  const useGoogle3dTiles = settingsManager.getUseGoogle3dTiles();
+  if (!useGoogle3dTiles) {
+    const modelName = localStorage.getItem(BASE_LAYER_STORAGE_KEY);
+    const viewModel = viewer.baseLayerPicker.viewModel.imageryProviderViewModels.find(m => m.name === modelName);
+    if (viewModel) viewer.baseLayerPicker.viewModel.selectedImagery = viewModel;
+    document.querySelectorAll(".cesium-baseLayerPicker-item").forEach((item) => {
+      item.addEventListener("click", () => {
+        localStorage.setItem(BASE_LAYER_STORAGE_KEY, viewer.baseLayerPicker.viewModel.selectedImagery.name);
+      });
     });
-  });
+  }
 
   const pos = getMapPosition();
   if (pos) {

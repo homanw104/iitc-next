@@ -57,25 +57,29 @@ export function initCesiumViewer(container: string): Cesium.Viewer {
     navigationHelpButton: false,
     fullscreenButton: false,
     infoBox: false,
+    baseLayerPicker: !useGoogle3dTiles,
+    sceneModePicker: !useGoogle3dTiles,
     geocoder: useGoogle3dTiles ? Cesium.IonGeocodeProviderType.GOOGLE : undefined,
     requestRenderMode: true,
     maximumRenderTimeChange: Infinity,
   });
 
   // Remove unused imagery layer options
-  const models = viewer.baseLayerPicker.viewModel.imageryProviderViewModels;
-  viewer.baseLayerPicker.viewModel.imageryProviderViewModels = models.filter((model) => {
-    return model.name !== "Sentinel-2" &&
-      model.name !== "Blue Marble" &&
-      model.name !== "Earth at night" &&
-      model.name !== "Azure Maps Aerial" &&
-      model.name !== "Azure Maps Roads" &&
-      model.name !== "Esri World Ocean" &&
-      !model.name.startsWith("Stadia");
-  });
+  if (!useGoogle3dTiles) {
+    const models = viewer.baseLayerPicker.viewModel.imageryProviderViewModels;
+    viewer.baseLayerPicker.viewModel.imageryProviderViewModels = models.filter((model) => {
+      return model.name !== "Sentinel-2" &&
+        model.name !== "Blue Marble" &&
+        model.name !== "Earth at night" &&
+        model.name !== "Azure Maps Aerial" &&
+        model.name !== "Azure Maps Roads" &&
+        model.name !== "Esri World Ocean" &&
+        !model.name.startsWith("Stadia");
+    });
 
-  // Add Gaode imagery options to the base layer picker
-  viewer.baseLayerPicker.viewModel.imageryProviderViewModels.unshift(gaodeSatelliteViewModel, gaodeRoadViewModel);
+    // Add Gaode imagery options to the base layer picker
+    viewer.baseLayerPicker.viewModel.imageryProviderViewModels.unshift(gaodeSatelliteViewModel, gaodeRoadViewModel);
+  }
 
   // Constraint the tilt angle
   const controller = viewer.scene.screenSpaceCameraController;

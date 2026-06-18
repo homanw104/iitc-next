@@ -330,7 +330,7 @@ export class TileRequestManager {
 
   private async processQueue(refreshExisting: boolean = false): Promise<void> {
     if (this.activeRequestCount >= MAX_REQUESTS) {
-      logManager.info("TileRequestManager", `Max request count (${MAX_REQUESTS}) reached`);
+      logManager.info("TileRequestManager", `Max request count of ${MAX_REQUESTS} reached`);
       return;
     }
 
