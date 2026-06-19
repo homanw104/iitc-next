@@ -1,5 +1,6 @@
 package world.homans.iitcnext;
 
+import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
 import com.getcapacitor.Bridge;
 import com.getcapacitor.BridgeWebViewClient;
@@ -23,6 +24,15 @@ public class IITCWebViewClient extends BridgeWebViewClient {
         if (shouldInjectIITC(url)) {
             view.evaluateJavascript(activity.getScriptInjector().getInjectionJs(), null);
         }
+    }
+
+    @Override
+    public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+        if (IngressLinkHandler.openInApp(activity, request.getUrl())) {
+            return true;
+        }
+
+        return super.shouldOverrideUrlLoading(view, request);
     }
 
     @Override

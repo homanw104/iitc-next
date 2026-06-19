@@ -10,7 +10,7 @@ import PortalLink from "./PortalLink.tsx";
 
 const PortalDetailPane = ({ data, onCopy }: {
   data: PortalData,
-  onCopy: (link: string) => void
+  onCopy: (link: string) => void,
 }) => {
   const teamColor = getTeamColor(data.team);
   const teamColorHex = teamColor.toCssColorString();

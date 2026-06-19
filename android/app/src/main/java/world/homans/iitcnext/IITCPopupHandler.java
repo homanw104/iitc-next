@@ -53,6 +53,11 @@ public class IITCPopupHandler extends BridgeWebChromeClient {
         newWebView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                if (IngressLinkHandler.openInApp(activity, request.getUrl())) {
+                    dismissPopup();
+                    return true;
+                }
+
                 String url = request.getUrl().toString();
                 if (url.contains("google.com") || url.contains("nianticspatial.com") || url.contains("ingress.com")) {
                     return false;
