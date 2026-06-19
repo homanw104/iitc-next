@@ -7,11 +7,11 @@ import { PortalHistoryEntityManager } from "../managers/portalHistoryEntityManag
 import { ScoutHistoryEntityManager } from "../managers/scoutHistoryEntityManager";
 import { TileRequestManager } from "../managers/tileRequestManager";
 import { logManager } from "../managers/logManager";
-import CommDetailPane from "../components/panes/CommDetailPane/CommDetailPane";
+import CommPane from "../components/panes/CommPane/CommPane.tsx";
 import type { PortalDetailPaneController } from "./PortalDetailPaneController.tsx";
 import type { PortalDetailState } from "../core/coreControllers";
 
-export class CommDetailPaneController {
+export class CommPaneController {
   private readonly viewer: Viewer;
   private readonly commManager: CommManager;
   private readonly portalEntityManager: PortalEntityManager;
@@ -86,7 +86,7 @@ export class CommDetailPaneController {
       if (channel === "alerts") await this.commManager.requestAlerts(fetchOld);
 
       const newMsgCount = this.commManager.getMessages(channel, false).length - msgCount;
-      logManager.info("CommDetailPane", `Received ${newMsgCount} new message${newMsgCount === 1 ? "" : "s"} from ${channel.toUpperCase()}`);
+      logManager.info("CommPane", `Received ${newMsgCount} new message${newMsgCount === 1 ? "" : "s"} from ${channel.toUpperCase()}`);
     } finally {
       this.isFetchingNew = false;
       this.isFetchingOld = false;
@@ -165,7 +165,7 @@ export class CommDetailPaneController {
 
   private createPaneEl(): HTMLElement {
     return (
-      <CommDetailPane
+      <CommPane
         viewer={this.viewer}
         commManager={this.commManager}
         portalEntityManager={this.portalEntityManager}

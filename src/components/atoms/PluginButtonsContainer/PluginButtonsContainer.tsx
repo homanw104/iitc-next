@@ -1,6 +1,6 @@
 import { h } from "../../../utils/dom.ts";
 
-const PluginButtonContainer = () => {
+const PluginButtonsContainer = () => {
   return (
     <div
       className="plugin-button-container"
@@ -27,4 +27,4 @@ const PluginButtonContainer = () => {
   ) as HTMLElement;
 };
 
-export default PluginButtonContainer;
+export default PluginButtonsContainer;

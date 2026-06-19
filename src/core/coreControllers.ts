@@ -4,14 +4,14 @@
 
 import type * as Cesium from "cesium";
 import type { PortalData } from "../types/ingress";
-import GameDetailButton from "../components/buttons/GameDetailButton/GameDetailButton";
+import ProfileButton from "../components/buttons/ProfileButton/ProfileButton.tsx";
 import GetLocationButton from "../components/buttons/GetLocationButton/GetLocationButton";
 import SoftRefreshButton from "../components/buttons/SoftRefreshButton/SoftRefreshButton";
-import CommDetailButton from "../components/buttons/CommDetailButton/CommDetailButton";
+import CommButton from "../components/buttons/CommButton/CommButton.tsx";
 import LayerChooserButton from "../components/buttons/LayerChooserButton/LayerChooserButton";
 import PortalDetailBar from "../components/buttons/PortalDetailBar/PortalDetailBar";
-import { CommDetailPaneController } from "../controllers/CommDetailPaneController.tsx";
-import { GameDetailPaneController } from "../controllers/GameDetailPaneController.tsx";
+import { CommPaneController } from "../controllers/CommPaneController.tsx";
+import { ProfilePaneController } from "../controllers/ProfilePaneController.tsx";
 import { PortalDetailPaneController } from "../controllers/PortalDetailPaneController.tsx";
 import { SoftRefreshButtonController } from "../controllers/SoftRefreshButtonController.tsx";
 import { LayerChooserPaneController } from "../controllers/LayerChooserPaneController.tsx";
@@ -39,8 +39,8 @@ export function mountCoreControllersAndUI(viewer: Cesium.Viewer, container: HTML
   const softRefreshButtonController = new SoftRefreshButtonController(managers.tileRequestManager);
   const layerChooserPaneController = new LayerChooserPaneController(container, managers.layerManager);
   const portalDetailPaneController = new PortalDetailPaneController(container);
-  const gameDetailPaneController = new GameDetailPaneController(container, managers.scoreManager, managers.redeemManager, managers.tileRequestManager);
-  const commDetailPaneController = new CommDetailPaneController(
+  const gameDetailPaneController = new ProfilePaneController(container, managers.scoreManager, managers.redeemManager, managers.tileRequestManager);
+  const commDetailPaneController = new CommPaneController(
     viewer,
     container,
     managers.commManager,
@@ -55,9 +55,9 @@ export function mountCoreControllersAndUI(viewer: Cesium.Viewer, container: HTML
   state.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailPaneController: portalDetailPaneController }));
   container.appendChild(GetLocationButton({ viewer }));
   container.appendChild(SoftRefreshButton({ softRefreshButtonController: softRefreshButtonController }));
-  container.appendChild(CommDetailButton({ commDetailPaneController: commDetailPaneController }));
+  container.appendChild(CommButton({ commDetailPaneController: commDetailPaneController }));
   container.appendChild(LayerChooserButton({ layerChooserPaneController: layerChooserPaneController }));
-  container.appendChild(GameDetailButton({ gameDetailPaneController: gameDetailPaneController }));
+  container.appendChild(ProfileButton({ gameDetailPaneController: gameDetailPaneController }));
 
   logManager.setCallback((msg: string) => {
     state.lastLogMsg = msg;

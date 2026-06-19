@@ -1,6 +1,6 @@
 import { h } from "../../../utils/dom.ts";
 
-const AboutDetailButtonBar = () => {
+const AboutPaneButtonBar = () => {
   return (
     <div style={{ marginTop: "20px", marginBottom: "10px", display: "flex", justifyContent: "space-between", gap: "8px" }}>
       <div style={{ display: "flex", gap: "12px" }}>
@@ -42,4 +42,4 @@ const AboutDetailButtonBar = () => {
   );
 };
 
-export default AboutDetailButtonBar;
+export default AboutPaneButtonBar;

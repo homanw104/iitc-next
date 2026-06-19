@@ -1,15 +1,15 @@
 import { RedeemManager } from "../managers/redeemManager";
 import { ScoreManager } from "../managers/scoreManager";
 import { TileRequestManager } from "../managers/tileRequestManager";
-import GameDetailPane from "../components/panes/GameDetailPane/GameDetailPane";
-import PluginDetailPane from "../components/panes/PluginDetailPane/PluginDetailPane";
-import SettingsDetailPane from "../components/panes/SettingsDetailPane/SettingsDetailPane";
-import LoggingDetailPane from "../components/panes/LoggingDetailPane/LoggingDetailPane";
-import RefreshIntervalDetailPane from "../components/panes/RefreshIntervalDetailPane/RefreshIntervalDetailPane";
-import AboutDetailPane from "../components/panes/AboutDetailPane/AboutDetailPane";
+import ProfilePane from "../components/panes/ProfilePane/ProfilePane.tsx";
+import PluginSettingsPane from "../components/panes/PluginSettingsPane/PluginSettingsPane.tsx";
+import SettingsPane from "../components/panes/SettingsPane/SettingsPane.tsx";
+import LoggingSettingsPane from "../components/panes/LoggingSettingsPane/LoggingSettingsPane.tsx";
+import RefreshIntervalSettingsPane from "../components/panes/RefreshIntervalSettingsPane/RefreshIntervalSettingsPane.tsx";
+import AboutPane from "../components/panes/AboutPane/AboutPane.tsx";
 import RedeemResultPane from "../components/panes/RedeemResultPane/RedeemResultPane";
 
-export class GameDetailPaneController {
+export class ProfilePaneController {
   private gameDetailPane: HTMLElement | null = null;
   private pluginDetailPane: HTMLElement | null = null;
   private settingsDetailPane: HTMLElement | null = null;
@@ -113,7 +113,7 @@ export class GameDetailPaneController {
     this.closeLoggingDetailPane();
     this.closeRefreshIntervalDetailPane();
     this.closeAboutDetailPane();
-    this.gameDetailPane = container.appendChild(GameDetailPane({
+    this.gameDetailPane = container.appendChild(ProfilePane({
       scoreManager: this.scoreManager,
       redeemManager: this.redeemManager,
       onClose: () => this.closeGameDetailPane(),
@@ -127,7 +127,7 @@ export class GameDetailPaneController {
       this.scoreManager.fetchGameScore().then(() => {
         if (this.gameDetailPane) {
           this.closeGameDetailPane();
-          this.gameDetailPane = container.appendChild(GameDetailPane({
+          this.gameDetailPane = container.appendChild(ProfilePane({
             scoreManager: this.scoreManager,
             redeemManager: this.redeemManager,
             onClose: () => this.closeGameDetailPane(),
@@ -147,7 +147,7 @@ export class GameDetailPaneController {
     this.closeLoggingDetailPane();
     this.closeRefreshIntervalDetailPane();
     this.closeAboutDetailPane();
-    this.pluginDetailPane = container.appendChild(PluginDetailPane({
+    this.pluginDetailPane = container.appendChild(PluginSettingsPane({
       onBack: () => this.showSettingsDetailPane(container),
       onClose: () => this.closePluginDetailPane(),
     }));
@@ -159,7 +159,7 @@ export class GameDetailPaneController {
     this.closeLoggingDetailPane();
     this.closeRefreshIntervalDetailPane();
     this.closeAboutDetailPane();
-    this.settingsDetailPane = container.appendChild(SettingsDetailPane({
+    this.settingsDetailPane = container.appendChild(SettingsPane({
       onBack: () => this.showGameDetailPane(container),
       onClose: () => this.closeSettingsDetailPane(),
       onShowRefreshIntervalDetail: () => this.showRefreshIntervalDetailPane(container),
@@ -175,7 +175,7 @@ export class GameDetailPaneController {
     this.closeLoggingDetailPane();
     this.closeRefreshIntervalDetailPane();
     this.closeAboutDetailPane();
-    this.loggingDetailPane = container.appendChild(LoggingDetailPane({
+    this.loggingDetailPane = container.appendChild(LoggingSettingsPane({
       onBack: () => this.showSettingsDetailPane(container),
       onClose: () => this.closeLoggingDetailPane(),
     }));
@@ -188,7 +188,7 @@ export class GameDetailPaneController {
     this.closeLoggingDetailPane();
     this.closeRefreshIntervalDetailPane();
     this.closeAboutDetailPane();
-    this.refreshIntervalDetailPane = container.appendChild(RefreshIntervalDetailPane({
+    this.refreshIntervalDetailPane = container.appendChild(RefreshIntervalSettingsPane({
       tileRequestManager: this.tileRequestManager,
       onBack: () => this.showSettingsDetailPane(container),
       onClose: () => this.closeRefreshIntervalDetailPane(),
@@ -201,7 +201,7 @@ export class GameDetailPaneController {
     this.closeSettingsDetailPane();
     this.closeLoggingDetailPane();
     this.closeRefreshIntervalDetailPane();
-    this.aboutDetailPane = container.appendChild(AboutDetailPane({
+    this.aboutDetailPane = container.appendChild(AboutPane({
       onBack: () => this.showGameDetailPane(container),
       onClose: () => this.closeAboutDetailPane()
     }));

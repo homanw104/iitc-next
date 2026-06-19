@@ -1,9 +1,9 @@
 import { h } from "../../../utils/dom.ts";
-import AboutDetailButtonBar from "./AboutDetailButtonBar.tsx";
+import AboutPaneButtonBar from "./AboutPaneButtonBar.tsx";
 import CloseButton from "../../atoms/CloseButton/CloseButton.tsx";
 import BackButton from "../../atoms/BackButton/BackButton.tsx";
 
-const AboutDetailPane = ({ onBack, onClose }: {
+const AboutPane = ({ onBack, onClose }: {
   onBack: () => void,
   onClose: () => void,
 }) => {
@@ -49,9 +49,9 @@ const AboutDetailPane = ({ onBack, onClose }: {
         IITC Next is a Total Conversion for Ingress Intel that adds a 3D globe view, powered by CesiumJS.
       </div>
 
-      <AboutDetailButtonBar />
+      <AboutPaneButtonBar />
     </div>
   ) as HTMLElement;
 };
 
-export default AboutDetailPane;
+export default AboutPane;

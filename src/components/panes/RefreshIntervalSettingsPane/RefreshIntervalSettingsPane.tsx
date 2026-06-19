@@ -14,7 +14,7 @@ const REFRESH_INTERVAL_OPTIONS: { label: string; intervalMs: RefreshIntervalMs }
   { label: "30 minutes", intervalMs: 1800000 },
 ];
 
-const RefreshIntervalDetailPane = ({ tileRequestManager, onBack, onClose }: {
+const RefreshIntervalSettingsPane = ({ tileRequestManager, onBack, onClose }: {
   tileRequestManager: TileRequestManager,
   onBack: () => void,
   onClose: () => void,
@@ -105,4 +105,4 @@ const RefreshIntervalDetailPane = ({ tileRequestManager, onBack, onClose }: {
   ) as HTMLElement;
 };
 
-export default RefreshIntervalDetailPane;
+export default RefreshIntervalSettingsPane;

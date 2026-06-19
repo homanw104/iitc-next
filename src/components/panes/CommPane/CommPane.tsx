@@ -17,7 +17,7 @@ import CommMessage from "./CommMessage.tsx";
 import CommTab from "./CommTab.tsx";
 import CommDateDivider from "./CommDateDivider.tsx";
 
-const CommDetailPane = ({
+const CommPane = ({
   viewer,
   commManager,
   portalEntityManager,
@@ -179,4 +179,4 @@ const CommDetailPane = ({
   ) as HTMLElement;
 };
 
-export default CommDetailPane;
+export default CommPane;

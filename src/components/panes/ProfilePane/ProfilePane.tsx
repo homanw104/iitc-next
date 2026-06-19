@@ -6,10 +6,10 @@ import PlayerInfo from "./PlayerInfo.tsx";
 import PlayerStatus from "./PlayerStatus.tsx";
 import GameScore from "./GameScore.tsx";
 import GameRedeem from "./GameRedeem.tsx";
-import GameDetailButtonBar from "./GameDetailButtonBar.tsx";
+import ProfilePaneButtonBar from "./ProfilePaneButtonBar.tsx";
 import CloseButton from "../../atoms/CloseButton/CloseButton.tsx";
 
-const GameDetailPane = ({
+const ProfilePane = ({
   scoreManager,
   redeemManager,
   onClose,
@@ -59,9 +59,9 @@ const GameDetailPane = ({
       <PlayerStatus player={player} />
       <GameScore scoreManager={scoreManager} />
       <GameRedeem redeemManager={redeemManager} onRedeemSuccess={onRedeemSuccess} />
-      <GameDetailButtonBar onShowSettingsDetail={onShowSettingsDetail} onShowAboutDetail={onShowAboutDetail} />
+      <ProfilePaneButtonBar onShowSettingsDetail={onShowSettingsDetail} onShowAboutDetail={onShowAboutDetail} />
     </div>
   ) as HTMLElement;
 };
 
-export default GameDetailPane;
+export default ProfilePane;

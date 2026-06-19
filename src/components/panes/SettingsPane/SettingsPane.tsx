@@ -5,7 +5,7 @@ import BackButton from "../../atoms/BackButton/BackButton.tsx";
 import CloseButton from "../../atoms/CloseButton/CloseButton.tsx";
 import RightArrowIcon from "./RightArrowIcon.tsx";
 
-const SettingsDetailPane = ({
+const SettingsPane = ({
   onBack,
   onClose,
   onShowRefreshIntervalDetail,
@@ -166,4 +166,4 @@ const SettingsDetailPane = ({
   ) as HTMLElement;
 };
 
-export default SettingsDetailPane;
+export default SettingsPane;

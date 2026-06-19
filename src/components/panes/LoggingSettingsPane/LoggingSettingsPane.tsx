@@ -3,7 +3,7 @@ import { logManager } from "../../../managers/logManager.ts";
 import { settingsManager } from "../../../managers/settingsManager.ts";
 import BackButton from "../../atoms/BackButton/BackButton.tsx";
 import CloseButton from "../../atoms/CloseButton/CloseButton.tsx";
-import RightArrowIcon from "../SettingsDetailPane/RightArrowIcon.tsx";
+import RightArrowIcon from "../SettingsPane/RightArrowIcon.tsx";
 
 const exportLogs = () => {
   const logs = logManager.exportRecordedLogs();
@@ -16,7 +16,7 @@ const exportLogs = () => {
   URL.revokeObjectURL(url);
 };
 
-const LoggingDetailPane = ({ onBack, onClose }: {
+const LoggingSettingsPane = ({ onBack, onClose }: {
   onBack: () => void,
   onClose: () => void,
 }) => {
@@ -121,4 +121,4 @@ const LoggingDetailPane = ({ onBack, onClose }: {
   ) as HTMLElement;
 };
 
-export default LoggingDetailPane;
+export default LoggingSettingsPane;

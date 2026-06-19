@@ -1,8 +1,8 @@
 import { h } from "../../../utils/dom.ts";
-import { GameDetailPaneController } from "../../../controllers/GameDetailPaneController.tsx";
+import { ProfilePaneController } from "../../../controllers/ProfilePaneController.tsx";
 
-const GameDetailButton = ({ gameDetailPaneController }: {
-  gameDetailPaneController: GameDetailPaneController,
+const ProfileButton = ({ gameDetailPaneController }: {
+  gameDetailPaneController: ProfilePaneController,
 }): HTMLElement => {
   return (
     <div
@@ -30,4 +30,4 @@ const GameDetailButton = ({ gameDetailPaneController }: {
   ) as HTMLElement;
 };
 
-export default GameDetailButton;
+export default ProfileButton;

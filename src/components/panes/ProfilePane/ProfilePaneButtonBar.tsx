@@ -1,6 +1,6 @@
 import { h } from "../../../utils/dom.ts";
 
-const GameDetailButtonBar = ({ onShowSettingsDetail, onShowAboutDetail }: {
+const ProfilePaneButtonBar = ({ onShowSettingsDetail, onShowAboutDetail }: {
   onShowSettingsDetail: () => void,
   onShowAboutDetail: () => void,
 }) => {
@@ -41,4 +41,4 @@ const GameDetailButtonBar = ({ onShowSettingsDetail, onShowAboutDetail }: {
   );
 };
 
-export default GameDetailButtonBar;
+export default ProfilePaneButtonBar;

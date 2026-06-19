@@ -2,7 +2,7 @@
  * Manage and handle various interface elements.
  */
 
-import PluginButtonContainer from "../components/atoms/PluginButtonContainer/PluginButtonContainer";
+import PluginButtonsContainer from "../components/atoms/PluginButtonsContainer/PluginButtonsContainer.tsx";
 
 export class InterfaceManager {
   private readonly container: HTMLElement;
@@ -10,7 +10,7 @@ export class InterfaceManager {
 
   constructor(container: HTMLElement) {
     this.container = container;
-    this.pluginButtonContainer = this.container.appendChild(PluginButtonContainer());
+    this.pluginButtonContainer = this.container.appendChild(PluginButtonsContainer());
   }
 
   public getContainer(): HTMLElement {

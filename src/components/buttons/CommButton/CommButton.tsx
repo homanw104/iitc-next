@@ -1,8 +1,8 @@
 import { h } from "../../../utils/dom.ts";
-import { CommDetailPaneController } from "../../../controllers/CommDetailPaneController.tsx";
+import { CommPaneController } from "../../../controllers/CommPaneController.tsx";
 
-const CommDetailButton = ({ commDetailPaneController }: {
-  commDetailPaneController: CommDetailPaneController,
+const CommButton = ({ commDetailPaneController }: {
+  commDetailPaneController: CommPaneController,
 }): HTMLElement => {
   return (
     <div
@@ -34,4 +34,4 @@ const CommDetailButton = ({ commDetailPaneController }: {
   ) as HTMLElement;
 };
 
-export default CommDetailButton;
+export default CommButton;

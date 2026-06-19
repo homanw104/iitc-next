@@ -3,7 +3,7 @@ import { pluginManager } from "../../../managers/pluginManager.ts";
 import BackButton from "../../atoms/BackButton/BackButton.tsx";
 import CloseButton from "../../atoms/CloseButton/CloseButton.tsx";
 
-const PluginDetailPane = ({ onBack, onClose }: {
+const PluginSettingsPane = ({ onBack, onClose }: {
   onBack: () => void,
   onClose: () => void,
 }) => {
@@ -84,4 +84,4 @@ const PluginDetailPane = ({ onBack, onClose }: {
   ) as HTMLElement;
 };
 
-export default PluginDetailPane;
+export default PluginSettingsPane;
