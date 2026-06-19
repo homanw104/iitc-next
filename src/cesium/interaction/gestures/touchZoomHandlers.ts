@@ -4,6 +4,7 @@
 
 import * as Cesium from "cesium";
 import type { InteractionGestureState } from "../state/interactionGestureState";
+import { panCameraByOrbitingGlobe } from "../camera/cameraGestures";
 
 const DRAG_THRESHOLD_PIXELS = 8;
 const DOUBLE_TAP_AND_DRAG_ZOOM_THRESHOLD_PIXELS = 4;
@@ -27,9 +28,33 @@ export function createTouchZoomHandlers(
   let totalMovementLength = 0;
   let isDuringTheSecondTap = false;
   let hasMovedDuringTheSecondTap = false;
+  let activeTouchCount = 0;
+  let isSingleTouchPanning = false;
   let inertiaResetTimeoutId: ReturnType<typeof setTimeout> | null = null;
   let revertHasJustMovedTimeoutId: ReturnType<typeof setTimeout> | null = null;
   let revertHasJustDoubleTappedTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  viewer.scene.canvas.addEventListener("touchstart", (event) => {
+    activeTouchCount = event.touches.length;
+    if (activeTouchCount === 1) {
+      controller.enableInputs = false;
+    } else {
+      isSingleTouchPanning = false;
+      controller.enableInputs = true;
+    }
+  }, { passive: true });
+
+  viewer.scene.canvas.addEventListener("touchend", (event) => {
+    activeTouchCount = event.touches.length;
+  }, { passive: true });
+
+  viewer.scene.canvas.addEventListener("touchcancel", (event) => {
+    activeTouchCount = event.touches.length;
+    if (activeTouchCount === 0) {
+      isSingleTouchPanning = false;
+      controller.enableInputs = true;
+    }
+  }, { passive: true });
 
   const handleTouchStart = () => {
     const now = Date.now();
@@ -62,7 +87,7 @@ export function createTouchZoomHandlers(
       isDuringTheSecondTap = false;
       gestureState.pendingSingleTapTime = now;
       gestureState.hasJustDoubleTapped = false;
-      controller.enableInputs = true;
+      controller.enableInputs = activeTouchCount !== 1;
     }
   };
 
@@ -97,13 +122,25 @@ export function createTouchZoomHandlers(
       const height = viewer.camera.positionCartographic.height;
       const zoomFactor = height * 0.003;
       viewer.camera.zoomIn(dy * zoomFactor);
+    } else if (activeTouchCount === 1 && totalMovementLength > DRAG_THRESHOLD_PIXELS) {
+      isSingleTouchPanning = true;
+      controller.enableInputs = false;
+      panCameraByOrbitingGlobe(
+        viewer.camera,
+        viewer.scene.globe.ellipsoid,
+        event.startPosition,
+        event.endPosition,
+      );
     }
   };
 
   const handleTouchEnd = (event: Cesium.ScreenSpaceEventHandler.PositionedEvent) => {
     gestureState.isDuringTheTap = false;
 
-    if (isDuringTheSecondTap) {
+    if (isSingleTouchPanning) {
+      isSingleTouchPanning = false;
+      controller.enableInputs = true;
+    } else if (isDuringTheSecondTap) {
       isDuringTheSecondTap = false;
 
       if (!hasMovedDuringTheSecondTap) {
