@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.1.0
+
+* Added quality options for Google 3D Tiles
+* Added an option to darken Google 3D Tiles for better visibility on portals
+* Added a link to directly open the portal in Ingress
+* Added a separate layer for player activity paths
+* Fixed zooming and tilting pierced through the ground
+* Other minor improvements
+
 ## 2.0.0
 
 * Added Google 3D terrain tiles option, just like Google Earth
