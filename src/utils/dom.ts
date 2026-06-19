@@ -2,103 +2,189 @@
  * A simple JSX factory that creates DOM elements.
  */
 
+const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
+const SVG_TAGS = new Set([
+  "circle",
+  "defs",
+  "ellipse",
+  "g",
+  "image",
+  "line",
+  "linearGradient",
+  "marker",
+  "mask",
+  "path",
+  "pattern",
+  "polygon",
+  "polyline",
+  "radialGradient",
+  "rect",
+  "stop",
+  "svg",
+  "symbol",
+  "text",
+  "use",
+]);
+
 declare global {
   namespace JSX {
-    type Element = globalThis.Element | any[];
-    interface IntrinsicElements {
-      [elemName: string]: any;
-    }
+    export type Element = globalThis.Element | Child[];
+    export type IntrinsicElements = {
+      [Tag in keyof HTMLElementTagNameMap]: DOMProps<HTMLElementTagNameMap[Tag]>;
+    } & {
+      [Tag in Exclude<keyof SVGElementTagNameMap, keyof HTMLElementTagNameMap>]: DOMProps<SVGElementTagNameMap[Tag]>;
+    } & Record<string, DOMProps>;
+    export type IntrinsicAttributes = { key?: string | number };
   }
 }
 
-/**
- * Creates a JSX element or invokes a function component.
- *
- * @param {string | Function} tag - The HTML tag name or a function component.
- * @param {any} props - An object containing the properties for the element.
- * @param {...any[]} children - Child elements to be added as children of the created element.
- * @return {JSX.Element | any} A JSX element or the result of the invoked function component.
- */
-export function h(tag: string | Function, props: any, ...children: any[]): JSX.Element | any {
+type Child = JSX.Element | string | number | boolean | null | undefined | Child[];
+
+type Props = Record<string, unknown>;
+
+type DOMProps<TElement extends Element = Element> = {
+  [attribute: string]: unknown;
+  children?: Child | Child[];
+  className?: string;
+  disabled?: boolean;
+  ref?: (el: TElement) => void;
+  style?: Record<string, string | number | null | undefined>;
+};
+
+type Component<P = Props> = (
+  props: P & { children?: Child[] }
+) => JSX.Element | Child[] | null | undefined;
+
+export function h(
+  tag: string | Component,
+  props: Props | null,
+  ...children: Child[]
+): JSX.Element {
   if (typeof tag === "function") {
-    return tag({ ...props, children: children.flat() });
+    return tag({ ...props, children: children.flat() }) as JSX.Element;
   }
 
-  const isSvg = [
-    "svg", "path", "circle", "rect", "line", "polyline", "polygon", "ellipse", "text", "g", "defs", "marker", "mask", "pattern", "symbol", "use", "image", "linearGradient", "radialGradient", "stop"
-  ].includes(tag);
+  const element = createElement(tag);
 
-  const el = isSvg
-    ? document.createElementNS("http://www.w3.org/2000/svg", tag)
+  applyProps(element, props);
+  appendChildren(element, children);
+
+  return element;
+}
+
+export function Fragment(props: { children?: Child[] }): Child[] {
+  return props.children?.flat() ?? [];
+}
+
+function createElement(tag: string): HTMLElement | SVGElement {
+  return isSvgTag(tag)
+    ? document.createElementNS(SVG_NAMESPACE, tag)
     : document.createElement(tag);
+}
 
+function isSvgTag(tag: string): boolean {
+  return SVG_TAGS.has(tag);
+}
+
+function applyProps(element: HTMLElement | SVGElement, props: Props | null): void {
   if (props) {
     for (const [key, value] of Object.entries(props)) {
-      if (key === "style" && typeof value === "object") {
-        Object.assign((el as HTMLElement | SVGElement).style, value);
-      } else if (key.startsWith("on") && typeof value === "function") {
-        const eventName = key.toLowerCase().substring(2);
-        el.addEventListener(eventName, value as EventListener);
-      } else if (key === "className") {
-        if (isSvg) {
-          el.setAttribute("class", value as string);
-        } else {
-          (el as HTMLElement).className = value as string;
-        }
-      } else if (key === "ref" && typeof value === "function") {
-        value(el);
-      } else if (key === "indeterminate" && el instanceof HTMLInputElement) {
-        el.indeterminate = !!value;
-      } else if (key === "checked" && el instanceof HTMLInputElement) {
-        el.checked = !!value;
-      } else if (key === "unselectable" && value) {
-        Object.assign((el as HTMLElement).style, {
-          userSelect: "none",
-          WebkitUserSelect: "none",
-          MozUserSelect: "none",
-          msUserSelect: "none",
-        });
-      } else if (key === "no-scroll-bar" && value) {
-        Object.assign((el as HTMLElement).style, {
-          scrollbarWidth: "none",
-          msOverflowStyle: "none",
-        });
-        const style = document.createElement("style");
-        style.textContent = `
-          #${el.id || (el.id = "id" + Math.random().toString(36).substring(2, 9))}::-webkit-scrollbar {
-            display: none !important;
-          }
-        `;
-        el.appendChild(style);
-      } else if (key === "disabled" && (el instanceof HTMLButtonElement || el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement)) {
-        el.disabled = !!value;
-      } else {
-        el.setAttribute(key, value as string);
-      }
+      applyProp(element, key, value);
     }
   }
-
-  const appendChildren = (parent: Node, children: any[]) => {
-    for (const child of children) {
-      if (child === null || child === undefined || child === false) continue;
-      if (Array.isArray(child)) {
-        appendChildren(parent, child);
-      } else if (child instanceof Node) {
-        parent.appendChild(child);
-      } else {
-        parent.appendChild(document.createTextNode(String(child)));
-      }
-    }
-  };
-
-  appendChildren(el, children);
-  return el;
 }
 
-/**
- * A simple Fragment component for JSX.
- * Usage: return <Fragment>{...}</Fragment> or return <>{...}</>.
- */
-export function Fragment(props: any): any[] {
-  return Array.isArray(props.children) ? props.children.flat() : [props.children];
+function applyProp(element: HTMLElement | SVGElement, key: string, value: unknown): void {
+  if (key === "style" && isRecord(value)) {
+    Object.assign(element.style, value);
+  } else if (key.startsWith("on") && typeof value === "function") {
+    element.addEventListener(toEventName(key), value as EventListener);
+  } else if (key === "className") {
+    applyClassName(element, value);
+  } else if (key === "ref" && typeof value === "function") {
+    (value as (el: Element) => void)(element);
+  } else if (key === "indeterminate" && element instanceof HTMLInputElement) {
+    element.indeterminate = !!value;
+  } else if (key === "checked" && element instanceof HTMLInputElement) {
+    element.checked = !!value;
+  } else if (key === "unselectable" && value) {
+    applyUnselectable(element);
+  } else if (key === "no-scroll-bar" && value) {
+    applyNoScrollBar(element);
+  } else if (key === "disabled" && isDisableable(element)) {
+    element.disabled = !!value;
+  } else {
+    element.setAttribute(key, value as string);
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function toEventName(key: string): string {
+  return key.toLowerCase().substring(2);
+}
+
+function applyClassName(element: HTMLElement | SVGElement, value: unknown): void {
+  if (element instanceof SVGElement) {
+    element.setAttribute("class", value as string);
+  } else {
+    element.className = value as string;
+  }
+}
+
+function applyUnselectable(element: HTMLElement | SVGElement): void {
+  Object.assign(element.style, {
+    MozUserSelect: "none",
+    WebkitUserSelect: "none",
+    msUserSelect: "none",
+    userSelect: "none",
+  });
+}
+
+function applyNoScrollBar(element: HTMLElement | SVGElement): void {
+  Object.assign(element.style, {
+    msOverflowStyle: "none",
+    scrollbarWidth: "none",
+  });
+
+  const style = document.createElement("style");
+  style.textContent = `
+    #${element.id || (element.id = createDomId())}::-webkit-scrollbar {
+      display: none !important;
+    }
+  `;
+  element.appendChild(style);
+}
+
+function createDomId(): string {
+  return "id" + Math.random().toString(36).substring(2, 9);
+}
+
+function isDisableable(
+  element: HTMLElement | SVGElement
+): element is HTMLButtonElement | HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement {
+  return element instanceof HTMLButtonElement
+    || element instanceof HTMLInputElement
+    || element instanceof HTMLSelectElement
+    || element instanceof HTMLTextAreaElement;
+}
+
+function appendChildren(parent: Node, children: Child[]): void {
+  for (const child of children) {
+    appendChild(parent, child);
+  }
+}
+
+function appendChild(parent: Node, child: Child): void {
+  if (child === null || child === undefined || child === false) return;
+
+  if (Array.isArray(child)) {
+    appendChildren(parent, child);
+  } else if (child instanceof Node) {
+    parent.appendChild(child);
+  } else {
+    parent.appendChild(document.createTextNode(String(child)));
+  }
 }

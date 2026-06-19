@@ -5,6 +5,11 @@
 import { apiRequest } from "../utils/network";
 import { logManager } from "./logManager";
 
+interface ScoreResponse {
+  error?: string;
+  result: Array<string>;
+}
+
 export class ScoreManager {
   private enlScore: number = 0;
   private resScore: number = 0;
@@ -13,13 +18,13 @@ export class ScoreManager {
     this.fetchGameScore().then(() => {
       logManager.debug("ScoreManager", "Game score fetched");
     }).catch(e => {
-      logManager.error("ScoreManager", "Failed to fetch game score", e);
+      logManager.error("ScoreManager", "Failed to fetch game score", JSON.stringify(e));
     });
   }
 
   public async fetchGameScore() {
     try {
-      const data = (await apiRequest("getGameScore", {})) as any;
+      const data = (await apiRequest("getGameScore", {})) as ScoreResponse;
       if (data && data.result) {
         this.enlScore = parseInt(data.result[0]);
         this.resScore = parseInt(data.result[1]);

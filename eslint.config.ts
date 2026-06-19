@@ -22,6 +22,7 @@ export default defineConfig(
     rules: {
       "semi": ["error", "always"],
       "quotes": ["error", "double", { "allowTemplateLiterals": true }],
+      "@typescript-eslint/no-namespace": ["error", { "allowDeclarations": true }],
     }
   },
   {

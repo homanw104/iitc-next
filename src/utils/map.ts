@@ -16,7 +16,14 @@ export class AmapMercatorTilingScheme extends Cesium.WebMercatorTilingScheme {
     super(options);
 
     const projection = new Cesium.WebMercatorProjection();
-    (this as any)._projection.project = function(cartographic: Cesium.Cartographic, result?: Cesium.Cartesian3): Cesium.Cartesian3 {
+    const internalTilingScheme = this as unknown as {
+      _projection: {
+        project: (cartographic: Cesium.Cartographic, result?: Cesium.Cartesian3) => Cesium.Cartesian3;
+        unproject: (cartesian: Cesium.Cartesian3, result?: Cesium.Cartographic) => Cesium.Cartographic;
+      };
+    };
+
+    internalTilingScheme._projection.project = function(cartographic: Cesium.Cartographic, result?: Cesium.Cartesian3): Cesium.Cartesian3 {
       const gcj02 = wgs84ToGcj02(
         Cesium.Math.toDegrees(cartographic.longitude),
         Cesium.Math.toDegrees(cartographic.latitude)
@@ -35,7 +42,7 @@ export class AmapMercatorTilingScheme extends Cesium.WebMercatorTilingScheme {
       }
       return cartesian;
     };
-    (this as any)._projection.unproject = function(cartesian: Cesium.Cartesian3, result?: Cesium.Cartographic): Cesium.Cartographic {
+    internalTilingScheme._projection.unproject = function(cartesian: Cesium.Cartesian3, result?: Cesium.Cartographic): Cesium.Cartographic {
       const cartographic = projection.unproject(cartesian);
       const wgs84 = gcj02ToWgs84(
         Cesium.Math.toDegrees(cartographic.longitude),
@@ -57,43 +64,38 @@ export class AmapMercatorTilingScheme extends Cesium.WebMercatorTilingScheme {
 }
 
 function wgs84ToGcj02(lng: number, lat: number) {
-  const PI = Math.PI;
-  const a = 6378245.0;
-  const ee = 0.00669342162296594323;
-
-  let dLat = transformLat(lng - 105.0, lat - 35.0);
-  let dLng = transformLng(lng - 105.0, lat - 35.0);
-  const radLat = lat / 180.0 * PI;
-  let magic = Math.sin(radLat);
-  magic = 1 - ee * magic * magic;
-  const sqrtMagic = Math.sqrt(magic);
-  dLat = (dLat * 180.0) / ((a * (1 - ee)) / (magic * sqrtMagic) * PI);
-  dLng = (dLng * 180.0) / (a / sqrtMagic * Math.cos(radLat) * PI);
+  const [dLng, dLat] = calculateDelta(lng, lat);
   const mgLat = lat + dLat;
   const mgLng = lng + dLng;
   return [mgLng, mgLat];
 }
 
 function gcj02ToWgs84(lng: number, lat: number) {
+  const [dLng, dLat] = calculateDelta(lng, lat);
+  const mgLat = lat + dLat;
+  const mgLng = lng + dLng;
+
+  return [lng * 2 - mgLng, lat * 2 - mgLat];
+}
+
+function calculateDelta(lng: number, lat: number): [number, number] {
   const PI = Math.PI;
   const a = 6378245.0;
-  const ee = 0.00669342162296594323;
+  const ee = 0.006693421622965943;
 
   let dLat = transformLat(lng - 105.0, lat - 35.0);
   let dLng = transformLng(lng - 105.0, lat - 35.0);
 
   const radLat = lat / 180.0 * PI;
   let magic = Math.sin(radLat);
+
   magic = 1 - ee * magic * magic;
 
   const sqrtMagic = Math.sqrt(magic);
   dLat = (dLat * 180.0) / ((a * (1 - ee)) / (magic * sqrtMagic) * PI);
   dLng = (dLng * 180.0) / (a / sqrtMagic * Math.cos(radLat) * PI);
 
-  const mgLat = lat + dLat;
-  const mgLng = lng + dLng;
-
-  return [lng * 2 - mgLng, lat * 2 - mgLat];
+  return [dLng, dLat];
 }
 
 function transformLat(lng: number, lat: number) {
