@@ -15,6 +15,11 @@ import type { PlextMark } from "../managers/commManager";
 import type { EntityCoordinates, EntityPositionCallback } from "../managers/entityPositionManager";
 import "../types/iitc.ts";
 
+const PLAYER_ACTIVITY_ENL_LAYER_NAME = "Player Activity Enl";
+const PLAYER_ACTIVITY_RES_LAYER_NAME = "Player Activity Res";
+const ACTIVITY_PATH_ENL_LAYER_NAME = "Activity Path Enl";
+const ACTIVITY_PATH_RES_LAYER_NAME = "Activity Path Res";
+
 type Team = "ENLIGHTENED" | "RESISTANCE" | "MACHINA" | "NEUTRAL";
 
 interface Player {
@@ -52,6 +57,8 @@ class PlayerActivityPlugin {
 
   private dataSourceEnl: Cesium.CustomDataSource = new Cesium.CustomDataSource("player-activity-enl");
   private dataSourceRes: Cesium.CustomDataSource = new Cesium.CustomDataSource("player-activity-res");
+  private pathDataSourceEnl: Cesium.CustomDataSource = new Cesium.CustomDataSource("activity-path-enl");
+  private pathDataSourceRes: Cesium.CustomDataSource = new Cesium.CustomDataSource("activity-path-res");
   private playerLocations: Map<string, Cesium.Entity> = new Map();
   private playerPaths: Map<string, Cesium.Entity> = new Map();
   private playerPositionSubscriptions: Map<string, {
@@ -92,8 +99,10 @@ class PlayerActivityPlugin {
     this.setUpTooltipElement();
     this.setUpHoverAction();
 
-    this.dataSourceEnl = this.layerManager.getOrCreateOverlayLayer("Player Activity Enl");
-    this.dataSourceRes = this.layerManager.getOrCreateOverlayLayer("Player Activity Res");
+    this.dataSourceEnl = this.layerManager.getOrCreateOverlayLayer(PLAYER_ACTIVITY_ENL_LAYER_NAME);
+    this.dataSourceRes = this.layerManager.getOrCreateOverlayLayer(PLAYER_ACTIVITY_RES_LAYER_NAME);
+    this.pathDataSourceEnl = this.layerManager.getOrCreateOverlayLayer(ACTIVITY_PATH_ENL_LAYER_NAME);
+    this.pathDataSourceRes = this.layerManager.getOrCreateOverlayLayer(ACTIVITY_PATH_RES_LAYER_NAME);
     this.setUpDataSource(this.dataSourceEnl);
     this.setUpDataSource(this.dataSourceRes);
 
@@ -105,8 +114,10 @@ class PlayerActivityPlugin {
   public deinit() {
     this.unsetPlayerPositionSubscriptions();
     this.commManager?.unsetOnReceiveMsgCallback(this.onReceiveCommMsgCallback);
-    this.layerManager?.removeOverlayLayer("Player Activity Enl");
-    this.layerManager?.removeOverlayLayer("Player Activity Res");
+    this.layerManager?.removeOverlayLayer(PLAYER_ACTIVITY_ENL_LAYER_NAME);
+    this.layerManager?.removeOverlayLayer(PLAYER_ACTIVITY_RES_LAYER_NAME);
+    this.layerManager?.removeOverlayLayer(ACTIVITY_PATH_ENL_LAYER_NAME);
+    this.layerManager?.removeOverlayLayer(ACTIVITY_PATH_RES_LAYER_NAME);
     this.playerLocations.clear();
     this.playerPaths.clear();
     this.playerPositionSubscriptions.clear();
@@ -348,6 +359,35 @@ class PlayerActivityPlugin {
     this.viewer?.scene.requestRender();
   }
 
+  private updatePlayerPositionSubscription(playerName: string, coordinates: EntityCoordinates, entity: Cesium.Entity): void {
+    const existing = this.playerPositionSubscriptions.get(playerName);
+    if (existing?.coordinates.latE6 === coordinates.latE6 && existing.coordinates.lngE6 === coordinates.lngE6) return;
+
+    if (existing) {
+      this.entityPositionManager?.unsetOnCoordinatePositionChangedCallback(existing.coordinates, existing.callback);
+    }
+
+    const callback: EntityPositionCallback = (_latE6, _lngE6, position) => {
+      entity.position = new Cesium.ConstantPositionProperty(position);
+      this.viewer?.scene.requestRender();
+    };
+    const subscriptionCoordinates = {
+      latE6: coordinates.latE6,
+      lngE6: coordinates.lngE6,
+    };
+    this.entityPositionManager?.setOnCoordinatePositionChangedCallback(subscriptionCoordinates, callback);
+    this.playerPositionSubscriptions.set(playerName, {
+      coordinates: subscriptionCoordinates,
+      callback,
+    });
+  }
+
+  private unsetPlayerPositionSubscriptions(): void {
+    this.playerPositionSubscriptions.forEach(({ coordinates, callback }) => {
+      this.entityPositionManager?.unsetOnCoordinatePositionChangedCallback(coordinates, callback);
+    });
+  }
+
   private renderPlayerLocations(playerActivities: Map<string, PlayerActivity[]>): void {
     playerActivities.forEach((activities, playerName) => {
       const lastActivity = this.getLatestActivity(activities);
@@ -411,35 +451,6 @@ class PlayerActivityPlugin {
     });
   }
 
-  private updatePlayerPositionSubscription(playerName: string, coordinates: EntityCoordinates, entity: Cesium.Entity): void {
-    const existing = this.playerPositionSubscriptions.get(playerName);
-    if (existing?.coordinates.latE6 === coordinates.latE6 && existing.coordinates.lngE6 === coordinates.lngE6) return;
-
-    if (existing) {
-      this.entityPositionManager?.unsetOnCoordinatePositionChangedCallback(existing.coordinates, existing.callback);
-    }
-
-    const callback: EntityPositionCallback = (_latE6, _lngE6, position) => {
-      entity.position = new Cesium.ConstantPositionProperty(position);
-      this.viewer?.scene.requestRender();
-    };
-    const subscriptionCoordinates = {
-      latE6: coordinates.latE6,
-      lngE6: coordinates.lngE6,
-    };
-    this.entityPositionManager?.setOnCoordinatePositionChangedCallback(subscriptionCoordinates, callback);
-    this.playerPositionSubscriptions.set(playerName, {
-      coordinates: subscriptionCoordinates,
-      callback,
-    });
-  }
-
-  private unsetPlayerPositionSubscriptions(): void {
-    this.playerPositionSubscriptions.forEach(({ coordinates, callback }) => {
-      this.entityPositionManager?.unsetOnCoordinatePositionChangedCallback(coordinates, callback);
-    });
-  }
-
   private renderPlayerPaths(playerActivities: Map<string, PlayerActivity[]>): void {
     playerActivities.forEach((activities, playerName) => {
       const lastActivity = this.getLatestActivity(activities);
@@ -450,11 +461,17 @@ class PlayerActivityPlugin {
       const positions = Cesium.Cartesian3.fromDegreesArrayHeights(coordinates);
 
       let source: CustomDataSource;
-      if (lastActivity.team === "ENLIGHTENED") source = this.dataSourceEnl;
-      else if (lastActivity.team === "RESISTANCE") source = this.dataSourceRes;
+      if (lastActivity.team === "ENLIGHTENED") source = this.pathDataSourceEnl;
+      else if (lastActivity.team === "RESISTANCE") source = this.pathDataSourceRes;
       else return;
 
       let entity = this.playerPaths.get(playerName);
+      if (entity && !source.entities.contains(entity)) {
+        this.pathDataSourceEnl.entities.remove(entity);
+        this.pathDataSourceRes.entities.remove(entity);
+        entity = undefined;
+      }
+
       if (!entity) {
         entity = source.entities.add({
           polyline: {
