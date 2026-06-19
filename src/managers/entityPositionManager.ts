@@ -17,12 +17,12 @@ const GOOGLE_WORLD_TERRAIN_SAMPLE_BATCH_SIZE = 1024;
 const GOOGLE_WORLD_TERRAIN_BATCH_DELAY_MS = 10;
 
 // Quick height sampling from currently rendered Google 3D Tiles.
-const GOOGLE_RENDERED_SAMPLE_BATCH_SIZE = 256;
+const GOOGLE_RENDERED_SAMPLE_BATCH_SIZE = 64;
 const GOOGLE_RENDERED_SAMPLE_BATCH_DELAY_MS = 50;
 
 // Slower Google 3D Tiles sampling that resolves the best available height and is cached.
+const GOOGLE_MOST_DETAILED_SAMPLE_BATCH_SIZE = 32;
 const GOOGLE_MOST_DETAILED_SAMPLE_DELAY_MS = 100;
-const GOOGLE_MOST_DETAILED_SAMPLE_BATCH_SIZE = 64;
 
 // Height quality progresses from the synchronous placeholder to final cached height.
 type HeightQuality = "ellipsoid" | "worldTerrain" | "rendered" | "mostDetailed";
