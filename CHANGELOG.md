@@ -1,9 +1,20 @@
 # Changelog
 
+## 2.0.0
+
+* Added Google 3D terrain tiles option, just like Google Earth
+* Removed tilt degree limitations, now you can set tilt to any degree
+* Portals are now occlusive behind the terrain and buildings
+* Huge performance improvements rendering portals when using 3D terrain
+* Fixed tilting gestures not using the correct center point
+* Fixed panning gestures falling back to camera look around
+* Fixed clicking on portals not responding by increasing the pan gesture threshold
+* Fixed fields not showing on complex 3D terrain
+
 ## 1.5.0
 
-* Added about panel
-* Added settings panel
+* Added about pane
+* Added settings pane
 * Added logging and export settings
 * Added refresh interval settings
 * Added close and back buttons to game detail panes
