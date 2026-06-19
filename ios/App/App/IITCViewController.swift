@@ -17,6 +17,16 @@ class IITCViewController: CAPBridgeViewController, WKUIDelegate {
         scriptInjector.loadUserScript()
     }
 
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        publishSystemInsets()
+    }
+
+    override func viewSafeAreaInsetsDidChange() {
+        super.viewSafeAreaInsetsDidChange()
+        publishSystemInsets()
+    }
+
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
 
@@ -27,6 +37,7 @@ class IITCViewController: CAPBridgeViewController, WKUIDelegate {
             capacitorNavigationDelegate = webView.navigationDelegate
             webView.uiDelegate = self
             webView.navigationDelegate = self
+            publishSystemInsets(to: webView)
         }
     }
 
@@ -259,6 +270,28 @@ class IITCViewController: CAPBridgeViewController, WKUIDelegate {
             || host == "ingress.com"
             || host.hasSuffix(".ingress.com")
     }
+
+    private func publishSystemInsets() {
+        if let webView = webView {
+            publishSystemInsets(to: webView)
+        }
+        if let popupWebView = popupWebView {
+            publishSystemInsets(to: popupWebView, from: popupViewController?.view)
+        }
+    }
+
+    private func publishSystemInsets(to targetWebView: WKWebView, from sourceView: UIView? = nil) {
+        let insets = (sourceView ?? view).safeAreaInsets
+        let script = """
+            document.documentElement.style.setProperty('--iitc-system-top-inset', '\(Int(round(insets.top)))px');
+            document.documentElement.style.setProperty('--iitc-system-right-inset', '\(Int(round(insets.right)))px');
+            document.documentElement.style.setProperty('--iitc-system-bottom-inset', '\(Int(round(insets.bottom)))px');
+            document.documentElement.style.setProperty('--iitc-system-left-inset', '\(Int(round(insets.left)))px');
+        """
+        DispatchQueue.main.async {
+            targetWebView.evaluateJavaScript(script, completionHandler: nil)
+        }
+    }
 }
 
 extension IITCViewController: WKNavigationDelegate {
@@ -269,11 +302,14 @@ extension IITCViewController: WKNavigationDelegate {
             handledDelegate.webView?(webView, didFinish: navigation)
         }
 
+        publishSystemInsets(to: webView, from: webView == popupWebView ? popupViewController?.view : nil)
+
         guard let url = webView.url?.absoluteString else { return }
 
         if url.contains("intel.ingress.com") && !url.contains("/login") && !url.contains("/signinhandler") {
             webView.evaluateJavaScript(scriptInjector.getInjectionJs(), completionHandler: nil)
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                self.publishSystemInsets(to: webView, from: webView == self.popupWebView ? self.popupViewController?.view : nil)
                 webView.evaluateJavaScript(self.scriptInjector.getInjectionJs(), completionHandler: nil)
             }
         }
