@@ -125,7 +125,7 @@ export function createPinchGestureHandlers(
         panCameraByOrbitingGlobe(camera, viewer.scene.globe.ellipsoid, previousAvgPosition, avgPosition);
       }
 
-      const center = camera.pickEllipsoid(centerPosition, viewer.scene.globe.ellipsoid);
+      const center = pickRenderedGlobeOrTilePosition(viewer.scene, centerPosition);
       // Momentum keeps using the last valid anchor if the fingers leave the visible globe.
       if (center) lastPinchCenter = center;
 
