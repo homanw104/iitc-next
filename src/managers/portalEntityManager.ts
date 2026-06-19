@@ -10,7 +10,7 @@ import { getTeamColor } from "../utils/color";
 import { apiRequest } from "../utils/network";
 
 export const PORTAL_DISABLE_DEPTH_TEST_DISTANCE = 2e4;
-export const PORTAL_OCCLUDED_ALPHA = 0.3;
+export const PORTAL_OCCLUDED_ALPHA = 0.5;
 
 interface PortalDetailsResponse {
   result: unknown[];
