@@ -250,7 +250,7 @@ async function addGoogle3dTiles(viewer: Cesium.Viewer, renderSettings: Google3dT
       skipLevels: renderSettings.skipLevels,
       immediatelyLoadDesiredLevelOfDetail: renderSettings.immediatelyLoadDesiredLevelOfDetail,
       loadSiblings: renderSettings.loadSiblings,
-      enableCollision: false,
+      enableCollision: true,
     });
     viewer.scene.primitives.add(tileset);
     viewer.scene.requestRender();
@@ -270,5 +270,5 @@ function applyGoogle3dTilesRenderSettings(viewer: Cesium.Viewer, renderSettings:
   viewer.scene.globe.showGroundAtmosphere = false;
   viewer.scene.fog.enabled = true;
   viewer.scene.fog.density = 0.001;
-  viewer.scene.screenSpaceCameraController.enableCollisionDetection = false;
+  viewer.scene.screenSpaceCameraController.enableCollisionDetection = true;
 }

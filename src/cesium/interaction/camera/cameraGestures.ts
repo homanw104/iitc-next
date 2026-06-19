@@ -4,6 +4,8 @@
 
 import * as Cesium from "cesium";
 
+export const MINIMUM_3D_TILE_CAMERA_CLEARANCE_METERS = 5;
+
 export function pickRenderedGlobeOrTilePosition(
   scene: Cesium.Scene,
   windowPosition: Cesium.Cartesian2,
@@ -63,6 +65,34 @@ export function panCameraByOrbitingGlobe(
 
 export function zoomCameraAlongViewDirection(camera: Cesium.Camera, amount: number): void {
   camera.zoomIn(amount);
+}
+
+export function keepCameraAboveRenderedSurface(scene: Cesium.Scene): void {
+  if (!scene.sampleHeightSupported) return;
+
+  const camera = scene.camera;
+  const cartographic = camera.positionCartographic;
+  const surfaceHeight = scene.sampleHeight(cartographic);
+
+  if (surfaceHeight === undefined) return;
+
+  const minimumCameraHeight = surfaceHeight + MINIMUM_3D_TILE_CAMERA_CLEARANCE_METERS;
+  if (cartographic.height >= minimumCameraHeight) return;
+
+  const correctedPosition = new Cesium.Cartographic(
+    cartographic.longitude,
+    cartographic.latitude,
+    minimumCameraHeight,
+  );
+
+  camera.setView({
+    destination: Cesium.Cartographic.toCartesian(correctedPosition, scene.globe.ellipsoid),
+    orientation: {
+      heading: camera.heading,
+      pitch: camera.pitch,
+      roll: camera.roll,
+    },
+  });
 }
 
 export function getCameraPitchRelativeToGlobePoint(camera: Cesium.Camera, center: Cesium.Cartesian3): number {

@@ -5,6 +5,7 @@
 import * as Cesium from "cesium";
 import {
   getCameraPitchRelativeToGlobePoint,
+  keepCameraAboveRenderedSurface,
   panCameraByOrbitingGlobe,
   pickRenderedGlobeOrTilePosition,
   zoomCameraAlongViewDirection,
@@ -151,6 +152,7 @@ export function createPinchGestureHandlers(
         } else {
           zoomCameraAlongViewDirection(camera, distanceDelta * zoomFactor);
         }
+        keepCameraAboveRenderedSurface(viewer.scene);
       }
 
       if (pinchMode === "rotate" && center) {
@@ -240,6 +242,7 @@ export function createPinchGestureHandlers(
         } else {
           zoomCameraAlongViewDirection(camera, distanceDelta * zoomFactor);
         }
+        keepCameraAboveRenderedSurface(viewer.scene);
 
         pinchZoomVelocity *= 0.64;
 

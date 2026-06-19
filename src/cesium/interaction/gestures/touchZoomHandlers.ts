@@ -4,7 +4,11 @@
 
 import * as Cesium from "cesium";
 import type { InteractionGestureState } from "../state/interactionGestureState";
-import { panCameraByOrbitingGlobe } from "../camera/cameraGestures";
+import {
+  keepCameraAboveRenderedSurface,
+  MINIMUM_3D_TILE_CAMERA_CLEARANCE_METERS,
+  panCameraByOrbitingGlobe,
+} from "../camera/cameraGestures";
 
 const DRAG_THRESHOLD_PIXELS = 8;
 const DOUBLE_TAP_AND_DRAG_ZOOM_THRESHOLD_PIXELS = 4;
@@ -122,6 +126,7 @@ export function createTouchZoomHandlers(
       const height = viewer.camera.positionCartographic.height;
       const zoomFactor = height * 0.003;
       viewer.camera.zoomIn(dy * zoomFactor);
+      keepCameraAboveRenderedSurface(viewer.scene);
     } else if (activeTouchCount === 1 && totalMovementLength > DRAG_THRESHOLD_PIXELS) {
       isSingleTouchPanning = true;
       controller.enableInputs = false;
@@ -150,7 +155,12 @@ export function createTouchZoomHandlers(
         const destination = viewer.camera.pickEllipsoid(event.position, viewer.scene.globe.ellipsoid);
         if (destination) {
           const cartographic = Cesium.Cartographic.fromCartesian(destination);
-          cartographic.height = targetHeight;
+          const surfaceHeight = viewer.scene.sampleHeightSupported
+            ? viewer.scene.sampleHeight(cartographic)
+            : undefined;
+          cartographic.height = surfaceHeight === undefined
+            ? targetHeight
+            : Math.max(targetHeight, surfaceHeight + MINIMUM_3D_TILE_CAMERA_CLEARANCE_METERS);
           camera.flyTo({
             destination: Cesium.Cartographic.toCartesian(cartographic),
             duration: 0.5,
@@ -176,6 +186,7 @@ export function createTouchZoomHandlers(
           const height = viewer.camera.positionCartographic.height;
           const zoomFactor = height * 0.003;
           viewer.camera.zoomIn(dy * zoomFactor);
+          keepCameraAboveRenderedSurface(viewer.scene);
 
           zoomVelocity *= ZOOM_VELOCITY_FRICTION_FACTOR;
 
