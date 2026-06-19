@@ -6,6 +6,7 @@ import * as Cesium from "cesium";
 import {
   getCameraPitchRelativeToGlobePoint,
   panCameraByOrbitingGlobe,
+  pickRenderedGlobeOrTilePosition,
   zoomCameraAlongViewDirection,
   zoomCameraAroundGlobePoint,
 } from "../camera/cameraGestures";
@@ -162,7 +163,10 @@ export function createPinchGestureHandlers(
 
     if (pinchMode === "tilt") {
       const canvas = viewer.scene.canvas;
-      const center = camera.pickEllipsoid(new Cesium.Cartesian2(canvas.clientWidth / 2, canvas.clientHeight / 2), viewer.scene.globe.ellipsoid);
+      const center = pickRenderedGlobeOrTilePosition(
+        viewer.scene,
+        new Cesium.Cartesian2(canvas.clientWidth / 2, canvas.clientHeight / 2),
+      );
 
       if (!center) return;
 

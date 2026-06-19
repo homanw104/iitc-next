@@ -4,6 +4,38 @@
 
 import * as Cesium from "cesium";
 
+export function pickRenderedGlobeOrTilePosition(
+  scene: Cesium.Scene,
+  windowPosition: Cesium.Cartesian2,
+): Cesium.Cartesian3 | undefined {
+  const camera = scene.camera;
+  const globe = scene.globe;
+
+  let depthIntersection: Cesium.Cartesian3 | undefined;
+  if (scene.pickPositionSupported) {
+    depthIntersection = scene.pickPosition(windowPosition);
+  }
+
+  const ray = camera.getPickRay(windowPosition);
+  const terrainIntersection = globe && ray
+    ? globe.pick(ray, scene)
+    : undefined;
+
+  const depthDistance = depthIntersection
+    ? Cesium.Cartesian3.distance(depthIntersection, camera.positionWC)
+    : Number.POSITIVE_INFINITY;
+  const terrainDistance = terrainIntersection
+    ? Cesium.Cartesian3.distance(terrainIntersection, camera.positionWC)
+    : Number.POSITIVE_INFINITY;
+
+  if (depthDistance < terrainDistance) return depthIntersection;
+  if (terrainIntersection) return terrainIntersection;
+
+  return ray && globe
+    ? camera.pickEllipsoid(windowPosition, globe.ellipsoid)
+    : undefined;
+}
+
 export function panCameraByOrbitingGlobe(
   camera: Cesium.Camera,
   ellipsoid: Cesium.Ellipsoid,
