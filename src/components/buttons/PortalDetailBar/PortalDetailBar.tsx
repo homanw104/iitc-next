@@ -13,12 +13,12 @@ const PortalDetailBar = ({ portalDetailPaneController, data, msg }: {
       onClick={() => portalDetailPaneController.toggleDetailPane(data)}
       style={{
         position: "absolute",
-        left: "5px",
-        bottom: "5px",
+        left: "var(--iitc-left-control-padding, 5px)",
+        bottom: "var(--iitc-bottom-control-padding, 5px)",
         margin: "2px 3px",
         height: "30px",
         width: "400px",
-        maxWidth: "calc(100% - 18px - 24px - 114px)",
+        maxWidth: "calc(100% - var(--iitc-left-control-padding, 5px) - var(--iitc-right-control-padding, 5px) - 146px)",
         paddingLeft: "12px",
         paddingRight: "12px",
         fontSize: "14px",

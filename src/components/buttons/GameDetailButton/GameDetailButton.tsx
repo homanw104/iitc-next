@@ -8,8 +8,8 @@ const GameDetailButton = ({ gameDetailPaneController }: {
     <div
       style={{
         position: "absolute",
-        top: "5px",
-        left: "5px",
+        top: "var(--iitc-top-control-padding, 5px)",
+        left: "var(--iitc-left-control-padding, 5px)",
         zIndex: "10000",
         display: "flex",
         flexDirection: "column",

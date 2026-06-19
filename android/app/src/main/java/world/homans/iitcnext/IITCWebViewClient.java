@@ -28,9 +28,13 @@ public class IITCWebViewClient extends BridgeWebViewClient {
     @Override
     public void onPageFinished(WebView view, String url) {
         super.onPageFinished(view, url);
+        activity.publishSystemInsets(view);
         injectIITC(view, url);
         // Retry after a short delay for cases where the DOM isn't ready
-        view.postDelayed(() -> injectIITC(view, view.getUrl()), 2000);
+        view.postDelayed(() -> {
+            activity.publishSystemInsets(view);
+            injectIITC(view, view.getUrl());
+        }, 2000);
     }
 
 }

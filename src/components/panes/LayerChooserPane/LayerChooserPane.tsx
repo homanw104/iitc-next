@@ -14,18 +14,18 @@ const LayerChooserPane = ({ layerManager, onToggle }: {
     <div
       style={{
         position: "absolute",
-        right: "5px",
+        right: "var(--iitc-right-control-padding, 5px)",
         margin: "2px 3px",
-        bottom: "43px",
+        bottom: "calc(var(--iitc-bottom-control-padding, 5px) + 38px)",
         border: "1px solid #555",
         borderRadius: "4.2px",
         padding: "6px",
         width: "150px",
 
         // 100% - 2 * right - 2 * margin - 2 * boarder - 2 * padding
-        maxWidth: "calc(100% - 2 * 5px - 2 * 3px - 2 * 1px - 2 * 6px)",
+        maxWidth: "calc(100% - var(--iitc-left-control-padding, 5px) - var(--iitc-right-control-padding, 5px) - 20px)",
         // 100% - 2 * right - 2 * margin - 2 * boarder - 2 * padding - 2 * button - 2 * margin compensate
-        maxHeight: "calc(100% - 2 * 5px - 2 * 2px - 2 * 1px - 2 * 6px - 2 * 36px - 2 * 2px)",
+        maxHeight: "calc(100% - var(--iitc-system-top-inset, 0px) - var(--iitc-system-bottom-inset, 0px) - 104px)",
 
         backgroundColor: "rgba(42, 42, 42, 0.9)",
         color: "white",

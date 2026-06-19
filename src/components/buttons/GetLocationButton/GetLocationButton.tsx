@@ -30,8 +30,8 @@ const GetLocationButton = ({ viewer }: {
     <div
       style={{
         position: "absolute",
-        bottom: "70px",
-        right: "34px",
+        bottom: "calc(var(--iitc-bottom-control-padding, 5px) + 65px)",
+        right: "calc(var(--iitc-right-control-padding, 5px) + 29px)",
         zIndex: "10000",
         display: "flex",
       }}

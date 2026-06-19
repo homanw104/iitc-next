@@ -32,6 +32,10 @@ const config: CapacitorConfig = {
   plugins: {
     CapacitorCookies: {
       enabled: true
+    },
+    SystemBars: {
+      insetsHandling: "disable",
+      style: "DARK"
     }
   }
 };

@@ -830,10 +830,10 @@ const ConfirmPane = ({ msg, onConfirm, onCancel }: {
   return (
     <div style={{
       position: "absolute",
-      top: "0px",
-      left: "0px",
-      bottom: "0px",
-      right: "0px",
+      top: "var(--iitc-system-top-inset, 0px)",
+      left: "var(--iitc-system-left-inset, 0px)",
+      bottom: "var(--iitc-system-bottom-inset, 0px)",
+      right: "var(--iitc-system-right-inset, 0px)",
       margin: "auto",
       display: "flex",
       flexDirection: "column",

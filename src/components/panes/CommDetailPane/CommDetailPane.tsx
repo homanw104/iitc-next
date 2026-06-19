@@ -101,8 +101,8 @@ const CommDetailPane = ({
     <div
       style={{
         position: "absolute",
-        bottom: "43px",
-        right: "5px",
+        bottom: "calc(var(--iitc-bottom-control-padding, 5px) + 38px)",
+        right: "var(--iitc-right-control-padding, 5px)",
         margin: "2px 3px",
         border: "1px solid #555",
         borderRadius: "4.2px",
@@ -111,9 +111,9 @@ const CommDetailPane = ({
         height: "500px",
 
         // 100% - 2 * right - 2 * margin - 2 * boarder - 2 * padding
-        maxWidth: "calc(100% - 2 * 5px - 2 * 3px - 2 * 1px - 2 * 12px)",
+        maxWidth: "calc(100% - var(--iitc-left-control-padding, 5px) - var(--iitc-right-control-padding, 5px) - 32px)",
         // 100% - 2 * right - 2 * margin - 2 * boarder - 2 * padding - 2 * button - 2 * margin compensate
-        maxHeight: "calc(100% - 2 * 5px - 2 * 2px - 2 * 1px - 2 * 12px - 2 * 36px - 2 * 2px)",
+        maxHeight: "calc(100% - var(--iitc-system-top-inset, 0px) - var(--iitc-system-bottom-inset, 0px) - 116px)",
 
         display: "flex",
         flexDirection: "column",
