@@ -18,6 +18,7 @@ export class InterfaceManager {
   }
 
   public mountSidebarButton(button: HTMLElement): void {
+    button.style.flex = "0 0 auto";   // Fix buttons shrinking
     this.pluginButtonContainer.appendChild(button);
   }
 

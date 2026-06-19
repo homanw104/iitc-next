@@ -22,26 +22,29 @@ const PortalDetailPane = ({ data, onCopy }: {
       style={{
         position: "absolute",
         left: "5px",
-        bottom: "calc(5px + 36px + 2px)",
-        padding: "12px",
+        bottom: "43px",
         margin: "2px 3px",
+        border: `1px solid ${teamColorHex}`,
+        borderRadius: "4.2px",
+        padding: "12px",
+        width: "400px",
+
+        // 100% - 2 * right - 2 * margin - 2 * boarder - 2 * padding
+        maxWidth: "calc(100% - 2 * 5px - 2 * 3px - 2 * 1px - 2 * 12px)",
+        // 100% - 2 * right - 2 * margin - 2 * boarder - 2 * padding - 2 * button - 2 * margin compensate
+        maxHeight: "calc(100% - 2 * 5px - 2 * 2px - 2 * 1px - 2 * 12px - 2 * 36px - 2 * 2px)",
+
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "flex-start",
         gap: "12px",
-        zIndex: "10020",
         backgroundColor: "rgba(42, 42, 42, 0.9)",
         color: "white",
         fontFamily: "sans-serif",
-        borderRadius: "4.2px",
-        boxShadow: "0 0 10px rgba(0, 0, 0, 0.5)",
-        border: `1px solid ${teamColorHex}`,
-        width: "400px",
-        maxWidth: "calc(100% - 18px - 24px)",
-        maxHeight: "calc(100% - 14px - 36px - 24px - 43px)",
         pointerEvents: "auto",
         overflow: "scroll",
+        zIndex: "10020",
       }}
     >
       <PortalTitle data={data} teamColorHex={teamColorHex} />

@@ -101,19 +101,23 @@ const CommDetailPane = ({
     <div
       style={{
         position: "absolute",
-        bottom: "41px",
+        bottom: "43px",
         right: "5px",
         margin: "2px 3px",
-        width: "600px",
-        height: "500px",
-        maxWidth: "calc(100% - 18px - 24px)",
-        maxHeight: "calc(100% - 16px - 24px)",
-        display: "flex",
-        flexDirection: "column",
-        padding: "12px",
-        backgroundColor: "rgba(42, 42, 42, 0.9)",
         border: "1px solid #555",
         borderRadius: "4.2px",
+        padding: "12px",
+        width: "600px",
+        height: "500px",
+
+        // 100% - 2 * right - 2 * margin - 2 * boarder - 2 * padding
+        maxWidth: "calc(100% - 2 * 5px - 2 * 3px - 2 * 1px - 2 * 12px)",
+        // 100% - 2 * right - 2 * margin - 2 * boarder - 2 * padding - 2 * button - 2 * margin compensate
+        maxHeight: "calc(100% - 2 * 5px - 2 * 2px - 2 * 1px - 2 * 12px - 2 * 36px - 2 * 2px)",
+
+        display: "flex",
+        flexDirection: "column",
+        backgroundColor: "rgba(42, 42, 42, 0.9)",
         color: "white",
         zIndex: "10015",
       }}

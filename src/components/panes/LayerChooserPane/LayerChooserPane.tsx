@@ -13,20 +13,24 @@ const LayerChooserPane = ({ layerManager, onToggle }: {
   return (
     <div
       style={{
-        backgroundColor: "rgba(42, 42, 42, 0.9)",
         position: "absolute",
         right: "5px",
-        bottom: "41px",
         margin: "2px 3px",
-        padding: "6px",
+        bottom: "43px",
+        border: "1px solid #555",
         borderRadius: "4.2px",
+        padding: "6px",
+        width: "150px",
+
+        // 100% - 2 * right - 2 * margin - 2 * boarder - 2 * padding
+        maxWidth: "calc(100% - 2 * 5px - 2 * 3px - 2 * 1px - 2 * 6px)",
+        // 100% - 2 * right - 2 * margin - 2 * boarder - 2 * padding - 2 * button - 2 * margin compensate
+        maxHeight: "calc(100% - 2 * 5px - 2 * 2px - 2 * 1px - 2 * 6px - 2 * 36px - 2 * 2px)",
+
+        backgroundColor: "rgba(42, 42, 42, 0.9)",
         color: "white",
         fontFamily: "sans-serif",
         fontSize: "12px",
-        boxShadow: "0 0 10px rgba(0,0,0,0.5)",
-        border: "1px solid #555",
-        minWidth: "150px",
-        maxHeight: "calc(100% - 104px)",
         overflowY: "auto",
         zIndex: "10024",
       }}

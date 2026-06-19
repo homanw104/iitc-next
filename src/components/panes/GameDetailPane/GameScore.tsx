@@ -14,7 +14,7 @@ const GameScore = ({ scoreManager }: {
   return (
     <>
       <div style={{ marginTop: "20px" }}>Global Score</div>
-      <div style={{ width: "100%", height: "24px", display: "flex", borderRadius: "2px", overflow: "hidden" }}>
+      <div style={{ width: "100%", height: "24px", minHeight: "24px", display: "flex", borderRadius: "2px", overflow: "hidden" }}>
         <div style={{
           width: `${enlPercentage}%`,
           backgroundColor: getTeamColor("ENLIGHTENED").toCssColorString(),
