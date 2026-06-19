@@ -59,22 +59,24 @@ export class EntityPositionManager {
   private readonly mostDetailedHeightSamplingKeys = new Set<string>();
   private readonly callbacksByKey = new Map<string, Set<EntityPositionCallback>>();
   private worldTerrainSamplingScheduled = false;
+  private worldTerrainSamplingTimeout: number | undefined;
   private renderedHeightSamplingScheduled = false;
   private renderedHeightSamplingTimeout: number | undefined;
   private mostDetailedHeightSamplingInProgress = false;
   private mostDetailedHeightSamplingScheduled = false;
   private mostDetailedHeightSamplingTimeout: number | undefined;
   private cameraMoving = false;
+  private interactionActive = false;
   private heightSamplingGeneration = 0;
   private readonly worldTerrainProviderPromise: Promise<Cesium.TerrainProvider | undefined> | undefined;
 
   constructor(private readonly viewer: Cesium.Viewer) {
-    if (!this.useGoogle3dTiles) return;
-
-    this.worldTerrainProviderPromise = Cesium.createWorldTerrainAsync()
-      .catch(() => {
-        return undefined;
-      });
+    if (this.useGoogle3dTiles) {
+      this.worldTerrainProviderPromise = Cesium.createWorldTerrainAsync()
+        .catch(() => {
+          return undefined;
+        });
+    }
 
     viewer.camera.moveStart.addEventListener(() => {
       this.cameraMoving = true;
@@ -85,15 +87,14 @@ export class EntityPositionManager {
       this.renderedHeightSamplingKeys.clear();
       this.mostDetailedHeightQueuedKeys.clear();
       this.mostDetailedHeightSamplingKeys.clear();
+      this.cancelWorldTerrainSample();
       this.cancelRenderedSample();
       this.cancelDetailedSample();
     });
 
     viewer.camera.moveEnd.addEventListener(() => {
       this.cameraMoving = false;
-      this.scheduleWorldTerrain();
-      this.scheduleRenderedHeights();
-      this.scheduleDetailedHeights();
+      this.resumeQueuedHeightSampling();
     });
   }
 
@@ -133,9 +134,27 @@ export class EntityPositionManager {
     if (callbacks.size === 0) this.callbacksByKey.delete(key);
   }
 
-  public refreshTerrainPositions(): void {
+  public suppressHeightSampling(): void {
+    if (this.interactionActive) return;
+
+    this.interactionActive = true;
+    this.cancelWorldTerrainSample();
+    this.cancelRenderedSample();
+    this.cancelDetailedSample();
+  }
+
+  public resumeHeightSampling(): void {
+    if (!this.interactionActive) return;
+
+    this.interactionActive = false;
+    this.resumeQueuedHeightSampling();
+  }
+
+  public refreshTerrainPositions(): boolean {
+    if (this.isHeightSamplingSuppressed()) return false;
+
     // Tile idle events can be noisy; only revisit positions that have not reached most-detailed height.
-    if (this.refreshableHeightKeys.size === 0) return;
+    if (this.refreshableHeightKeys.size === 0) return true;
 
     Array.from(this.refreshableHeightKeys).forEach((key) => {
       const entry = this.positionEntriesByKey.get(key);
@@ -147,15 +166,19 @@ export class EntityPositionManager {
       entry.heightSamplingVersion = -1;
       this.queueHeightSample(entry);
     });
+    return true;
   }
 
-  public invalidateTerrainPositions(): void {
+  public invalidateTerrainPositions(): boolean {
+    if (this.isHeightSamplingSuppressed()) return false;
+
     this.heightSamplingGeneration++;
     this.refreshableHeightKeys.clear();
     this.worldTerrainQueuedKeys.clear();
     this.worldTerrainSamplingKeys.clear();
     this.renderedHeightQueuedKeys.clear();
     this.renderedHeightSamplingKeys.clear();
+    this.cancelWorldTerrainSample();
     this.cancelRenderedSample();
     this.cancelDetailedSample();
     this.mostDetailedHeightQueuedKeys.clear();
@@ -167,6 +190,7 @@ export class EntityPositionManager {
       this.queueHeightSample(entry);
     });
     logManager.debug(LOG_TAG, "Height cache reset");
+    return true;
   }
 
   public hasRefreshableTerrainPositions(): boolean {
@@ -210,15 +234,15 @@ export class EntityPositionManager {
 
   private scheduleWorldTerrain(): void {
     if (this.worldTerrainSamplingScheduled) return;
-    if (this.useGoogle3dTiles && this.cameraMoving) return;
+    if (this.isHeightSamplingSuppressed()) return;
 
     this.worldTerrainSamplingScheduled = true;
-    window.setTimeout(() => this.flushWorldTerrainQueue(), GOOGLE_WORLD_TERRAIN_BATCH_DELAY_MS);
+    this.worldTerrainSamplingTimeout = window.setTimeout(() => this.flushWorldTerrainQueue(), GOOGLE_WORLD_TERRAIN_BATCH_DELAY_MS);
   }
 
   private scheduleRenderedHeights(delayMs = 0): void {
     if (this.renderedHeightSamplingScheduled) return;
-    if (this.useGoogle3dTiles && this.cameraMoving) return;
+    if (this.isHeightSamplingSuppressed()) return;
 
     this.renderedHeightSamplingScheduled = true;
     this.renderedHeightSamplingTimeout = window.setTimeout(() => this.flushRenderedHeightQueue(), delayMs);
@@ -226,7 +250,7 @@ export class EntityPositionManager {
 
   private scheduleDetailedHeights(): void {
     if (
-      this.cameraMoving ||
+      this.isHeightSamplingSuppressed() ||
       this.mostDetailedHeightSamplingInProgress ||
       this.mostDetailedHeightSamplingScheduled ||
       this.mostDetailedHeightQueuedKeys.size === 0
@@ -240,6 +264,26 @@ export class EntityPositionManager {
       this.mostDetailedHeightSamplingTimeout = undefined;
       this.flushMostDetailedHeightQueue();
     }, GOOGLE_MOST_DETAILED_SAMPLE_DELAY_MS);
+  }
+
+  private isHeightSamplingSuppressed(): boolean {
+    return this.cameraMoving || this.interactionActive;
+  }
+
+  private resumeQueuedHeightSampling(): void {
+    if (this.isHeightSamplingSuppressed()) return;
+
+    this.scheduleWorldTerrain();
+    this.scheduleRenderedHeights();
+    this.scheduleDetailedHeights();
+  }
+
+  private cancelWorldTerrainSample(): void {
+    if (this.worldTerrainSamplingTimeout === undefined) return;
+
+    window.clearTimeout(this.worldTerrainSamplingTimeout);
+    this.worldTerrainSamplingTimeout = undefined;
+    this.worldTerrainSamplingScheduled = false;
   }
 
   private cancelRenderedSample(): void {
@@ -260,6 +304,8 @@ export class EntityPositionManager {
 
   private flushWorldTerrainQueue(): void {
     this.worldTerrainSamplingScheduled = false;
+    this.worldTerrainSamplingTimeout = undefined;
+    if (this.isHeightSamplingSuppressed()) return;
 
     const keys = takeHeightBatch(this.worldTerrainQueuedKeys, GOOGLE_WORLD_TERRAIN_SAMPLE_BATCH_SIZE);
     if (keys.length === 0) return;
@@ -282,6 +328,7 @@ export class EntityPositionManager {
   private flushRenderedHeightQueue(): void {
     this.renderedHeightSamplingScheduled = false;
     this.renderedHeightSamplingTimeout = undefined;
+    if (this.isHeightSamplingSuppressed()) return;
 
     const keys = this.useGoogle3dTiles
       ? takeHeightBatch(this.renderedHeightQueuedKeys, GOOGLE_RENDERED_SAMPLE_BATCH_SIZE)
@@ -322,23 +369,31 @@ export class EntityPositionManager {
 
     Cesium.sampleTerrainMostDetailed(terrainProvider, cartographics)
       .then((sampledPositions) => {
-        if (batchHeightSamplingGeneration !== this.heightSamplingGeneration) return;
+        if (batchHeightSamplingGeneration !== this.heightSamplingGeneration || this.isHeightSamplingSuppressed()) return;
         entries.forEach((entry, index) => {
           const sampled = sampledPositions[index];
           this.updateEntry(entry, getTerrainPosition(sampled.longitude, sampled.latitude, sampled.height), "mostDetailed");
         });
       })
       .catch(() => {
+        if (this.isHeightSamplingSuppressed()) return;
+
         logManager.warn(LOG_TAG, "Terrain height failed");
         entries.forEach((entry, index) => this.useRenderedTerrainHeight(entry, cartographics[index], batchHeightSamplingGeneration));
       })
       .finally(() => {
         entries.forEach((entry) => this.renderedHeightSamplingKeys.delete(getEntityPositionKey(entry.latE6, entry.lngE6)));
+        if (this.isHeightSamplingSuppressed()) {
+          entries.forEach((entry) => {
+            entry.heightSamplingVersion = -1;
+            this.queueHeightSample(entry);
+          });
+        }
       });
   }
 
   private flushMostDetailedHeightQueue(): void {
-    if (this.cameraMoving || this.mostDetailedHeightSamplingInProgress || this.mostDetailedHeightQueuedKeys.size === 0) return;
+    if (this.isHeightSamplingSuppressed() || this.mostDetailedHeightSamplingInProgress || this.mostDetailedHeightQueuedKeys.size === 0) return;
 
     const entries = takeDetailedBatch(this.mostDetailedHeightQueuedKeys, this.positionEntriesByKey);
     if (entries.length === 0) return;
@@ -360,7 +415,7 @@ export class EntityPositionManager {
     this.mostDetailedHeightSamplingInProgress = true;
     mostDetailedSample
       .then((sampledPositions) => {
-        if (batchHeightSamplingGeneration !== this.heightSamplingGeneration || this.cameraMoving) return;
+        if (batchHeightSamplingGeneration !== this.heightSamplingGeneration || this.isHeightSamplingSuppressed()) return;
 
         entries.forEach((entry, index) => {
           const sampled = sampledPositions[index];
@@ -377,6 +432,12 @@ export class EntityPositionManager {
       })
       .finally(() => {
         entries.forEach((entry) => this.mostDetailedHeightSamplingKeys.delete(getEntityPositionKey(entry.latE6, entry.lngE6)));
+        if (this.isHeightSamplingSuppressed()) {
+          entries.forEach((entry) => {
+            const key = getEntityPositionKey(entry.latE6, entry.lngE6);
+            if (entry.heightQuality !== "mostDetailed") this.mostDetailedHeightQueuedKeys.add(key);
+          });
+        }
         this.mostDetailedHeightSamplingInProgress = false;
         this.scheduleDetailedHeights();
       });
@@ -401,7 +462,7 @@ export class EntityPositionManager {
         return Cesium.sampleTerrain(terrainProvider, GOOGLE_WORLD_TERRAIN_SAMPLE_LEVEL, cartographics);
       })
       .then((sampledPositions) => {
-        if (batchHeightSamplingGeneration !== this.heightSamplingGeneration) return;
+        if (batchHeightSamplingGeneration !== this.heightSamplingGeneration || this.isHeightSamplingSuppressed()) return;
 
         sampledPositions?.forEach((sampled, index) => {
           if (sampled.height === undefined) return;
@@ -423,7 +484,7 @@ export class EntityPositionManager {
   }
 
   private sampleGoogleRenderedHeights(entries: EntityPositionEntry[], cartographics: Cesium.Cartographic[], batchHeightSamplingGeneration: number): void {
-    if (batchHeightSamplingGeneration !== this.heightSamplingGeneration) return;
+    if (batchHeightSamplingGeneration !== this.heightSamplingGeneration || this.isHeightSamplingSuppressed()) return;
 
     entries.forEach((entry, index) => {
       const cartographic = cartographics[index];
@@ -441,7 +502,7 @@ export class EntityPositionManager {
   }
 
   private useRenderedTerrainHeight(entry: EntityPositionEntry, cartographic: Cesium.Cartographic, batchHeightSamplingGeneration: number): void {
-    if (batchHeightSamplingGeneration !== this.heightSamplingGeneration) return;
+    if (batchHeightSamplingGeneration !== this.heightSamplingGeneration || this.isHeightSamplingSuppressed()) return;
 
     const height = this.viewer.scene.globe.getHeight(cartographic) ?? 0;
     this.updateEntry(entry, getTerrainPosition(cartographic.longitude, cartographic.latitude, height), "rendered");
@@ -468,13 +529,13 @@ export class EntityPositionManager {
 
   private logQueueStatus(): void {
     if (this.renderedHeightQueuedKeys.size > 0 && this.mostDetailedHeightQueuedKeys.size > 0) {
-      logManager.debug(LOG_TAG, `Loading ${this.renderedHeightQueuedKeys.size} rendered heights and ${this.mostDetailedHeightQueuedKeys.size} detailed heights`);
+      logManager.info(LOG_TAG, `Loading ${this.renderedHeightQueuedKeys.size} rendered heights and ${this.mostDetailedHeightQueuedKeys.size} detailed heights`);
     } else if (this.renderedHeightQueuedKeys.size > 0) {
-      logManager.debug(LOG_TAG, `Loading ${this.renderedHeightQueuedKeys.size} rendered heights`);
+      logManager.info(LOG_TAG, `Loading ${this.renderedHeightQueuedKeys.size} rendered heights`);
     } else if (this.mostDetailedHeightQueuedKeys.size > 0) {
-      logManager.debug(LOG_TAG, `Loading ${this.mostDetailedHeightQueuedKeys.size} detailed heights`);
+      logManager.info(LOG_TAG, `Loading ${this.mostDetailedHeightQueuedKeys.size} detailed heights`);
     } else {
-      logManager.debug(LOG_TAG, "Loaded all terrain positions");
+      logManager.info(LOG_TAG, "Loaded all terrain positions");
     }
   }
 }

@@ -14,6 +14,7 @@ export function setUpEntityPositionRefresh(
   let heightRefreshRequested = false;
   let heightCacheResetRequested = false;
   let cameraMoving = false;
+  let interactionActive = false;
   let idleRefreshTimeout: ReturnType<typeof setTimeout> | undefined;
   const watchedHeightTilesets = new WeakSet<Cesium.Cesium3DTileset>();
 
@@ -35,7 +36,7 @@ export function setUpEntityPositionRefresh(
   const scheduleIdleHeightRefresh = () => {
     clearIdleRefresh();
 
-    if (cameraMoving) return;
+    if (cameraMoving || interactionActive) return;
 
     idleRefreshTimeout = setTimeout(() => {
       idleRefreshTimeout = undefined;
@@ -44,17 +45,45 @@ export function setUpEntityPositionRefresh(
   };
 
   viewer.scene.postRender.addEventListener(() => {
-    if (!heightRefreshRequested || cameraMoving || idleRefreshTimeout !== undefined) return;
+    if (!heightRefreshRequested || cameraMoving || interactionActive || idleRefreshTimeout !== undefined) return;
+
+    const refreshed = heightCacheResetRequested
+      ? entityPositionManager.invalidateTerrainPositions()
+      : entityPositionManager.refreshTerrainPositions();
+
+    if (!refreshed) {
+      scheduleIdleHeightRefresh();
+      return;
+    }
 
     heightRefreshRequested = false;
-    if (heightCacheResetRequested) {
-      heightCacheResetRequested = false;
-      entityPositionManager.invalidateTerrainPositions();
-    } else {
-      entityPositionManager.refreshTerrainPositions();
-    }
+    heightCacheResetRequested = false;
     viewer.scene.requestRender();
   });
+
+  const handleInteractionStart = () => {
+    interactionActive = true;
+    clearIdleRefresh();
+    entityPositionManager.suppressHeightSampling();
+  };
+
+  const handleInteractionEnd = () => {
+    if (!interactionActive) return;
+
+    interactionActive = false;
+    entityPositionManager.resumeHeightSampling();
+    if (heightRefreshRequested) scheduleIdleHeightRefresh();
+  };
+
+  viewer.scene.canvas.addEventListener("pointerdown", handleInteractionStart, { passive: true });
+  viewer.scene.canvas.addEventListener("mousedown", handleInteractionStart, { passive: true });
+  viewer.scene.canvas.addEventListener("touchstart", handleInteractionStart, { passive: true });
+  window.addEventListener("pointerup", handleInteractionEnd, { passive: true });
+  window.addEventListener("pointercancel", handleInteractionEnd, { passive: true });
+  window.addEventListener("mouseup", handleInteractionEnd, { passive: true });
+  window.addEventListener("touchend", handleInteractionEnd, { passive: true });
+  window.addEventListener("touchcancel", handleInteractionEnd, { passive: true });
+  window.addEventListener("blur", handleInteractionEnd);
 
   viewer.camera.moveStart.addEventListener(() => {
     cameraMoving = true;
