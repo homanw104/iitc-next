@@ -6,16 +6,12 @@ import PluginSettingsPane from "../components/panes/PluginSettingsPane/PluginSet
 import SettingsPane from "../components/panes/SettingsPane/SettingsPane.tsx";
 import LoggingSettingsPane from "../components/panes/LoggingSettingsPane/LoggingSettingsPane.tsx";
 import RefreshIntervalSettingsPane from "../components/panes/RefreshIntervalSettingsPane/RefreshIntervalSettingsPane.tsx";
+import GoogleTilesSettingsPane from "../components/panes/GoogleTilesSettingsPane/GoogleTilesSettingsPane.tsx";
 import AboutPane from "../components/panes/AboutPane/AboutPane.tsx";
 import RedeemResultPane from "../components/panes/RedeemResultPane/RedeemResultPane";
 
 export class ProfilePaneController {
-  private gameDetailPane: HTMLElement | null = null;
-  private pluginDetailPane: HTMLElement | null = null;
-  private settingsDetailPane: HTMLElement | null = null;
-  private loggingDetailPane: HTMLElement | null = null;
-  private refreshIntervalDetailPane: HTMLElement | null = null;
-  private aboutDetailPane: HTMLElement | null = null;
+  private activePane: HTMLElement | null = null;
   private redeemResultPane: HTMLElement | null = null;
   private readonly container: HTMLElement;
   private readonly scoreManager: ScoreManager;
@@ -30,72 +26,17 @@ export class ProfilePaneController {
   }
 
   public toggleGameDetailPane() {
-    if (this.gameDetailPane) {
-      this.closeGameDetailPane();
-      return;
-    }
-    if (this.pluginDetailPane) {
-      this.closePluginDetailPane();
-      return;
-    }
-    if (this.settingsDetailPane) {
-      this.closeSettingsDetailPane();
-      return;
-    }
-    if (this.loggingDetailPane) {
-      this.closeLoggingDetailPane();
-      return;
-    }
-    if (this.refreshIntervalDetailPane) {
-      this.closeRefreshIntervalDetailPane();
-      return;
-    }
-    if (this.aboutDetailPane) {
-      this.closeAboutDetailPane();
+    if (this.activePane) {
+      this.closeActivePane();
       return;
     }
     this.showGameDetailPane(this.container);
   }
 
-  private closeGameDetailPane() {
-    if (this.gameDetailPane) {
-      this.gameDetailPane.remove();
-      this.gameDetailPane = null;
-    }
-  }
-
-  private closePluginDetailPane() {
-    if (this.pluginDetailPane) {
-      this.pluginDetailPane.remove();
-      this.pluginDetailPane = null;
-    }
-  }
-
-  private closeSettingsDetailPane() {
-    if (this.settingsDetailPane) {
-      this.settingsDetailPane.remove();
-      this.settingsDetailPane = null;
-    }
-  }
-
-  private closeLoggingDetailPane() {
-    if (this.loggingDetailPane) {
-      this.loggingDetailPane.remove();
-      this.loggingDetailPane = null;
-    }
-  }
-
-  private closeRefreshIntervalDetailPane() {
-    if (this.refreshIntervalDetailPane) {
-      this.refreshIntervalDetailPane.remove();
-      this.refreshIntervalDetailPane = null;
-    }
-  }
-
-  private closeAboutDetailPane() {
-    if (this.aboutDetailPane) {
-      this.aboutDetailPane.remove();
-      this.aboutDetailPane = null;
+  private closeActivePane() {
+    if (this.activePane) {
+      this.activePane.remove();
+      this.activePane = null;
     }
   }
 
@@ -106,62 +47,45 @@ export class ProfilePaneController {
     }
   }
 
+  private showPane(container: HTMLElement, paneFactory: () => HTMLElement) {
+    this.closeActivePane();
+    this.activePane = container.appendChild(paneFactory());
+  }
+
   private showGameDetailPane(container: HTMLElement) {
-    this.closeGameDetailPane();
-    this.closePluginDetailPane();
-    this.closeSettingsDetailPane();
-    this.closeLoggingDetailPane();
-    this.closeRefreshIntervalDetailPane();
-    this.closeAboutDetailPane();
-    this.gameDetailPane = container.appendChild(ProfilePane({
+    const createPane = () => ProfilePane({
       scoreManager: this.scoreManager,
       redeemManager: this.redeemManager,
-      onClose: () => this.closeGameDetailPane(),
+      onClose: () => this.closeActivePane(),
       onRedeemSuccess: (msg) => this.showRedeemResultPane(container, msg),
       onShowSettingsDetail: () => this.showSettingsDetailPane(container),
       onShowAboutDetail: () => this.showAboutDetailPane(container),
-    }));
+    });
+
+    this.showPane(container, createPane);
 
     // Fetch score if there's no score
     if (this.scoreManager.getEnlScore() === 0 && this.scoreManager.getResScore() === 0) {
       this.scoreManager.fetchGameScore().then(() => {
-        if (this.gameDetailPane) {
-          this.closeGameDetailPane();
-          this.gameDetailPane = container.appendChild(ProfilePane({
-            scoreManager: this.scoreManager,
-            redeemManager: this.redeemManager,
-            onClose: () => this.closeGameDetailPane(),
-            onRedeemSuccess: (msg) => this.showRedeemResultPane(container, msg),
-            onShowSettingsDetail: () => this.showSettingsDetailPane(container),
-            onShowAboutDetail: () => this.showAboutDetailPane(container),
-          }));
+        if (this.activePane) {
+          this.showPane(container, createPane);
         }
       });
     }
   }
 
   private showPluginDetailPane(container: HTMLElement) {
-    this.closeGameDetailPane();
-    this.closePluginDetailPane();
-    this.closeSettingsDetailPane();
-    this.closeLoggingDetailPane();
-    this.closeRefreshIntervalDetailPane();
-    this.closeAboutDetailPane();
-    this.pluginDetailPane = container.appendChild(PluginSettingsPane({
+    this.showPane(container, () => PluginSettingsPane({
       onBack: () => this.showSettingsDetailPane(container),
-      onClose: () => this.closePluginDetailPane(),
+      onClose: () => this.closeActivePane(),
     }));
   }
 
   private showSettingsDetailPane(container: HTMLElement) {
-    this.closeGameDetailPane();
-    this.closePluginDetailPane();
-    this.closeLoggingDetailPane();
-    this.closeRefreshIntervalDetailPane();
-    this.closeAboutDetailPane();
-    this.settingsDetailPane = container.appendChild(SettingsPane({
+    this.showPane(container, () => SettingsPane({
       onBack: () => this.showGameDetailPane(container),
-      onClose: () => this.closeSettingsDetailPane(),
+      onClose: () => this.closeActivePane(),
+      onShowGoogleTilesDetail: () => this.showGoogleTilesDetailPane(container),
       onShowRefreshIntervalDetail: () => this.showRefreshIntervalDetailPane(container),
       onShowLoggingDetail: () => this.showLoggingDetailPane(container),
       onShowPluginDetail: () => this.showPluginDetailPane(container),
@@ -169,41 +93,31 @@ export class ProfilePaneController {
   }
 
   private showLoggingDetailPane(container: HTMLElement) {
-    this.closeGameDetailPane();
-    this.closePluginDetailPane();
-    this.closeSettingsDetailPane();
-    this.closeLoggingDetailPane();
-    this.closeRefreshIntervalDetailPane();
-    this.closeAboutDetailPane();
-    this.loggingDetailPane = container.appendChild(LoggingSettingsPane({
+    this.showPane(container, () => LoggingSettingsPane({
       onBack: () => this.showSettingsDetailPane(container),
-      onClose: () => this.closeLoggingDetailPane(),
+      onClose: () => this.closeActivePane(),
     }));
   }
 
   private showRefreshIntervalDetailPane(container: HTMLElement) {
-    this.closeGameDetailPane();
-    this.closePluginDetailPane();
-    this.closeSettingsDetailPane();
-    this.closeLoggingDetailPane();
-    this.closeRefreshIntervalDetailPane();
-    this.closeAboutDetailPane();
-    this.refreshIntervalDetailPane = container.appendChild(RefreshIntervalSettingsPane({
+    this.showPane(container, () => RefreshIntervalSettingsPane({
       tileRequestManager: this.tileRequestManager,
       onBack: () => this.showSettingsDetailPane(container),
-      onClose: () => this.closeRefreshIntervalDetailPane(),
+      onClose: () => this.closeActivePane(),
+    }));
+  }
+
+  private showGoogleTilesDetailPane(container: HTMLElement) {
+    this.showPane(container, () => GoogleTilesSettingsPane({
+      onBack: () => this.showSettingsDetailPane(container),
+      onClose: () => this.closeActivePane(),
     }));
   }
 
   private showAboutDetailPane(container: HTMLElement) {
-    this.closeGameDetailPane();
-    this.closePluginDetailPane();
-    this.closeSettingsDetailPane();
-    this.closeLoggingDetailPane();
-    this.closeRefreshIntervalDetailPane();
-    this.aboutDetailPane = container.appendChild(AboutPane({
+    this.showPane(container, () => AboutPane({
       onBack: () => this.showGameDetailPane(container),
-      onClose: () => this.closeAboutDetailPane()
+      onClose: () => this.closeActivePane()
     }));
   }
 

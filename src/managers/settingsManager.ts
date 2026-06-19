@@ -9,6 +9,7 @@ export interface Settings {
   };
   map: {
     useGoogle3dTiles: boolean;
+    google3dTilesRenderQuality: Google3dTilesRenderQuality;
   };
   refresh: {
     intervalMs: RefreshIntervalMs;
@@ -16,6 +17,7 @@ export interface Settings {
 }
 
 export type RefreshIntervalMs = null | 10000 | 30000 | 60000 | 300000 | 600000 | 1800000;
+export type Google3dTilesRenderQuality = "performance" | "balanced" | "high" | "ultra";
 
 const DEFAULT_SETTINGS: Settings = {
   logging: {
@@ -23,6 +25,7 @@ const DEFAULT_SETTINGS: Settings = {
   },
   map: {
     useGoogle3dTiles: false,
+    google3dTilesRenderQuality: "balanced",
   },
   refresh: {
     intervalMs: null,
@@ -60,6 +63,15 @@ export class SettingsManager {
     this.saveState();
   }
 
+  public getGoogle3dTilesRenderQuality(): Google3dTilesRenderQuality {
+    return this.settings.map.google3dTilesRenderQuality;
+  }
+
+  public setGoogle3dTilesRenderQuality(renderQuality: Google3dTilesRenderQuality): void {
+    this.settings.map.google3dTilesRenderQuality = renderQuality;
+    this.saveState();
+  }
+
   public getRefreshIntervalMs(): RefreshIntervalMs {
     return this.settings.refresh.intervalMs;
   }
@@ -81,6 +93,7 @@ export class SettingsManager {
         },
         map: {
           useGoogle3dTiles: parsed.map?.useGoogle3dTiles ?? DEFAULT_SETTINGS.map.useGoogle3dTiles,
+          google3dTilesRenderQuality: this.normalizeGoogle3dTilesRenderQuality(parsed.map?.google3dTilesRenderQuality),
         },
         refresh: {
           intervalMs: this.normalizeRefreshIntervalMs(parsed.refresh?.intervalMs),
@@ -110,6 +123,13 @@ export class SettingsManager {
     return allowedIntervals.includes(intervalMs as RefreshIntervalMs)
       ? intervalMs as RefreshIntervalMs
       : DEFAULT_SETTINGS.refresh.intervalMs;
+  }
+
+  private normalizeGoogle3dTilesRenderQuality(renderQuality: unknown): Google3dTilesRenderQuality {
+    const allowedQualities: Google3dTilesRenderQuality[] = ["performance", "balanced", "high", "ultra"];
+    return allowedQualities.includes(renderQuality as Google3dTilesRenderQuality)
+      ? renderQuality as Google3dTilesRenderQuality
+      : DEFAULT_SETTINGS.map.google3dTilesRenderQuality;
   }
 }
 

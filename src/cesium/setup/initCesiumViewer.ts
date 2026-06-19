@@ -6,7 +6,7 @@ import "cesium/Build/Cesium/Widgets/widgets.css";
 import * as Cesium from "cesium";
 import { AmapMercatorTilingScheme } from "../../utils/map";
 import { logManager } from "../../managers/logManager";
-import { settingsManager } from "../../managers/settingsManager";
+import { settingsManager, type Google3dTilesRenderQuality } from "../../managers/settingsManager";
 
 // Tell Cesium where to find its assets (Images, Workers, etc.).
 // Since we use the CDN for the main library, we should also use it for assets.
@@ -15,6 +15,105 @@ window.CESIUM_BASE_URL = "https://cdn.jsdelivr.net/npm/cesium@1.142.0/Build/Cesi
 
 // Default access token restricted to https://intel.ingress.com
 Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJkZGViN2YzNC1hYzgyLTQ2ZTQtYTEyMS0wZGYwOTY2ZWJiMzEiLCJpZCI6NDM1NTgyLCJzdWIiOiJob21hbncxMDQiLCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoiSUlUQyBOZXh0IiwiaWF0IjoxNzc5NTY3OTg4fQ.YBXp3trSarnjwb9R2G5sU57DC0VbI0iCJrZv7TyuZFk";
+
+type Google3dTilesRenderSettings = {
+  maximumScreenSpaceError: number;
+  cacheBytes: number;
+  maximumCacheOverflowBytes: number;
+  cullWithChildrenBounds: boolean;
+  dynamicScreenSpaceError: boolean;
+  dynamicScreenSpaceErrorFactor: number;
+  foveatedScreenSpaceError: boolean;
+  foveatedMinimumScreenSpaceErrorRelaxation: number;
+  skipLevelOfDetail: boolean;
+  baseScreenSpaceError: number;
+  skipScreenSpaceErrorFactor: number;
+  skipLevels: number;
+  immediatelyLoadDesiredLevelOfDetail: boolean;
+  loadSiblings: boolean;
+  resolutionScale: number;
+  msaaSamples: number;
+  fxaaEnabled: boolean;
+};
+
+const GOOGLE_3D_TILES_RENDER_SETTINGS: Record<Google3dTilesRenderQuality, Google3dTilesRenderSettings> = {
+  performance: {
+    maximumScreenSpaceError: 48,
+    cacheBytes: 192 * 1024 * 1024,
+    maximumCacheOverflowBytes: 64 * 1024 * 1024,
+    cullWithChildrenBounds: true,
+    dynamicScreenSpaceError: true,
+    dynamicScreenSpaceErrorFactor: 48,
+    foveatedScreenSpaceError: true,
+    foveatedMinimumScreenSpaceErrorRelaxation: 24,
+    skipLevelOfDetail: true,
+    baseScreenSpaceError: 1024,
+    skipScreenSpaceErrorFactor: 20,
+    skipLevels: 1,
+    immediatelyLoadDesiredLevelOfDetail: false,
+    loadSiblings: false,
+    resolutionScale: 0.85,
+    msaaSamples: 1,
+    fxaaEnabled: true,
+  },
+  balanced: {
+    maximumScreenSpaceError: 32,
+    cacheBytes: 256 * 1024 * 1024,
+    maximumCacheOverflowBytes: 128 * 1024 * 1024,
+    cullWithChildrenBounds: true,
+    dynamicScreenSpaceError: true,
+    dynamicScreenSpaceErrorFactor: 32,
+    foveatedScreenSpaceError: true,
+    foveatedMinimumScreenSpaceErrorRelaxation: 16,
+    skipLevelOfDetail: true,
+    baseScreenSpaceError: 1024,
+    skipScreenSpaceErrorFactor: 16,
+    skipLevels: 1,
+    immediatelyLoadDesiredLevelOfDetail: false,
+    loadSiblings: false,
+    resolutionScale: 1,
+    msaaSamples: 1,
+    fxaaEnabled: true,
+  },
+  high: {
+    maximumScreenSpaceError: 16,
+    cacheBytes: 512 * 1024 * 1024,
+    maximumCacheOverflowBytes: 256 * 1024 * 1024,
+    cullWithChildrenBounds: true,
+    dynamicScreenSpaceError: true,
+    dynamicScreenSpaceErrorFactor: 16,
+    foveatedScreenSpaceError: true,
+    foveatedMinimumScreenSpaceErrorRelaxation: 8,
+    skipLevelOfDetail: true,
+    baseScreenSpaceError: 1024,
+    skipScreenSpaceErrorFactor: 12,
+    skipLevels: 1,
+    immediatelyLoadDesiredLevelOfDetail: false,
+    loadSiblings: false,
+    resolutionScale: 1.25,
+    msaaSamples: 4,
+    fxaaEnabled: false,
+  },
+  ultra: {
+    maximumScreenSpaceError: 8,
+    cacheBytes: 768 * 1024 * 1024,
+    maximumCacheOverflowBytes: 384 * 1024 * 1024,
+    cullWithChildrenBounds: false,
+    dynamicScreenSpaceError: false,
+    dynamicScreenSpaceErrorFactor: 8,
+    foveatedScreenSpaceError: false,
+    foveatedMinimumScreenSpaceErrorRelaxation: 0,
+    skipLevelOfDetail: false,
+    baseScreenSpaceError: 1024,
+    skipScreenSpaceErrorFactor: 8,
+    skipLevels: 0,
+    immediatelyLoadDesiredLevelOfDetail: true,
+    loadSiblings: true,
+    resolutionScale: 1.5,
+    msaaSamples: 4,
+    fxaaEnabled: false,
+  },
+};
 
 export function initCesiumViewer(container: string): Cesium.Viewer {
   const useGoogle3dTiles = settingsManager.getUseGoogle3dTiles();
@@ -114,8 +213,9 @@ export function initCesiumViewer(container: string): Cesium.Viewer {
   viewer.scene.postProcessStages.fxaa.enabled = false;  // No need if msaa is enabled. Turn off to improve performance
 
   if (useGoogle3dTiles) {
-    applyGoogle3dTilesRenderSettings(viewer);
-    addGoogle3dTiles(viewer).then();
+    const renderSettings = GOOGLE_3D_TILES_RENDER_SETTINGS[settingsManager.getGoogle3dTilesRenderQuality()];
+    applyGoogle3dTilesRenderSettings(viewer, renderSettings);
+    addGoogle3dTiles(viewer, renderSettings).then();
   }
 
   // Remove the credits widget
@@ -127,29 +227,29 @@ export function initCesiumViewer(container: string): Cesium.Viewer {
   return viewer;
 }
 
-async function addGoogle3dTiles(viewer: Cesium.Viewer): Promise<void> {
+async function addGoogle3dTiles(viewer: Cesium.Viewer, renderSettings: Google3dTilesRenderSettings): Promise<void> {
   try {
     const tileset = await Cesium.createGooglePhotorealistic3DTileset({
       onlyUsingWithGoogleGeocoder: true,
     }, {
-      maximumScreenSpaceError: 32,
-      cacheBytes: 256 * 1024 * 1024,
-      maximumCacheOverflowBytes: 128 * 1024 * 1024,
-      cullWithChildrenBounds: true,
-      dynamicScreenSpaceError: true,
+      maximumScreenSpaceError: renderSettings.maximumScreenSpaceError,
+      cacheBytes: renderSettings.cacheBytes,
+      maximumCacheOverflowBytes: renderSettings.maximumCacheOverflowBytes,
+      cullWithChildrenBounds: renderSettings.cullWithChildrenBounds,
+      dynamicScreenSpaceError: renderSettings.dynamicScreenSpaceError,
       dynamicScreenSpaceErrorDensity: 4.0e-4,
-      dynamicScreenSpaceErrorFactor: 32,
+      dynamicScreenSpaceErrorFactor: renderSettings.dynamicScreenSpaceErrorFactor,
       dynamicScreenSpaceErrorHeightFalloff: 0.25,
-      foveatedScreenSpaceError: true,
+      foveatedScreenSpaceError: renderSettings.foveatedScreenSpaceError,
       foveatedConeSize: 0.15,
-      foveatedMinimumScreenSpaceErrorRelaxation: 16,
+      foveatedMinimumScreenSpaceErrorRelaxation: renderSettings.foveatedMinimumScreenSpaceErrorRelaxation,
       foveatedTimeDelay: 0.5,
-      skipLevelOfDetail: true,
-      baseScreenSpaceError: 1024,
-      skipScreenSpaceErrorFactor: 16,
-      skipLevels: 1,
-      immediatelyLoadDesiredLevelOfDetail: false,
-      loadSiblings: false,
+      skipLevelOfDetail: renderSettings.skipLevelOfDetail,
+      baseScreenSpaceError: renderSettings.baseScreenSpaceError,
+      skipScreenSpaceErrorFactor: renderSettings.skipScreenSpaceErrorFactor,
+      skipLevels: renderSettings.skipLevels,
+      immediatelyLoadDesiredLevelOfDetail: renderSettings.immediatelyLoadDesiredLevelOfDetail,
+      loadSiblings: renderSettings.loadSiblings,
       enableCollision: false,
     });
     viewer.scene.primitives.add(tileset);
@@ -162,11 +262,11 @@ async function addGoogle3dTiles(viewer: Cesium.Viewer): Promise<void> {
   }
 }
 
-function applyGoogle3dTilesRenderSettings(viewer: Cesium.Viewer): void {
+function applyGoogle3dTilesRenderSettings(viewer: Cesium.Viewer, renderSettings: Google3dTilesRenderSettings): void {
   viewer.scene.highDynamicRange = false;
-  viewer.scene.msaaSamples = 1;
-  viewer.resolutionScale = 1;
-  viewer.scene.postProcessStages.fxaa.enabled = true;
+  viewer.scene.msaaSamples = renderSettings.msaaSamples;
+  viewer.resolutionScale = renderSettings.resolutionScale;
+  viewer.scene.postProcessStages.fxaa.enabled = renderSettings.fxaaEnabled;
   viewer.scene.globe.showGroundAtmosphere = false;
   viewer.scene.fog.enabled = true;
   viewer.scene.fog.density = 0.001;
