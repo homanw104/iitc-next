@@ -9,6 +9,7 @@ export interface Settings {
   };
   map: {
     useGoogle3dTiles: boolean;
+    darkenGoogle3dTiles: boolean;
     google3dTilesRenderQuality: Google3dTilesRenderQuality;
   };
   refresh: {
@@ -25,6 +26,7 @@ const DEFAULT_SETTINGS: Settings = {
   },
   map: {
     useGoogle3dTiles: false,
+    darkenGoogle3dTiles: false,
     google3dTilesRenderQuality: "balanced",
   },
   refresh: {
@@ -72,6 +74,15 @@ export class SettingsManager {
     this.saveState();
   }
 
+  public getDarkenGoogle3dTiles(): boolean {
+    return this.settings.map.darkenGoogle3dTiles;
+  }
+
+  public setDarkenGoogle3dTiles(darkenGoogle3dTiles: boolean): void {
+    this.settings.map.darkenGoogle3dTiles = darkenGoogle3dTiles;
+    this.saveState();
+  }
+
   public getRefreshIntervalMs(): RefreshIntervalMs {
     return this.settings.refresh.intervalMs;
   }
@@ -94,6 +105,7 @@ export class SettingsManager {
         map: {
           useGoogle3dTiles: parsed.map?.useGoogle3dTiles ?? DEFAULT_SETTINGS.map.useGoogle3dTiles,
           google3dTilesRenderQuality: this.normalizeGoogle3dTilesRenderQuality(parsed.map?.google3dTilesRenderQuality),
+          darkenGoogle3dTiles: parsed.map?.darkenGoogle3dTiles ?? DEFAULT_SETTINGS.map.darkenGoogle3dTiles,
         },
         refresh: {
           intervalMs: this.normalizeRefreshIntervalMs(parsed.refresh?.intervalMs),

@@ -36,6 +36,10 @@ type Google3dTilesRenderSettings = {
   fxaaEnabled: boolean;
 };
 
+const DARKEN_GOOGLE_3D_TILES_STYLE = new Cesium.Cesium3DTileStyle({
+  color: "color('#808080')",
+});
+
 const GOOGLE_3D_TILES_RENDER_SETTINGS: Record<Google3dTilesRenderQuality, Google3dTilesRenderSettings> = {
   performance: {
     maximumScreenSpaceError: 48,
@@ -252,6 +256,9 @@ async function addGoogle3dTiles(viewer: Cesium.Viewer, renderSettings: Google3dT
       loadSiblings: renderSettings.loadSiblings,
       enableCollision: true,
     });
+    if (settingsManager.getDarkenGoogle3dTiles()) {
+      tileset.style = DARKEN_GOOGLE_3D_TILES_STYLE;
+    }
     viewer.scene.primitives.add(tileset);
     viewer.scene.requestRender();
     logManager.debug("CesiumViewer", "Google Photorealistic 3D Tiles enabled");

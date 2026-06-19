@@ -37,6 +37,7 @@ const GoogleTilesSettingsPane = ({ onBack, onClose }: {
 }) => {
   const initialUseGoogle3dTiles = settingsManager.getUseGoogle3dTiles();
   const initialRenderQuality = settingsManager.getGoogle3dTilesRenderQuality();
+  const initialDarkenGoogle3dTiles = settingsManager.getDarkenGoogle3dTiles();
   const optionInputs: HTMLInputElement[] = [];
   let reloadButton: HTMLAnchorElement | null = null;
 
@@ -44,7 +45,8 @@ const GoogleTilesSettingsPane = ({ onBack, onClose }: {
     if (!reloadButton) return;
     const useGoogle3dTilesChanged = settingsManager.getUseGoogle3dTiles() !== initialUseGoogle3dTiles;
     const renderQualityChanged = settingsManager.getGoogle3dTilesRenderQuality() !== initialRenderQuality;
-    reloadButton.style.display = useGoogle3dTilesChanged || renderQualityChanged ? "inline" : "none";
+    const darkenGoogle3dTilesChanged = settingsManager.getDarkenGoogle3dTiles() !== initialDarkenGoogle3dTiles;
+    reloadButton.style.display = useGoogle3dTilesChanged || renderQualityChanged || darkenGoogle3dTilesChanged ? "inline" : "none";
   };
 
   const updateCheckedOptions = () => {
@@ -110,6 +112,36 @@ const GoogleTilesSettingsPane = ({ onBack, onClose }: {
             onClick={(e: Event) => {
               const target = e.target as HTMLInputElement;
               settingsManager.setUseGoogle3dTiles(target.checked);
+              updateReloadButtonVisibility();
+            }}
+            style={{
+              width: "20px",
+              height: "20px",
+              cursor: "pointer",
+            }}
+          />
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: "8px",
+            backgroundColor: "rgba(255, 255, 255, 0.05)",
+            borderRadius: "4px",
+          }}
+        >
+          <div>
+            <div style={{ fontWeight: "bold" }}>Darken Google 3D Tiles</div>
+            <div style={{ fontSize: "12px", color: "#aaa" }}>Darker tiles make portals easier to see. Reload is required.</div>
+          </div>
+          <input
+            type="checkbox"
+            checked={initialDarkenGoogle3dTiles}
+            onClick={(e: Event) => {
+              const target = e.target as HTMLInputElement;
+              settingsManager.setDarkenGoogle3dTiles(target.checked);
               updateReloadButtonVisibility();
             }}
             style={{
