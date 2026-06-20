@@ -6,9 +6,29 @@ This project is a Total Conversion for Ingress Intel that adds a 3D globe view u
 
 ## Features
 
-* Full 3D Globe view of the Earth.
-* Integration with Ingress Intel.
+* A 3D Globe view of the Earth.
+* Integration with Google Earth's 3D tiles.
 * Lightweight userscript powered by Vite and Cesium CDN.
+* Custom user plugins for various features of IITC Next.
+
+## Installation
+
+### For browsers
+
+1. Download the userscript from [Releases](https://github.com/homanw104/iitc-next/releases).
+   The userscript is named like `iitc-next-v2.1.0.js`.
+2. Install [Tampermonkey](https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo)
+   in your browser, a userscript executor.
+3. Open Tampermonkey, inside the Dashboard, go to the Utility page.
+4. Choose "Import from file" and select the downloaded userscript.
+5. Install the userscript in Tampermonkey.
+6. Open <https://intel.ingress.com/>
+7. Enjoy.
+
+### For Android
+
+Download the apk from [Releases](https://github.com/homanw104/iitc-next/releases),
+or request for closed test access on Google Play by joining the [Telegram group](https://t.me/iitc_next_closed_test).
 
 ## Development
 
