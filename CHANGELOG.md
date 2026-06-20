@@ -2,6 +2,7 @@
 
 ## 2.1.0
 
+* Added fullscreen (edge-to-edge) support
 * Added quality options for Google 3D Tiles
 * Added an option to darken Google 3D Tiles for better visibility on portals
 * Added a link to directly open the portal in Ingress
