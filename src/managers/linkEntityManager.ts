@@ -20,7 +20,7 @@ export class LinkEntityManager {
       latE6: data.oLatE6,
       lngE6: data.oLngE6,
       isPlaceholder: true,
-    } as PortalData);
+    } as PortalData).then();
 
     this.portalManager.addOrUpdatePortal({
       guid: data.dGuid,
@@ -28,7 +28,7 @@ export class LinkEntityManager {
       latE6: data.dLatE6,
       lngE6: data.dLngE6,
       isPlaceholder: true,
-    } as PortalData);
+    } as PortalData).then();
 
     const existing = this.links.get(data.guid);
     if (existing) {
@@ -61,7 +61,7 @@ export class LinkEntityManager {
     return false;
   }
 
-  public removeLinkInView(viewRect: Cesium.Rectangle): void {
+  public removeLinksInView(viewRect: Cesium.Rectangle): void {
     this.removeLinkEntityInView(viewRect);
   }
 

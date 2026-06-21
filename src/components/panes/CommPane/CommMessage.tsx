@@ -11,6 +11,8 @@ import { Channel } from "../../../types/ingress.ts";
 import PortalDetailBar from "../../buttons/PortalDetailBar/PortalDetailBar.tsx";
 import type { PortalDetailPaneController } from "../../../controllers/PortalDetailPaneController.tsx";
 import type { PortalDetailState } from "../../../core/coreControllers.ts";
+import { PortalLabelEntityManager } from "../../../managers/portalLabelEntityManager.ts";
+import { PortalOrnamentEntityManager } from "../../../managers/portalOrnamentEntityManager.ts";
 
 let latestPortalSelectionRequest = 0;
 
@@ -18,6 +20,8 @@ async function selectLoadedPortal(
   viewer: Viewer,
   container: HTMLElement,
   portalEntityManager: PortalEntityManager,
+  portalLabelEntityManager: PortalLabelEntityManager,
+  portalOrnamentEntityManager: PortalOrnamentEntityManager,
   portalHistoryEntityManager: PortalHistoryEntityManager,
   scoutHistoryEntityManager: ScoutHistoryEntityManager,
   portalDetailPaneController: PortalDetailPaneController,
@@ -42,8 +46,10 @@ async function selectLoadedPortal(
     portalDetailState.portalDetailBar?.remove();
     portalDetailState.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailPaneController: portalDetailPaneController, data: freshData }));
     portalDetailPaneController.updateDetailPane(freshData);
-    portalHistoryEntityManager.addOrUpdateHistoryHalo(freshData);
-    scoutHistoryEntityManager.addOrUpdateScoutControlHalo(freshData);
+    await portalLabelEntityManager.addOrUpdateLabel(freshData);
+    await portalOrnamentEntityManager.addOrUpdateOrnament(freshData);
+    await portalHistoryEntityManager.addOrUpdateHistoryHalo(freshData);
+    await scoutHistoryEntityManager.addOrUpdateScoutControlHalo(freshData);
     return true;
   } catch {
     return false;
@@ -55,6 +61,8 @@ function handleOnClick(
   viewer: Viewer,
   container: HTMLElement,
   portalEntityManager: PortalEntityManager,
+  portalLabelEntityManager: PortalLabelEntityManager,
+  portalOrnamentEntityManager: PortalOrnamentEntityManager,
   portalHistoryEntityManager: PortalHistoryEntityManager,
   scoutHistoryEntityManager: ScoutHistoryEntityManager,
   tileRequestManager: TileRequestManager,
@@ -69,6 +77,8 @@ function handleOnClick(
       viewer,
       container,
       portalEntityManager,
+      portalLabelEntityManager,
+      portalOrnamentEntityManager,
       portalHistoryEntityManager,
       scoutHistoryEntityManager,
       portalDetailPaneController,
@@ -98,6 +108,8 @@ function handleOnClick(
             viewer,
             container,
             portalEntityManager,
+            portalLabelEntityManager,
+            portalOrnamentEntityManager,
             portalHistoryEntityManager,
             scoutHistoryEntityManager,
             portalDetailPaneController,
@@ -116,8 +128,10 @@ const CommMessage = ({
   message,
   viewer,
   container,
-  portalEntityManager,
   tileRequestManager,
+  portalEntityManager,
+  portalLabelEntityManager,
+  portalOrnamentEntityManager,
   portalHistoryEntityManager,
   scoutHistoryEntityManager,
   portalDetailPaneController,
@@ -127,8 +141,10 @@ const CommMessage = ({
   message: CommResponseItem;
   viewer: Viewer;
   container: HTMLElement;
-  portalEntityManager: PortalEntityManager;
   tileRequestManager: TileRequestManager;
+  portalEntityManager: PortalEntityManager;
+  portalLabelEntityManager: PortalLabelEntityManager;
+  portalOrnamentEntityManager: PortalOrnamentEntityManager;
   portalHistoryEntityManager: PortalHistoryEntityManager;
   scoutHistoryEntityManager: ScoutHistoryEntityManager;
   portalDetailPaneController: PortalDetailPaneController;
@@ -171,11 +187,13 @@ const CommMessage = ({
                   viewer,
                   container,
                   portalEntityManager,
+                  portalLabelEntityManager,
+                  portalOrnamentEntityManager,
                   portalHistoryEntityManager,
                   scoutHistoryEntityManager,
                   tileRequestManager,
                   portalDetailPaneController,
-                  portalDetailState
+                  portalDetailState,
                 )}
               >
                 {data.plain}

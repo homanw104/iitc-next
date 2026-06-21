@@ -3,6 +3,8 @@ import { h } from "../utils/dom";
 import { Channel } from "../types/ingress";
 import { CommManager } from "../managers/commManager";
 import { PortalEntityManager } from "../managers/portalEntityManager";
+import { PortalLabelEntityManager } from "../managers/portalLabelEntityManager.ts";
+import { PortalOrnamentEntityManager } from "../managers/portalOrnamentEntityManager.ts";
 import { PortalHistoryEntityManager } from "../managers/portalHistoryEntityManager";
 import { ScoutHistoryEntityManager } from "../managers/scoutHistoryEntityManager";
 import { TileRequestManager } from "../managers/tileRequestManager";
@@ -14,8 +16,10 @@ import type { PortalDetailState } from "../core/coreControllers";
 export class CommPaneController {
   private readonly viewer: Viewer;
   private readonly commManager: CommManager;
-  private readonly portalEntityManager: PortalEntityManager;
   private readonly tileRequestManager: TileRequestManager;
+  private readonly portalEntityManager: PortalEntityManager;
+  private readonly portalLabelEntityManager: PortalLabelEntityManager;
+  private readonly portalOrnamentEntityManager: PortalOrnamentEntityManager;
   private readonly portalHistoryEntityManager: PortalHistoryEntityManager;
   private readonly scoutHistoryEntityManager: ScoutHistoryEntityManager;
   private readonly portalDetailPaneController: PortalDetailPaneController;
@@ -39,8 +43,10 @@ export class CommPaneController {
     viewer: Viewer,
     container: HTMLElement,
     commManager: CommManager,
-    portalEntityManager: PortalEntityManager,
     tileRequestManager: TileRequestManager,
+    portalEntityManager: PortalEntityManager,
+    portalLabelEntityManager: PortalLabelEntityManager,
+    portalOrnamentEntityManager: PortalOrnamentEntityManager,
     portalHistoryEntityManager: PortalHistoryEntityManager,
     scoutHistoryEntityManager: ScoutHistoryEntityManager,
     portalDetailPaneController: PortalDetailPaneController,
@@ -49,8 +55,10 @@ export class CommPaneController {
     this.viewer = viewer;
     this.container = container;
     this.commManager = commManager;
-    this.portalEntityManager = portalEntityManager;
     this.tileRequestManager = tileRequestManager;
+    this.portalEntityManager = portalEntityManager;
+    this.portalLabelEntityManager = portalLabelEntityManager;
+    this.portalOrnamentEntityManager = portalOrnamentEntityManager;
     this.portalHistoryEntityManager = portalHistoryEntityManager;
     this.scoutHistoryEntityManager = scoutHistoryEntityManager;
     this.portalDetailPaneController = portalDetailPaneController;
@@ -168,8 +176,10 @@ export class CommPaneController {
       <CommPane
         viewer={this.viewer}
         commManager={this.commManager}
-        portalEntityManager={this.portalEntityManager}
         tileRequestManager={this.tileRequestManager}
+        portalEntityManager={this.portalEntityManager}
+        portalLabelEntityManager={this.portalLabelEntityManager}
+        portalOrnamentEntityManager={this.portalOrnamentEntityManager}
         portalHistoryEntityManager={this.portalHistoryEntityManager}
         scoutHistoryEntityManager={this.scoutHistoryEntityManager}
         portalDetailPaneController={this.portalDetailPaneController}

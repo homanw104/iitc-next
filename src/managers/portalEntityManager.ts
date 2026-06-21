@@ -4,13 +4,23 @@
 
 import * as Cesium from "cesium";
 import { PortalData, PortalLevel, PortalMod, PortalResonator, RawEntity } from "../types/ingress";
-import { LayerManager } from "./layerManager";
 import { EntityPositionManager, EntityPositionCallback } from "./entityPositionManager";
+import { LayerManager } from "./layerManager";
 import { getTeamColor } from "../utils/color";
 import { apiRequest } from "../utils/network";
 
+export const PORTAL_POINT_PIXEL_SIZE = 16;
+export const PORTAL_POINT_OUTLINE_WIDTH = 2;
 export const PORTAL_DISABLE_DEPTH_TEST_DISTANCE = 2e4;
 export const PORTAL_OCCLUDED_ALPHA = 0.5;
+export const PORTAL_NEAR_FAR_SCALAR = new Cesium.NearFarScalar(1e1, 1, 2e4, 0.125);
+
+interface Portal {
+  data: PortalData;
+  entity: Cesium.Entity;
+  occlusionEntity: Cesium.Entity;
+  positionCallback: EntityPositionCallback;
+}
 
 interface PortalDetailsResponse {
   result: unknown[];
@@ -44,16 +54,23 @@ export class PortalRequest {
 }
 
 export class PortalEntityManager {
-  private portals: Map<string, {
-    data: PortalData;
-    entity: Cesium.Entity;
-    occlusionEntity: Cesium.Entity;
-    positionCallback: EntityPositionCallback;
-  }> = new Map();
+  private portals: Map<string, Portal> = new Map();
+  private portalsPendingCreation: Set<string> = new Set();
 
-  constructor(private layerManager: LayerManager, private entityPositionManager: EntityPositionManager) {}
+  constructor(
+    private layerManager: LayerManager,
+    private entityPositionManager: EntityPositionManager
+  ) {}
 
-  public addOrUpdatePortal(data: PortalData): void {
+  public async requestPortalDetails(guid: string): Promise<void> {
+    const request = new PortalRequest(guid);
+    const response = await request.send();
+    const data = response as PortalDetailsResponse;
+    const portalData = parsePortal([guid, data.result[13] as number, data.result]);
+    await this.addOrUpdatePortal(portalData);
+  }
+
+  public async addOrUpdatePortal(data: PortalData): Promise<void> {
     const existing = this.portals.get(data.guid);
     if (existing) {
       if (data.isPlaceholder) return;
@@ -67,43 +84,29 @@ export class PortalEntityManager {
         if (oldLayerId !== newLayerId) {
           this.layerManager.getOrCreateDataSourceLayer(oldLayerId).entities.remove(existing.entity);
           this.layerManager.getOrCreateDataSourceLayer(oldLayerId).entities.remove(existing.occlusionEntity);
-          this.layerManager.getOrCreateDataSourceLayer(newLayerId).entities.add(existing.occlusionEntity);
           this.layerManager.getOrCreateDataSourceLayer(newLayerId).entities.add(existing.entity);
+          this.layerManager.getOrCreateDataSourceLayer(newLayerId).entities.add(existing.occlusionEntity);
         }
+        await this.updatePortalEntity(existing.entity, existing.occlusionEntity, data);
         this.updatePortalPositionSubscription(existing, data);
-        this.updatePortalEntity(existing.entity, existing.occlusionEntity, data);
         existing.data = data;
       }
-      return;
+    } else {
+      if (this.portalsPendingCreation.has(data.guid)) return;
+      this.portalsPendingCreation.add(data.guid);
+      const { entity, occlusionEntity } = await this.createPortalEntity(data);
+      const positionCallback: EntityPositionCallback = (_latE6, _lngE6, position) => {
+        entity.position = new Cesium.ConstantPositionProperty(position);
+        occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
+      };
+      this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, positionCallback);
+      this.portals.set(data.guid, { data, entity, occlusionEntity, positionCallback });
+      this.portalsPendingCreation.delete(data.guid);
     }
-
-    const { entity, occlusionEntity } = this.createPortalEntities(data);
-    const positionCallback: EntityPositionCallback = (_latE6, _lngE6, position) => {
-      entity.position = new Cesium.ConstantPositionProperty(position);
-      occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
-    };
-    this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, positionCallback);
-    this.portals.set(data.guid, { data, entity, occlusionEntity, positionCallback });
-  }
-
-  public removePortalInView(viewRect: Cesium.Rectangle): void {
-    this.removePortalEntityInView(viewRect);
-  }
-
-  public async requestPortalDetails(guid: string): Promise<void> {
-    const request = new PortalRequest(guid);
-    const response = await request.send();
-    const data = response as PortalDetailsResponse;
-    const portalData = parsePortal([guid, data.result[13] as number, data.result]);
-    this.addOrUpdatePortal(portalData);
   }
 
   public getPortalData(guid: string): PortalData | undefined {
     return this.portals.get(guid)?.data;
-  }
-
-  public getPortalEntity(guid: string): Cesium.Entity | undefined {
-    return this.portals.get(guid)?.entity;
   }
 
   public getPortalDataByCoordinates(latE6: number, lngE6: number): PortalData | undefined {
@@ -112,76 +115,69 @@ export class PortalEntityManager {
     )?.data;
   }
 
-  private createPortalEntities(data: PortalData): { entity: Cesium.Entity; occlusionEntity: Cesium.Entity } {
+  public getPortalEntity(guid: string): Cesium.Entity | undefined {
+    return this.portals.get(guid)?.entity;
+  }
+
+  public removePortal(guid: string): void {
+    this.removePortalEntity(guid);
+  }
+
+  public removePortalsInView(viewRect: Cesium.Rectangle): void {
+    this.removePortalEntitiesInView(viewRect);
+  }
+
+  private async createPortalEntity(data: PortalData): Promise<{
+    entity: Cesium.Entity;
+    occlusionEntity: Cesium.Entity
+  }> {
     const layerId = getPortalLayerId(data);
     const entities = this.layerManager.getOrCreateDataSourceLayer(layerId).entities;
-    const position = this.entityPositionManager.getPosition(data);
+    const position = await this.entityPositionManager.getPosition(data);
+
+    const entity = entities.add({
+      id: `portal-${data.guid}`,
+      position: position,
+      point: {
+        pixelSize: PORTAL_POINT_PIXEL_SIZE,
+        heightReference: Cesium.HeightReference.NONE,
+        disableDepthTestDistance: 0,
+        scaleByDistance: PORTAL_NEAR_FAR_SCALAR,
+        color: getTeamColor(data.team),
+        outlineColor: Cesium.Color.BLACK,
+        outlineWidth: PORTAL_POINT_OUTLINE_WIDTH,
+      },
+      properties: {
+        selectable: true,
+      },
+    });
+
     const occlusionEntity = entities.add({
       id: `portal-${data.guid}-occluded`,
-      position,
+      position: position,
       point: {
-        pixelSize: 16,
+        pixelSize: PORTAL_POINT_PIXEL_SIZE,
         heightReference: Cesium.HeightReference.NONE,
         disableDepthTestDistance: PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
-        scaleByDistance: new Cesium.NearFarScalar(1e1, 1.0, 2e4, 0.125),
-        translucencyByDistance: new Cesium.NearFarScalar(1e1, 1, 2e4, 0.125),
+        scaleByDistance: PORTAL_NEAR_FAR_SCALAR,
+        translucencyByDistance: PORTAL_NEAR_FAR_SCALAR,
         color: getTeamColor(data.team).withAlpha(PORTAL_OCCLUDED_ALPHA),
         outlineColor: Cesium.Color.BLACK.withAlpha(PORTAL_OCCLUDED_ALPHA),
-        outlineWidth: 2,
+        outlineWidth: PORTAL_POINT_OUTLINE_WIDTH,
       },
       properties: {
         selectable: false,
       },
     });
 
-    const entity = entities.add({
-      id: `portal-${data.guid}`,
-      position,
-      point: {
-        pixelSize: 16,
-        heightReference: Cesium.HeightReference.NONE,
-        disableDepthTestDistance: 0,
-        scaleByDistance: new Cesium.NearFarScalar(1e1, 1.0, 2e4, 0.125),
-        color: getTeamColor(data.team),
-        outlineColor: Cesium.Color.BLACK,
-        outlineWidth: 2,
-      },
-      properties: {
-        selectable: true,
-      },
-    });
     return { entity, occlusionEntity };
   }
 
-  private removePortalEntity(guid: string): void {
-    const portalInfo = this.portals.get(guid);
-    if (portalInfo) {
-      const layerId = getPortalLayerId(portalInfo.data);
-      this.layerManager.getOrCreateDataSourceLayer(layerId).entities.remove(portalInfo.entity);
-      this.layerManager.getOrCreateDataSourceLayer(layerId).entities.remove(portalInfo.occlusionEntity);
-      this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(portalInfo.data, portalInfo.positionCallback);
-      this.portals.delete(guid);
-    }
-  }
-  
-  private removePortalEntityInView(viewRect: Cesium.Rectangle): void {
-    const toRemove: string[] = [];
-    this.portals.forEach((info, guid) => {
-      const position = info.entity.position?.getValue(Cesium.JulianDate.now());
-      if (position) {
-        const cartographic = Cesium.Cartographic.fromCartesian(position);
-        if (Cesium.Rectangle.contains(viewRect, cartographic)) {
-          toRemove.push(guid);
-        }
-      }
-    });
-    toRemove.forEach(guid => this.removePortalEntity(guid));
-  }
-
-  private updatePortalEntity(entity: Cesium.Entity, occlusionEntity: Cesium.Entity, data: PortalData): void {
-    const position = this.entityPositionManager.getPosition(data);
+  private async updatePortalEntity(entity: Cesium.Entity, occlusionEntity: Cesium.Entity, data: PortalData): Promise<void> {
+    const position = await this.entityPositionManager.getPosition(data);
     entity.position = new Cesium.ConstantPositionProperty(position);
     occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
+
     if (entity.point) {
       entity.point.color = new Cesium.ConstantProperty(getTeamColor(data.team));
       entity.point.heightReference = new Cesium.ConstantProperty(Cesium.HeightReference.NONE);
@@ -189,7 +185,6 @@ export class PortalEntityManager {
     }
     if (occlusionEntity.point) {
       occlusionEntity.point.color = new Cesium.ConstantProperty(getTeamColor(data.team).withAlpha(PORTAL_OCCLUDED_ALPHA));
-      occlusionEntity.point.outlineColor = new Cesium.ConstantProperty(Cesium.Color.BLACK.withAlpha(PORTAL_OCCLUDED_ALPHA));
       occlusionEntity.point.heightReference = new Cesium.ConstantProperty(Cesium.HeightReference.NONE);
       occlusionEntity.point.disableDepthTestDistance = new Cesium.ConstantProperty(PORTAL_DISABLE_DEPTH_TEST_DISTANCE);
     }
@@ -203,6 +198,35 @@ export class PortalEntityManager {
 
     this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(portalInfo.data, portalInfo.positionCallback);
     this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, portalInfo.positionCallback);
+  }
+
+  private removePortalEntity(guid: string): void {
+    const portalInfo = this.portals.get(guid);
+    if (portalInfo) {
+      const layerId = getPortalLayerId(portalInfo.data);
+      const entities = this.layerManager.getOrCreateDataSourceLayer(layerId).entities;
+
+      entities.remove(portalInfo.entity);
+      entities.remove(portalInfo.occlusionEntity);
+
+      this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(portalInfo.data, portalInfo.positionCallback);
+      this.portals.delete(guid);
+    }
+    this.portalsPendingCreation.delete(guid);
+  }
+
+  private removePortalEntitiesInView(viewRect: Cesium.Rectangle): void {
+    const toRemove: string[] = [];
+    this.portals.forEach((info, guid) => {
+      const position = info.entity.position?.getValue(Cesium.JulianDate.now());
+      if (position) {
+        const cartographic = Cesium.Cartographic.fromCartesian(position);
+        if (Cesium.Rectangle.contains(viewRect, cartographic)) {
+          toRemove.push(guid);
+        }
+      }
+    });
+    toRemove.forEach(guid => this.removePortalEntity(guid));
   }
 }
 

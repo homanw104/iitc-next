@@ -61,6 +61,7 @@ class PlayerActivityPlugin {
   private pathDataSourceRes: Cesium.CustomDataSource = new Cesium.CustomDataSource("activity-path-res");
   private playerLocations: Map<string, Cesium.Entity> = new Map();
   private playerPaths: Map<string, Cesium.Entity> = new Map();
+  private pendingPlayerLocationActivityByName: Map<string, PlayerActivity> = new Map();
   private playerPositionSubscriptions: Map<string, {
     coordinates: EntityCoordinates;
     callback: EntityPositionCallback;
@@ -392,63 +393,74 @@ class PlayerActivityPlugin {
     playerActivities.forEach((activities, playerName) => {
       const lastActivity = this.getLatestActivity(activities);
       if (!lastActivity) return;
-      const lastPosition = this.entityPositionManager?.getPosition(lastActivity);
-      if (!lastPosition) return;
-
-      let source: CustomDataSource;
-      if (lastActivity.team === "ENLIGHTENED") source = this.dataSourceEnl;
-      else if (lastActivity.team === "RESISTANCE") source = this.dataSourceRes;
-      else return;
-
-      let entity = this.playerLocations.get(playerName);
-      if (!entity) {
-        entity = source.entities.add({
-          id: `player-activity-${playerName}`,
-          position: lastPosition,
-          label: {
-            text: playerName,
-            font: "16px coda_regular, arial, helvetica, sans-serif",
-            verticalOrigin: Cesium.VerticalOrigin.CENTER,
-            horizontalOrigin: lastActivity.team === "ENLIGHTENED" ? Cesium.HorizontalOrigin.LEFT : Cesium.HorizontalOrigin.RIGHT,
-            pixelOffset: lastActivity.team === "ENLIGHTENED" ? new Cesium.Cartesian2(25, 0) : new Cesium.Cartesian2(-25, 0),
-            fillColor: getTeamColor(lastActivity.team),
-            outlineColor: Cesium.Color.BLACK,
-            outlineWidth: 6,
-            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-            heightReference: Cesium.HeightReference.NONE,
-            disableDepthTestDistance: Number.POSITIVE_INFINITY,
-          },
-          billboard: {
-            image: this.buildCanvas(),
-            heightReference: Cesium.HeightReference.NONE,
-            disableDepthTestDistance: Number.POSITIVE_INFINITY,
-          },
-          properties: {
-            activities: activities as PlayerActivity[]
-          },
-        });
-      } else {
-        entity.position = new Cesium.ConstantPositionProperty(lastPosition);
-
-        // For rare ocations where agents might change their faction
-        if (entity.label) {
-          entity.label.horizontalOrigin = lastActivity.team === "ENLIGHTENED" ?
-            new Cesium.ConstantProperty(Cesium.HorizontalOrigin.LEFT) :
-            new Cesium.ConstantProperty(Cesium.HorizontalOrigin.RIGHT);
-          entity.label.pixelOffset = lastActivity.team === "ENLIGHTENED" ?
-            new Cesium.ConstantProperty(new Cesium.Cartesian2(25, 0)) :
-            new Cesium.ConstantProperty(new Cesium.Cartesian2(-25, 0));
-          entity.label.fillColor = new Cesium.ConstantProperty(getTeamColor(lastActivity.team));
-        }
-
-        // Update the properties for tooltips
-        if (entity.properties) {
-          entity.properties?.activities.setValue(activities as PlayerActivity[]);
-        }
-      }
-      this.updatePlayerPositionSubscription(playerName, lastActivity, entity);
-      this.playerLocations.set(playerName, entity);
+      this.renderPlayerLocation(playerName, activities, lastActivity).then();
     });
+  }
+
+  private async renderPlayerLocation(playerName: string, activities: PlayerActivity[], lastActivity: PlayerActivity): Promise<void> {
+    this.pendingPlayerLocationActivityByName.set(playerName, lastActivity);
+    let lastPosition: Cesium.Cartesian3 | undefined;
+    try {
+      lastPosition = await this.entityPositionManager?.getPosition(lastActivity);
+    } catch {
+      return;
+    }
+    if (!lastPosition || this.pendingPlayerLocationActivityByName.get(playerName) !== lastActivity) return;
+
+    let source: CustomDataSource;
+    if (lastActivity.team === "ENLIGHTENED") source = this.dataSourceEnl;
+    else if (lastActivity.team === "RESISTANCE") source = this.dataSourceRes;
+    else return;
+
+    let entity = this.playerLocations.get(playerName);
+    if (!entity) {
+      entity = source.entities.add({
+        id: `player-activity-${playerName}`,
+        position: lastPosition,
+        label: {
+          text: playerName,
+          font: "16px coda_regular, arial, helvetica, sans-serif",
+          verticalOrigin: Cesium.VerticalOrigin.CENTER,
+          horizontalOrigin: lastActivity.team === "ENLIGHTENED" ? Cesium.HorizontalOrigin.LEFT : Cesium.HorizontalOrigin.RIGHT,
+          pixelOffset: lastActivity.team === "ENLIGHTENED" ? new Cesium.Cartesian2(25, 0) : new Cesium.Cartesian2(-25, 0),
+          fillColor: getTeamColor(lastActivity.team),
+          outlineColor: Cesium.Color.BLACK,
+          outlineWidth: 6,
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          heightReference: Cesium.HeightReference.NONE,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+        billboard: {
+          image: this.buildCanvas(),
+          heightReference: Cesium.HeightReference.NONE,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+        properties: {
+          activities: activities as PlayerActivity[]
+        },
+      });
+    } else {
+      entity.position = new Cesium.ConstantPositionProperty(lastPosition);
+
+      // For rare ocations where agents might change their faction
+      if (entity.label) {
+        entity.label.horizontalOrigin = lastActivity.team === "ENLIGHTENED" ?
+          new Cesium.ConstantProperty(Cesium.HorizontalOrigin.LEFT) :
+          new Cesium.ConstantProperty(Cesium.HorizontalOrigin.RIGHT);
+        entity.label.pixelOffset = lastActivity.team === "ENLIGHTENED" ?
+          new Cesium.ConstantProperty(new Cesium.Cartesian2(25, 0)) :
+          new Cesium.ConstantProperty(new Cesium.Cartesian2(-25, 0));
+        entity.label.fillColor = new Cesium.ConstantProperty(getTeamColor(lastActivity.team));
+      }
+
+      // Update the properties for tooltips
+      if (entity.properties) {
+        entity.properties?.activities.setValue(activities as PlayerActivity[]);
+      }
+    }
+    this.updatePlayerPositionSubscription(playerName, lastActivity, entity);
+    this.playerLocations.set(playerName, entity);
+    this.pendingPlayerLocationActivityByName.delete(playerName);
   }
 
   private renderPlayerPaths(playerActivities: Map<string, PlayerActivity[]>): void {

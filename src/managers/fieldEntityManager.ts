@@ -24,7 +24,7 @@ export class FieldEntityManager {
         latE6: p.latE6,
         lngE6: p.lngE6,
         isPlaceholder: true,
-      } as PortalData);
+      } as PortalData).then();
     });
 
     const existing = this.fields.get(data.guid);
@@ -58,7 +58,7 @@ export class FieldEntityManager {
     return false;
   }
 
-  public removeFieldInView(viewRect: Cesium.Rectangle): void {
+  public removeFieldsInView(viewRect: Cesium.Rectangle): void {
     this.removeFieldEntityInView(viewRect);
   }
 

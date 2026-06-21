@@ -109,10 +109,10 @@ export function handlePortalSelection({
           interfaceState.portalDetailBar?.remove();
           interfaceState.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailPaneController: portalDetailPaneController, data: freshData }));
           portalDetailPaneController.updateDetailPane(freshData);
-          portalLabelEntityManager.addOrUpdateLabel(freshData);
-          portalOrnamentEntityManager.addOrUpdateOrnament(freshData);
-          portalHistoryEntityManager.addOrUpdateHistoryHalo(freshData);
-          scoutHistoryEntityManager.addOrUpdateScoutControlHalo(freshData);
+          portalLabelEntityManager.addOrUpdateLabel(freshData).then();
+          portalOrnamentEntityManager.addOrUpdateOrnament(freshData).then();
+          portalHistoryEntityManager.addOrUpdateHistoryHalo(freshData).then();
+          scoutHistoryEntityManager.addOrUpdateScoutControlHalo(freshData).then();
         }
       }, Math.max(0, displayPortalDetailAfter - Date.now()));
     }).finally(() => {

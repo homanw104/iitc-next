@@ -44,12 +44,14 @@ export function mountCoreControllersAndUI(viewer: Cesium.Viewer, container: HTML
     viewer,
     container,
     managers.commManager,
-    managers.portalEntityManager,
     managers.tileRequestManager,
+    managers.portalEntityManager,
+    managers.portalLabelEntityManager,
+    managers.portalOrnamentEntityManager,
     managers.portalHistoryEntityManager,
     managers.scoutHistoryEntityManager,
     portalDetailPaneController,
-    state
+    state,
   );
 
   state.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailPaneController: portalDetailPaneController }));

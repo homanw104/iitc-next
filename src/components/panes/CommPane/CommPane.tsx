@@ -16,12 +16,16 @@ import CommLoadingIndicator from "./CommLoadingIndicator.tsx";
 import CommMessage from "./CommMessage.tsx";
 import CommTab from "./CommTab.tsx";
 import CommDateDivider from "./CommDateDivider.tsx";
+import { PortalLabelEntityManager } from "../../../managers/portalLabelEntityManager.ts";
+import { PortalOrnamentEntityManager } from "../../../managers/portalOrnamentEntityManager.ts";
 
 const CommPane = ({
   viewer,
   commManager,
-  portalEntityManager,
   tileRequestManager,
+  portalEntityManager,
+  portalLabelEntityManager,
+  portalOrnamentEntityManager,
   portalHistoryEntityManager,
   scoutHistoryEntityManager,
   portalDetailPaneController,
@@ -41,8 +45,10 @@ const CommPane = ({
 }: {
   viewer: Viewer;
   commManager: CommManager;
-  portalEntityManager: PortalEntityManager;
   tileRequestManager: TileRequestManager;
+  portalEntityManager: PortalEntityManager;
+  portalLabelEntityManager: PortalLabelEntityManager;
+  portalOrnamentEntityManager: PortalOrnamentEntityManager;
   portalHistoryEntityManager: PortalHistoryEntityManager;
   scoutHistoryEntityManager: ScoutHistoryEntityManager;
   portalDetailPaneController: PortalDetailPaneController;
@@ -79,8 +85,10 @@ const CommPane = ({
       <CommMessage
         message={message}
         viewer={viewer}
-        portalEntityManager={portalEntityManager}
         tileRequestManager={tileRequestManager}
+        portalEntityManager={portalEntityManager}
+        portalLabelEntityManager={portalLabelEntityManager}
+        portalOrnamentEntityManager={portalOrnamentEntityManager}
         portalHistoryEntityManager={portalHistoryEntityManager}
         scoutHistoryEntityManager={scoutHistoryEntityManager}
         portalDetailPaneController={portalDetailPaneController}

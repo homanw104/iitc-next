@@ -140,6 +140,8 @@ export class TileRequestManager {
   private refreshIntervalId: number | null = null;
   private lastDataZoom: number | undefined;
   private lastTileKeysCount: number | undefined;
+  private queueProcessingScheduled = false;
+  private scheduledRefreshExisting = false;
 
   constructor(
     private viewer: Cesium.Viewer,
@@ -200,7 +202,7 @@ export class TileRequestManager {
       }
     });
     logManager.debug("TileRequestManager", `Skipped ${skippedCount} tile${skippedCount === 1 ? "" : "s"}`);
-    this.processQueue(refreshExisting).then();
+    this.scheduleQueueProcessing(refreshExisting);
   }
 
   public removeTiles(tileKeys: string[]): void {
@@ -213,7 +215,7 @@ export class TileRequestManager {
         this.requestedTiles.delete(key);
       }
     });
-    this.processQueue().then();
+    this.scheduleQueueProcessing();
   }
 
   public onTileStatusChange(callback: TileStatusCallback): void {
@@ -237,6 +239,19 @@ export class TileRequestManager {
 
     const resolvers = this.idleResolvers.splice(0);
     resolvers.forEach((resolve) => resolve());
+  }
+
+  private scheduleQueueProcessing(refreshExisting: boolean = false): void {
+    this.scheduledRefreshExisting ||= refreshExisting;
+    if (this.queueProcessingScheduled) return;
+
+    this.queueProcessingScheduled = true;
+    window.queueMicrotask(() => {
+      const shouldRefreshExisting = this.scheduledRefreshExisting;
+      this.queueProcessingScheduled = false;
+      this.scheduledRefreshExisting = false;
+      this.processQueue(shouldRefreshExisting).then(() => this.resolveIdleWaiters());
+    });
   }
 
   private setTileStatus(key: string, status: TileStatus): void {
@@ -363,16 +378,16 @@ export class TileRequestManager {
       if (response && refreshExisting) {
         const viewRect = this.computeViewRectangle(this.viewer.scene.globe.ellipsoid);
         if (!viewRect) return;
-        this.portalEntityManager.removePortalInView(viewRect);
-        this.portalLabelEntityManager.removeLabelInView(viewRect);
-        this.portalOrnamentEntityManager.removeOrnamentInView(viewRect);
-        this.portalHistoryEntityManager.removeHistoryHaloInView(viewRect);
-        this.scoutHistoryEntityManager.removeScoutControlHaloInView(viewRect);
-        this.linkEntityManager.removeLinkInView(viewRect);
-        this.fieldEntityManager.removeFieldInView(viewRect);
+        this.portalEntityManager.removePortalsInView(viewRect);
+        this.portalLabelEntityManager.removeLabelsInView(viewRect);
+        this.portalOrnamentEntityManager.removeOrnamentsInView(viewRect);
+        this.portalHistoryEntityManager.removeHistoryHalosInView(viewRect);
+        this.scoutHistoryEntityManager.removeScoutControlHalosInView(viewRect);
+        this.linkEntityManager.removeLinksInView(viewRect);
+        this.fieldEntityManager.removeFieldsInView(viewRect);
         logManager.debug("TileRequestManager", "Removed entities from current view");
       }
-      this.handleResponse(response, tilesToRequest);
+      await this.handleResponse(response, tilesToRequest);
     } catch (error) {
       logManager.error("TileRequestManager", "Tile request failed:", error);
       tilesToRequest.forEach((key) => {
@@ -381,11 +396,11 @@ export class TileRequestManager {
       });
     } finally {
       this.activeRequestCount--;
-      this.processQueue().then(() => this.resolveIdleWaiters());
+      this.scheduleQueueProcessing();
     }
   }
 
-  private handleResponse(response: unknown, tileKeys: string[]): void {
+  private async handleResponse(response: unknown, tileKeys: string[]): Promise<void> {
     const data = response as TileResponse;
     if (!data || !data.result) {
       logManager.warn("TileRequestManager", "Invalid response data:", data);
@@ -424,11 +439,11 @@ export class TileRequestManager {
       if (tileData.gameEntities) {
         entitiesFound += tileData.gameEntities.length;
         const { portals, links, fields } = parseTileEntities(tileData.gameEntities);
-        portals.forEach((p) => this.portalEntityManager.addOrUpdatePortal(p));
-        portals.forEach((p) => this.portalLabelEntityManager.addOrUpdateLabel(p));
-        portals.forEach((p) => this.portalOrnamentEntityManager.addOrUpdateOrnament(p));
-        portals.forEach((p) => this.portalHistoryEntityManager.addOrUpdateHistoryHalo(p));
-        portals.forEach((p) => this.scoutHistoryEntityManager.addOrUpdateScoutControlHalo(p));
+        await Promise.all(portals.map((p) => this.portalEntityManager.addOrUpdatePortal(p)));
+        await Promise.all(portals.map((p) => this.portalLabelEntityManager.addOrUpdateLabel(p)));
+        await Promise.all(portals.map((p) => this.portalOrnamentEntityManager.addOrUpdateOrnament(p)));
+        await Promise.all(portals.map((p) => this.portalHistoryEntityManager.addOrUpdateHistoryHalo(p)));
+        await Promise.all(portals.map((p) => this.scoutHistoryEntityManager.addOrUpdateScoutControlHalo(p)));
         links.forEach((l) => this.linkEntityManager.addOrUpdateLink(l));
         fields.forEach((f) => this.fieldEntityManager.addOrUpdateField(f));
       }

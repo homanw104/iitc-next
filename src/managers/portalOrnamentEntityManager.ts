@@ -1,26 +1,41 @@
+/**
+ * Manage portal ornament entities.
+ */
+
 import * as Cesium from "cesium";
-import { PortalData } from "../types/ingress.ts";
-import { LayerManager } from "./layerManager.ts";
-import { EntityPositionCallback, EntityPositionManager } from "./entityPositionManager.ts";
-import { PORTAL_DISABLE_DEPTH_TEST_DISTANCE, PORTAL_OCCLUDED_ALPHA } from "./portalEntityManager.ts";
+import { PortalData } from "../types/ingress";
+import { EntityPositionCallback, EntityPositionManager } from "./entityPositionManager";
+import { LayerManager } from "./layerManager";
+import {
+  PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
+  PORTAL_OCCLUDED_ALPHA,
+  PORTAL_NEAR_FAR_SCALAR,
+} from "./portalEntityManager.ts";
 
 const AP1_ORNAMENT_SIZE = 16;
 const AP1_ORNAMENT_HOLLOW_SIZE = 8;
+const AP1_ORNAMENT_ALPHA = 0.5;
 const CANVAS_DIMENSION = AP1_ORNAMENT_SIZE * 2;
 
 const ornamentImageCache = new Map<string, HTMLCanvasElement>();
 
+interface PortalOrnament {
+  data: PortalData;
+  entity: Cesium.Entity;
+  occlusionEntity: Cesium.Entity;
+  positionCallback: EntityPositionCallback;
+}
+
 export class PortalOrnamentEntityManager {
-  private ornaments: Map<string, {
-    data: PortalData;
-    entity: Cesium.Entity;
-    occlusionEntity: Cesium.Entity;
-    positionCallback: EntityPositionCallback;
-  }> = new Map();
+  private ornaments: Map<string, PortalOrnament> = new Map();
+  private ornamentsPendingCreation: Set<string> = new Set();
 
-  constructor(private layerManager: LayerManager, private entityPositionManager: EntityPositionManager) {}
+  constructor(
+    private layerManager: LayerManager,
+    private entityPositionManager: EntityPositionManager
+  ) {}
 
-  public addOrUpdateOrnament(data: PortalData): void {
+  public async addOrUpdateOrnament(data: PortalData): Promise<void> {
     if (!data.ornaments?.length) {
       this.removeOrnament(data.guid);
       return;
@@ -33,49 +48,59 @@ export class PortalOrnamentEntityManager {
       if (oldLayerId !== newLayerId) {
         this.layerManager.getOrCreateDataSourceLayer(oldLayerId).entities.remove(existing.entity);
         this.layerManager.getOrCreateDataSourceLayer(oldLayerId).entities.remove(existing.occlusionEntity);
-        this.layerManager.getOrCreateDataSourceLayer(newLayerId).entities.add(existing.occlusionEntity);
         this.layerManager.getOrCreateDataSourceLayer(newLayerId).entities.add(existing.entity);
+        this.layerManager.getOrCreateDataSourceLayer(newLayerId).entities.add(existing.occlusionEntity);
       }
+      await this.updateOrnamentEntity(existing.entity, existing.occlusionEntity, data);
       this.updateOrnamentPositionSubscription(existing, data);
-      this.updateOrnamentEntity(existing.entity, existing.occlusionEntity, data);
       existing.data = data;
       return;
+    } else {
+      if (this.ornamentsPendingCreation.has(data.guid)) return;
+      this.ornamentsPendingCreation.add(data.guid);
+      const { entity, occlusionEntity } = await this.createOrnamentEntity(data);
+      const positionCallback: EntityPositionCallback = (_latE6, _lngE6, position) => {
+        entity.position = new Cesium.ConstantPositionProperty(position);
+        occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
+      };
+      this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, positionCallback);
+      this.ornaments.set(data.guid, { data, entity, occlusionEntity, positionCallback });
+      this.ornamentsPendingCreation.delete(data.guid);
     }
-
-    const { entity, occlusionEntity } = this.createOrnamentEntities(data);
-    const positionCallback: EntityPositionCallback = (_latE6, _lngE6, position) => {
-      entity.position = new Cesium.ConstantPositionProperty(position);
-      occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
-    };
-    this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, positionCallback);
-    this.ornaments.set(data.guid, { data, entity, occlusionEntity, positionCallback });
   }
 
   public removeOrnament(guid: string): void {
     this.removeOrnamentEntity(guid);
   }
 
-  public removeOrnamentInView(viewRect: Cesium.Rectangle): void {
-    const toRemove: string[] = [];
-    this.ornaments.forEach((info, guid) => {
-      const position = info.entity.position?.getValue(Cesium.JulianDate.now());
-      if (position) {
-        const cartographic = Cesium.Cartographic.fromCartesian(position);
-        if (Cesium.Rectangle.contains(viewRect, cartographic)) {
-          toRemove.push(guid);
-        }
-      }
-    });
-    toRemove.forEach(guid => this.removeOrnamentEntity(guid));
+  public removeOrnamentsInView(viewRect: Cesium.Rectangle): void {
+    this.removeOrnamentEntitiesInView(viewRect);
   }
 
-  private createOrnamentEntities(data: PortalData): { entity: Cesium.Entity; occlusionEntity: Cesium.Entity } {
+  private async createOrnamentEntity(data: PortalData): Promise<{
+    entity: Cesium.Entity;
+    occlusionEntity: Cesium.Entity
+  }> {
     const layerId = getPortalOrnamentLayerId(data);
     const entities = this.layerManager.getOrCreateDataSourceLayer(layerId).entities;
-    const position = this.entityPositionManager.getPosition(data);
+    const position = await this.entityPositionManager.getPosition(data);
+
+    const entity = entities.add({
+      id: `ornament-${data.guid}`,
+      position: position,
+      billboard: {
+        image: getOrnamentImage(data),
+        heightReference: Cesium.HeightReference.NONE,
+        disableDepthTestDistance: 0,
+        horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+        verticalOrigin: Cesium.VerticalOrigin.CENTER,
+        scaleByDistance: PORTAL_NEAR_FAR_SCALAR,
+      },
+    });
+
     const occlusionEntity = entities.add({
       id: `ornament-${data.guid}-occluded`,
-      position,
+      position: position,
       billboard: {
         image: getOrnamentImage(data),
         color: Cesium.Color.WHITE.withAlpha(PORTAL_OCCLUDED_ALPHA),
@@ -83,28 +108,16 @@ export class PortalOrnamentEntityManager {
         disableDepthTestDistance: PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
         horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
         verticalOrigin: Cesium.VerticalOrigin.CENTER,
-        scaleByDistance: new Cesium.NearFarScalar(1e1, 1.0, 2e4, 0.125),
-        translucencyByDistance: new Cesium.NearFarScalar(1e1, 1, 2e4, 0.125),
-      },
-    });
-
-    const entity = entities.add({
-      id: `ornament-${data.guid}`,
-      position,
-      billboard: {
-        image: getOrnamentImage(data),
-        heightReference: Cesium.HeightReference.NONE,
-        disableDepthTestDistance: 0,
-        horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-        verticalOrigin: Cesium.VerticalOrigin.CENTER,
-        scaleByDistance: new Cesium.NearFarScalar(1e1, 1.0, 2e4, 0.125),
+        scaleByDistance: PORTAL_NEAR_FAR_SCALAR,
+        translucencyByDistance: PORTAL_NEAR_FAR_SCALAR,
       },
     });
     return { entity, occlusionEntity };
   }
 
-  private updateOrnamentEntity(entity: Cesium.Entity, occlusionEntity: Cesium.Entity, data: PortalData): void {
-    const position = this.entityPositionManager.getPosition(data);
+  private async updateOrnamentEntity(entity: Cesium.Entity, occlusionEntity: Cesium.Entity, data: PortalData): Promise<void> {
+    const position = await this.entityPositionManager.getPosition(data);
+
     entity.position = new Cesium.ConstantPositionProperty(position);
     occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
     if (entity.billboard) {
@@ -120,17 +133,6 @@ export class PortalOrnamentEntityManager {
     }
   }
 
-  private removeOrnamentEntity(guid: string): void {
-    const ornamentInfo = this.ornaments.get(guid);
-    if (!ornamentInfo) return;
-
-    const layerId = getPortalOrnamentLayerId(ornamentInfo.data);
-    this.layerManager.getOrCreateDataSourceLayer(layerId).entities.remove(ornamentInfo.entity);
-    this.layerManager.getOrCreateDataSourceLayer(layerId).entities.remove(ornamentInfo.occlusionEntity);
-    this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(ornamentInfo.data, ornamentInfo.positionCallback);
-    this.ornaments.delete(guid);
-  }
-
   private updateOrnamentPositionSubscription(ornamentInfo: {
     data: PortalData;
     positionCallback: EntityPositionCallback;
@@ -139,6 +141,35 @@ export class PortalOrnamentEntityManager {
 
     this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(ornamentInfo.data, ornamentInfo.positionCallback);
     this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, ornamentInfo.positionCallback);
+  }
+
+  private removeOrnamentEntity(guid: string): void {
+    const ornamentInfo = this.ornaments.get(guid);
+    if (ornamentInfo) {
+      const layerId = getPortalOrnamentLayerId(ornamentInfo.data);
+      const entities = this.layerManager.getOrCreateDataSourceLayer(layerId).entities;
+
+      entities.remove(ornamentInfo.entity);
+      entities.remove(ornamentInfo.occlusionEntity);
+
+      this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(ornamentInfo.data, ornamentInfo.positionCallback);
+      this.ornaments.delete(guid);
+    }
+    this.ornamentsPendingCreation.delete(guid);
+  }
+
+  private removeOrnamentEntitiesInView(viewRect: Cesium.Rectangle): void {
+    const toRemove: string[] = [];
+    this.ornaments.forEach((info, guid) => {
+      const position = info.entity.position?.getValue(Cesium.JulianDate.now());
+      if (position) {
+        const cartographic = Cesium.Cartographic.fromCartesian(position);
+        if (Cesium.Rectangle.contains(viewRect, cartographic)) {
+          toRemove.push(guid);
+        }
+      }
+    });
+    toRemove.forEach(guid => this.removeOrnamentEntity(guid));
   }
 }
 
@@ -159,7 +190,7 @@ function getOrnamentImage(data: PortalData): HTMLCanvasElement {
   if (!context) return canvas;
 
   if (data.ornaments?.includes("ap1")) {
-    context.fillStyle = "#ff9135";
+    context.fillStyle = `rgba(255, 146, 53, ${AP1_ORNAMENT_ALPHA})`;
     context.beginPath();
     context.arc(CANVAS_DIMENSION / 2, CANVAS_DIMENSION / 2, AP1_ORNAMENT_SIZE, 0, 2 * Math.PI);
     context.fill();

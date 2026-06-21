@@ -1,27 +1,37 @@
 /**
- * Manage Cesium label-backed portal label entities.
+ * Manage portal label entities.
  */
 
 import * as Cesium from "cesium";
 import { PortalData } from "../types/ingress";
-import { LayerManager } from "./layerManager";
 import { EntityPositionCallback, EntityPositionManager } from "./entityPositionManager";
-import { PORTAL_DISABLE_DEPTH_TEST_DISTANCE, PORTAL_OCCLUDED_ALPHA } from "./portalEntityManager.ts";
+import { LayerManager } from "./layerManager";
+import {
+  PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
+  PORTAL_OCCLUDED_ALPHA,
+} from "./portalEntityManager.ts";
 
 const LABEL_FONT = "12px sans-serif";
 const LABEL_PIXEL_OFFSET_Y = -12;
 const LABEL_MAX_LINE_LENGTH = 24;
+
+interface PortalLabel {
+  data: PortalData;
+  entity: Cesium.Entity;
+  occlusionEntity: Cesium.Entity;
+  positionCallback: EntityPositionCallback;
+}
+
 export class PortalLabelEntityManager {
-  private labels: Map<string, {
-    data: PortalData;
-    entity: Cesium.Entity;
-    occlusionEntity: Cesium.Entity;
-    positionCallback: EntityPositionCallback;
-  }> = new Map();
+  private labels: Map<string, PortalLabel> = new Map();
+  private labelsPendingCreation: Set<string> = new Set();
 
-  constructor(private layerManager: LayerManager, private entityPositionManager: EntityPositionManager) {}
+  constructor(
+    private layerManager: LayerManager,
+    private entityPositionManager: EntityPositionManager
+  ) {}
 
-  public addOrUpdateLabel(data: PortalData): void {
+  public async addOrUpdateLabel(data: PortalData): Promise<void> {
     if (!data.title) {
       this.removeLabel(data.guid);
       return;
@@ -34,72 +44,46 @@ export class PortalLabelEntityManager {
       if (oldLayerId !== newLayerId) {
         this.layerManager.getOrCreateDataSourceLayer(oldLayerId).entities.remove(existing.entity);
         this.layerManager.getOrCreateDataSourceLayer(oldLayerId).entities.remove(existing.occlusionEntity);
-        this.layerManager.getOrCreateDataSourceLayer(newLayerId).entities.add(existing.occlusionEntity);
         this.layerManager.getOrCreateDataSourceLayer(newLayerId).entities.add(existing.entity);
+        this.layerManager.getOrCreateDataSourceLayer(newLayerId).entities.add(existing.occlusionEntity);
       }
+      await this.updateLabelEntity(existing.entity, existing.occlusionEntity, data);
       this.updateLabelPositionSubscription(existing, data);
-      this.updateLabelEntity(existing.entity, existing.occlusionEntity, data);
       existing.data = data;
       return;
+    } else {
+      if (this.labelsPendingCreation.has(data.guid)) return;
+      this.labelsPendingCreation.add(data.guid);
+      const { entity, occlusionEntity } = await this.createLabelEntity(data);
+      const positionCallback: EntityPositionCallback = (_latE6, _lngE6, position) => {
+        entity.position = new Cesium.ConstantPositionProperty(position);
+        occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
+      };
+      this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, positionCallback);
+      this.labels.set(data.guid, { data, entity, occlusionEntity, positionCallback });
+      this.labelsPendingCreation.delete(data.guid);
     }
-
-    const { entity, occlusionEntity } = this.createLabelEntities(data);
-    const positionCallback: EntityPositionCallback = (_latE6, _lngE6, position) => {
-      entity.position = new Cesium.ConstantPositionProperty(position);
-      occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
-    };
-    this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, positionCallback);
-    this.labels.set(data.guid, { data, entity, occlusionEntity, positionCallback });
   }
 
   public removeLabel(guid: string): void {
     this.removeLabelEntity(guid);
   }
 
-  public removeLabelInView(viewRect: Cesium.Rectangle): void {
-    const toRemove: string[] = [];
-    this.labels.forEach((info, guid) => {
-      const position = info.entity.position?.getValue(Cesium.JulianDate.now());
-      if (position) {
-        const cartographic = Cesium.Cartographic.fromCartesian(position);
-        if (Cesium.Rectangle.contains(viewRect, cartographic)) {
-          toRemove.push(guid);
-        }
-      }
-    });
-    toRemove.forEach(guid => this.removeLabelEntity(guid));
+  public removeLabelsInView(viewRect: Cesium.Rectangle): void {
+    this.removeLabelEntitiesInView(viewRect);
   }
 
-  private createLabelEntities(data: PortalData): { entity: Cesium.Entity; occlusionEntity: Cesium.Entity } {
+  private async createLabelEntity(data: PortalData): Promise<{
+    entity: Cesium.Entity;
+    occlusionEntity: Cesium.Entity
+  }> {
     const layerId = getPortalLabelLayerId(data);
     const entities = this.layerManager.getOrCreateDataSourceLayer(layerId).entities;
-    const position = this.entityPositionManager.getPosition(data);
-    const occlusionEntity = entities.add({
-      id: `label-${data.guid}-occluded`,
-      position,
-      label: {
-        text: wrapLabelText(data.title || ""),
-        font: LABEL_FONT,
-        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        fillColor: Cesium.Color.WHITE.withAlpha(PORTAL_OCCLUDED_ALPHA),
-        outlineColor: Cesium.Color.BLACK.withAlpha(PORTAL_OCCLUDED_ALPHA),
-        outlineWidth: 8,
-        showBackground: false,
-        heightReference: Cesium.HeightReference.NONE,
-        disableDepthTestDistance: PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
-        horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-        pixelOffset: new Cesium.Cartesian2(0, LABEL_PIXEL_OFFSET_Y),
-        translucencyByDistance: new Cesium.NearFarScalar(6e2, 1.0, 8e2, 0.0),
-      },
-      properties: {
-        selectable: false,
-      },
-    });
+    const position = await this.entityPositionManager.getPosition(data);
 
     const entity = entities.add({
       id: `label-${data.guid}`,
-      position,
+      position: position,
       label: {
         text: wrapLabelText(data.title || ""),
         font: LABEL_FONT,
@@ -119,22 +103,35 @@ export class PortalLabelEntityManager {
         selectable: false,
       },
     });
+
+    const occlusionEntity = entities.add({
+      id: `label-occluded-${data.guid}`,
+      position: position,
+      label: {
+        text: wrapLabelText(data.title || ""),
+        font: LABEL_FONT,
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        fillColor: Cesium.Color.WHITE.withAlpha(PORTAL_OCCLUDED_ALPHA),
+        outlineColor: Cesium.Color.BLACK.withAlpha(PORTAL_OCCLUDED_ALPHA),
+        outlineWidth: 8,
+        showBackground: false,
+        heightReference: Cesium.HeightReference.NONE,
+        disableDepthTestDistance: PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
+        horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+        pixelOffset: new Cesium.Cartesian2(0, LABEL_PIXEL_OFFSET_Y),
+        translucencyByDistance: new Cesium.NearFarScalar(6e2, 1.0, 8e2, 0.0),
+      },
+      properties: {
+        selectable: false,
+      },
+    });
     return { entity, occlusionEntity };
   }
 
-  private removeLabelEntity(guid: string): void {
-    const labelInfo = this.labels.get(guid);
-    if (!labelInfo) return;
+  private async updateLabelEntity(entity: Cesium.Entity, occlusionEntity: Cesium.Entity, data: PortalData): Promise<void> {
+    const position = await this.entityPositionManager.getPosition(data);
 
-    const layerId = getPortalLabelLayerId(labelInfo.data);
-    this.layerManager.getOrCreateDataSourceLayer(layerId).entities.remove(labelInfo.entity);
-    this.layerManager.getOrCreateDataSourceLayer(layerId).entities.remove(labelInfo.occlusionEntity);
-    this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(labelInfo.data, labelInfo.positionCallback);
-    this.labels.delete(guid);
-  }
-
-  private updateLabelEntity(entity: Cesium.Entity, occlusionEntity: Cesium.Entity, data: PortalData): void {
-    const position = this.entityPositionManager.getPosition(data);
     entity.position = new Cesium.ConstantPositionProperty(position);
     occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
     if (entity.label) {
@@ -159,6 +156,35 @@ export class PortalLabelEntityManager {
 
     this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(labelInfo.data, labelInfo.positionCallback);
     this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, labelInfo.positionCallback);
+  }
+
+  private removeLabelEntity(guid: string): void {
+    const labelInfo = this.labels.get(guid);
+    if (labelInfo) {
+      const layerId = getPortalLabelLayerId(labelInfo.data);
+      const entities = this.layerManager.getOrCreateDataSourceLayer(layerId).entities;
+
+      entities.remove(labelInfo.entity);
+      entities.remove(labelInfo.occlusionEntity);
+
+      this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(labelInfo.data, labelInfo.positionCallback);
+      this.labels.delete(guid);
+    }
+    this.labelsPendingCreation.delete(guid);
+  }
+
+  private removeLabelEntitiesInView(viewRect: Cesium.Rectangle): void {
+    const toRemove: string[] = [];
+    this.labels.forEach((info, guid) => {
+      const position = info.entity.position?.getValue(Cesium.JulianDate.now());
+      if (position) {
+        const cartographic = Cesium.Cartographic.fromCartesian(position);
+        if (Cesium.Rectangle.contains(viewRect, cartographic)) {
+          toRemove.push(guid);
+        }
+      }
+    });
+    toRemove.forEach(guid => this.removeLabelEntity(guid));
   }
 }
 
