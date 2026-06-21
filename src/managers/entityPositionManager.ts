@@ -63,6 +63,7 @@ export class EntityPositionManager {
   private cameraMoving = false;
   private interactionActive = false;
   private heightSamplingGeneration = 0;
+  private queueStatusLoggingActive = false;
   private readonly worldTerrainProviderPromise: Promise<Cesium.TerrainProvider | undefined>;
 
   constructor(private readonly viewer: Cesium.Viewer) {
@@ -328,7 +329,7 @@ export class EntityPositionManager {
       if (this.useGoogle3dTiles) positionState.renderedHeightAttemptGeneration = batchHeightSamplingGeneration;
       this.renderedHeightSamplingKeys.add(getEntityPositionKey(positionState.latE6, positionState.lngE6));
     });
-    this.logQueueStatus();
+    this.logQueueStartStatus();
 
     const cartographics = positionStates.map((positionState) => Cesium.Cartographic.fromDegrees(positionState.lngE6 / 1e6, positionState.latE6 / 1e6));
 
@@ -338,6 +339,7 @@ export class EntityPositionManager {
       if (this.renderedHeightQueuedKeys.size > 0) {
         this.scheduleRenderedHeights(GOOGLE_RENDERED_SAMPLE_BATCH_DELAY_MS);
       }
+      this.logQueueStatus();
       return;
     }
 
@@ -345,6 +347,7 @@ export class EntityPositionManager {
     if (!terrainProvider.availability) {
       positionStates.forEach((positionState, index) => this.useRenderedTerrainHeight(positionState, cartographics[index], batchHeightSamplingGeneration));
       positionStates.forEach((positionState) => this.renderedHeightSamplingKeys.delete(getEntityPositionKey(positionState.latE6, positionState.lngE6)));
+      this.logQueueStatus();
       return;
     }
 
@@ -370,6 +373,7 @@ export class EntityPositionManager {
             this.queueHeightSample(positionState);
           });
         }
+        this.logQueueStatus();
       });
   }
 
@@ -379,7 +383,7 @@ export class EntityPositionManager {
     const positionStates = takeDetailedBatch(this.mostDetailedHeightQueuedKeys, this.positionStatesByKey);
     if (positionStates.length === 0) return;
     positionStates.forEach((positionState) => this.mostDetailedHeightSamplingKeys.add(getEntityPositionKey(positionState.latE6, positionState.lngE6)));
-    this.logQueueStatus();
+    this.logQueueStartStatus();
 
     const batchHeightSamplingGeneration = this.heightSamplingGeneration;
     const cartographics = positionStates.map((positionState) => Cesium.Cartographic.fromDegrees(positionState.lngE6 / 1e6, positionState.latE6 / 1e6));
@@ -390,6 +394,7 @@ export class EntityPositionManager {
     } catch {
       positionStates.forEach((positionState) => this.mostDetailedHeightSamplingKeys.delete(getEntityPositionKey(positionState.latE6, positionState.lngE6)));
       logManager.debug(LOG_TAG, "Detailed heights failed to load");
+      this.logQueueStatus();
       return;
     }
 
@@ -421,6 +426,7 @@ export class EntityPositionManager {
         }
         this.mostDetailedHeightSamplingInProgress = false;
         this.scheduleDetailedHeights();
+        this.logQueueStatus();
       });
   }
 
@@ -504,16 +510,27 @@ export class EntityPositionManager {
   private logQueueStatus(): void {
     const renderedHeightCount = this.renderedHeightQueuedKeys.size + this.renderedHeightSamplingKeys.size;
     const detailedHeightCount = this.mostDetailedHeightQueuedKeys.size + this.mostDetailedHeightSamplingKeys.size;
+    const hasQueuedOrSamplingTerrainHeights = this.hasQueuedOrSamplingTerrainHeights();
+    const hasUnresolvedRefreshableTerrainPositions = this.hasUnresolvedRefreshableTerrainPositions();
 
     if (renderedHeightCount > 0 && detailedHeightCount > 0) {
-      logManager.info(LOG_TAG, `Loading ${renderedHeightCount} rendered heights and ${detailedHeightCount} detailed heights`);
+      logManager.info(LOG_TAG, `Rendering ${renderedHeightCount} portal positions`);
     } else if (renderedHeightCount > 0) {
-      logManager.info(LOG_TAG, `Loading ${renderedHeightCount} rendered heights`);
+      logManager.info(LOG_TAG, `Rendering ${renderedHeightCount} portal positions`);
     } else if (detailedHeightCount > 0) {
-      logManager.info(LOG_TAG, `Loading ${detailedHeightCount} detailed heights`);
-    } else if (!this.hasQueuedOrSamplingTerrainHeights() && !this.hasUnresolvedRefreshableTerrainPositions()) {
-      logManager.info(LOG_TAG, "Loaded all terrain positions");
+      logManager.info(LOG_TAG, `Rendering ${detailedHeightCount} detailed positions`);
+    } else if (!hasQueuedOrSamplingTerrainHeights && !hasUnresolvedRefreshableTerrainPositions) {
+      logManager.info(LOG_TAG, "Rendered all terrain positions");
     }
+
+    if (!hasQueuedOrSamplingTerrainHeights) this.queueStatusLoggingActive = false;
+  }
+
+  private logQueueStartStatus(): void {
+    if (this.queueStatusLoggingActive) return;
+
+    this.queueStatusLoggingActive = true;
+    this.logQueueStatus();
   }
 
   private hasQueuedOrSamplingTerrainHeights(): boolean {
