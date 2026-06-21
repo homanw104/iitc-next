@@ -7,9 +7,9 @@ import { PortalData } from "../types/ingress";
 import { EntityPositionCallback, EntityPositionManager } from "./entityPositionManager";
 import { LayerManager } from "./layerManager";
 import {
-  PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
   PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
   PORTAL_OCCLUDED_ALPHA,
+  getPortalDisableDepthTestDistance,
 } from "./portalEntityManager.ts";
 
 const LABEL_FONT = "12px sans-serif";
@@ -43,10 +43,10 @@ export class PortalLabelEntityManager {
       const oldLayerId = getPortalLabelLayerId(existing.data);
       const newLayerId = getPortalLabelLayerId(data);
       if (oldLayerId !== newLayerId) {
-        this.layerManager.getOrCreateDataSourceLayer(oldLayerId).entities.remove(existing.entity);
-        this.layerManager.getOrCreateDataSourceLayer(oldLayerId).entities.remove(existing.occlusionEntity);
-        this.layerManager.getOrCreateDataSourceLayer(newLayerId).entities.add(existing.entity);
-        this.layerManager.getOrCreateDataSourceLayer(newLayerId).entities.add(existing.occlusionEntity);
+        this.layerManager.getOrCreateOverlayLayer(oldLayerId).entities.remove(existing.entity);
+        this.layerManager.getOrCreateOverlayLayer(oldLayerId).entities.remove(existing.occlusionEntity);
+        this.layerManager.getOrCreateOverlayLayer(newLayerId).entities.add(existing.entity);
+        this.layerManager.getOrCreateOverlayLayer(newLayerId).entities.add(existing.occlusionEntity);
       }
       await this.updateLabelEntity(existing.entity, existing.occlusionEntity, data);
       this.updateLabelPositionSubscription(existing, data);
@@ -79,7 +79,7 @@ export class PortalLabelEntityManager {
     occlusionEntity: Cesium.Entity
   }> {
     const layerId = getPortalLabelLayerId(data);
-    const entities = this.layerManager.getOrCreateDataSourceLayer(layerId).entities;
+    const entities = this.layerManager.getOrCreateOverlayLayer(layerId).entities;
     const position = await this.entityPositionManager.getPosition(data);
 
     const entity = entities.add({
@@ -94,7 +94,7 @@ export class PortalLabelEntityManager {
         outlineWidth: 8,
         showBackground: false,
         heightReference: Cesium.HeightReference.NONE,
-        disableDepthTestDistance: PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
+        disableDepthTestDistance: getPortalDisableDepthTestDistance(),
         horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
         pixelOffset: new Cesium.Cartesian2(0, LABEL_PIXEL_OFFSET_Y),
@@ -157,7 +157,7 @@ export class PortalLabelEntityManager {
     const labelInfo = this.labels.get(guid);
     if (labelInfo) {
       const layerId = getPortalLabelLayerId(labelInfo.data);
-      const entities = this.layerManager.getOrCreateDataSourceLayer(layerId).entities;
+      const entities = this.layerManager.getOrCreateOverlayLayer(layerId).entities;
 
       entities.remove(labelInfo.entity);
       entities.remove(labelInfo.occlusionEntity);

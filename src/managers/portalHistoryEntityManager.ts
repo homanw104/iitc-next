@@ -7,12 +7,12 @@ import { PortalData } from "../types/ingress";
 import { EntityPositionCallback, EntityPositionManager } from "./entityPositionManager";
 import { LayerManager } from "./layerManager";
 import {
-  PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
   PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
   PORTAL_OCCLUDED_ALPHA,
   PORTAL_POINT_PIXEL_SIZE,
   PORTAL_POINT_OUTLINE_WIDTH,
   PORTAL_NEAR_FAR_SCALAR,
+  getPortalDisableDepthTestDistance,
 } from "./portalEntityManager.ts";
 
 const DATA_SOURCE_LAYER_NAME = "history-visited-captured";
@@ -109,7 +109,7 @@ export class PortalHistoryEntityManager {
           scaleByDistance: PORTAL_NEAR_FAR_SCALAR,
           translucencyByDistance: PORTAL_NEAR_FAR_SCALAR,
           heightReference: Cesium.HeightReference.NONE,
-          disableDepthTestDistance: PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
+          disableDepthTestDistance: getPortalDisableDepthTestDistance(),
         },
       });
       occlusionEntity = entities.add({
@@ -141,7 +141,7 @@ export class PortalHistoryEntityManager {
           scaleByDistance: PORTAL_NEAR_FAR_SCALAR,
           translucencyByDistance: PORTAL_NEAR_FAR_SCALAR,
           heightReference: Cesium.HeightReference.NONE,
-          disableDepthTestDistance: PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
+          disableDepthTestDistance: getPortalDisableDepthTestDistance(),
         },
       });
       reverseOcclusionEntity = reverseEntities.add({

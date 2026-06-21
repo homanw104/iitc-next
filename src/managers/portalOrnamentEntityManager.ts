@@ -7,10 +7,10 @@ import { PortalData } from "../types/ingress";
 import { EntityPositionCallback, EntityPositionManager } from "./entityPositionManager";
 import { LayerManager } from "./layerManager";
 import {
-  PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
   PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
   PORTAL_OCCLUDED_ALPHA,
   PORTAL_NEAR_FAR_SCALAR,
+  getPortalDisableDepthTestDistance,
 } from "./portalEntityManager.ts";
 
 const AP1_ORNAMENT_SIZE = 16;
@@ -92,7 +92,7 @@ export class PortalOrnamentEntityManager {
       billboard: {
         image: getOrnamentImage(data),
         heightReference: Cesium.HeightReference.NONE,
-        disableDepthTestDistance: PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
+        disableDepthTestDistance: getPortalDisableDepthTestDistance(),
         horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
         verticalOrigin: Cesium.VerticalOrigin.CENTER,
         scaleByDistance: PORTAL_NEAR_FAR_SCALAR,

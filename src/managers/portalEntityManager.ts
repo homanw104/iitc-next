@@ -12,10 +12,12 @@ import { settingsManager } from "./settingsManager.ts";
 
 export const PORTAL_POINT_PIXEL_SIZE = 16;
 export const PORTAL_POINT_OUTLINE_WIDTH = 2;
-export const PORTAL_DISABLE_DEPTH_TEST_DISTANCE = settingsManager.getUseGoogle3dTiles() ? 0 : 2e4;
 export const PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE = 2e4;
 export const PORTAL_OCCLUDED_ALPHA = 0.5;
 export const PORTAL_NEAR_FAR_SCALAR = new Cesium.NearFarScalar(1e1, 1, 2e4, 0.125);
+
+const PORTAL_DISABLE_DEPTH_TEST_DISTANCE_DEFAULT = 2e4;
+const PORTAL_DISABLE_DEPTH_TEST_DISTANCE_GOOGLE = 0;
 
 interface Portal {
   data: PortalData;
@@ -143,7 +145,7 @@ export class PortalEntityManager {
       point: {
         pixelSize: PORTAL_POINT_PIXEL_SIZE,
         heightReference: Cesium.HeightReference.NONE,
-        disableDepthTestDistance: PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
+        disableDepthTestDistance: getPortalDisableDepthTestDistance(),
         scaleByDistance: PORTAL_NEAR_FAR_SCALAR,
         color: getTeamColor(data.team),
         outlineColor: Cesium.Color.BLACK,
@@ -235,6 +237,12 @@ function getPortalLayerId(data: PortalData): string {
     return `portals-placeholder-${team}`;
   }
   return `portals-l${level}-${team}`;
+}
+
+export function getPortalDisableDepthTestDistance(): number {
+  return settingsManager.getUseGoogle3dTiles() ?
+    PORTAL_DISABLE_DEPTH_TEST_DISTANCE_GOOGLE :
+    PORTAL_DISABLE_DEPTH_TEST_DISTANCE_DEFAULT;
 }
 
 export function parsePortal(ent: RawEntity): PortalData {

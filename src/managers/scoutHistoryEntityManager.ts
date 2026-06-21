@@ -11,7 +11,8 @@ import {
   PORTAL_OCCLUDED_ALPHA,
   PORTAL_POINT_PIXEL_SIZE,
   PORTAL_POINT_OUTLINE_WIDTH,
-  PORTAL_NEAR_FAR_SCALAR, PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
+  PORTAL_NEAR_FAR_SCALAR,
+  getPortalDisableDepthTestDistance,
 } from "./portalEntityManager.ts";
 
 const DATA_SOURCE_LAYER_NAME = "history-scout-control";
@@ -105,7 +106,7 @@ export class ScoutHistoryEntityManager {
           outlineWidth: HALO_POINT_OUTLINE_WIDTH,
           scaleByDistance: PORTAL_NEAR_FAR_SCALAR,
           heightReference: Cesium.HeightReference.NONE,
-          disableDepthTestDistance: PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
+          disableDepthTestDistance: getPortalDisableDepthTestDistance(),
         },
       });
       occlusionEntity = entities.add({
@@ -133,7 +134,7 @@ export class ScoutHistoryEntityManager {
           outlineWidth: HALO_POINT_OUTLINE_WIDTH,
           scaleByDistance: PORTAL_NEAR_FAR_SCALAR,
           heightReference: Cesium.HeightReference.NONE,
-          disableDepthTestDistance: PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
+          disableDepthTestDistance: getPortalDisableDepthTestDistance(),
         },
       });
       reverseOcclusionEntity = reverseEntities.add({
