@@ -98,14 +98,17 @@ export class PortalEntityManager {
     } else {
       if (this.portalsPendingCreation.has(data.guid)) return;
       this.portalsPendingCreation.add(data.guid);
-      const { entity, occlusionEntity } = await this.createPortalEntity(data);
-      const positionCallback: EntityPositionCallback = (_latE6, _lngE6, position) => {
-        entity.position = new Cesium.ConstantPositionProperty(position);
-        occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
-      };
-      this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, positionCallback);
-      this.portals.set(data.guid, { data, entity, occlusionEntity, positionCallback });
-      this.portalsPendingCreation.delete(data.guid);
+      try {
+        const { entity, occlusionEntity } = await this.createPortalEntity(data);
+        const positionCallback: EntityPositionCallback = (_latE6, _lngE6, position) => {
+          entity.position = new Cesium.ConstantPositionProperty(position);
+          occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
+        };
+        this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, positionCallback);
+        this.portals.set(data.guid, { data, entity, occlusionEntity, positionCallback });
+      } finally {
+        this.portalsPendingCreation.delete(data.guid);
+      }
     }
   }
 

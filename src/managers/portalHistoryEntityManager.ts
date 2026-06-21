@@ -52,23 +52,26 @@ export class PortalHistoryEntityManager {
     } else {
       if (this.historyHalosPendingCreation.has(data.guid)) return;
       this.historyHalosPendingCreation.add(data.guid);
-      const { entity, occlusionEntity, reverseEntity, reverseOcclusionEntity } = await this.createHistoryHaloEntity(data);
-      const portalHistoryHalo: PortalHistoryHalo = {
-        data,
-        entity,
-        occlusionEntity,
-        reverseEntity,
-        reverseOcclusionEntity,
-        positionCallback: (_latE6, _lngE6, position) => {
-          if (portalHistoryHalo.entity) portalHistoryHalo.entity.position = new Cesium.ConstantPositionProperty(position);
-          if (portalHistoryHalo.occlusionEntity) portalHistoryHalo.occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
-          if (portalHistoryHalo.reverseEntity) portalHistoryHalo.reverseEntity.position = new Cesium.ConstantPositionProperty(position);
-          if (portalHistoryHalo.reverseOcclusionEntity) portalHistoryHalo.reverseOcclusionEntity.position = new Cesium.ConstantPositionProperty(position);
-        },
-      };
-      this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, portalHistoryHalo.positionCallback);
-      this.historyHalos.set(data.guid, portalHistoryHalo);
-      this.historyHalosPendingCreation.delete(data.guid);
+      try {
+        const { entity, occlusionEntity, reverseEntity, reverseOcclusionEntity } = await this.createHistoryHaloEntity(data);
+        const portalHistoryHalo: PortalHistoryHalo = {
+          data,
+          entity,
+          occlusionEntity,
+          reverseEntity,
+          reverseOcclusionEntity,
+          positionCallback: (_latE6, _lngE6, position) => {
+            if (portalHistoryHalo.entity) portalHistoryHalo.entity.position = new Cesium.ConstantPositionProperty(position);
+            if (portalHistoryHalo.occlusionEntity) portalHistoryHalo.occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
+            if (portalHistoryHalo.reverseEntity) portalHistoryHalo.reverseEntity.position = new Cesium.ConstantPositionProperty(position);
+            if (portalHistoryHalo.reverseOcclusionEntity) portalHistoryHalo.reverseOcclusionEntity.position = new Cesium.ConstantPositionProperty(position);
+          },
+        };
+        this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, portalHistoryHalo.positionCallback);
+        this.historyHalos.set(data.guid, portalHistoryHalo);
+      } finally {
+        this.historyHalosPendingCreation.delete(data.guid);
+      }
     }
   }
 
@@ -164,7 +167,7 @@ export class PortalHistoryEntityManager {
   }
 
   private async updateHistoryHaloEntity(portalHistoryHalo: PortalHistoryHalo, data: PortalData): Promise<void> {
-    this.removeHistoryHaloEntity(portalHistoryHalo.data.guid);
+    this.removeHistoryHaloEntityGroup(portalHistoryHalo);
     const { entity, occlusionEntity, reverseEntity, reverseOcclusionEntity } = await this.createHistoryHaloEntity(data);
     portalHistoryHalo.entity = entity;
     portalHistoryHalo.occlusionEntity = occlusionEntity;
@@ -185,18 +188,26 @@ export class PortalHistoryEntityManager {
   private removeHistoryHaloEntity(guid: string): void {
     const portalHistoryHalo = this.historyHalos.get(guid);
     if (portalHistoryHalo) {
-      const entities = this.layerManager.getOrCreateDataSourceLayer(DATA_SOURCE_LAYER_NAME).entities;
-      const reverseEntities = this.layerManager.getOrCreateDataSourceLayer(DATA_SOURCE_LAYER_NAME_REVERSE).entities;
-
-      if (portalHistoryHalo.entity) entities.remove(portalHistoryHalo.entity);
-      if (portalHistoryHalo.occlusionEntity) entities.remove(portalHistoryHalo.occlusionEntity);
-      if (portalHistoryHalo.reverseEntity) reverseEntities.remove(portalHistoryHalo.reverseEntity);
-      if (portalHistoryHalo.reverseOcclusionEntity) reverseEntities.remove(portalHistoryHalo.reverseOcclusionEntity);
-
+      this.removeHistoryHaloEntityGroup(portalHistoryHalo);
       this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(portalHistoryHalo.data, portalHistoryHalo.positionCallback);
       this.historyHalos.delete(guid);
     }
     this.historyHalosPendingCreation.delete(guid);
+  }
+
+  private removeHistoryHaloEntityGroup(portalHistoryHalo: PortalHistoryHalo): void {
+    const entities = this.layerManager.getOrCreateDataSourceLayer(DATA_SOURCE_LAYER_NAME).entities;
+    const reverseEntities = this.layerManager.getOrCreateDataSourceLayer(DATA_SOURCE_LAYER_NAME_REVERSE).entities;
+
+    if (portalHistoryHalo.entity) entities.remove(portalHistoryHalo.entity);
+    if (portalHistoryHalo.occlusionEntity) entities.remove(portalHistoryHalo.occlusionEntity);
+    if (portalHistoryHalo.reverseEntity) reverseEntities.remove(portalHistoryHalo.reverseEntity);
+    if (portalHistoryHalo.reverseOcclusionEntity) reverseEntities.remove(portalHistoryHalo.reverseOcclusionEntity);
+
+    portalHistoryHalo.entity = undefined;
+    portalHistoryHalo.occlusionEntity = undefined;
+    portalHistoryHalo.reverseEntity = undefined;
+    portalHistoryHalo.reverseOcclusionEntity = undefined;
   }
 
   private removeHistoryHaloEntitiesInView(viewRect: Cesium.Rectangle): void {

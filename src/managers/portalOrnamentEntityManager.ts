@@ -59,14 +59,17 @@ export class PortalOrnamentEntityManager {
     } else {
       if (this.ornamentsPendingCreation.has(data.guid)) return;
       this.ornamentsPendingCreation.add(data.guid);
-      const { entity, occlusionEntity } = await this.createOrnamentEntity(data);
-      const positionCallback: EntityPositionCallback = (_latE6, _lngE6, position) => {
-        entity.position = new Cesium.ConstantPositionProperty(position);
-        occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
-      };
-      this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, positionCallback);
-      this.ornaments.set(data.guid, { data, entity, occlusionEntity, positionCallback });
-      this.ornamentsPendingCreation.delete(data.guid);
+      try {
+        const { entity, occlusionEntity } = await this.createOrnamentEntity(data);
+        const positionCallback: EntityPositionCallback = (_latE6, _lngE6, position) => {
+          entity.position = new Cesium.ConstantPositionProperty(position);
+          occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
+        };
+        this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, positionCallback);
+        this.ornaments.set(data.guid, { data, entity, occlusionEntity, positionCallback });
+      } finally {
+        this.ornamentsPendingCreation.delete(data.guid);
+      }
     }
   }
 

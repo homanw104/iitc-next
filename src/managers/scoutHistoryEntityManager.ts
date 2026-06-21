@@ -51,23 +51,26 @@ export class ScoutHistoryEntityManager {
     } else {
       if (this.scoutControlHalosPendingCreation.has(data.guid)) return;
       this.scoutControlHalosPendingCreation.add(data.guid);
-      const { entity, occlusionEntity, reverseEntity, reverseOcclusionEntity } = await this.createScoutControlHaloEntity(data);
-      const scoutHistoryHalo: ScoutHistoryHalo = {
-        data,
-        entity,
-        occlusionEntity,
-        reverseEntity,
-        reverseOcclusionEntity,
-        positionCallback: (_latE6, _lngE6, position) => {
-          if (scoutHistoryHalo.entity) scoutHistoryHalo.entity.position = new Cesium.ConstantPositionProperty(position);
-          if (scoutHistoryHalo.occlusionEntity) scoutHistoryHalo.occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
-          if (scoutHistoryHalo.reverseEntity) scoutHistoryHalo.reverseEntity.position = new Cesium.ConstantPositionProperty(position);
-          if (scoutHistoryHalo.reverseOcclusionEntity) scoutHistoryHalo.reverseOcclusionEntity.position = new Cesium.ConstantPositionProperty(position);
-        },
-      };
-      this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, scoutHistoryHalo.positionCallback);
-      this.scoutControlHalos.set(data.guid, scoutHistoryHalo);
-      this.scoutControlHalosPendingCreation.delete(data.guid);
+      try {
+        const { entity, occlusionEntity, reverseEntity, reverseOcclusionEntity } = await this.createScoutControlHaloEntity(data);
+        const scoutHistoryHalo: ScoutHistoryHalo = {
+          data,
+          entity,
+          occlusionEntity,
+          reverseEntity,
+          reverseOcclusionEntity,
+          positionCallback: (_latE6, _lngE6, position) => {
+            if (scoutHistoryHalo.entity) scoutHistoryHalo.entity.position = new Cesium.ConstantPositionProperty(position);
+            if (scoutHistoryHalo.occlusionEntity) scoutHistoryHalo.occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
+            if (scoutHistoryHalo.reverseEntity) scoutHistoryHalo.reverseEntity.position = new Cesium.ConstantPositionProperty(position);
+            if (scoutHistoryHalo.reverseOcclusionEntity) scoutHistoryHalo.reverseOcclusionEntity.position = new Cesium.ConstantPositionProperty(position);
+          },
+        };
+        this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, scoutHistoryHalo.positionCallback);
+        this.scoutControlHalos.set(data.guid, scoutHistoryHalo);
+      } finally {
+        this.scoutControlHalosPendingCreation.delete(data.guid);
+      }
     }
   }
 
@@ -157,7 +160,7 @@ export class ScoutHistoryEntityManager {
   }
 
   private async updateScoutControlHaloEntity(scoutHistoryHalo: ScoutHistoryHalo, data: PortalData): Promise<void> {
-    this.removeScoutControlHaloEntity(scoutHistoryHalo.data.guid);
+    this.removeScoutControlHaloEntityGroup(scoutHistoryHalo);
     const { entity, occlusionEntity, reverseEntity, reverseOcclusionEntity } = await this.createScoutControlHaloEntity(data);
     scoutHistoryHalo.entity = entity;
     scoutHistoryHalo.occlusionEntity = occlusionEntity;
@@ -178,18 +181,26 @@ export class ScoutHistoryEntityManager {
   private removeScoutControlHaloEntity(guid: string): void {
     const scoutControlHalo = this.scoutControlHalos.get(guid);
     if (scoutControlHalo) {
-      const entities = this.layerManager.getOrCreateDataSourceLayer(DATA_SOURCE_LAYER_NAME).entities;
-      const reverseEntities = this.layerManager.getOrCreateDataSourceLayer(DATA_SOURCE_LAYER_NAME_REVERSE).entities;
-
-      if (scoutControlHalo.entity) entities.remove(scoutControlHalo.entity);
-      if (scoutControlHalo.occlusionEntity) entities.remove(scoutControlHalo.occlusionEntity);
-      if (scoutControlHalo.reverseEntity) reverseEntities.remove(scoutControlHalo.reverseEntity);
-      if (scoutControlHalo.reverseOcclusionEntity) reverseEntities.remove(scoutControlHalo.reverseOcclusionEntity);
-
+      this.removeScoutControlHaloEntityGroup(scoutControlHalo);
       this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(scoutControlHalo.data, scoutControlHalo.positionCallback);
       this.scoutControlHalos.delete(guid);
     }
     this.scoutControlHalosPendingCreation.delete(guid);
+  }
+
+  private removeScoutControlHaloEntityGroup(scoutControlHalo: ScoutHistoryHalo): void {
+    const entities = this.layerManager.getOrCreateDataSourceLayer(DATA_SOURCE_LAYER_NAME).entities;
+    const reverseEntities = this.layerManager.getOrCreateDataSourceLayer(DATA_SOURCE_LAYER_NAME_REVERSE).entities;
+
+    if (scoutControlHalo.entity) entities.remove(scoutControlHalo.entity);
+    if (scoutControlHalo.occlusionEntity) entities.remove(scoutControlHalo.occlusionEntity);
+    if (scoutControlHalo.reverseEntity) reverseEntities.remove(scoutControlHalo.reverseEntity);
+    if (scoutControlHalo.reverseOcclusionEntity) reverseEntities.remove(scoutControlHalo.reverseOcclusionEntity);
+
+    scoutControlHalo.entity = undefined;
+    scoutControlHalo.occlusionEntity = undefined;
+    scoutControlHalo.reverseEntity = undefined;
+    scoutControlHalo.reverseOcclusionEntity = undefined;
   }
 
   private removeScoutControlHaloEntitiesInView(viewRect: Cesium.Rectangle): void {
