@@ -8,11 +8,18 @@ import { readFileSync } from "node:fs";
 
 const packageJson = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")) as {
   version: string,
+  dependencies: Record<string, string>,
 };
+
+const cesiumVersion = packageJson.dependencies.cesium.replace(/^[~^]/, "");
+const cesiumBaseUrl = `https://cdn.jsdelivr.net/npm/cesium@${cesiumVersion}/Build/Cesium/`;
+const cesiumWidgetsCssUrl = `${cesiumBaseUrl}Widgets/widgets.css`;
+const cesiumWidgetsCssImport = "cesium/Build/Cesium/Widgets/widgets.css";
 
 export default defineConfig({
   define: {
     __IITC_NEXT_VERSION__: JSON.stringify(packageJson.version),
+    __CESIUM_BASE_URL__: JSON.stringify(cesiumBaseUrl),
   },
   plugins: [
     monkey({
@@ -31,11 +38,10 @@ export default defineConfig({
           cesium: cdn.jsdelivr("Cesium", "Build/Cesium/Cesium.js"),
         },
         externalResource: {
-          "cesium/Build/Cesium/Widgets/widgets.css": [
-            "cesium/Build/Cesium/Widgets/widgets.css",
-            (version) =>
-              `https://cdn.jsdelivr.net/npm/cesium@${version}/Build/Cesium/Widgets/widgets.css`,
-          ],
+          [cesiumWidgetsCssImport]: {
+            resourceName: "cesiumWidgets",
+            resourceUrl: cesiumWidgetsCssUrl,
+          },
         },
       },
     }),

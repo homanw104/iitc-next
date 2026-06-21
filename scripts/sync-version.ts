@@ -1,6 +1,5 @@
 /**
- * Sync static files: package-lock.json root package version
- * and iOS MARKETING_VERSION / CURRENT_PROJECT_VERSION.
+ * Sync static files that mirror package.json versions.
  */
 
 import { readFileSync, writeFileSync } from "node:fs";
@@ -9,6 +8,7 @@ import { fileURLToPath } from "node:url";
 
 type PackageJson = {
   version: string;
+  dependencies: Record<string, string>;
 };
 
 type PackageLock = {
@@ -24,22 +24,49 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const packageJsonPath = join(root, "package.json");
 const packageLockPath = join(root, "package-lock.json");
 const xcodeProjectPath = join(root, "ios/App/App.xcodeproj/project.pbxproj");
+const readmePath = join(root, "README.md");
+const iosScriptInjectorPath = join(root, "ios/App/App/ScriptInjector.swift");
+const androidScriptInjectorPath = join(root, "android/app/src/main/java/world/homans/iitcnext/ScriptInjector.java");
 
+// Get the app version from package.json
 const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8")) as PackageJson;
-const { version } = packageJson;
-const versionCode = version
+const appVersion = packageJson.version;
+const appVersionCode = appVersion
   .split(".")
   .map((part) => Number(part))
   .reduce((code, part, index) => code + part * [10000, 100, 1][index], 0);
 
+// Update app versions in package-lock.json
 const packageLock = JSON.parse(readFileSync(packageLockPath, "utf8")) as PackageLock;
-packageLock.version = version;
-if (packageLock.packages?.[""]) {
-  packageLock.packages[""].version = version;
-}
+packageLock.version = appVersion;
+if (packageLock.packages?.[""]) packageLock.packages[""].version = appVersion;
 writeFileSync(packageLockPath, `${JSON.stringify(packageLock, null, 2)}\n`);
 
+// Update app versions in the xcode project
 const xcodeProject = readFileSync(xcodeProjectPath, "utf8")
-  .replace(/MARKETING_VERSION = [^;]+;/g, `MARKETING_VERSION = ${version};`)
-  .replace(/CURRENT_PROJECT_VERSION = [^;]+;/g, `CURRENT_PROJECT_VERSION = ${versionCode};`);
+  .replace(/MARKETING_VERSION = [^;]+;/g, `MARKETING_VERSION = ${appVersion};`)
+  .replace(/CURRENT_PROJECT_VERSION = [^;]+;/g, `CURRENT_PROJECT_VERSION = ${appVersionCode};`);
 writeFileSync(xcodeProjectPath, xcodeProject);
+
+// Update app version references in documentation
+const readme = readFileSync(readmePath, "utf8")
+  .replace(/iitc-next-v[^`]+\.js/g, `iitc-next-v${appVersion}.js`);
+writeFileSync(readmePath, readme);
+
+// Get the Cesium version from package.json
+const cesiumVersion = packageJson.dependencies.cesium.replace(/^[~^]/, "");
+const cesiumBaseUrl = `https://cdn.jsdelivr.net/npm/cesium@${cesiumVersion}/Build/Cesium/`;
+const cesiumJsUrl = `${cesiumBaseUrl}Cesium.js`;
+const cesiumCssUrl = `${cesiumBaseUrl}Widgets/widgets.css`;
+
+// Update Cesium versions in the script injectors in the iOS project
+const iosScriptInjector = readFileSync(iosScriptInjectorPath, "utf8")
+  .replace(/https:\/\/cdn\.jsdelivr\.net\/npm\/cesium@[^"]+\/Build\/Cesium\/Cesium\.js/g, cesiumJsUrl)
+  .replace(/https:\/\/cdn\.jsdelivr\.net\/npm\/cesium@[^"]+\/Build\/Cesium\/Widgets\/widgets\.css/g, cesiumCssUrl);
+writeFileSync(iosScriptInjectorPath, iosScriptInjector);
+
+// Update Cesium versions in the script injectors in the Android project
+const androidScriptInjector = readFileSync(androidScriptInjectorPath, "utf8")
+  .replace(/https:\/\/cdn\.jsdelivr\.net\/npm\/cesium@[^"]+\/Build\/Cesium\/Cesium\.js/g, cesiumJsUrl)
+  .replace(/https:\/\/cdn\.jsdelivr\.net\/npm\/cesium@[^"]+\/Build\/Cesium\/Widgets\/widgets\.css/g, cesiumCssUrl);
+writeFileSync(androidScriptInjectorPath, androidScriptInjector);

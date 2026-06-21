@@ -11,7 +11,7 @@ import org.json.JSONObject;
 
 public class ScriptInjector {
     private String cesiumJs = "https://cdn.jsdelivr.net/npm/cesium@1.142.0/Build/Cesium/Cesium.js";
-    private String cesiumCss = "https://cdn.jsdelivr.net/npm/cesium@latest/Build/Cesium/Widgets/widgets.css";
+    private String cesiumCss = "https://cdn.jsdelivr.net/npm/cesium@1.142.0/Build/Cesium/Widgets/widgets.css";
     private String systemJs = "https://cdn.jsdelivr.net/npm/systemjs@6.15.1/dist/system.min.js";
     private String systemNamedRegister = "https://cdn.jsdelivr.net/npm/systemjs@6.15.1/dist/extras/named-register.min.js";
     private String scriptVersion = BuildConfig.VERSION_NAME;
