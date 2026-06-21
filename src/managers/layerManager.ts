@@ -160,6 +160,9 @@ export class LayerManager {
   // Overlay layers use custom OverlayLayer and are mostly used by plugins
   private overlayLayers: Map<string, OverlayLayer> = new Map();
 
+  // Plugin layers can use normal data sources or overlay layers
+  private pluginLayerNames: Set<string> = new Set();
+
   // Master layer visibility settings that are shown in the layer detail pane
   private layerVisibility: Map<string, boolean> = new Map();
 
@@ -295,7 +298,7 @@ export class LayerManager {
   }
 
   public getPluginFilters(): Array<[string, boolean]> {
-    return Array.from(this.pluginFilterState).filter(([name]) => this.overlayLayers.has(name));
+    return Array.from(this.pluginLayerNames, name => [name, this.pluginFilterState.get(name) !== false]);
   }
 
   public getOrCreateDataSourceLayer(name: string): Cesium.DataSource {
@@ -315,7 +318,15 @@ export class LayerManager {
     return source;
   }
 
+  public getOrCreatePluginDataSourceLayer(name: string): Cesium.DataSource {
+    this.registerPluginLayer(name);
+    const source = this.getOrCreateDataSourceLayer(name);
+    source.show = this.getLayerVisibility(name);
+    return source;
+  }
+
   public getOrCreateOverlayLayer(name: string, zIndex?: number): Cesium.DataSource {
+    this.registerPluginLayer(name);
     let layer = this.overlayLayers.get(name);
 
     if (!layer) {
@@ -325,11 +336,6 @@ export class LayerManager {
     } else if (zIndex !== undefined) {
       layer.setZIndex(zIndex);
       this.raiseOverlayLayersToTop();
-    }
-
-    if (!this.pluginFilterState.has(name)) {
-      this.pluginFilterState.set(name, true);
-      this.saveStorageState();
     }
 
     return layer.source;
@@ -349,6 +355,34 @@ export class LayerManager {
       layer.destroy();
       this.overlayLayers.delete(name);
     }
+
+    this.unregisterPluginLayer(name);
+  }
+
+  public removePluginDataSourceLayer(name: string): void {
+    const source = this.dataSources.get(name);
+    if (source) {
+      this.viewer.dataSources.remove(source, true);
+      this.dataSources.delete(name);
+    }
+
+    this.unregisterPluginLayer(name);
+  }
+
+  private registerPluginLayer(name: string): void {
+    this.pluginLayerNames.add(name);
+
+    if (!this.pluginFilterState.has(name)) {
+      this.pluginFilterState.set(name, true);
+      this.saveStorageState();
+    }
+
+    const pluginFilterVisible = this.pluginFilterState.get(name) !== false;
+    this.setLayerVisibility(name, pluginFilterVisible);
+  }
+
+  private unregisterPluginLayer(name: string): void {
+    this.pluginLayerNames.delete(name);
 
     if (this.pluginFilterState.has(name)) {
       this.pluginFilterState.delete(name);

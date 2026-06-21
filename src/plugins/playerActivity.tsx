@@ -103,8 +103,8 @@ class PlayerActivityPlugin {
       this.setUpHoverAction();
       this.dataSourceEnl = this.layerManager.getOrCreateOverlayLayer(PLAYER_ACTIVITY_ENL_LAYER_NAME);
       this.dataSourceRes = this.layerManager.getOrCreateOverlayLayer(PLAYER_ACTIVITY_RES_LAYER_NAME);
-      this.pathDataSourceEnl = this.layerManager.getOrCreateOverlayLayer(ACTIVITY_PATH_ENL_LAYER_NAME);
-      this.pathDataSourceRes = this.layerManager.getOrCreateOverlayLayer(ACTIVITY_PATH_RES_LAYER_NAME);
+      this.pathDataSourceEnl = this.layerManager.getOrCreatePluginDataSourceLayer(ACTIVITY_PATH_ENL_LAYER_NAME);
+      this.pathDataSourceRes = this.layerManager.getOrCreatePluginDataSourceLayer(ACTIVITY_PATH_RES_LAYER_NAME);
       this.configureDataSource(this.dataSourceEnl);
       this.configureDataSource(this.dataSourceRes);
       this.onReceiveCommMsgCallback = () => this.updatePlayerActivity();
@@ -122,8 +122,8 @@ class PlayerActivityPlugin {
       this.commManager.unsetOnReceiveMsgCallback(this.onReceiveCommMsgCallback);
       this.layerManager.removeOverlayLayer(PLAYER_ACTIVITY_ENL_LAYER_NAME);
       this.layerManager.removeOverlayLayer(PLAYER_ACTIVITY_RES_LAYER_NAME);
-      this.layerManager.removeOverlayLayer(ACTIVITY_PATH_ENL_LAYER_NAME);
-      this.layerManager.removeOverlayLayer(ACTIVITY_PATH_RES_LAYER_NAME);
+      this.layerManager.removePluginDataSourceLayer(ACTIVITY_PATH_ENL_LAYER_NAME);
+      this.layerManager.removePluginDataSourceLayer(ACTIVITY_PATH_RES_LAYER_NAME);
       this.playerLocations.clear();
       this.playerPaths.clear();
       this.playerLocationsPendingCreation.clear();
@@ -533,11 +533,9 @@ class PlayerActivityPlugin {
       });
       if (pathActivities.length < 2) return;
 
-      const positions = await Promise.all(
-        pathActivities.map(async (activity) => {
-          return await this.entityPositionManager.getPosition(activity);
-        })
-      );
+      const coordinates: number[] = [];
+      pathActivities.forEach(activity => coordinates.push(activity.lngE6 / 1e6, activity.latE6 / 1e6));
+      const positions = Cesium.Cartesian3.fromDegreesArray(coordinates);
 
       let source: Cesium.DataSource;
       if (lastActivity.team === "ENLIGHTENED") source = this.pathDataSourceEnl;
