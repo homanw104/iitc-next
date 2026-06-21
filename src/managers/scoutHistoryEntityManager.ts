@@ -7,18 +7,18 @@ import { PortalData } from "../types/ingress";
 import { EntityPositionCallback, EntityPositionManager } from "./entityPositionManager";
 import { LayerManager } from "./layerManager";
 import {
-  PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
+  PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
   PORTAL_OCCLUDED_ALPHA,
   PORTAL_POINT_PIXEL_SIZE,
   PORTAL_POINT_OUTLINE_WIDTH,
-  PORTAL_NEAR_FAR_SCALAR,
+  PORTAL_NEAR_FAR_SCALAR, PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
 } from "./portalEntityManager.ts";
 
 const DATA_SOURCE_LAYER_NAME = "history-scout-control";
 const DATA_SOURCE_LAYER_NAME_REVERSE = "history-scout-control-reverse";
 const HALO_POINT_PIXEL_SIZE = PORTAL_POINT_PIXEL_SIZE + PORTAL_POINT_OUTLINE_WIDTH;
 const HALO_POINT_OUTLINE_WIDTH = 4;
-const HALO_POINT_ALPHA = 0.5;
+const HALO_POINT_ALPHA = 0.95;
 const SCOUT_CONTROL_COLOR = "#FF9000";
 
 type ScoutHistoryState = "none" | "controlled";
@@ -119,7 +119,7 @@ export class ScoutHistoryEntityManager {
           scaleByDistance: PORTAL_NEAR_FAR_SCALAR,
           translucencyByDistance: PORTAL_NEAR_FAR_SCALAR,
           heightReference: Cesium.HeightReference.NONE,
-          disableDepthTestDistance: PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
+          disableDepthTestDistance: PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
         },
       });
     } else {
@@ -147,7 +147,7 @@ export class ScoutHistoryEntityManager {
           scaleByDistance: PORTAL_NEAR_FAR_SCALAR,
           translucencyByDistance: PORTAL_NEAR_FAR_SCALAR,
           heightReference: Cesium.HeightReference.NONE,
-          disableDepthTestDistance: PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
+          disableDepthTestDistance: PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
         },
       });
     }

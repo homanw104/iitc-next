@@ -8,10 +8,12 @@ import { EntityPositionManager, EntityPositionCallback } from "./entityPositionM
 import { LayerManager } from "./layerManager";
 import { getTeamColor } from "../utils/color";
 import { apiRequest } from "../utils/network";
+import { settingsManager } from "./settingsManager.ts";
 
 export const PORTAL_POINT_PIXEL_SIZE = 16;
 export const PORTAL_POINT_OUTLINE_WIDTH = 2;
-export const PORTAL_DISABLE_DEPTH_TEST_DISTANCE = 2e4;
+export const PORTAL_DISABLE_DEPTH_TEST_DISTANCE = settingsManager.getUseGoogle3dTiles() ? 0 : 2e4;
+export const PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE = 2e4;
 export const PORTAL_OCCLUDED_ALPHA = 0.5;
 export const PORTAL_NEAR_FAR_SCALAR = new Cesium.NearFarScalar(1e1, 1, 2e4, 0.125);
 
@@ -141,7 +143,7 @@ export class PortalEntityManager {
       point: {
         pixelSize: PORTAL_POINT_PIXEL_SIZE,
         heightReference: Cesium.HeightReference.NONE,
-        disableDepthTestDistance: 0,
+        disableDepthTestDistance: PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
         scaleByDistance: PORTAL_NEAR_FAR_SCALAR,
         color: getTeamColor(data.team),
         outlineColor: Cesium.Color.BLACK,
@@ -158,7 +160,7 @@ export class PortalEntityManager {
       point: {
         pixelSize: PORTAL_POINT_PIXEL_SIZE,
         heightReference: Cesium.HeightReference.NONE,
-        disableDepthTestDistance: PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
+        disableDepthTestDistance: PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
         scaleByDistance: PORTAL_NEAR_FAR_SCALAR,
         translucencyByDistance: PORTAL_NEAR_FAR_SCALAR,
         color: getTeamColor(data.team).withAlpha(PORTAL_OCCLUDED_ALPHA),
@@ -180,13 +182,9 @@ export class PortalEntityManager {
 
     if (entity.point) {
       entity.point.color = new Cesium.ConstantProperty(getTeamColor(data.team));
-      entity.point.heightReference = new Cesium.ConstantProperty(Cesium.HeightReference.NONE);
-      entity.point.disableDepthTestDistance = new Cesium.ConstantProperty(0);
     }
     if (occlusionEntity.point) {
       occlusionEntity.point.color = new Cesium.ConstantProperty(getTeamColor(data.team).withAlpha(PORTAL_OCCLUDED_ALPHA));
-      occlusionEntity.point.heightReference = new Cesium.ConstantProperty(Cesium.HeightReference.NONE);
-      occlusionEntity.point.disableDepthTestDistance = new Cesium.ConstantProperty(PORTAL_DISABLE_DEPTH_TEST_DISTANCE);
     }
   }
 

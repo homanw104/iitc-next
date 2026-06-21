@@ -8,6 +8,7 @@ import { EntityPositionCallback, EntityPositionManager } from "./entityPositionM
 import { LayerManager } from "./layerManager";
 import {
   PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
+  PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
   PORTAL_OCCLUDED_ALPHA,
 } from "./portalEntityManager.ts";
 
@@ -93,11 +94,11 @@ export class PortalLabelEntityManager {
         outlineWidth: 8,
         showBackground: false,
         heightReference: Cesium.HeightReference.NONE,
-        disableDepthTestDistance: 0,
+        disableDepthTestDistance: PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
         horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
         pixelOffset: new Cesium.Cartesian2(0, LABEL_PIXEL_OFFSET_Y),
-        translucencyByDistance: new Cesium.NearFarScalar(6e2, 1.0, 8e2, 0.0),
+        translucencyByDistance: new Cesium.NearFarScalar(4e2, 1.0, 5e2, 0.0),
       },
       properties: {
         selectable: false,
@@ -116,7 +117,7 @@ export class PortalLabelEntityManager {
         outlineWidth: 8,
         showBackground: false,
         heightReference: Cesium.HeightReference.NONE,
-        disableDepthTestDistance: PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
+        disableDepthTestDistance: PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
         horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
         pixelOffset: new Cesium.Cartesian2(0, LABEL_PIXEL_OFFSET_Y),
@@ -136,15 +137,9 @@ export class PortalLabelEntityManager {
     occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
     if (entity.label) {
       entity.label.text = new Cesium.ConstantProperty(wrapLabelText(data.title || ""));
-      entity.label.heightReference = new Cesium.ConstantProperty(Cesium.HeightReference.NONE);
-      entity.label.disableDepthTestDistance = new Cesium.ConstantProperty(0);
     }
     if (occlusionEntity.label) {
       occlusionEntity.label.text = new Cesium.ConstantProperty(wrapLabelText(data.title || ""));
-      occlusionEntity.label.fillColor = new Cesium.ConstantProperty(Cesium.Color.WHITE.withAlpha(PORTAL_OCCLUDED_ALPHA));
-      occlusionEntity.label.outlineColor = new Cesium.ConstantProperty(Cesium.Color.BLACK.withAlpha(PORTAL_OCCLUDED_ALPHA));
-      occlusionEntity.label.heightReference = new Cesium.ConstantProperty(Cesium.HeightReference.NONE);
-      occlusionEntity.label.disableDepthTestDistance = new Cesium.ConstantProperty(PORTAL_DISABLE_DEPTH_TEST_DISTANCE);
     }
   }
 

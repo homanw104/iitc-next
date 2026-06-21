@@ -8,6 +8,7 @@ import { EntityPositionCallback, EntityPositionManager } from "./entityPositionM
 import { LayerManager } from "./layerManager";
 import {
   PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
+  PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
   PORTAL_OCCLUDED_ALPHA,
   PORTAL_POINT_PIXEL_SIZE,
   PORTAL_POINT_OUTLINE_WIDTH,
@@ -18,7 +19,7 @@ const DATA_SOURCE_LAYER_NAME = "history-visited-captured";
 const DATA_SOURCE_LAYER_NAME_REVERSE = "history-visited-captured-reverse";
 const HALO_POINT_PIXEL_SIZE = PORTAL_POINT_PIXEL_SIZE + PORTAL_POINT_OUTLINE_WIDTH;
 const HALO_POINT_OUTLINE_WIDTH = 4;
-const HALO_POINT_ALPHA = 0.5;
+const HALO_POINT_ALPHA = 0.95;
 const VISITED_COLOR = "#FFCE00";
 const CAPTURED_COLOR = "#FF6060";
 
@@ -122,7 +123,7 @@ export class PortalHistoryEntityManager {
           scaleByDistance: PORTAL_NEAR_FAR_SCALAR,
           translucencyByDistance: PORTAL_NEAR_FAR_SCALAR,
           heightReference: Cesium.HeightReference.NONE,
-          disableDepthTestDistance: PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
+          disableDepthTestDistance: PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
         },
       });
     }
@@ -154,7 +155,7 @@ export class PortalHistoryEntityManager {
           scaleByDistance: PORTAL_NEAR_FAR_SCALAR,
           translucencyByDistance: PORTAL_NEAR_FAR_SCALAR,
           heightReference: Cesium.HeightReference.NONE,
-          disableDepthTestDistance: PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
+          disableDepthTestDistance: PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
         },
       });
     }

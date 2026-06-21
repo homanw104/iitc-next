@@ -8,13 +8,14 @@ import { EntityPositionCallback, EntityPositionManager } from "./entityPositionM
 import { LayerManager } from "./layerManager";
 import {
   PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
+  PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
   PORTAL_OCCLUDED_ALPHA,
   PORTAL_NEAR_FAR_SCALAR,
 } from "./portalEntityManager.ts";
 
 const AP1_ORNAMENT_SIZE = 16;
 const AP1_ORNAMENT_HOLLOW_SIZE = 8;
-const AP1_ORNAMENT_ALPHA = 0.5;
+const AP1_ORNAMENT_ALPHA = 0.95;
 const CANVAS_DIMENSION = AP1_ORNAMENT_SIZE * 2;
 
 const ornamentImageCache = new Map<string, HTMLCanvasElement>();
@@ -91,7 +92,7 @@ export class PortalOrnamentEntityManager {
       billboard: {
         image: getOrnamentImage(data),
         heightReference: Cesium.HeightReference.NONE,
-        disableDepthTestDistance: 0,
+        disableDepthTestDistance: PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
         horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
         verticalOrigin: Cesium.VerticalOrigin.CENTER,
         scaleByDistance: PORTAL_NEAR_FAR_SCALAR,
@@ -105,7 +106,7 @@ export class PortalOrnamentEntityManager {
         image: getOrnamentImage(data),
         color: Cesium.Color.WHITE.withAlpha(PORTAL_OCCLUDED_ALPHA),
         heightReference: Cesium.HeightReference.NONE,
-        disableDepthTestDistance: PORTAL_DISABLE_DEPTH_TEST_DISTANCE,
+        disableDepthTestDistance: PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
         horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
         verticalOrigin: Cesium.VerticalOrigin.CENTER,
         scaleByDistance: PORTAL_NEAR_FAR_SCALAR,
@@ -122,14 +123,9 @@ export class PortalOrnamentEntityManager {
     occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
     if (entity.billboard) {
       entity.billboard.image = new Cesium.ConstantProperty(getOrnamentImage(data));
-      entity.billboard.heightReference = new Cesium.ConstantProperty(Cesium.HeightReference.NONE);
-      entity.billboard.disableDepthTestDistance = new Cesium.ConstantProperty(0);
     }
     if (occlusionEntity.billboard) {
       occlusionEntity.billboard.image = new Cesium.ConstantProperty(getOrnamentImage(data));
-      occlusionEntity.billboard.color = new Cesium.ConstantProperty(Cesium.Color.WHITE.withAlpha(PORTAL_OCCLUDED_ALPHA));
-      occlusionEntity.billboard.heightReference = new Cesium.ConstantProperty(Cesium.HeightReference.NONE);
-      occlusionEntity.billboard.disableDepthTestDistance = new Cesium.ConstantProperty(PORTAL_DISABLE_DEPTH_TEST_DISTANCE);
     }
   }
 
