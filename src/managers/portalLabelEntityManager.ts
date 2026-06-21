@@ -13,8 +13,9 @@ import {
 } from "./portalEntityManager.ts";
 
 const LABEL_FONT = "12px sans-serif";
-const LABEL_PIXEL_OFFSET_Y = -12;
+const LABEL_PIXEL_OFFSET_Y = -16;
 const LABEL_MAX_LINE_LENGTH = 24;
+const LABEL_TRANSLUCENCY_NEAR_FAR_SCALAR = new Cesium.NearFarScalar(300, 1.0, 360, 0.0);
 
 interface PortalLabel {
   data: PortalData;
@@ -43,10 +44,10 @@ export class PortalLabelEntityManager {
       const oldLayerId = getPortalLabelLayerId(existing.data);
       const newLayerId = getPortalLabelLayerId(data);
       if (oldLayerId !== newLayerId) {
-        this.layerManager.getOrCreateOverlayLayer(oldLayerId).entities.remove(existing.entity);
-        this.layerManager.getOrCreateOverlayLayer(oldLayerId).entities.remove(existing.occlusionEntity);
-        this.layerManager.getOrCreateOverlayLayer(newLayerId).entities.add(existing.entity);
-        this.layerManager.getOrCreateOverlayLayer(newLayerId).entities.add(existing.occlusionEntity);
+        this.layerManager.getOrCreateDataSourceLayer(oldLayerId).entities.remove(existing.entity);
+        this.layerManager.getOrCreateDataSourceLayer(oldLayerId).entities.remove(existing.occlusionEntity);
+        this.layerManager.getOrCreateDataSourceLayer(newLayerId).entities.add(existing.entity);
+        this.layerManager.getOrCreateDataSourceLayer(newLayerId).entities.add(existing.occlusionEntity);
       }
       await this.updateLabelEntity(existing.entity, existing.occlusionEntity, data);
       this.updateLabelPositionSubscription(existing, data);
@@ -79,7 +80,7 @@ export class PortalLabelEntityManager {
     occlusionEntity: Cesium.Entity
   }> {
     const layerId = getPortalLabelLayerId(data);
-    const entities = this.layerManager.getOrCreateOverlayLayer(layerId).entities;
+    const entities = this.layerManager.getOrCreateDataSourceLayer(layerId).entities;
     const position = await this.entityPositionManager.getPosition(data);
 
     const entity = entities.add({
@@ -98,7 +99,7 @@ export class PortalLabelEntityManager {
         horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
         pixelOffset: new Cesium.Cartesian2(0, LABEL_PIXEL_OFFSET_Y),
-        translucencyByDistance: new Cesium.NearFarScalar(4e2, 1.0, 5e2, 0.0),
+        translucencyByDistance: LABEL_TRANSLUCENCY_NEAR_FAR_SCALAR,
       },
       properties: {
         selectable: false,
@@ -121,7 +122,7 @@ export class PortalLabelEntityManager {
         horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
         pixelOffset: new Cesium.Cartesian2(0, LABEL_PIXEL_OFFSET_Y),
-        translucencyByDistance: new Cesium.NearFarScalar(6e2, 1.0, 8e2, 0.0),
+        translucencyByDistance: LABEL_TRANSLUCENCY_NEAR_FAR_SCALAR,
       },
       properties: {
         selectable: false,
@@ -157,7 +158,7 @@ export class PortalLabelEntityManager {
     const labelInfo = this.labels.get(guid);
     if (labelInfo) {
       const layerId = getPortalLabelLayerId(labelInfo.data);
-      const entities = this.layerManager.getOrCreateOverlayLayer(layerId).entities;
+      const entities = this.layerManager.getOrCreateDataSourceLayer(layerId).entities;
 
       entities.remove(labelInfo.entity);
       entities.remove(labelInfo.occlusionEntity);

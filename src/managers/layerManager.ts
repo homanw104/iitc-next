@@ -7,6 +7,7 @@ import { TEAMS, PORTAL_LEVELS } from "../types/ingress";
 import { safeLocalStorage } from "../utils/storage";
 import { logManager } from "./logManager";
 
+const CESIUM_PASS_OVERLAY = 13;
 const FILTER_STATES_STORAGE_KEY = "iitc-next-filter-states";
 const PLUGIN_FILTER_STATES_STORAGE_KEY = "iitc-next-plugin-filter-states";
 const MUTUALLY_EXCLUSIVE_HISTORY_FILTERS = [
@@ -22,6 +23,7 @@ type DataSourceDisplayWithCollections = Cesium.DataSourceDisplay & {
 };
 
 interface LayerRenderCommand {
+  pass?: unknown;
   renderState: unknown;
 }
 
@@ -44,7 +46,9 @@ type CesiumWithPrivateRenderer = typeof Cesium & {
 };
 
 class OverlayLayer {
-  public source: Cesium.CustomDataSource;
+  public viewer: Cesium.Viewer;
+  public source: Cesium.DataSource;
+  public zIndex: number;
   private readonly dataSourceCollection = new Cesium.DataSourceCollection();
   private readonly display: Cesium.DataSourceDisplay;
   private readonly ready: Promise<Cesium.DataSource>;
@@ -52,9 +56,17 @@ class OverlayLayer {
   private readonly removeCollectionListener: () => void;
   private isDestroyed: boolean = false;
 
-  constructor(private viewer: Cesium.Viewer, name: string, visible: boolean) {
+  constructor(
+    viewer: Cesium.Viewer,
+    name: string,
+    visible: boolean,
+    zIndex: number,
+  ) {
+    this.viewer = viewer;
     this.source = new Cesium.CustomDataSource(name);
     this.source.show = visible;
+    this.zIndex = zIndex;
+
     this.ready = this.dataSourceCollection.add(this.source);
     this.display = new Cesium.DataSourceDisplay({
       scene: this.viewer.scene,
@@ -86,6 +98,12 @@ class OverlayLayer {
     this.source.show = visible;
   }
 
+  public setZIndex(zIndex: number): void {
+    if (this.zIndex === zIndex) return;
+    this.zIndex = zIndex;
+    this.viewer.scene.requestRender();
+  }
+
   private installOverlayHooks(): void {
     const collections = this.display as DataSourceDisplayWithCollections;
     this.installOverlayHook(collections._primitives as unknown as PrimitiveCollectionWithUpdate);
@@ -103,6 +121,7 @@ class OverlayLayer {
 
       for (let i = firstCommand; i < frameState.commandList.length; i++) {
         const command = frameState.commandList[i];
+        command.pass = CESIUM_PASS_OVERLAY;
         command.renderState = getNoDepthRenderState(command.renderState);
       }
     };
@@ -133,6 +152,8 @@ class OverlayLayer {
 }
 
 export class LayerManager {
+  private static readonly DEFAULT_OVERLAY_Z_INDEX = 1000;
+
   // Built-in layers like portals and links use normal dataSources
   private dataSources: Map<string, Cesium.DataSource> = new Map();
 
@@ -287,19 +308,23 @@ export class LayerManager {
       // source.entities.collectionChanged.addEventListener(() => this.viewer.scene.requestRender());
 
       // Ensure overlay layers are always on top
-      this.viewer.dataSources.add(source).then(() => this.overlayLayers.forEach(layer => layer.raiseToTop()));
+      this.viewer.dataSources.add(source).then(() => this.raiseOverlayLayersToTop());
       this.dataSources.set(name, source);
     }
 
     return source;
   }
 
-  public getOrCreateOverlayLayer(name: string): Cesium.DataSource {
+  public getOrCreateOverlayLayer(name: string, zIndex?: number): Cesium.DataSource {
     let layer = this.overlayLayers.get(name);
+
     if (!layer) {
-      layer = new OverlayLayer(this.viewer, name, this.getLayerVisibility(name));
+      layer = new OverlayLayer(this.viewer, name, this.getLayerVisibility(name), zIndex ?? LayerManager.DEFAULT_OVERLAY_Z_INDEX);
       this.overlayLayers.set(name, layer);
-      this.overlayLayers.forEach(layer => layer.raiseToTop());
+      this.raiseOverlayLayersToTop();
+    } else if (zIndex !== undefined) {
+      layer.setZIndex(zIndex);
+      this.raiseOverlayLayersToTop();
     }
 
     if (!this.pluginFilterState.has(name)) {
@@ -308,6 +333,14 @@ export class LayerManager {
     }
 
     return layer.source;
+  }
+
+  public setOverlayLayerZIndex(name: string, zIndex: number): void {
+    const layer = this.overlayLayers.get(name);
+    if (!layer) return;
+
+    layer.setZIndex(zIndex);
+    this.raiseOverlayLayersToTop();
   }
 
   public removeOverlayLayer(name: string): void {
@@ -339,6 +372,12 @@ export class LayerManager {
 
   private getLayerVisibility(name: string): boolean {
     return this.layerVisibility.get(name) !== false;
+  }
+
+  private raiseOverlayLayersToTop(): void {
+    Array.from(this.overlayLayers.values())
+      .sort((a, b) => a.zIndex - b.zIndex)
+      .forEach(layer => layer.raiseToTop());
   }
 
   private requestVisibilityRender(): void {
