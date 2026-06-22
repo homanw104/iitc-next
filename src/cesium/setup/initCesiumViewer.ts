@@ -56,9 +56,9 @@ const GOOGLE_3D_TILES_RENDER_SETTINGS: Record<Google3dTilesRenderQuality, Google
     skipLevels: 0,
     immediatelyLoadDesiredLevelOfDetail: false,
     loadSiblings: false,
-    resolutionScale: 0.85,
+    resolutionScale: 0.75,
     msaaSamples: 1,
-    fxaaEnabled: true,
+    fxaaEnabled: false,
   },
   balanced: {
     maximumScreenSpaceError: 24,
@@ -262,9 +262,9 @@ async function addGoogle3dTiles(viewer: Cesium.Viewer, renderSettings: Google3dT
     }
     viewer.scene.primitives.add(tileset);
     viewer.scene.requestRender();
-    logManager.debug("CesiumViewer", "Google Photorealistic 3D Tiles enabled");
+    logManager.debug("InitCesiumViewer", "Google 3D Tiles enabled");
   } catch (error) {
-    logManager.error("CesiumViewer", "Failed to load Google Photorealistic 3D Tiles", error);
+    logManager.error("InitCesiumViewer", "Failed to load Google 3D Tiles", error);
     viewer.scene.globe.show = true;
     viewer.scene.requestRender();
   }

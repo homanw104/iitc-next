@@ -15,12 +15,12 @@ const GOOGLE_GROUND_TERRAIN_COMPENSATION_METER = 1;
 const WORLD_TERRAIN_SAMPLE_LEVEL = 11;
 
 // Quick height sampling from currently rendered Google 3D Tiles.
-const GOOGLE_RENDERED_SAMPLE_BATCH_SIZE = 32;
-const GOOGLE_RENDERED_SAMPLE_BATCH_DELAY_MS = 50;
+const GOOGLE_RENDERED_SAMPLE_BATCH_SIZE = 16;
+const GOOGLE_RENDERED_SAMPLE_BATCH_DELAY_MS = 10;
 
 // Slower Google 3D Tiles sampling that resolves the best available height and is cached.
-const GOOGLE_MOST_DETAILED_SAMPLE_BATCH_SIZE = 32;
-const GOOGLE_MOST_DETAILED_SAMPLE_DELAY_MS = 50;
+const GOOGLE_MOST_DETAILED_SAMPLE_BATCH_SIZE = 16;
+const GOOGLE_MOST_DETAILED_SAMPLE_DELAY_MS = 2;
 
 // Height quality progresses from the world-terrain baseline to final cached height.
 type HeightQuality = "worldTerrain" | "rendered" | "mostDetailed";
@@ -514,13 +514,13 @@ export class EntityPositionManager {
     const hasUnresolvedRefreshableTerrainPositions = this.hasUnresolvedRefreshableTerrainPositions();
 
     if (renderedHeightCount > 0 && detailedHeightCount > 0) {
-      logManager.info(LOG_TAG, `Rendering ${renderedHeightCount} portal positions`);
+      logManager.info(LOG_TAG, `Rendering ${renderedHeightCount} entity positions`);
     } else if (renderedHeightCount > 0) {
-      logManager.info(LOG_TAG, `Rendering ${renderedHeightCount} portal positions`);
+      logManager.info(LOG_TAG, `Rendering ${renderedHeightCount} entity positions`);
     } else if (detailedHeightCount > 0) {
       logManager.info(LOG_TAG, `Rendering ${detailedHeightCount} detailed positions`);
     } else if (!hasQueuedOrSamplingTerrainHeights && !hasUnresolvedRefreshableTerrainPositions) {
-      logManager.info(LOG_TAG, "Rendered all terrain positions");
+      logManager.info(LOG_TAG, "Rendered all entity positions");
     }
 
     if (!hasQueuedOrSamplingTerrainHeights) this.queueStatusLoggingActive = false;
