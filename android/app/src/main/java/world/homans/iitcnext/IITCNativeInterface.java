@@ -102,7 +102,6 @@ public class IITCNativeInterface {
                     Intent shareIntent = new Intent();
                     shareIntent.setAction(Intent.ACTION_SEND);
                     shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                    shareIntent.setDataAndType(contentUri, mimeType);
                     shareIntent.putExtra(Intent.EXTRA_STREAM, contentUri);
                     shareIntent.setType(mimeType);
 

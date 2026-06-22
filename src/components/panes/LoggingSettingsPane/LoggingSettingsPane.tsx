@@ -7,11 +7,22 @@ import RightArrowIcon from "../SettingsPane/RightArrowIcon.tsx";
 
 const exportLogs = () => {
   const logs = logManager.exportRecordedLogs();
-  const blob = new Blob([logs], { type: "text/plain;charset=utf-8" });
+  const filename = `iitc-next-logs-${new Date().toISOString().replace(/:/g, "-")}.txt`;
+  const mimeType = "text/plain";
+
+  // Support for Android Wrapper
+  // @ts-expect-error support for Android wrapper
+  if (window.IITC_Native && window.IITC_Native.saveFile) {
+    // @ts-expect-error support for Android wrapper
+    window.IITC_Native.saveFile(logs, filename, mimeType);
+    return;
+  }
+
+  const blob = new Blob([logs], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `iitc-next-logs-${new Date().toISOString()}.txt`;
+  a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
 };
