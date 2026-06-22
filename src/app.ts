@@ -10,7 +10,7 @@ import extractPlayerInfo from "./procedures/extractPlayerInfo";
 import extractVersionString from "./procedures/extractVersionString";
 import unloadOriginalIntelMap from "./procedures/unloadOriginalIntelMap";
 import loadCesiumViewer from "./procedures/loadCesiumViewer";
-import setUpPluginManager from "./procedures/registerPlugins";
+import registerPlugins from "./procedures/registerPlugins";
 import initPlugins from "./procedures/initPlugins";
 import { getPlayerInfo } from "./utils/player";
 import "./types/iitc.ts";
@@ -53,7 +53,7 @@ const init = async () => {
     const managers = loadCesiumViewer();
 
     // Load all plugins
-    await setUpPluginManager();
+    await registerPlugins();
     initPlugins(managers.layerManager);
   }
 };

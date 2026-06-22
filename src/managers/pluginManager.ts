@@ -11,7 +11,8 @@ const ENABLED_PLUGINS_STORAGE_KEY = "iitc-enabled-plugins";
 export class PluginManager {
   private plugins: Map<string, IITCPlugin> = new Map();
   private enabledPlugins: Set<string> = new Set();
-  private initializedPlugins = new Set<string>();
+  private activePlugins = new Set<string>();
+  private pluginRuntimeReady = false;
 
   private initialized = false;
 
@@ -52,7 +53,7 @@ export class PluginManager {
   }
 
   public isInitialized(pluginId: string): boolean {
-    return this.initializedPlugins.has(pluginId);
+    return this.activePlugins.has(pluginId);
   }
 
   public registerPlugin(plugin: IITCPlugin) {
@@ -62,46 +63,73 @@ export class PluginManager {
     } else {
       this.plugins.set(plugin.id, plugin);
       logManager.info("PluginManager", `Plugin registered: ${plugin.name}`);
+
+      if (this.pluginRuntimeReady && this.isEnabled(plugin.id)) this.initPlugin(plugin.id);
     }
 
-    if (this.isEnabled(plugin.id) && !this.isInitialized(plugin.id)) {
-      this.enablePlugin(plugin.id);
-    }
   }
 
-  enablePlugin(pluginId: string) {
+  public enablePlugin(pluginId: string) {
     if (!this.enabledPlugins.has(pluginId)) {
       this.enabledPlugins.add(pluginId);
       this.saveState();
     }
-    const plugin = this.plugins.get(pluginId);
-    if (plugin && !this.isInitialized(pluginId)) {
-      try {
-        plugin.init();
-        this.initializedPlugins.add(pluginId);
-        logManager.info("PluginManager", `Enabled plugin ${plugin.name}`);
-      } catch (e) {
-        logManager.error("PluginManager", `Failed to initialize plugin ${plugin.name}`, e);
-      }
-    }
+
+    if (this.pluginRuntimeReady) this.initPlugin(pluginId);
   }
 
-  disablePlugin(pluginId: string) {
+  public disablePlugin(pluginId: string) {
     if (this.enabledPlugins.has(pluginId)) {
       this.enabledPlugins.delete(pluginId);
       this.saveState();
     }
+
+    this.deinitPlugin(pluginId);
+  }
+
+  public initEnabledPlugins() {
+    this.pluginRuntimeReady = true;
+
+    this.plugins.forEach(plugin => {
+      if (this.isEnabled(plugin.id)) {
+        this.initPlugin(plugin.id);
+      } else {
+        logManager.info("PluginManager", `Plugin ${plugin.name} is disabled`);
+      }
+    });
+  }
+
+  private initPlugin(pluginId: string) {
+    if (this.isInitialized(pluginId)) return;
+
     const plugin = this.plugins.get(pluginId);
-    if (plugin && plugin.deinit) {
+    if (!plugin) return;
+
+    try {
+      plugin.init();
+      this.activePlugins.add(pluginId);
+      logManager.info("PluginManager", `Enabled plugin ${plugin.name}`);
+    } catch (e) {
+      logManager.error("PluginManager", `Failed to initialize plugin ${plugin.name}`, e);
+    }
+  }
+
+  private deinitPlugin(pluginId: string) {
+    if (!this.isInitialized(pluginId)) return;
+
+    const plugin = this.plugins.get(pluginId);
+    if (!plugin) return;
+
+    if (plugin.deinit) {
       try {
         plugin.deinit();
-        this.initializedPlugins.delete(pluginId);
+        this.activePlugins.delete(pluginId);
         logManager.info("PluginManager", `Disabled plugin ${plugin.name}`);
       } catch {
         logManager.error("PluginManager", `Failed to deinit plugin ${plugin.name}: Reload needed`);
       }
-    } else if (plugin) {
-      this.initializedPlugins.delete(pluginId);
+    } else {
+      this.activePlugins.delete(pluginId);
       logManager.info("PluginManager", `Disabled plugin ${plugin.name}: Reload needed`);
     }
   }
