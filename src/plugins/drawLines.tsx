@@ -11,6 +11,7 @@ import { h } from "../utils/dom.ts";
 import * as Cesium from "cesium";
 import { safeLocalStorage } from "../utils/storage.ts";
 
+const LOG_TAG = "DrawLines";
 const LAYER_NAME = "Draw Lines";
 const STORAGE_KEY = "iitc-next-draw-lines";
 const PREVIEW_COLOR = "#cc823f";
@@ -34,10 +35,10 @@ class DrawLinesPlugin {
   public name = "Draw Lines";
   public description = "This plugin enables you to draw lines on the map.";
 
-  private viewer: IITCCore["viewer"];
-  private logManager: IITCCore["logManager"];
-  private interfaceManager: IITCCore["interfaceManager"];
-  private layerManager: IITCCore["layerManager"];
+  private viewer!: NonNullable<IITCCore["viewer"]>;
+  private logManager!: NonNullable<IITCCore["logManager"]>;
+  private interfaceManager!: NonNullable<IITCCore["interfaceManager"]>;
+  private layerManager!: NonNullable<IITCCore["layerManager"]>;
 
   private isDrawing: boolean = false;
   private isDeleting: boolean = false;
@@ -63,16 +64,14 @@ class DrawLinesPlugin {
   private ignoreTouchGestureUntil = 0;
 
   public init() {
-    if (safeWindow) {
-      const iitc: IITCCore = safeWindow.iitc;
-      this.viewer = iitc.viewer!;
-      this.logManager = iitc.logManager!;
-      this.interfaceManager = iitc.interfaceManager!;
-      this.layerManager = iitc.layerManager!;
-    }
+    const iitc: IITCCore = safeWindow.iitc;
+    this.viewer = iitc.viewer!;
+    this.logManager = iitc.logManager!;
+    this.interfaceManager = iitc.interfaceManager!;
+    this.layerManager = iitc.layerManager!;
 
     if (!this.viewer || !this.logManager || !this.interfaceManager || !this.layerManager) {
-      console.warn("[WARN][SamplePlugin] IITC Next core components missing", {
+      console.warn(`[WARN][${LOG_TAG}] IITC Next core components missing`, {
         viewer: !!this.viewer,
         logManager: !!this.logManager,
         interfaceManager: !!this.interfaceManager,
@@ -81,59 +80,57 @@ class DrawLinesPlugin {
       return;
     }
 
-    this.drawLinesButtonEl = DrawLinesButton({ onClick: () => this.toggleDrawing() });
-    this.deleteLinesButtonEl = DeleteLinesButton({ onClick: () => this.toggleDeleting() });
-    this.clearLinesButtonEl = ClearLinesButton({ onClick: () => this.clearLines() });
-    this.exportLinesButtonEl = ExportLinesButton({ onClick: () => this.exportLines() });
-    this.importLinesButtonEl = ImportLinesButton({ onClick: () => this.importLines() });
+    try {
+      this.drawLinesButtonEl = DrawLinesButton({ onClick: () => this.toggleDrawing() });
+      this.deleteLinesButtonEl = DeleteLinesButton({ onClick: () => this.toggleDeleting() });
+      this.clearLinesButtonEl = ClearLinesButton({ onClick: () => this.clearLines() });
+      this.exportLinesButtonEl = ExportLinesButton({ onClick: () => this.exportLines() });
+      this.importLinesButtonEl = ImportLinesButton({ onClick: () => this.importLines() });
 
-    this.interfaceManager.mountSidebarButton(this.drawLinesButtonEl);
-    this.interfaceManager.mountSidebarButton(this.deleteLinesButtonEl);
-    this.interfaceManager.mountSidebarButton(this.clearLinesButtonEl);
-    this.interfaceManager.mountSidebarButton(this.exportLinesButtonEl);
-    this.interfaceManager.mountSidebarButton(this.importLinesButtonEl);
+      this.interfaceManager.mountSidebarButton(this.drawLinesButtonEl);
+      this.interfaceManager.mountSidebarButton(this.deleteLinesButtonEl);
+      this.interfaceManager.mountSidebarButton(this.clearLinesButtonEl);
+      this.interfaceManager.mountSidebarButton(this.exportLinesButtonEl);
+      this.interfaceManager.mountSidebarButton(this.importLinesButtonEl);
 
-    this.dataSource = this.layerManager.getOrCreateOverlay(LAYER_NAME);
-    this.handler = new Cesium.ScreenSpaceEventHandler(this.viewer.scene.canvas);
-    this.bindEvents();
+      this.dataSource = this.layerManager.getOrCreateOverlay(LAYER_NAME);
+      this.handler = new Cesium.ScreenSpaceEventHandler(this.viewer.scene.canvas);
+      this.bindEvents();
 
-    // Restore from storage
-    const entities = this.readLinesFromKml(safeLocalStorage.getItem(STORAGE_KEY) || "");
-    if (entities) entities.forEach(line => this.dataSource?.entities.add(line));
+      const entities = this.readLinesFromKml(safeLocalStorage.getItem(STORAGE_KEY) || "");
+      if (entities) entities.forEach(line => this.dataSource?.entities.add(line));
+    } catch (e) {
+      this.logManager.error(LOG_TAG, "Failed to initialize draw lines plugin", e);
+    }
   }
 
   public deinit() {
-    if (!this.handler) throw new Error("draw-lines: handler is undefined");
-    if (!this.layerManager) throw new Error("draw-lines: layer manager is undefined");
-    if (!this.interfaceManager) throw new Error("draw-lines: interface manager is undefined");
-    if (!this.importLinesButtonEl) throw new Error("draw-lines: importLinesButtonEl is undefined");
-    if (!this.exportLinesButtonEl) throw new Error("draw-lines: exportLinesButtonEl is undefined");
-    if (!this.clearLinesButtonEl) throw new Error("draw-lines: clearLinesButtonEl is undefined");
-    if (!this.deleteLinesButtonEl) throw new Error("draw-lines: deleteLinesButtonEl is undefined");
-    if (!this.drawLinesButtonEl) throw new Error("draw-lines: drawLinesButtonEl is undefined");
+    try {
+      this.unbindEvents();
+      this.handler = undefined;
+      this.layerManager.removeOverlay(LAYER_NAME);
 
-    this.unbindEvents();
-    this.handler = undefined;
-    this.layerManager.removeOverlay(LAYER_NAME);
+      if (this.importLinesButtonEl) this.interfaceManager.unmountSidebarButton(this.importLinesButtonEl);
+      if (this.exportLinesButtonEl) this.interfaceManager.unmountSidebarButton(this.exportLinesButtonEl);
+      if (this.clearLinesButtonEl) this.interfaceManager.unmountSidebarButton(this.clearLinesButtonEl);
+      if (this.deleteLinesButtonEl) this.interfaceManager.unmountSidebarButton(this.deleteLinesButtonEl);
+      if (this.drawLinesButtonEl) this.interfaceManager.unmountSidebarButton(this.drawLinesButtonEl);
 
-    this.interfaceManager.unmountSidebarButton(this.importLinesButtonEl);
-    this.interfaceManager.unmountSidebarButton(this.exportLinesButtonEl);
-    this.interfaceManager.unmountSidebarButton(this.clearLinesButtonEl);
-    this.interfaceManager.unmountSidebarButton(this.deleteLinesButtonEl);
-    this.interfaceManager.unmountSidebarButton(this.drawLinesButtonEl);
+      this.exportLinesButtonEl = undefined;
+      this.deleteLinesButtonEl = undefined;
+      this.drawLinesButtonEl = undefined;
 
-    this.exportLinesButtonEl = undefined;
-    this.deleteLinesButtonEl = undefined;
-    this.drawLinesButtonEl = undefined;
+      this.currentLine = undefined;
+      this.currentLineEntity = undefined;
+      this.dataSource = undefined;
+      this.isDrawing = false;
+      this.isDeleting = false;
+      this.isLineStarted = false;
 
-    this.currentLine = undefined;
-    this.currentLineEntity = undefined;
-    this.dataSource = undefined;
-    this.isDrawing = false;
-    this.isDeleting = false;
-    this.isLineStarted = false;
-
-    this.removeLineMarkers();
+      this.removeLineMarkers();
+    } catch (e) {
+      this.logManager.error(LOG_TAG, "Failed to deinitialize draw lines plugin", e);
+    }
   }
 
   private bindEvents() {

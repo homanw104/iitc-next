@@ -9,28 +9,29 @@ import "../types/iitc.ts";
 import { IITCCore } from "../types/iitc";
 import { safeWindow } from "../utils/window";
 
+const LOG_TAG = "SamplePlugin";
+
 class SamplePlugin {
   public id = "sample-plugin";
   public name = "Sample Plugin";
   public description = "Print a message to the console every 5 seconds.";
 
-  private viewer: IITCCore["viewer"];
-  private logManager: IITCCore["logManager"];
+  // Register the managers you need here
+  private viewer!: NonNullable<IITCCore["viewer"]>;
+  private logManager!: NonNullable<IITCCore["logManager"]>;
 
   // Your variables are set here
   private interval: number | undefined;
 
   public init() {
-    // Hire more managers here
-    if (safeWindow) {
-      const iitc: IITCCore = safeWindow.iitc;
-      this.viewer = iitc.viewer!;
-      this.logManager = iitc.logManager!;
-    }
+    // Call in the managers here
+    const iitc = safeWindow.iitc;
+    this.viewer = iitc.viewer!;
+    this.logManager = iitc.logManager!;
 
     // Check for the core components here
     if (!this.viewer || !this.logManager) {
-      console.warn("[WARN][SamplePlugin] IITC Next core components missing", {
+      console.warn(`[WARN][${LOG_TAG}] IITC Next core components missing`, {
         viewer: !!this.viewer,
         logManager: !!this.logManager,
       });
@@ -38,14 +39,22 @@ class SamplePlugin {
     }
 
     // Your code runs here
-    this.logEveryFiveSeconds();
+    try {
+      this.logEveryFiveSeconds();
+    } catch (e) {
+      this.logManager.error(LOG_TAG, "Failed to initialize sample plugin", e);
+    }
   }
 
-  // Remember to remove the interval when deinitializing
   public deinit() {
-    if (this.interval) {
-      clearInterval(this.interval);
-      this.interval = undefined;
+    // Remember to clean up when deinitializing
+    try {
+      if (this.interval) {
+        clearInterval(this.interval);
+        this.interval = undefined;
+      }
+    } catch (e) {
+      this.logManager.error(LOG_TAG, "Failed to deinitialize sample plugin", e);
     }
   }
 

@@ -76,26 +76,25 @@ class PlayerActivityPlugin {
   private hoverAction: Cesium.ScreenSpaceEventHandler.MotionEventCallback = () => {};
 
   public init() {
-    const { viewer, logManager, layerManager, interfaceManager, commManager, entityPositionManager } = safeWindow.iitc;
+    const iitc = safeWindow.iitc;
+    this.viewer = iitc.viewer!;
+    this.logManager = iitc.logManager!;
+    this.layerManager = iitc.layerManager!;
+    this.interfaceManager = iitc.interfaceManager!;
+    this.commManager = iitc.commManager!;
+    this.entityPositionManager = iitc.entityPositionManager!;
 
-    if (!viewer || !layerManager || !interfaceManager || !logManager || !commManager || !entityPositionManager) {
+    if (!this.viewer || !this.layerManager || !this.interfaceManager || !this.logManager || !this.commManager || !this.entityPositionManager) {
       console.warn(`[WARN][${LOG_TAG}] IITC Next core components missing`, {
-        viewer: !!viewer,
-        logManager: !!logManager,
-        layerManager: !!layerManager,
-        interfaceManager: !!interfaceManager,
-        commManager: !!commManager,
-        entityPositionManager: !!entityPositionManager,
+        viewer: !!this.viewer,
+        logManager: !!this.logManager,
+        layerManager: !!this.layerManager,
+        interfaceManager: !!this.interfaceManager,
+        commManager: !!this.commManager,
+        entityPositionManager: !!this.entityPositionManager,
       });
       return;
     }
-
-    this.viewer = viewer;
-    this.logManager = logManager;
-    this.layerManager = layerManager;
-    this.interfaceManager = interfaceManager;
-    this.commManager = commManager;
-    this.entityPositionManager = entityPositionManager;
 
     try {
       this.hoverHandler = new Cesium.ScreenSpaceEventHandler(this.viewer.scene.canvas);
@@ -132,7 +131,7 @@ class PlayerActivityPlugin {
       this.unsetHoverAction();
       this.unsetTooltipElement();
     } catch (e) {
-      this.logManager.error(LOG_TAG, e);
+      this.logManager.error(LOG_TAG, "Failed to deinitialize player activity plugin", e);
     }
   }
 

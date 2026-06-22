@@ -12,18 +12,19 @@ import * as Cesium from "cesium";
 import { IITCCore } from "../types/iitc";
 import { safeWindow } from "../utils/window";
 
+const LOG_TAG = "DoneLinesPlugin";
 const DRAW_LINES_LAYER_NAME = "Draw Lines";
 const LINK_LAYER_NAMES = ["links-enlightened", "links-resistance", "links-machina", "links-neutral"];
 const HIGHLIGHT_WIDTH = 4;
 const DASH_LENGTH = 6;
 const POSITION_EPSILON = 1e-6;
 
+type Segment = [Point, Point];
+
 interface Point {
   lng: number;
   lat: number;
 }
-
-type Segment = [Point, Point];
 
 interface LineStyle {
   material: Cesium.MaterialProperty;
@@ -41,9 +42,9 @@ class DoneLinesPlugin {
   public name = "Done Lines";
   public description = "Highlight draw lines that match existing map links.";
 
-  private viewer: IITCCore["viewer"];
-  private logManager: IITCCore["logManager"];
-  private layerManager: IITCCore["layerManager"];
+  private viewer!: NonNullable<IITCCore["viewer"]>;
+  private logManager!: NonNullable<IITCCore["logManager"]>;
+  private layerManager!: NonNullable<IITCCore["layerManager"]>;
 
   private drawLinesSource: Cesium.CustomDataSource | undefined;
   private updateQueued = false;
@@ -57,15 +58,13 @@ class DoneLinesPlugin {
   private dataSourceRemovedListener = (source: Cesium.DataSource) => this.untrackSource(source);
 
   public init() {
-    if (safeWindow) {
-      const iitc: IITCCore = safeWindow.iitc;
-      this.viewer = iitc.viewer!;
-      this.logManager = iitc.logManager!;
-      this.layerManager = iitc.layerManager!;
-    }
+    const iitc: IITCCore = safeWindow.iitc;
+    this.viewer = iitc.viewer!;
+    this.logManager = iitc.logManager!;
+    this.layerManager = iitc.layerManager!;
 
     if (!this.viewer || !this.logManager || !this.layerManager) {
-      console.warn("[WARN][DoneLinesPlugin] IITC Next core components missing", {
+      console.warn(`[WARN][${LOG_TAG}] IITC Next core components missing`, {
         viewer: !!this.viewer,
         logManager: !!this.logManager,
         layerManager: !!this.layerManager,
@@ -73,24 +72,31 @@ class DoneLinesPlugin {
       return;
     }
 
-    this.drawLinesSource = this.layerManager.getOrCreateOverlay(DRAW_LINES_LAYER_NAME);
-    const layerManager = this.layerManager;
-    this.viewer.dataSources.dataSourceAdded.addEventListener(this.dataSourceAddedListener);
-    this.viewer.dataSources.dataSourceRemoved.addEventListener(this.dataSourceRemovedListener);
-    this.trackSource(this.drawLinesSource);
-    LINK_LAYER_NAMES.forEach(name => this.trackSource(layerManager.getOrCreateDataSource(name)));
-    this.forEachDataSource(source => this.trackSource(source));
-    this.scheduleUpdate();
+    try {
+      this.drawLinesSource = this.layerManager.getOrCreateOverlay(DRAW_LINES_LAYER_NAME);
+      this.viewer.dataSources.dataSourceAdded.addEventListener(this.dataSourceAddedListener);
+      this.viewer.dataSources.dataSourceRemoved.addEventListener(this.dataSourceRemovedListener);
+      this.trackSource(this.drawLinesSource);
+      LINK_LAYER_NAMES.forEach(name => this.trackSource(this.layerManager.getOrCreateDataSource(name)));
+      this.forEachDataSource(source => this.trackSource(source));
+      this.scheduleUpdate();
+    } catch (e) {
+      this.logManager.error(LOG_TAG, "Failed to initialize done lines plugin", e);
+    }
   }
 
   public deinit() {
-    this.viewer?.dataSources.dataSourceAdded.removeEventListener(this.dataSourceAddedListener);
-    this.viewer?.dataSources.dataSourceRemoved.removeEventListener(this.dataSourceRemovedListener);
-    this.trackedSources.forEach(source => this.untrackSource(source));
-    this.trackedSources.clear();
-    this.restoreAllLineStyles();
-    this.drawLinesSource = undefined;
-    this.updateQueued = false;
+    try {
+      this.viewer?.dataSources.dataSourceAdded.removeEventListener(this.dataSourceAddedListener);
+      this.viewer?.dataSources.dataSourceRemoved.removeEventListener(this.dataSourceRemovedListener);
+      this.trackedSources.forEach(source => this.untrackSource(source));
+      this.trackedSources.clear();
+      this.restoreAllLineStyles();
+      this.drawLinesSource = undefined;
+      this.updateQueued = false;
+    } catch (e) {
+      this.logManager.error(LOG_TAG, "Failed to deinitialize done lines plugin", e);
+    }
   }
 
   private forEachDataSource(callback: (source: Cesium.DataSource) => void) {
