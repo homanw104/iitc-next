@@ -1,5 +1,5 @@
 import { h } from "../../../utils/dom.ts";
-import { getPlayerInfo } from "../../../utils/player.ts";
+import { playerInfoManager } from "../../../managers/playerInfoManager.ts";
 import { ScoreManager } from "../../../managers/scoreManager.ts";
 import { RedeemManager } from "../../../managers/redeemManager.ts";
 import PlayerInfo from "./PlayerInfo.tsx";
@@ -24,7 +24,7 @@ const ProfilePane = ({
   onShowSettingsDetail: () => void,
   onShowAboutDetail: () => void,
 }) => {
-  const player = getPlayerInfo();
+  const player = playerInfoManager.getPlayerInfo();
 
   return (
     <div

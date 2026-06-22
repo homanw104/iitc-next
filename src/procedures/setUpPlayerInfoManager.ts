@@ -4,7 +4,8 @@
 
 import { Team } from "../types/ingress";
 import { logManager } from "../managers/logManager";
-import { setPlayerInfo } from "../utils/player";
+import { playerInfoManager } from "../managers/playerInfoManager.ts";
+import { safeWindow } from "../utils/window.ts";
 
 declare global {
   interface Window {
@@ -23,7 +24,7 @@ declare global {
   }
 }
 
-export default function extractPlayerInfo() {
+export default function setUpPlayerInfoManager() {
   if (!window.PLAYER || !window.PLAYER.nickname) {
     logManager.warn("User not logged in. Initialization will be skipped");
 
@@ -32,7 +33,7 @@ export default function extractPlayerInfo() {
       logManager.error("Logged in but page doesn't have player data");
     }
   } else {
-    setPlayerInfo({
+    playerInfoManager.setPlayerInfo({
       ap: window.PLAYER.ap,
       availableInvites: window.PLAYER.available_invites,
       energy: window.PLAYER.energy,
@@ -44,4 +45,6 @@ export default function extractPlayerInfo() {
       xmCapacity: window.PLAYER.xm_capacity,
     });
   }
+
+  if (safeWindow) safeWindow.iitc.playerInfoManager = playerInfoManager;
 }

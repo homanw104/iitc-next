@@ -4,15 +4,15 @@
 
 import { safeWindow } from "./utils/window";
 import { safeLocalStorage } from "./utils/storage";
+import extractVersionString from "./procedures/extractVersionString";
 import setUpLogManager from "./procedures/setUpLogManager";
 import setUpSettingsManager from "./procedures/setUpSettingsManager.ts";
-import extractPlayerInfo from "./procedures/extractPlayerInfo";
-import extractVersionString from "./procedures/extractVersionString";
+import setUpPlayerInfoManager from "./procedures/setUpPlayerInfoManager.ts";
+import getLoginStatus from "./procedures/getLoginStatus.ts";
 import unloadOriginalIntelMap from "./procedures/unloadOriginalIntelMap";
 import loadCesiumViewer from "./procedures/loadCesiumViewer";
 import registerPlugins from "./procedures/registerPlugins";
 import initPlugins from "./procedures/initPlugins";
-import { getPlayerInfo } from "./utils/player";
 import "./types/iitc.ts";
 
 let initStarted = false;
@@ -28,18 +28,20 @@ const init = async () => {
   // Initialize iitc variable
   if (safeWindow) safeWindow.iitc = {};
 
+  // Extract data from the original intel map
+  extractVersionString();
+
   // Set up logging for this app
   setUpLogManager();
 
-  // Load settings
+  // Load settings for this app
   setUpSettingsManager();
 
-  // Extract data from the original intel map
-  extractVersionString();
-  extractPlayerInfo();
+  // Extract player info
+  setUpPlayerInfoManager();
 
   // Halt if user isn't logged in
-  if (!getPlayerInfo()) {
+  if (!getLoginStatus()) {
     initStarted = false;
 
     // Modify the login page
