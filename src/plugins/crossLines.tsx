@@ -59,13 +59,13 @@ class CrossLinesPlugin {
       return;
     }
 
-    this.drawLinesSource = this.layerManager.getOrCreateOverlayLayer(DRAW_LINES_LAYER_NAME);
-    this.highlightSource = this.layerManager.getOrCreateOverlayLayer(CROSS_LINES_LAYER_NAME);
+    this.drawLinesSource = this.layerManager.getOrCreateOverlay(DRAW_LINES_LAYER_NAME);
+    this.highlightSource = this.layerManager.getOrCreateOverlay(CROSS_LINES_LAYER_NAME);
     const layerManager = this.layerManager;
     this.viewer.dataSources.dataSourceAdded.addEventListener(this.dataSourceAddedListener);
     this.viewer.dataSources.dataSourceRemoved.addEventListener(this.dataSourceRemovedListener);
     this.trackSource(this.drawLinesSource);
-    LINK_LAYER_NAMES.forEach(name => this.trackSource(layerManager.getOrCreateDataSourceLayer(name)));
+    LINK_LAYER_NAMES.forEach(name => this.trackSource(layerManager.getOrCreateDataSource(name)));
     this.forEachDataSource(source => this.trackSource(source));
     this.scheduleUpdate();
   }
@@ -75,7 +75,7 @@ class CrossLinesPlugin {
     this.viewer?.dataSources.dataSourceRemoved.removeEventListener(this.dataSourceRemovedListener);
     this.trackedSources.forEach(source => this.untrackSource(source));
     this.trackedSources.clear();
-    this.layerManager?.removeOverlayLayer(CROSS_LINES_LAYER_NAME);
+    this.layerManager?.removeOverlay(CROSS_LINES_LAYER_NAME);
     this.highlightSource = undefined;
     this.drawLinesSource = undefined;
     this.updateQueued = false;

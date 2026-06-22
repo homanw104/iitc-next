@@ -1,3 +1,7 @@
+/**
+ * Settings Manager manages settings and has methods to load/save them.
+ */
+
 import { safeLocalStorage } from "../utils/storage";
 import { logManager } from "./logManager";
 
@@ -7,7 +11,7 @@ export interface Settings {
   logging: {
     recordLogs: boolean;
   };
-  map: {
+  googleTiles: {
     useGoogle3dTiles: boolean;
     darkenGoogle3dTiles: boolean;
     google3dTilesRenderQuality: Google3dTilesRenderQuality;
@@ -17,6 +21,10 @@ export interface Settings {
   };
 }
 
+type LegacySettings = Partial<Settings> & {
+  map?: Partial<Settings["googleTiles"]>;
+};
+
 export type RefreshIntervalMs = null | 10000 | 30000 | 60000 | 300000 | 600000 | 1800000;
 export type Google3dTilesRenderQuality = "performance" | "balanced" | "high" | "ultra";
 
@@ -24,7 +32,7 @@ const DEFAULT_SETTINGS: Settings = {
   logging: {
     recordLogs: false,
   },
-  map: {
+  googleTiles: {
     useGoogle3dTiles: false,
     darkenGoogle3dTiles: false,
     google3dTilesRenderQuality: "balanced",
@@ -57,29 +65,29 @@ export class SettingsManager {
   }
 
   public getUseGoogle3dTiles(): boolean {
-    return this.settings.map.useGoogle3dTiles;
+    return this.settings.googleTiles.useGoogle3dTiles;
   }
 
   public setUseGoogle3dTiles(useGoogle3dTiles: boolean): void {
-    this.settings.map.useGoogle3dTiles = useGoogle3dTiles;
+    this.settings.googleTiles.useGoogle3dTiles = useGoogle3dTiles;
     this.saveState();
   }
 
   public getGoogle3dTilesRenderQuality(): Google3dTilesRenderQuality {
-    return this.settings.map.google3dTilesRenderQuality;
+    return this.settings.googleTiles.google3dTilesRenderQuality;
   }
 
   public setGoogle3dTilesRenderQuality(renderQuality: Google3dTilesRenderQuality): void {
-    this.settings.map.google3dTilesRenderQuality = renderQuality;
+    this.settings.googleTiles.google3dTilesRenderQuality = renderQuality;
     this.saveState();
   }
 
   public getDarkenGoogle3dTiles(): boolean {
-    return this.settings.map.darkenGoogle3dTiles;
+    return this.settings.googleTiles.darkenGoogle3dTiles;
   }
 
   public setDarkenGoogle3dTiles(darkenGoogle3dTiles: boolean): void {
-    this.settings.map.darkenGoogle3dTiles = darkenGoogle3dTiles;
+    this.settings.googleTiles.darkenGoogle3dTiles = darkenGoogle3dTiles;
     this.saveState();
   }
 
@@ -97,15 +105,16 @@ export class SettingsManager {
     if (!stored) return;
 
     try {
-      const parsed = JSON.parse(stored) as Partial<Settings>;
+      const parsed = JSON.parse(stored) as LegacySettings;
+      const googleTiles = parsed.googleTiles ?? parsed.map;
       this.settings = {
         logging: {
           recordLogs: parsed.logging?.recordLogs ?? DEFAULT_SETTINGS.logging.recordLogs,
         },
-        map: {
-          useGoogle3dTiles: parsed.map?.useGoogle3dTiles ?? DEFAULT_SETTINGS.map.useGoogle3dTiles,
-          google3dTilesRenderQuality: this.normalizeGoogle3dTilesRenderQuality(parsed.map?.google3dTilesRenderQuality),
-          darkenGoogle3dTiles: parsed.map?.darkenGoogle3dTiles ?? DEFAULT_SETTINGS.map.darkenGoogle3dTiles,
+        googleTiles: {
+          useGoogle3dTiles: googleTiles?.useGoogle3dTiles ?? DEFAULT_SETTINGS.googleTiles.useGoogle3dTiles,
+          google3dTilesRenderQuality: this.normalizeGoogle3dTilesRenderQuality(googleTiles?.google3dTilesRenderQuality),
+          darkenGoogle3dTiles: googleTiles?.darkenGoogle3dTiles ?? DEFAULT_SETTINGS.googleTiles.darkenGoogle3dTiles,
         },
         refresh: {
           intervalMs: this.normalizeRefreshIntervalMs(parsed.refresh?.intervalMs),
@@ -141,7 +150,7 @@ export class SettingsManager {
     const allowedQualities: Google3dTilesRenderQuality[] = ["performance", "balanced", "high", "ultra"];
     return allowedQualities.includes(renderQuality as Google3dTilesRenderQuality)
       ? renderQuality as Google3dTilesRenderQuality
-      : DEFAULT_SETTINGS.map.google3dTilesRenderQuality;
+      : DEFAULT_SETTINGS.googleTiles.google3dTilesRenderQuality;
   }
 }
 

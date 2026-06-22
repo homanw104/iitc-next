@@ -4,8 +4,9 @@
 
 import { logManager } from "../managers/logManager";
 import { pluginManager } from "../managers/pluginManager";
+import type { LayerManager } from "../managers/layerManager";
 
-export default function initPlugins(): void {
+export default function initPlugins(layerManager: LayerManager): void {
   const plugins = pluginManager.getPlugins();
   
   plugins.forEach(plugin => {
@@ -21,4 +22,6 @@ export default function initPlugins(): void {
       logManager.info("InitPlugins", `Plugin ${plugin.name} is disabled`);
     }
   });
+
+  layerManager.finalizePluginFilterRegistration();
 }

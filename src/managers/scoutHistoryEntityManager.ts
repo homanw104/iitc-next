@@ -88,8 +88,8 @@ export class ScoutHistoryEntityManager {
     reverseEntity: Cesium.Entity | undefined;
     reverseOcclusionEntity: Cesium.Entity | undefined;
   }> {
-    const entities = this.layerManager.getOrCreateDataSourceLayer(DATA_SOURCE_LAYER_NAME).entities;
-    const reverseEntities = this.layerManager.getOrCreateDataSourceLayer(DATA_SOURCE_LAYER_NAME_REVERSE).entities;
+    const entities = this.layerManager.getOrCreateDataSource(DATA_SOURCE_LAYER_NAME).entities;
+    const reverseEntities = this.layerManager.getOrCreateDataSource(DATA_SOURCE_LAYER_NAME_REVERSE).entities;
     const scoutHistoryState = getScoutHistoryState(data);
     const position = await this.entityPositionManager.getPosition(data);
 
@@ -189,8 +189,8 @@ export class ScoutHistoryEntityManager {
   }
 
   private removeScoutControlHaloEntityGroup(scoutControlHalo: ScoutHistoryHalo): void {
-    const entities = this.layerManager.getOrCreateDataSourceLayer(DATA_SOURCE_LAYER_NAME).entities;
-    const reverseEntities = this.layerManager.getOrCreateDataSourceLayer(DATA_SOURCE_LAYER_NAME_REVERSE).entities;
+    const entities = this.layerManager.getOrCreateDataSource(DATA_SOURCE_LAYER_NAME).entities;
+    const reverseEntities = this.layerManager.getOrCreateDataSource(DATA_SOURCE_LAYER_NAME_REVERSE).entities;
 
     if (scoutControlHalo.entity) entities.remove(scoutControlHalo.entity);
     if (scoutControlHalo.occlusionEntity) entities.remove(scoutControlHalo.occlusionEntity);

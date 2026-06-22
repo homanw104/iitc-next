@@ -86,10 +86,10 @@ export class PortalEntityManager {
         const oldLayerId = getPortalLayerId(existing.data);
         const newLayerId = getPortalLayerId(data);
         if (oldLayerId !== newLayerId) {
-          this.layerManager.getOrCreateDataSourceLayer(oldLayerId).entities.remove(existing.entity);
-          this.layerManager.getOrCreateDataSourceLayer(oldLayerId).entities.remove(existing.occlusionEntity);
-          this.layerManager.getOrCreateDataSourceLayer(newLayerId).entities.add(existing.entity);
-          this.layerManager.getOrCreateDataSourceLayer(newLayerId).entities.add(existing.occlusionEntity);
+          this.layerManager.getOrCreateDataSource(oldLayerId).entities.remove(existing.entity);
+          this.layerManager.getOrCreateDataSource(oldLayerId).entities.remove(existing.occlusionEntity);
+          this.layerManager.getOrCreateDataSource(newLayerId).entities.add(existing.entity);
+          this.layerManager.getOrCreateDataSource(newLayerId).entities.add(existing.occlusionEntity);
         }
         await this.updatePortalEntity(existing.entity, existing.occlusionEntity, data);
         this.updatePortalPositionSubscription(existing, data);
@@ -139,7 +139,7 @@ export class PortalEntityManager {
     occlusionEntity: Cesium.Entity
   }> {
     const layerId = getPortalLayerId(data);
-    const entities = this.layerManager.getOrCreateDataSourceLayer(layerId).entities;
+    const entities = this.layerManager.getOrCreateDataSource(layerId).entities;
     const position = await this.entityPositionManager.getPosition(data);
 
     const entity = entities.add({
@@ -207,7 +207,7 @@ export class PortalEntityManager {
     const portalInfo = this.portals.get(guid);
     if (portalInfo) {
       const layerId = getPortalLayerId(portalInfo.data);
-      const entities = this.layerManager.getOrCreateDataSourceLayer(layerId).entities;
+      const entities = this.layerManager.getOrCreateDataSource(layerId).entities;
 
       entities.remove(portalInfo.entity);
       entities.remove(portalInfo.occlusionEntity);

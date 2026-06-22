@@ -9,8 +9,9 @@ import { setUpTileUpdateWhenMove } from "../cesium/setup/setUpTileUpdateWhenMove
 import { configureCameraControls } from "../cesium/setup/configureCameraControls.ts";
 import { setUpInteractionHandlers } from "../cesium/setup/setUpInteractionHandlers.ts";
 import { setUpEntityPositionRefresh } from "../cesium/setup/setUpEntityPositionRefresh.ts";
+import type { CoreManagers } from "../core/coreManagers.ts";
 
-export default function loadCesiumViewer(): void {
+export default function loadCesiumViewer(): CoreManagers {
   logManager.debug("CesiumViewer", "Loading");
 
   const container = createCesiumContainer();
@@ -37,4 +38,6 @@ export default function loadCesiumViewer(): void {
   setUpEntityPositionRefresh(viewer, entityPositionManager);
   setUpTileUpdateWhenMove(viewer, tileRequestManager);
   configureCameraControls(viewer);
+
+  return managers;
 }

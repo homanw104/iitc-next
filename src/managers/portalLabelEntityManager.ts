@@ -44,10 +44,10 @@ export class PortalLabelEntityManager {
       const oldLayerId = getPortalLabelLayerId(existing.data);
       const newLayerId = getPortalLabelLayerId(data);
       if (oldLayerId !== newLayerId) {
-        this.layerManager.getOrCreateDataSourceLayer(oldLayerId).entities.remove(existing.entity);
-        this.layerManager.getOrCreateDataSourceLayer(oldLayerId).entities.remove(existing.occlusionEntity);
-        this.layerManager.getOrCreateDataSourceLayer(newLayerId).entities.add(existing.entity);
-        this.layerManager.getOrCreateDataSourceLayer(newLayerId).entities.add(existing.occlusionEntity);
+        this.layerManager.getOrCreateDataSource(oldLayerId).entities.remove(existing.entity);
+        this.layerManager.getOrCreateDataSource(oldLayerId).entities.remove(existing.occlusionEntity);
+        this.layerManager.getOrCreateDataSource(newLayerId).entities.add(existing.entity);
+        this.layerManager.getOrCreateDataSource(newLayerId).entities.add(existing.occlusionEntity);
       }
       await this.updateLabelEntity(existing.entity, existing.occlusionEntity, data);
       this.updateLabelPositionSubscription(existing, data);
@@ -83,7 +83,7 @@ export class PortalLabelEntityManager {
     occlusionEntity: Cesium.Entity
   }> {
     const layerId = getPortalLabelLayerId(data);
-    const entities = this.layerManager.getOrCreateDataSourceLayer(layerId).entities;
+    const entities = this.layerManager.getOrCreateDataSource(layerId).entities;
     const position = await this.entityPositionManager.getPosition(data);
 
     const entity = entities.add({
@@ -161,7 +161,7 @@ export class PortalLabelEntityManager {
     const labelInfo = this.labels.get(guid);
     if (labelInfo) {
       const layerId = getPortalLabelLayerId(labelInfo.data);
-      const entities = this.layerManager.getOrCreateDataSourceLayer(layerId).entities;
+      const entities = this.layerManager.getOrCreateDataSource(layerId).entities;
 
       entities.remove(labelInfo.entity);
       entities.remove(labelInfo.occlusionEntity);

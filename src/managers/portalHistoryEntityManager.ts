@@ -89,8 +89,8 @@ export class PortalHistoryEntityManager {
     reverseEntity: Cesium.Entity | undefined;
     reverseOcclusionEntity: Cesium.Entity | undefined;
   }> {
-    const entities = this.layerManager.getOrCreateDataSourceLayer(DATA_SOURCE_LAYER_NAME).entities;
-    const reverseEntities = this.layerManager.getOrCreateDataSourceLayer(DATA_SOURCE_LAYER_NAME_REVERSE).entities;
+    const entities = this.layerManager.getOrCreateDataSource(DATA_SOURCE_LAYER_NAME).entities;
+    const reverseEntities = this.layerManager.getOrCreateDataSource(DATA_SOURCE_LAYER_NAME_REVERSE).entities;
     const portalHistoryState = getPortalHistoryState(data);
     const position = await this.entityPositionManager.getPosition(data);
 
@@ -196,8 +196,8 @@ export class PortalHistoryEntityManager {
   }
 
   private removeHistoryHaloEntityGroup(portalHistoryHalo: PortalHistoryHalo): void {
-    const entities = this.layerManager.getOrCreateDataSourceLayer(DATA_SOURCE_LAYER_NAME).entities;
-    const reverseEntities = this.layerManager.getOrCreateDataSourceLayer(DATA_SOURCE_LAYER_NAME_REVERSE).entities;
+    const entities = this.layerManager.getOrCreateDataSource(DATA_SOURCE_LAYER_NAME).entities;
+    const reverseEntities = this.layerManager.getOrCreateDataSource(DATA_SOURCE_LAYER_NAME_REVERSE).entities;
 
     if (portalHistoryHalo.entity) entities.remove(portalHistoryHalo.entity);
     if (portalHistoryHalo.occlusionEntity) entities.remove(portalHistoryHalo.occlusionEntity);

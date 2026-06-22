@@ -73,12 +73,12 @@ class DoneLinesPlugin {
       return;
     }
 
-    this.drawLinesSource = this.layerManager.getOrCreateOverlayLayer(DRAW_LINES_LAYER_NAME);
+    this.drawLinesSource = this.layerManager.getOrCreateOverlay(DRAW_LINES_LAYER_NAME);
     const layerManager = this.layerManager;
     this.viewer.dataSources.dataSourceAdded.addEventListener(this.dataSourceAddedListener);
     this.viewer.dataSources.dataSourceRemoved.addEventListener(this.dataSourceRemovedListener);
     this.trackSource(this.drawLinesSource);
-    LINK_LAYER_NAMES.forEach(name => this.trackSource(layerManager.getOrCreateDataSourceLayer(name)));
+    LINK_LAYER_NAMES.forEach(name => this.trackSource(layerManager.getOrCreateDataSource(name)));
     this.forEachDataSource(source => this.trackSource(source));
     this.scheduleUpdate();
   }

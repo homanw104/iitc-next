@@ -47,10 +47,10 @@ export class PortalOrnamentEntityManager {
       const oldLayerId = getPortalOrnamentLayerId(existing.data);
       const newLayerId = getPortalOrnamentLayerId(data);
       if (oldLayerId !== newLayerId) {
-        this.layerManager.getOrCreateDataSourceLayer(oldLayerId).entities.remove(existing.entity);
-        this.layerManager.getOrCreateDataSourceLayer(oldLayerId).entities.remove(existing.occlusionEntity);
-        this.layerManager.getOrCreateDataSourceLayer(newLayerId).entities.add(existing.entity);
-        this.layerManager.getOrCreateDataSourceLayer(newLayerId).entities.add(existing.occlusionEntity);
+        this.layerManager.getOrCreateDataSource(oldLayerId).entities.remove(existing.entity);
+        this.layerManager.getOrCreateDataSource(oldLayerId).entities.remove(existing.occlusionEntity);
+        this.layerManager.getOrCreateDataSource(newLayerId).entities.add(existing.entity);
+        this.layerManager.getOrCreateDataSource(newLayerId).entities.add(existing.occlusionEntity);
       }
       await this.updateOrnamentEntity(existing.entity, existing.occlusionEntity, data);
       this.updateOrnamentPositionSubscription(existing, data);
@@ -86,7 +86,7 @@ export class PortalOrnamentEntityManager {
     occlusionEntity: Cesium.Entity
   }> {
     const layerId = getPortalOrnamentLayerId(data);
-    const entities = this.layerManager.getOrCreateDataSourceLayer(layerId).entities;
+    const entities = this.layerManager.getOrCreateDataSource(layerId).entities;
     const position = await this.entityPositionManager.getPosition(data);
 
     const entity = entities.add({
@@ -146,7 +146,7 @@ export class PortalOrnamentEntityManager {
     const ornamentInfo = this.ornaments.get(guid);
     if (ornamentInfo) {
       const layerId = getPortalOrnamentLayerId(ornamentInfo.data);
-      const entities = this.layerManager.getOrCreateDataSourceLayer(layerId).entities;
+      const entities = this.layerManager.getOrCreateDataSource(layerId).entities;
 
       entities.remove(ornamentInfo.entity);
       entities.remove(ornamentInfo.occlusionEntity);

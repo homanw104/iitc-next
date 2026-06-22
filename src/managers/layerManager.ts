@@ -9,7 +9,6 @@ import { logManager } from "./logManager";
 
 const CESIUM_PASS_OVERLAY = 13;
 const FILTER_STATES_STORAGE_KEY = "iitc-next-filter-states";
-const PLUGIN_FILTER_STATES_STORAGE_KEY = "iitc-next-plugin-filter-states";
 const MUTUALLY_EXCLUSIVE_HISTORY_FILTERS = [
   "history",
   "history-reverse",
@@ -45,7 +44,7 @@ type CesiumWithPrivateRenderer = typeof Cesium & {
   };
 };
 
-class OverlayLayer {
+class Overlay {
   public viewer: Cesium.Viewer;
   public source: Cesium.DataSource;
   public zIndex: number;
@@ -154,51 +153,41 @@ class OverlayLayer {
 export class LayerManager {
   private static readonly DEFAULT_OVERLAY_Z_INDEX = 1000;
 
-  // Built-in layers like portals and links use normal dataSources
+  // Entities like links and portals use normal DataSources, the name is the same as the dataSourceAndOverlayVisibility
   private dataSources: Map<string, Cesium.DataSource> = new Map();
 
-  // Overlay layers use custom OverlayLayer and are mostly used by plugins
-  private overlayLayers: Map<string, OverlayLayer> = new Map();
+  // Entities like player activity markers use custom Overlay, the name is the same as the dataSourceAndOverlayVisibility
+  private overlays: Map<string, Overlay> = new Map();
 
-  // Plugin layers can use normal data sources or overlay layers
-  private pluginLayerNames: Set<string> = new Set();
+  // Fine-grained filter controls that separate each DataSources or OverlayLayers like "portal-l8-enlightened", etc.
+  private dataSourceAndOverlayVisibility: Map<string, boolean> = new Map();
 
-  // Master layer visibility settings that are shown in the layer detail pane
-  private layerVisibility: Map<string, boolean> = new Map();
-
-  // Fine-grained filter controls that separate each portal-level-faction pair, etc.
+  // Master layer visibility settings like "portals" that are shown in the layer detail pane
   private filterState: Map<string, boolean> = new Map();
-  private pluginFilterState: Map<string, boolean> = new Map();
+
+  // Book-keeper for requestRender
   private pendingRenderFrame: number | null = null;
 
-  constructor(private readonly viewer: Cesium.Viewer) {
+  // Register plugin-related data sources and overlays
+  private pluginDataSourceAndOverlayNames: Set<string> = new Set();
+
+  constructor(
+    private readonly viewer: Cesium.Viewer
+  ) {
     this.loadDefaults();
     this.loadStorageState();
   }
 
-  private loadDefaults() {
-    TEAMS.forEach(t => this.filterState.set(`team-${t.toLowerCase()}`, true));
-    PORTAL_LEVELS.forEach(l => this.filterState.set(`level-${l}`, true));
-    this.filterState.set("portals-placeholder", true);
-    this.filterState.set("portals-label", true);
-    this.filterState.set("portals-ornament", true);
-    this.filterState.set("portals", true);
-    this.filterState.set("links", true);
-    this.filterState.set("fields", true);
-    this.filterState.set("history", false);
-    this.filterState.set("scout-control", false);
-    this.filterState.set("history-reverse", false);
-    this.filterState.set("scout-control-reverse", false);
-    this.filterState.set("debug-tiles", false);
+  private loadDefaults(): void {
+    this.filterState = createDefaultFilterState();
     this.applyFilters();
   }
 
-  private loadStorageState() {
+  private loadStorageState(): void {
     const stored = safeLocalStorage.getItem(FILTER_STATES_STORAGE_KEY);
-    const pluginStored = safeLocalStorage.getItem(PLUGIN_FILTER_STATES_STORAGE_KEY);
 
-    if (stored) {
-      try {
+    try {
+      if (stored) {
         const states = JSON.parse(stored);
         if (Array.isArray(states)) {
           states.forEach(([name, enabled]) => {
@@ -208,213 +197,162 @@ export class LayerManager {
           });
           logManager.debug("LayerManager", `Loaded ${states.length} filters from storage.`);
         }
-      } catch (e) {
-        logManager.error("LayerManager", "Failed to load filters from storage", e);
-        this.removeStorageState();
       }
+    } catch (e) {
+      logManager.warn("LayerManager", "Failed to load filters from storage", e);
+      this.removeStorageState();
+    } finally {
+      this.normalizeMutuallyExclusiveFilters();
+      this.applyFilters();
     }
-
-    if (pluginStored) {
-      try {
-        const states = JSON.parse(pluginStored);
-        if (Array.isArray(states)) {
-          states.forEach(([name, enabled]) => {
-            if (typeof name === "string" && typeof enabled === "boolean") {
-              this.pluginFilterState.set(name, enabled);
-            }
-          });
-          logManager.debug("PluginManager", `Loaded ${states.length} plugin filters from storage.`);
-        }
-      } catch (e) {
-        logManager.error("LayerManager", "Failed to load plugin filter states from storage", e);
-        this.removeStorageState();
-      }
-    }
-
-    this.normalizeMutuallyExclusiveFilters();
-    this.applyFilters();
   }
 
-  private saveStorageState() {
-    const states = Array.from(this.filterState);
-    const pluginStates = Array.from(this.pluginFilterState);
-    safeLocalStorage.setItem(FILTER_STATES_STORAGE_KEY, JSON.stringify(states));
-    safeLocalStorage.setItem(PLUGIN_FILTER_STATES_STORAGE_KEY, JSON.stringify(pluginStates));
+  private saveStorageState(): void {
+    safeLocalStorage.setItem(FILTER_STATES_STORAGE_KEY, JSON.stringify(Array.from(this.filterState)));
   }
 
-  private removeStorageState() {
+  private removeStorageState(): void {
     safeLocalStorage.removeItem(FILTER_STATES_STORAGE_KEY);
-    safeLocalStorage.removeItem(PLUGIN_FILTER_STATES_STORAGE_KEY);
   }
 
-  public setFilter(type: string, enabled: boolean): void {
-    if (this.isBuiltInFilter(type)) {
-      if (type === "portals") {
-        PORTAL_LEVELS.forEach(l => this.filterState.set(`level-${l}`, enabled));
-        this.filterState.set("portals-placeholder", enabled);
-        this.filterState.set("portals-label", enabled);
-        this.filterState.set("portals-ornament", enabled);
-      }
-      if (enabled && MUTUALLY_EXCLUSIVE_HISTORY_FILTERS.includes(type)) {
-        MUTUALLY_EXCLUSIVE_HISTORY_FILTERS.forEach(filter => this.filterState.set(filter, false));
-      }
-      this.filterState.set(type, enabled);
-    } else {
-      this.pluginFilterState.set(type, enabled);
+  public setFilter(name: string, enabled: boolean): void {
+    if (name === "portals") {
+      PORTAL_LEVELS.forEach(l => this.filterState.set(`level-${l}`, enabled));
+      this.filterState.set("portals-placeholder", enabled);
+      this.filterState.set("portals-label", enabled);
+      this.filterState.set("portals-ornament", enabled);
     }
+    if (enabled && MUTUALLY_EXCLUSIVE_HISTORY_FILTERS.includes(name)) {
+      MUTUALLY_EXCLUSIVE_HISTORY_FILTERS.forEach(filter => this.filterState.set(filter, false));
+    }
+    this.filterState.set(name, enabled);
     this.applyFilters();
     this.saveStorageState();
   }
 
-  public isFilterEnabled(type: string): boolean {
-    if (this.isBuiltInFilter(type)) {
-      if (type === "portals") {
-        const allLevels = PORTAL_LEVELS.every(l => this.filterState.get(`level-${l}`) !== false);
-        const placeholder = this.filterState.get("portals-placeholder") !== false;
-        const label = this.filterState.get("portals-label") !== false;
-        const ornament = this.filterState.get("portals-ornament") !== false;
-        return allLevels && placeholder && label && ornament;
-      }
-      return this.filterState.get(type) !== false;
-    } else {
-      return this.pluginFilterState.get(type) !== false;
+  public isFilterEnabled(name: string): boolean {
+    if (name === "portals") {
+      const allLevels = PORTAL_LEVELS.every(l => this.filterState.get(`level-${l}`) !== false);
+      const placeholder = this.filterState.get("portals-placeholder") !== false;
+      const label = this.filterState.get("portals-label") !== false;
+      const ornament = this.filterState.get("portals-ornament") !== false;
+      return allLevels && placeholder && label && ornament;
     }
+    return this.filterState.get(name) !== false;
   }
 
-  public isFilterIndeterminate(type: string): boolean {
-    if (this.isBuiltInFilter(type)) {
-      if (type === "portals") {
-        const states = PORTAL_LEVELS.map(l => this.filterState.get(`level-${l}`) !== false);
-        states.push(this.filterState.get("portals-placeholder") !== false);
-        states.push(this.filterState.get("portals-label") !== false);
-        states.push(this.filterState.get("portals-ornament") !== false);
-        const visibleCount = states.filter(v => v).length;
-        return visibleCount > 0 && visibleCount < states.length;
-      }
-      return false;
-    } else {
-      return false;
+  public isFilterIndeterminate(name: string): boolean {
+    if (name === "portals") {
+      const states = PORTAL_LEVELS.map(l => this.filterState.get(`level-${l}`) !== false);
+      states.push(this.filterState.get("portals-placeholder") !== false);
+      states.push(this.filterState.get("portals-label") !== false);
+      states.push(this.filterState.get("portals-ornament") !== false);
+      const visibleCount = states.filter(v => v).length;
+      return visibleCount > 0 && visibleCount < states.length;
     }
+    return false;
   }
 
-  public getPluginFilters(): Array<[string, boolean]> {
-    return Array.from(this.pluginLayerNames, name => [name, this.pluginFilterState.get(name) !== false]);
-  }
-
-  public getOrCreateDataSourceLayer(name: string): Cesium.DataSource {
+  public getOrCreateDataSource(name: string): Cesium.DataSource {
+    if (!isBuiltInDataSourceOrOverlay(name)) this.registerPluginFilter(name);
     let source = this.dataSources.get(name);
     if (!source) {
       source = new Cesium.CustomDataSource(name);
       source.show = this.getLayerVisibility(name);
-
-      // Unknown effect - Disabled for performance to avoid lag when zooming in and out
-      // source.entities.collectionChanged.addEventListener(() => this.viewer.scene.requestRender());
-
-      // Ensure overlay layers are always on top
-      this.viewer.dataSources.add(source).then(() => this.raiseOverlayLayersToTop());
+      this.viewer.dataSources.add(source).then(() => this.refreshOverlays());
       this.dataSources.set(name, source);
     }
-
     return source;
   }
 
-  public getOrCreatePluginDataSourceLayer(name: string): Cesium.DataSource {
-    this.registerPluginLayer(name);
-    const source = this.getOrCreateDataSourceLayer(name);
-    source.show = this.getLayerVisibility(name);
-    return source;
-  }
-
-  public getOrCreateOverlayLayer(name: string, zIndex?: number): Cesium.DataSource {
-    this.registerPluginLayer(name);
-    let layer = this.overlayLayers.get(name);
-
+  public getOrCreateOverlay(name: string, zIndex?: number): Cesium.DataSource {
+    if (!isBuiltInDataSourceOrOverlay(name)) this.registerPluginFilter(name);
+    let layer = this.overlays.get(name);
     if (!layer) {
-      layer = new OverlayLayer(this.viewer, name, this.getLayerVisibility(name), zIndex ?? LayerManager.DEFAULT_OVERLAY_Z_INDEX);
-      this.overlayLayers.set(name, layer);
-      this.raiseOverlayLayersToTop();
+      layer = new Overlay(
+        this.viewer,
+        name,
+        this.getLayerVisibility(name),
+        zIndex ?? LayerManager.DEFAULT_OVERLAY_Z_INDEX
+      );
+      this.overlays.set(name, layer);
+      this.refreshOverlays();
     } else if (zIndex !== undefined) {
       layer.setZIndex(zIndex);
-      this.raiseOverlayLayersToTop();
+      this.refreshOverlays();
     }
-
     return layer.source;
   }
 
-  public setOverlayLayerZIndex(name: string, zIndex: number): void {
-    const layer = this.overlayLayers.get(name);
-    if (!layer) return;
-
-    layer.setZIndex(zIndex);
-    this.raiseOverlayLayersToTop();
-  }
-
-  public removeOverlayLayer(name: string): void {
-    const layer = this.overlayLayers.get(name);
+  public setOverlayZIndex(name: string, zIndex: number): void {
+    const layer = this.overlays.get(name);
     if (layer) {
-      layer.destroy();
-      this.overlayLayers.delete(name);
+      layer.setZIndex(zIndex);
+      this.refreshOverlays();
     }
-
-    this.unregisterPluginLayer(name);
   }
 
-  public removePluginDataSourceLayer(name: string): void {
+  public removeDataSource(name: string): void {
     const source = this.dataSources.get(name);
     if (source) {
       this.viewer.dataSources.remove(source, true);
       this.dataSources.delete(name);
     }
-
-    this.unregisterPluginLayer(name);
+    if (!isBuiltInDataSourceOrOverlay(name)) this.unregisterPluginFilter(name);
   }
 
-  private registerPluginLayer(name: string): void {
-    this.pluginLayerNames.add(name);
+  public removeOverlay(name: string): void {
+    const layer = this.overlays.get(name);
+    if (layer) {
+      layer.destroy();
+      this.overlays.delete(name);
+    }
+    if (!isBuiltInDataSourceOrOverlay(name)) this.unregisterPluginFilter(name);
+  }
 
-    if (!this.pluginFilterState.has(name)) {
-      this.pluginFilterState.set(name, true);
+  private registerPluginFilter(name: string): void {
+    this.pluginDataSourceAndOverlayNames.add(name);
+    if (!this.filterState.has(name)) {
+      this.filterState.set(name, true);
       this.saveStorageState();
     }
-
-    const pluginFilterVisible = this.pluginFilterState.get(name) !== false;
+    const pluginFilterVisible = this.filterState.get(name) !== false;
     this.setLayerVisibility(name, pluginFilterVisible);
   }
 
-  private unregisterPluginLayer(name: string): void {
-    this.pluginLayerNames.delete(name);
-
-    if (this.pluginFilterState.has(name)) {
-      this.pluginFilterState.delete(name);
-      this.layerVisibility.delete(name);
+  private unregisterPluginFilter(name: string): void {
+    this.pluginDataSourceAndOverlayNames.delete(name);
+    if (this.filterState.has(name)) {
+      this.filterState.delete(name);
+      this.dataSourceAndOverlayVisibility.delete(name);
       this.saveStorageState();
     }
   }
 
   private setLayerVisibility(name: string, visible: boolean): void {
-    const previousVisible = this.layerVisibility.get(name);
-    this.layerVisibility.set(name, visible);
+    const previousVisible = this.dataSourceAndOverlayVisibility.get(name);
+    this.dataSourceAndOverlayVisibility.set(name, visible);
 
     const dataSource = this.dataSources.get(name);
     if (dataSource) dataSource.show = visible;
 
-    const pluginLayer = this.overlayLayers.get(name);
-    if (pluginLayer) pluginLayer.setVisible(visible);
+    const overlay = this.overlays.get(name);
+    if (overlay) overlay.setVisible(visible);
 
-    if (previousVisible !== visible) this.requestVisibilityRender();
+    if (previousVisible !== visible) this.refreshScene();
   }
 
   private getLayerVisibility(name: string): boolean {
-    return this.layerVisibility.get(name) !== false;
+    return this.dataSourceAndOverlayVisibility.get(name) !== false;
   }
 
-  private raiseOverlayLayersToTop(): void {
-    Array.from(this.overlayLayers.values())
+  private refreshOverlays(): void {
+    Array.from(this.overlays.values())
       .sort((a, b) => a.zIndex - b.zIndex)
       .forEach(layer => layer.raiseToTop());
   }
 
-  private requestVisibilityRender(): void {
+  private refreshScene(): void {
     if (this.viewer.isDestroyed()) return;
     if (this.pendingRenderFrame !== null) return;
 
@@ -427,10 +365,6 @@ export class LayerManager {
       this.viewer.dataSourceDisplay.update(this.viewer.clock.currentTime);
       this.viewer.scene.requestRender();
     });
-  }
-
-  private isBuiltInFilter(filterName: string): boolean {
-    return this.filterState.has(filterName);
   }
 
   private normalizeMutuallyExclusiveFilters(): void {
@@ -446,6 +380,22 @@ export class LayerManager {
         enabledFilter = filter;
       }
     });
+  }
+
+  public finalizePluginFilterRegistration(): void {
+
+    Array.from(this.filterState.keys()).forEach(name => {
+      if (!isBuiltInFilter(name) && !this.pluginDataSourceAndOverlayNames.has(name)) {
+        this.filterState.delete(name);
+      }
+    });
+
+    this.saveStorageState();
+    this.applyFilters();
+  }
+
+  public getPluginFilters(): Array<[string, boolean]> {
+    return Array.from(this.pluginDataSourceAndOverlayNames, name => [name, this.filterState.get(name) !== false]);
   }
 
   private applyFilters(): void {
@@ -502,9 +452,9 @@ export class LayerManager {
     this.setLayerVisibility("debug-tiles", debugTilesVisible);
 
     // Plugins
-    const pluginFilters = this.pluginFilterState.keys();
+    const pluginFilters = this.pluginDataSourceAndOverlayNames;
     for (const filter of pluginFilters) {
-      const pluginFilterVisible = this.pluginFilterState.get(filter) !== false;
+      const pluginFilterVisible = this.filterState.get(filter) !== false;
       this.setLayerVisibility(filter, pluginFilterVisible);
     }
 
@@ -535,4 +485,51 @@ function getNoDepthRenderState(renderState: unknown): unknown {
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function createDefaultFilterState(): Map<string, boolean> {
+  const filterState = new Map<string, boolean>();
+
+  TEAMS.forEach(t => filterState.set(`team-${t.toLowerCase()}`, true));
+  PORTAL_LEVELS.forEach(l => filterState.set(`level-${l}`, true));
+  filterState.set("portals-placeholder", true);
+  filterState.set("portals-label", true);
+  filterState.set("portals-ornament", true);
+  filterState.set("portals", true);
+  filterState.set("links", true);
+  filterState.set("fields", true);
+  filterState.set("history", false);
+  filterState.set("scout-control", false);
+  filterState.set("history-reverse", false);
+  filterState.set("scout-control-reverse", false);
+  filterState.set("debug-tiles", false);
+
+  return filterState;
+}
+
+function isBuiltInFilter(name: string): boolean {
+  return createDefaultFilterState().has(name);
+}
+
+function isBuiltInDataSourceOrOverlay(name: string): boolean {
+  const builtInDataSourceAndOverlayNames = [
+    "history-visited-captured",
+    "history-visited-captured-reverse",
+    "history-scout-control",
+    "history-scout-control-reverse",
+    "debug-tiles",
+  ];
+
+  TEAMS.forEach(t => {
+    const team = t.toLowerCase();
+
+    PORTAL_LEVELS.forEach(l => builtInDataSourceAndOverlayNames.push(`portals-l${l}-${team}`));
+    builtInDataSourceAndOverlayNames.push(`portals-placeholder-${team}`);
+    builtInDataSourceAndOverlayNames.push(`portals-label-${team}`);
+    builtInDataSourceAndOverlayNames.push(`portals-ornament-${team}`);
+    builtInDataSourceAndOverlayNames.push(`links-${team}`);
+    builtInDataSourceAndOverlayNames.push(`fields-${team}`);
+  });
+
+  return builtInDataSourceAndOverlayNames.includes(name);
 }

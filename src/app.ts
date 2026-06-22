@@ -41,18 +41,21 @@ const init = async () => {
   // Halt if user isn't logged in
   if (!getPlayerInfo()) {
     initStarted = false;
+
+    // Modify the login page
     return;
+
+  } else {
+    // Unload the original intel map
+    unloadOriginalIntelMap();
+
+    // Initialize Cesium
+    const managers = loadCesiumViewer();
+
+    // Load all plugins
+    await setUpPluginManager();
+    initPlugins(managers.layerManager);
   }
-
-  // Unload the original intel map
-  unloadOriginalIntelMap();
-
-  // Initialize Cesium
-  loadCesiumViewer();
-
-  // Load all plugins
-  await setUpPluginManager();
-  initPlugins();
 };
 
 // Disable vanilla JS
