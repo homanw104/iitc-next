@@ -13,6 +13,29 @@ import {
 } from "../camera/cameraGestures";
 import type { InteractionGestureState } from "../state/interactionGestureState";
 
+// Net two-finger twist needed before leaving pan/zoom for rotation
+const ROTATE_PROMOTION_RADIANS = 0.24;
+
+// Net vertical midpoint travel needed before leaving pan/zoom for tilt
+const TILT_PROMOTION_CENTER_PIXELS = 18;
+
+// Net pinch-distance change that locks the rest of the gesture to pan/zoom
+const ZOOM_LOCK_DISTANCE_PIXELS = 64;
+
+// Reject tilt if horizontal midpoint drift is close to vertical travel
+const TILT_HORIZONTAL_REJECTION_RATIO = 1.2;
+
+// Fixed slack for small mismatches between the two finger paths
+const TILT_RELATIVE_MOTION_TOLERANCE_PIXELS = 30;
+
+// Extra slack proportional to gesture size for imperfect parallel movement.
+const TILT_RELATIVE_MOTION_RATIO = 1.4;
+
+const MIN_PITCH = Cesium.Math.toRadians(-90);
+const MAX_PITCH = Cesium.Math.toRadians(0);
+
+type PinchMode = "pending" | "zoom" | "rotate" | "tilt";
+
 interface PinchMoveEvent {
   distance: { startPosition: Cesium.Cartesian2; endPosition: Cesium.Cartesian2 };
   angleAndHeight: { startPosition: Cesium.Cartesian2; endPosition: Cesium.Cartesian2 };
@@ -24,6 +47,19 @@ interface PinchGestureHandlers {
   handlePinchEnd: () => void;
 }
 
+interface PendingPinchGesture {
+  currentDistance: number;
+  currentAngle: number;
+  currentCenter: Cesium.Cartesian2;
+  startDistance: number;
+  startAngle: number;
+  startCenter: Cesium.Cartesian2;
+  finger1Start: Cesium.Cartesian2;
+  finger2Start: Cesium.Cartesian2;
+  finger1Current: Cesium.Cartesian2;
+  finger2Current: Cesium.Cartesian2;
+}
+
 export function createPinchGestureHandlers(
   viewer: Cesium.Viewer,
   handler: Cesium.ScreenSpaceEventHandler,
@@ -33,30 +69,36 @@ export function createPinchGestureHandlers(
 ): PinchGestureHandlers {
   const camera = viewer.camera;
 
-  let pinchMode: "zoom" | "rotate" | "tilt" = "zoom";
-  let totalZoomDelta = 0;
-  let totalAngleDelta = 0;
-  let totalHeightDelta = 0;
+  let pinchMode: PinchMode = "pending";
   let lastPinchMoveTime = 0;
   let pinchZoomVelocity = 0;
   let lastPinchCenter: Cesium.Cartesian3 | null = null;
+  let rotationCenter: Cesium.Cartesian3 | null = null;
+  let tiltCenter: Cesium.Cartesian3 | null = null;
+  let hasPinchStartPositions = false;
+  let pinchStartDistance = 0;
+  let pinchStartAngle = 0;
   let revertHasJustPinchedTimeoutId: ReturnType<typeof setTimeout> | null = null;
-
-  // Adjusted sweet spots
-  const zoomThreshold = 5.5;
-  const rotateThreshold = 0.1;
-  const tiltThreshold = 3.0;
-  const minPitch = Cesium.Math.toRadians(-90);
-  const maxPitch = Cesium.Math.toRadians(0);
+  const avgPosition = new Cesium.Cartesian2();
+  const previousAvgPosition = new Cesium.Cartesian2();
+  const centerPosition = new Cesium.Cartesian2();
+  const tiltCenterPosition = new Cesium.Cartesian2();
+  const pinchStartPosition1 = new Cesium.Cartesian2();
+  const pinchStartPosition2 = new Cesium.Cartesian2();
+  const pinchStartCenterPosition = new Cesium.Cartesian2();
+  const rotationTransform = new Cesium.Matrix4();
+  const tiltTransform = new Cesium.Matrix4();
 
   const handlePinchStart = () => {
     gestureState.isPinching = true;
-    pinchMode = "zoom";
-    totalZoomDelta = 0;
-    totalAngleDelta = 0;
-    totalHeightDelta = 0;
+    pinchMode = "pending";
     pinchZoomVelocity = 0;
     lastPinchCenter = null;
+    rotationCenter = null;
+    tiltCenter = null;
+    hasPinchStartPositions = false;
+    pinchStartDistance = 0;
+    pinchStartAngle = 0;
     lastPinchMoveTime = Date.now();
 
     if (gestureState.momentumRequestId) {
@@ -78,22 +120,29 @@ export function createPinchGestureHandlers(
     const previousPosition1 = previousPositions.values[0];
     const previousPosition2 = previousPositions.values[1];
 
-    const avgPosition = new Cesium.Cartesian2(
-      (position1.x + position2.x) / 2,
-      (position1.y + position2.y) / 2
-    );
+    const currentDistance = Cesium.Cartesian2.distance(position1, position2);
+    const previousDistance = Cesium.Cartesian2.distance(previousPosition1, previousPosition2);
 
-    const previousAvgPosition = new Cesium.Cartesian2(
-      (previousPosition1.x + previousPosition2.x) / 2,
-      (previousPosition1.y + previousPosition2.y) / 2
-    );
+    if (!hasPinchStartPositions) {
+      Cesium.Cartesian2.clone(previousPosition1, pinchStartPosition1);
+      Cesium.Cartesian2.clone(previousPosition2, pinchStartPosition2);
+      pinchStartCenterPosition.x = (previousPosition1.x + previousPosition2.x) / 2;
+      pinchStartCenterPosition.y = (previousPosition1.y + previousPosition2.y) / 2;
+      pinchStartDistance = previousDistance;
+      pinchStartAngle = Math.atan2(
+        previousPosition2.y - previousPosition1.y,
+        previousPosition2.x - previousPosition1.x,
+      );
+      hasPinchStartPositions = true;
+    }
 
-    const centerPosition = new Cesium.Cartesian2(
-      (avgPosition.x + previousAvgPosition.x) / 2,
-      (avgPosition.y + previousAvgPosition.y) / 2
-    );
+    avgPosition.x = (position1.x + position2.x) / 2;
+    avgPosition.y = (position1.y + position2.y) / 2;
+    previousAvgPosition.x = (previousPosition1.x + previousPosition2.x) / 2;
+    previousAvgPosition.y = (previousPosition1.y + previousPosition2.y) / 2;
+    centerPosition.x = (avgPosition.x + previousAvgPosition.x) / 2;
+    centerPosition.y = (avgPosition.y + previousAvgPosition.y) / 2;
 
-    const zoomDelta = event.distance.endPosition.y - event.distance.startPosition.y;
     let angleDelta = event.angleAndHeight.endPosition.x - event.angleAndHeight.startPosition.x;
     const heightDelta = event.angleAndHeight.endPosition.y - event.angleAndHeight.startPosition.y;
 
@@ -103,22 +152,22 @@ export function createPinchGestureHandlers(
       angleDelta += 2 * Math.PI;
     }
 
-    totalZoomDelta += Math.abs(zoomDelta);
-    totalAngleDelta += angleDelta;
-    totalHeightDelta += heightDelta;
-
-    if (pinchMode === "zoom") {
-      // Start optimistic as zoom, then switch once enough gesture evidence accumulates.
-      if (totalZoomDelta > zoomThreshold) {
-        pinchMode = "zoom";
-      } else if (Math.abs(totalHeightDelta) > tiltThreshold) {
-        pinchMode = "tilt";
-      } else if (Math.abs(totalAngleDelta) > rotateThreshold) {
-        pinchMode = "rotate";
-      }
+    if (pinchMode === "pending") {
+      pinchMode = classifyPendingPinchGesture({
+        currentDistance,
+        currentAngle: Math.atan2(position2.y - position1.y, position2.x - position1.x),
+        currentCenter: avgPosition,
+        startDistance: pinchStartDistance,
+        startAngle: pinchStartAngle,
+        startCenter: pinchStartCenterPosition,
+        finger1Start: pinchStartPosition1,
+        finger2Start: pinchStartPosition2,
+        finger1Current: position1,
+        finger2Current: position2,
+      });
     }
 
-    if (pinchMode === "zoom" || pinchMode === "rotate") {
+    if (pinchMode === "pending" || pinchMode === "zoom" || pinchMode === "rotate") {
       const dx = avgPosition.x - previousAvgPosition.x;
       const dy = avgPosition.y - previousAvgPosition.y;
 
@@ -126,12 +175,13 @@ export function createPinchGestureHandlers(
         panCameraByOrbitingGlobe(camera, viewer.scene.globe.ellipsoid, previousAvgPosition, avgPosition);
       }
 
-      const center = pickRenderedGlobeOrTilePosition(viewer.scene, centerPosition);
+      const center = pinchMode === "rotate"
+        ? rotationCenter ?? pickRenderedGlobeOrTilePosition(viewer.scene, centerPosition)
+        : pickRenderedGlobeOrTilePosition(viewer.scene, centerPosition);
+      if (pinchMode === "rotate" && center) rotationCenter = center;
       // Momentum keeps using the last valid anchor if the fingers leave the visible globe.
       if (center) lastPinchCenter = center;
 
-      const currentDistance = Cesium.Cartesian2.distance(position1, position2);
-      const previousDistance = Cesium.Cartesian2.distance(previousPosition1, previousPosition2);
       const distanceDelta = currentDistance - previousDistance;
 
       if (Math.abs(distanceDelta) > 0) {
@@ -156,50 +206,54 @@ export function createPinchGestureHandlers(
       }
 
       if (pinchMode === "rotate" && center) {
-        const transform = Cesium.Transforms.eastNorthUpToFixedFrame(center);
-        camera.lookAtTransform(transform);
+        Cesium.Transforms.eastNorthUpToFixedFrame(center, undefined, rotationTransform);
+        camera.lookAtTransform(rotationTransform);
         camera.rotateRight(angleDelta * 0.6);
         camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
       }
     }
 
     if (pinchMode === "tilt") {
-      const canvas = viewer.scene.canvas;
-      const center = pickRenderedGlobeOrTilePosition(
-        viewer.scene,
-        new Cesium.Cartesian2(canvas.clientWidth / 2, canvas.clientHeight / 2),
-      );
+      if (!tiltCenter) {
+        const canvas = viewer.scene.canvas;
+        tiltCenterPosition.x = canvas.clientWidth / 2;
+        tiltCenterPosition.y = canvas.clientHeight / 2;
+        tiltCenter = pickRenderedGlobeOrTilePosition(
+          viewer.scene,
+          tiltCenterPosition,
+        ) ?? null;
+      }
 
-      if (!center) return;
+      if (!tiltCenter) return;
 
       const tiltAmount = heightDelta * 0.02;
-      const currentPitch = getCameraPitchRelativeToGlobePoint(camera, center);
+      const currentPitch = getCameraPitchRelativeToGlobePoint(camera, tiltCenter);
       const targetPitch = currentPitch - tiltAmount;
       let actualTiltAmount = tiltAmount;
 
       // When zooming out makes the view-center pitch exceed the normal range, avoid snapping
       // back to the limit. Let user input reduce the violation but block making it worse.
-      if (currentPitch > maxPitch) {
+      if (currentPitch > MAX_PITCH) {
         if (targetPitch > currentPitch) {
           actualTiltAmount = 0;
-        } else if (targetPitch < minPitch) {
-          actualTiltAmount = currentPitch - minPitch;
+        } else if (targetPitch < MIN_PITCH) {
+          actualTiltAmount = currentPitch - MIN_PITCH;
         }
-      } else if (currentPitch < minPitch) {
+      } else if (currentPitch < MIN_PITCH) {
         if (targetPitch < currentPitch) {
           actualTiltAmount = 0;
-        } else if (targetPitch > maxPitch) {
-          actualTiltAmount = currentPitch - maxPitch;
+        } else if (targetPitch > MAX_PITCH) {
+          actualTiltAmount = currentPitch - MAX_PITCH;
         }
-      } else if (targetPitch > maxPitch) {
-        actualTiltAmount = currentPitch - maxPitch;
-      } else if (targetPitch < minPitch) {
-        actualTiltAmount = currentPitch - minPitch;
+      } else if (targetPitch > MAX_PITCH) {
+        actualTiltAmount = currentPitch - MAX_PITCH;
+      } else if (targetPitch < MIN_PITCH) {
+        actualTiltAmount = currentPitch - MIN_PITCH;
       }
 
       if (Math.abs(actualTiltAmount) > 0) {
-        const transform = Cesium.Transforms.eastNorthUpToFixedFrame(center);
-        camera.lookAtTransform(transform);
+        Cesium.Transforms.eastNorthUpToFixedFrame(tiltCenter, undefined, tiltTransform);
+        camera.lookAtTransform(tiltTransform);
         camera.rotateDown(actualTiltAmount);
         camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
       }
@@ -212,7 +266,7 @@ export function createPinchGestureHandlers(
     if (revertHasJustPinchedTimeoutId) clearTimeout(revertHasJustPinchedTimeoutId);
     revertHasJustPinchedTimeoutId = setTimeout(() => gestureState.hasJustPinched = false, doubleTapThreshold);
 
-    if (Math.abs(pinchZoomVelocity) > 0.1 && (pinchMode === "zoom" || pinchMode == "rotate")) {
+    if (Math.abs(pinchZoomVelocity) > 0.1 && (pinchMode === "pending" || pinchMode === "zoom" || pinchMode === "rotate")) {
       if (pinchZoomVelocity > 5) pinchZoomVelocity = 5;
       if (pinchZoomVelocity < -5) pinchZoomVelocity = -5;
 
@@ -257,4 +311,52 @@ export function createPinchGestureHandlers(
     handlePinchMove,
     handlePinchEnd,
   };
+}
+
+function classifyPendingPinchGesture(gesture: PendingPinchGesture): PinchMode {
+  const shouldLockZoom = Math.abs(gesture.currentDistance - gesture.startDistance) >= ZOOM_LOCK_DISTANCE_PIXELS;
+  const shouldPromoteRotate = Math.abs(getAngleDelta(gesture.startAngle, gesture.currentAngle)) >= ROTATE_PROMOTION_RADIANS;
+  const shouldPromoteTilt = getTiltPromotionMovementPixels(gesture) >= TILT_PROMOTION_CENTER_PIXELS;
+
+  if (shouldLockZoom) return "zoom";
+  if (shouldPromoteRotate && !shouldPromoteTilt) return "rotate";
+  if (shouldPromoteTilt && !shouldPromoteRotate) return "tilt";
+  return "pending";
+}
+
+function getTiltPromotionMovementPixels(gesture: PendingPinchGesture): number {
+  const centerDx = gesture.currentCenter.x - gesture.startCenter.x;
+  const centerDy = gesture.currentCenter.y - gesture.startCenter.y;
+  const absCenterDy = Math.abs(centerDy);
+
+  if (Math.abs(centerDx) * TILT_HORIZONTAL_REJECTION_RATIO > absCenterDy) return 0;
+
+  const finger1Dx = gesture.finger1Current.x - gesture.finger1Start.x;
+  const finger1Dy = gesture.finger1Current.y - gesture.finger1Start.y;
+  const finger2Dx = gesture.finger2Current.x - gesture.finger2Start.x;
+  const finger2Dy = gesture.finger2Current.y - gesture.finger2Start.y;
+  const sameVerticalDirection = finger1Dy === 0 || finger2Dy === 0 || Math.sign(finger1Dy) === Math.sign(finger2Dy);
+  if (!sameVerticalDirection) return 0;
+
+  const relativeMotion = Math.hypot(finger1Dx - finger2Dx, finger1Dy - finger2Dy);
+  const commonMotion = Math.hypot((finger1Dx + finger2Dx) / 2, (finger1Dy + finger2Dy) / 2);
+  const relativeMotionTolerance = Math.max(
+    TILT_RELATIVE_MOTION_TOLERANCE_PIXELS,
+    commonMotion * TILT_RELATIVE_MOTION_RATIO,
+  );
+  if (relativeMotion > relativeMotionTolerance) return 0;
+
+  return absCenterDy;
+}
+
+function getAngleDelta(startAngle: number, endAngle: number): number {
+  let angleDelta = endAngle - startAngle;
+
+  if (angleDelta > Math.PI) {
+    angleDelta -= 2 * Math.PI;
+  } else if (angleDelta < -Math.PI) {
+    angleDelta += 2 * Math.PI;
+  }
+
+  return angleDelta;
 }

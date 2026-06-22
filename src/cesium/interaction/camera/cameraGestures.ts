@@ -6,6 +6,15 @@ import * as Cesium from "cesium";
 
 export const MINIMUM_3D_TILE_CAMERA_CLEARANCE_METERS = 5;
 
+const panStartScratch = new Cesium.Cartesian3();
+const panEndScratch = new Cesium.Cartesian3();
+const panStartNormalScratch = new Cesium.Cartesian3();
+const panEndNormalScratch = new Cesium.Cartesian3();
+const panAxisScratch = new Cesium.Cartesian3();
+const pitchTransformScratch = new Cesium.Matrix4();
+const pitchInverseTransformScratch = new Cesium.Matrix4();
+const pitchLocalDirectionScratch = new Cesium.Cartesian3();
+
 export function pickRenderedGlobeOrTilePosition(
   scene: Cesium.Scene,
   windowPosition: Cesium.Cartesian2,
@@ -44,18 +53,18 @@ export function panCameraByOrbitingGlobe(
   startPosition: Cesium.Cartesian2,
   endPosition: Cesium.Cartesian2,
 ): void {
-  const start = camera.pickEllipsoid(startPosition, ellipsoid);
-  const end = camera.pickEllipsoid(endPosition, ellipsoid);
+  const start = camera.pickEllipsoid(startPosition, ellipsoid, panStartScratch);
+  const end = camera.pickEllipsoid(endPosition, ellipsoid, panEndScratch);
 
   if (!start || !end) return;
 
   // Treat the two picked surface points as unit vectors from the globe center.
   // Rotating the camera around their cross-product axis makes the ground slide
   // under the fingers without changing camera height.
-  const startNormal = Cesium.Cartesian3.normalize(start, new Cesium.Cartesian3());
-  const endNormal = Cesium.Cartesian3.normalize(end, new Cesium.Cartesian3());
+  const startNormal = Cesium.Cartesian3.normalize(start, panStartNormalScratch);
+  const endNormal = Cesium.Cartesian3.normalize(end, panEndNormalScratch);
   const dot = Cesium.Cartesian3.dot(startNormal, endNormal);
-  const axis = Cesium.Cartesian3.cross(startNormal, endNormal, new Cesium.Cartesian3());
+  const axis = Cesium.Cartesian3.cross(startNormal, endNormal, panAxisScratch);
 
   if (Cesium.Cartesian3.equalsEpsilon(axis, Cesium.Cartesian3.ZERO, Cesium.Math.EPSILON14)) return;
 
@@ -98,9 +107,9 @@ export function keepCameraAboveRenderedSurface(scene: Cesium.Scene): void {
 export function getCameraPitchRelativeToGlobePoint(camera: Cesium.Camera, center: Cesium.Cartesian3): number {
   // Measure pitch against the same local ground frame that tilt gestures rotate around.
   // Cesium's camera.pitch is relative to the camera's own nadir point, which diverges at a globe scale.
-  const transform = Cesium.Transforms.eastNorthUpToFixedFrame(center);
-  const inverseTransform = Cesium.Matrix4.inverseTransformation(transform, new Cesium.Matrix4());
-  const localDirection = Cesium.Matrix4.multiplyByPointAsVector(inverseTransform, camera.directionWC, new Cesium.Cartesian3());
+  const transform = Cesium.Transforms.eastNorthUpToFixedFrame(center, undefined, pitchTransformScratch);
+  const inverseTransform = Cesium.Matrix4.inverseTransformation(transform, pitchInverseTransformScratch);
+  const localDirection = Cesium.Matrix4.multiplyByPointAsVector(inverseTransform, camera.directionWC, pitchLocalDirectionScratch);
 
   // In an ENU frame, +Z is local up. Looking level has z = 0, looking down has z < 0,
   // so asin(z) gives the signed pitch angle relative to the tangent plane.
