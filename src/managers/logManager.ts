@@ -4,20 +4,19 @@
 
 export type LogLevel = "DEBUG" | "INFO" | "WARN" | "ERROR" | "NONE";
 
-export type LoggingCallback = (msg: string) => void;
+export type LogEntryCallback = (entry: LogEntry) => void;
 
 export interface LogEntry {
   timestamp: string;
-  level: Exclude<LogLevel, "NONE">;
+  level: LogLevel;
   tag: string;
   args: string[];
 }
 
 export class LogManager {
   private level: LogLevel = "INFO";
-  private latestMsg = "Loaded";
 
-  private cb: LoggingCallback | null = null;
+  private entryCallbacks = new Set<LogEntryCallback>();
   private isRecording = false;
   private recordedLogs: LogEntry[] = [];
 
@@ -25,39 +24,66 @@ export class LogManager {
     this.level = "INFO";
   }
 
-  private isLevelLessThanOrEqual(levelA: LogLevel, levelB: LogLevel): boolean {
-    if (levelA === levelB) return true;
-    if (levelA === "NONE") {
-      return false;
-    }
-    if (levelA === "ERROR") {
-      return levelB === "NONE";
-    }
-    if (levelA === "WARN") {
-      return levelB === "ERROR" || levelB === "NONE";
-    }
-    if (levelA === "INFO") {
-      return levelB === "WARN" || levelB === "ERROR" || levelB === "NONE";
-    }
-    return true; // DEBUG is only <= DEBUG
-  }
-
-  setLevel(level: LogLevel): void {
+  public setLevel(level: LogLevel): void {
     this.level = level;
   }
 
-  setCallback(cb: (msg: string) => void): void {
-    this.cb = cb;
+  public subscribe(callback: LogEntryCallback): void {
+    this.entryCallbacks.add(callback);
   }
 
-  setRecordingEnabled(isRecording: boolean): void {
+  public unsubscribe(callback: LogEntryCallback): void {
+    this.entryCallbacks.delete(callback);
+  }
+
+  public setRecordingEnabled(isRecording: boolean): void {
     this.isRecording = isRecording;
   }
 
-  exportRecordedLogs(): string {
+  public getRecordedLogs(): LogEntry[] {
+    return this.recordedLogs;
+  }
+
+  public exportRecordedLogs(): string {
     return this.recordedLogs
       .map((entry) => `${entry.timestamp} [${entry.level}][${entry.tag}] ${entry.args.join(" ")}`)
       .join("\n");
+  }
+
+  public debug(tag: string, ...args: unknown[]): void {
+    const entry = this.createEntry("DEBUG", tag, args);
+    this.record(entry);
+    if (this.isLevelLessThanOrEqual(this.level, "DEBUG")) {
+      console.log(`[DEBUG][${tag}]`, ...args);
+      this.emit(entry);
+    }
+  }
+
+  public info(tag: string, ...args: unknown[]): void {
+    const entry = this.createEntry("INFO", tag, args);
+    this.record(entry);
+    if (this.isLevelLessThanOrEqual(this.level, "INFO")) {
+      console.log(`[INFO][${tag}]`, ...args);
+      this.emit(entry);
+    }
+  }
+
+  public warn(tag: string, ...args: unknown[]): void {
+    const entry = this.createEntry("WARN", tag, args);
+    this.record(entry);
+    if (this.isLevelLessThanOrEqual(this.level, "WARN")) {
+      console.warn(`[WARN][${tag}]`, ...args);
+      this.emit(entry);
+    }
+  }
+
+  public error(tag: string, ...args: unknown[]): void {
+    const entry = this.createEntry("ERROR", tag, args);
+    this.record(entry);
+    if (this.isLevelLessThanOrEqual(this.level, "ERROR")) {
+      console.error(`[ERROR][${tag}]`, ...args);
+      this.emit(entry);
+    }
   }
 
   private formatArg(arg: unknown): string {
@@ -77,51 +103,39 @@ export class LogManager {
     }
   }
 
-  private record(level: Exclude<LogLevel, "NONE">, tag: string, args: unknown[]): void {
-    if (!this.isRecording) return;
-
-    this.recordedLogs.push({
+  private createEntry(level: LogLevel, tag: string, args: unknown[]): LogEntry {
+    return {
       timestamp: new Date().toISOString(),
       level,
       tag,
       args: args.map((arg) => this.formatArg(arg)),
-    });
+    };
   }
 
-  debug(tag: string, ...args: unknown[]): void {
-    this.record("DEBUG", tag, args);
-    if (this.isLevelLessThanOrEqual(this.level, "DEBUG")) {
-      console.log(`[DEBUG][${tag}]`, ...args);
-      this.latestMsg = args[0] as string;
-      if (this.cb) this.cb(this.latestMsg);
-    }
+  private record(entry: LogEntry): void {
+    if (!this.isRecording) return;
+    this.recordedLogs.push(entry);
   }
 
-  info(tag: string, ...args: unknown[]): void {
-    this.record("INFO", tag, args);
-    if (this.isLevelLessThanOrEqual(this.level, "INFO")) {
-      console.log(`[INFO][${tag}]`, ...args);
-      this.latestMsg = args[0] as string;
-      if (this.cb) this.cb(this.latestMsg);
-    }
+  private emit(entry: LogEntry): void {
+    this.entryCallbacks.forEach((callback) => callback(entry));
   }
 
-  warn(tag: string, ...args: unknown[]): void {
-    this.record("WARN", tag, args);
-    if (this.isLevelLessThanOrEqual(this.level, "WARN")) {
-      console.warn(`[WARN][${tag}]`, ...args);
-      this.latestMsg = args[0] as string;
-      if (this.cb) this.cb(this.latestMsg);
+  private isLevelLessThanOrEqual(levelA: LogLevel, levelB: LogLevel): boolean {
+    if (levelA === levelB) return true;
+    if (levelA === "NONE") {
+      return false;
     }
-  }
-
-  error(tag: string, ...args: unknown[]): void {
-    this.record("ERROR", tag, args);
-    if (this.isLevelLessThanOrEqual(this.level, "ERROR")) {
-      console.error(`[ERROR][${tag}]`, ...args);
-      this.latestMsg = args[0] as string;
-      if (this.cb) this.cb(this.latestMsg);
+    if (levelA === "ERROR") {
+      return levelB === "NONE";
     }
+    if (levelA === "WARN") {
+      return levelB === "ERROR" || levelB === "NONE";
+    }
+    if (levelA === "INFO") {
+      return levelB === "WARN" || levelB === "ERROR" || levelB === "NONE";
+    }
+    return true; // DEBUG is only <= DEBUG
   }
 }
 

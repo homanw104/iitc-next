@@ -61,8 +61,8 @@ export function mountCoreControllersAndUI(viewer: Cesium.Viewer, container: HTML
   container.appendChild(LayerChooserButton({ layerChooserPaneController: layerChooserPaneController }));
   container.appendChild(ProfileButton({ gameDetailPaneController: gameDetailPaneController }));
 
-  logManager.setCallback((msg: string) => {
-    state.lastLogMsg = msg;
+  logManager.subscribe((entry) => {
+    state.lastLogMsg = entry.args.join(" ");
     state.portalDetailBar?.remove();
 
     if (state.lastPortalData) {

@@ -5,6 +5,7 @@
 import * as Cesium from "cesium";
 import { logManager } from "./logManager";
 import { settingsManager } from "./settingsManager";
+import { SceneEventManager } from "./sceneEventManager";
 
 const LOG_TAG = "EntityPositionManager";
 
@@ -66,7 +67,10 @@ export class EntityPositionManager {
   private queueStatusLoggingActive = false;
   private readonly worldTerrainProviderPromise: Promise<Cesium.TerrainProvider | undefined>;
 
-  constructor(private readonly viewer: Cesium.Viewer) {
+  constructor(
+    private readonly viewer: Cesium.Viewer,
+    private readonly sceneEventManager: SceneEventManager,
+  ) {
     this.worldTerrainProviderPromise = Cesium.createWorldTerrainAsync()
       .catch(() => undefined);
 
@@ -84,6 +88,8 @@ export class EntityPositionManager {
   }
 
   public async getPosition(data: EntityCoordinates): Promise<Cesium.Cartesian3> {
+    await this.sceneEventManager.waitForInitSceneLoaded();
+
     const key = getEntityPositionKey(data.latE6, data.lngE6);
     const cachedPositionState = this.positionStatesByKey.get(key);
     if (cachedPositionState) return this.useCachedPosition(cachedPositionState);
@@ -192,7 +198,6 @@ export class EntityPositionManager {
       this.refreshableHeightKeys.add(getEntityPositionKey(positionState.latE6, positionState.lngE6));
       this.refreshWorldTerrainPosition(positionState);
     });
-    logManager.debug(LOG_TAG, "Height cache reset");
     return true;
   }
 

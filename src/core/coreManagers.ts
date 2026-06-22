@@ -6,6 +6,7 @@ import * as Cesium from "cesium";
 import type { IITCCore } from "../types/iitc";
 import { LayerManager } from "../managers/layerManager";
 import { EntityPositionManager } from "../managers/entityPositionManager";
+import { SceneEventManager } from "../managers/sceneEventManager";
 import { PortalEntityManager } from "../managers/portalEntityManager";
 import { PortalLabelEntityManager } from "../managers/portalLabelEntityManager";
 import { PortalOrnamentEntityManager } from "../managers/portalOrnamentEntityManager.ts";
@@ -22,6 +23,7 @@ import { InterfaceManager } from "../managers/interfaceManager";
 
 export interface CoreManagers {
   layerManager: LayerManager;
+  sceneEventManager: SceneEventManager;
   entityPositionManager: EntityPositionManager;
   portalEntityManager: PortalEntityManager;
   portalLabelEntityManager: PortalLabelEntityManager;
@@ -40,7 +42,8 @@ export interface CoreManagers {
 
 export function createCoreManagers(viewer: Cesium.Viewer, container: HTMLElement): CoreManagers {
   const layerManager = new LayerManager(viewer);
-  const entityPositionManager = new EntityPositionManager(viewer);
+  const sceneEventManager = new SceneEventManager(viewer);
+  const entityPositionManager = new EntityPositionManager(viewer, sceneEventManager);
   const portalEntityManager = new PortalEntityManager(layerManager, entityPositionManager);
   const portalLabelEntityManager = new PortalLabelEntityManager(layerManager, entityPositionManager);
   const portalOrnamentEntityManager = new PortalOrnamentEntityManager(layerManager, entityPositionManager);
@@ -59,6 +62,7 @@ export function createCoreManagers(viewer: Cesium.Viewer, container: HTMLElement
 
   return {
     layerManager,
+    sceneEventManager,
     entityPositionManager,
     portalEntityManager,
     portalLabelEntityManager,
@@ -79,6 +83,7 @@ export function createCoreManagers(viewer: Cesium.Viewer, container: HTMLElement
 export function exposeCoreManagers(iitc: IITCCore, viewer: Cesium.Viewer, managers: CoreManagers): void {
   iitc.viewer = viewer;
   iitc.layerManager = managers.layerManager;
+  iitc.sceneEventManager = managers.sceneEventManager;
   iitc.entityPositionManager = managers.entityPositionManager;
   iitc.portalEntityManager = managers.portalEntityManager;
   iitc.portalLabelEntityManager = managers.portalLabelEntityManager;

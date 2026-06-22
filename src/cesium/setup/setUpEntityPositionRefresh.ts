@@ -4,6 +4,7 @@
 
 import * as Cesium from "cesium";
 import type { EntityPositionManager } from "../../managers/entityPositionManager";
+import { logManager } from "../../managers/logManager.ts";
 
 const CAMERA_IDLE_REFRESH_DELAY_MS = 200;
 
@@ -23,14 +24,8 @@ export function setUpEntityPositionRefresh(
 
     heightRefreshRequested = true;
     heightCacheResetRequested = heightCacheResetRequested || resetHeightCache;
+    logManager.debug("EntityPositionRefresh", "Requested entity position refresh");
     scheduleIdleHeightRefresh();
-  };
-
-  const clearIdleRefresh = () => {
-    if (idleRefreshTimeout === undefined) return;
-
-    window.clearTimeout(idleRefreshTimeout);
-    idleRefreshTimeout = undefined;
   };
 
   const scheduleIdleHeightRefresh = () => {
@@ -42,6 +37,13 @@ export function setUpEntityPositionRefresh(
       idleRefreshTimeout = undefined;
       viewer.scene.requestRender();
     }, CAMERA_IDLE_REFRESH_DELAY_MS);
+  };
+
+  const clearIdleRefresh = () => {
+    if (idleRefreshTimeout === undefined) return;
+
+    clearTimeout(idleRefreshTimeout);
+    idleRefreshTimeout = undefined;
   };
 
   viewer.scene.postRender.addEventListener(() => {

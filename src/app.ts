@@ -2,61 +2,54 @@
  * Entry point of the application.
  */
 
+import { CoreManagers } from "./core/coreManagers.ts";
+import { SplashScreenController } from "./controllers/SplashScreenController.tsx";
 import { safeWindow } from "./utils/window";
 import { safeLocalStorage } from "./utils/storage";
-import extractVersionString from "./procedures/extractVersionString";
 import setUpLogManager from "./procedures/setUpLogManager";
+import loadSplashScreen from "./procedures/loadSplashScreen.ts";
+import extractVersionString from "./procedures/extractVersionString";
 import setUpSettingsManager from "./procedures/setUpSettingsManager.ts";
 import setUpPlayerInfoManager from "./procedures/setUpPlayerInfoManager.ts";
 import getLoginStatus from "./procedures/getLoginStatus.ts";
-import unloadOriginalIntelMap from "./procedures/unloadOriginalIntelMap";
 import loadCesiumViewer from "./procedures/loadCesiumViewer";
 import registerPlugins from "./procedures/registerPlugins";
 import initPlugins from "./procedures/initPlugins";
-import "./types/iitc.ts";
+import scheduleUnloadSplashScreen from "./procedures/scheduleUnloadSplashScreen.ts";
 
-let initStarted = false;
+export interface AppContext {
+  initStarted: boolean;
+  splashController: SplashScreenController | undefined;
+  coreManagers: CoreManagers | undefined;
+}
+
+const appContext: AppContext = {
+  initStarted: false,
+  splashController: undefined,
+  coreManagers: undefined,
+};
 
 const init = async () => {
-  if (initStarted) return;
-  initStarted = true;
+  if (appContext.initStarted) return;
+  appContext.initStarted = true;
 
-  // Initialize and shadow storage if needed
   await safeLocalStorage.initialize();
   safeLocalStorage.shadow();
+  safeWindow.iitc = {};
 
-  // Initialize iitc variable
-  if (safeWindow) safeWindow.iitc = {};
-
-  // Extract data from the original intel map
-  extractVersionString();
-
-  // Set up logging for this app
   setUpLogManager();
-
-  // Load settings for this app
+  extractVersionString();
   setUpSettingsManager();
-
-  // Extract player info
   setUpPlayerInfoManager();
 
-  // Halt if user isn't logged in
   if (!getLoginStatus()) {
-    initStarted = false;
-
-    // Modify the login page
-    return;
-
+    return;   // Load login screen
   } else {
-    // Unload the original intel map
-    unloadOriginalIntelMap();
-
-    // Initialize Cesium
-    const managers = loadCesiumViewer();
-
-    // Load all plugins
+    loadCesiumViewer(appContext);
+    loadSplashScreen(appContext);
     await registerPlugins();
-    initPlugins(managers.layerManager);
+    initPlugins(appContext);
+    scheduleUnloadSplashScreen(appContext);
   }
 };
 

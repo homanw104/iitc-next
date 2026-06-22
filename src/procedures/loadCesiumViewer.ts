@@ -1,3 +1,8 @@
+/**
+ * Load CesiumViewer into the document and create core managers.
+ */
+
+import type { AppContext } from "../app.ts";
 import { safeWindow } from "../utils/window";
 import { logManager } from "../managers/logManager";
 import { createCoreManagers, exposeCoreManagers } from "../core/coreManagers";
@@ -5,13 +10,12 @@ import { mountCoreControllersAndUI } from "../core/coreControllers.ts";
 import { createCesiumContainer } from "../cesium/setup/createCesiumContainer";
 import { initCesiumViewer } from "../cesium/setup/initCesiumViewer";
 import { restoreLastView } from "../cesium/setup/restoreLastView.ts";
-import { setUpTileUpdateWhenMove } from "../cesium/setup/setUpTileUpdateWhenMove.ts";
 import { configureCameraControls } from "../cesium/setup/configureCameraControls.ts";
 import { setUpInteractionHandlers } from "../cesium/setup/setUpInteractionHandlers.ts";
 import { setUpEntityPositionRefresh } from "../cesium/setup/setUpEntityPositionRefresh.ts";
-import type { CoreManagers } from "../core/coreManagers.ts";
+import { setUpTileUpdateWhenMove } from "../cesium/setup/setUpTileUpdateWhenMove.ts";
 
-export default function loadCesiumViewer(): CoreManagers {
+export default function loadCesiumViewer(appContext: AppContext): void {
   logManager.debug("CesiumViewer", "Loading");
 
   const container = createCesiumContainer();
@@ -34,10 +38,10 @@ export default function loadCesiumViewer(): CoreManagers {
   // Mount core UI and get portal details UI and portal data in state
   const { portalDetailPaneController, state } = mountCoreControllersAndUI(viewer, container, managers);
 
+  configureCameraControls(viewer);
   setUpInteractionHandlers(viewer, container, portalDetailPaneController, portalEntityManager, portalLabelEntityManager, portalOrnamentEntityManager, portalHistoryEntityManager, scoutHistoryEntityManager, state);
   setUpEntityPositionRefresh(viewer, entityPositionManager);
   setUpTileUpdateWhenMove(viewer, tileRequestManager);
-  configureCameraControls(viewer);
 
-  return managers;
+  appContext.coreManagers = managers;
 }
