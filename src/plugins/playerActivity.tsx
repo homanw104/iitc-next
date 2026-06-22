@@ -290,7 +290,7 @@ class PlayerActivityPlugin {
       cluster.label.style = Cesium.LabelStyle.FILL_AND_OUTLINE;
       cluster.label.disableDepthTestDistance = Number.POSITIVE_INFINITY;
       cluster.billboard.show = true;
-      cluster.billboard.image = buildCanvas()?.toDataURL() || "";
+      cluster.billboard.image = buildCanvas().toDataURL();
       cluster.billboard.disableDepthTestDistance = Number.POSITIVE_INFINITY;
     });
   }
@@ -583,7 +583,7 @@ function calcTimeAgoStr(time: number) {
   return `${hourStr} ${minutesStr} ago`;
 }
 
-function buildCanvas(): HTMLCanvasElement | undefined {
+function buildCanvas(): HTMLCanvasElement {
   const CANVAS_PX = 40;     // billboard size in screen pixels
   const PADDING = 4;        // padding around the focus square
   const BRACKET_LEN = 0.16; // bracket arm as fraction of the canvas half-side
@@ -598,7 +598,7 @@ function buildCanvas(): HTMLCanvasElement | undefined {
 
   // Create a context for the new canvas
   const ctx = canvas.getContext("2d");
-  if (!ctx) return;
+  if (!ctx) return canvas;
 
   // Clear the canvas
   ctx.clearRect(0, 0, CANVAS_PX, CANVAS_PX);

@@ -23,11 +23,15 @@ type DataSourceDisplayWithCollections = Cesium.DataSourceDisplay & {
 
 interface LayerRenderCommand {
   pass?: unknown;
+  uniformMap?: unknown;
   renderState: unknown;
 }
 
 interface LayerFrameState {
   commandList: LayerRenderCommand[];
+  context?: {
+    defaultTexture?: unknown;
+  };
   passes?: {
     render?: boolean;
     pick?: boolean;
@@ -113,15 +117,30 @@ class Overlay {
     const originalUpdate = collection.update.bind(collection);
 
     collection.update = (frameState: LayerFrameState) => {
+      // Only rewrite commands emitted by this overlay display, not commands already
+      // queued by the main viewer or other overlays earlier in the frame.
       const firstCommand = frameState.commandList.length;
       originalUpdate(frameState);
 
+      // Picking needs Cesium's normal command passes/render states so object
+      // selection keeps working. The overlay rewrite is only for color renders.
       if (!frameState.passes?.render || frameState.passes.pick) return;
 
       for (let i = firstCommand; i < frameState.commandList.length; i++) {
         const command = frameState.commandList[i];
+
+        // Draw this data source in Cesium's final overlay pass so it does not
+        // visually blend with normal data source entities.
         command.pass = CESIUM_PASS_OVERLAY;
+
+        // Overlay entities should render on top of terrain/tiles regardless of
+        // their original visualizer depth state.
         command.renderState = getNoDepthRenderState(command.renderState);
+
+        // Billboard and label atlases can be one render turn behind during
+        // startup. Bind Cesium's default texture for that transient gap instead
+        // of letting UniformSampler read `_target` from undefined.
+        command.uniformMap = getSafeOverlayUniformMap(command.uniformMap, frameState.context);
       }
     };
   }
@@ -463,6 +482,7 @@ export class LayerManager {
 }
 
 const noDepthRenderStateCache = new WeakMap<object, unknown>();
+const safeOverlayUniformMapCache = new WeakMap<object, unknown>();
 
 function getNoDepthRenderState(renderState: unknown): unknown {
   const renderStateFactory = (Cesium as CesiumWithPrivateRenderer).RenderState;
@@ -481,6 +501,27 @@ function getNoDepthRenderState(renderState: unknown): unknown {
 
   noDepthRenderStateCache.set(renderState, noDepthRenderState);
   return noDepthRenderState;
+}
+
+function getSafeOverlayUniformMap(uniformMap: unknown, context: LayerFrameState["context"]): unknown {
+  if (!isObject(uniformMap) || !context?.defaultTexture) return uniformMap;
+
+  const cached = safeOverlayUniformMapCache.get(uniformMap);
+  if (cached) return cached;
+
+  const safeUniformMap = {
+    ...uniformMap,
+    u_atlas: wrapTextureUniform(uniformMap.u_atlas, context.defaultTexture),
+    billboard_texture: wrapTextureUniform(uniformMap.billboard_texture, context.defaultTexture),
+  };
+
+  safeOverlayUniformMapCache.set(uniformMap, safeUniformMap);
+  return safeUniformMap;
+}
+
+function wrapTextureUniform(uniform: unknown, fallbackTexture: unknown): unknown {
+  if (typeof uniform !== "function") return uniform;
+  return () => uniform() ?? fallbackTexture;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
