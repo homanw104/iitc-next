@@ -108,7 +108,7 @@ export class PluginManager {
     try {
       plugin.init();
       this.activePlugins.add(pluginId);
-      logManager.info("PluginManager", `Enabled plugin ${plugin.name}`);
+      logManager.info("PluginManager", `Plugin ${plugin.name} enabled`);
     } catch (e) {
       logManager.error("PluginManager", `Failed to initialize plugin ${plugin.name}`, e);
     }
