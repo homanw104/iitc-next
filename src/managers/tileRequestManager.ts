@@ -187,7 +187,10 @@ export class TileRequestManager {
 
     if (intervalMs === null) return;
 
-    this.refreshIntervalId = window.setInterval(() => this.refreshView(), intervalMs);
+    this.refreshIntervalId = window.setInterval(() => {
+      this.refreshView();
+      logManager.info("TileRequestManager", `Refreshing view after ${intervalMs / 1000} seconds`);
+    }, intervalMs);
   }
 
   public addTiles(tileKeys: string[], refreshExisting: boolean = false): void {

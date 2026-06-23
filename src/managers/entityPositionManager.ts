@@ -162,6 +162,7 @@ export class EntityPositionManager {
 
   public refreshTerrainPositions(): boolean {
     if (this.isHeightSamplingSuppressed()) return false;
+    if (this.hasQueuedOrSamplingTerrainHeights()) return false;
 
     // Tile idle events can be noisy. Reconcile unresolved positions without resetting
     // per-generation attempt markers, so background tile refreshes do not refill the
@@ -181,8 +182,6 @@ export class EntityPositionManager {
   }
 
   public invalidateTerrainPositions(): boolean {
-    if (this.isHeightSamplingSuppressed()) return false;
-
     this.heightSamplingGeneration++;
     this.refreshableHeightKeys.clear();
     this.renderedHeightQueuedKeys.clear();
@@ -196,7 +195,7 @@ export class EntityPositionManager {
       positionState.heightSamplingVersion = -1;
       positionState.renderedHeightAttemptGeneration = -1;
       this.refreshableHeightKeys.add(getEntityPositionKey(positionState.latE6, positionState.lngE6));
-      this.refreshWorldTerrainPosition(positionState);
+      if (!this.isHeightSamplingSuppressed()) this.refreshWorldTerrainPosition(positionState);
     });
     return true;
   }
