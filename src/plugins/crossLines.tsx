@@ -37,8 +37,8 @@ class CrossLinesPlugin {
   private logManager!: NonNullable<IITCCore["logManager"]>;
   private layerManager!: NonNullable<IITCCore["layerManager"]>;
 
-  private drawLinesSource: Cesium.CustomDataSource | undefined;
-  private highlightSource: Cesium.CustomDataSource | undefined;
+  private drawLinesSource: Cesium.DataSource | undefined;
+  private highlightSource: Cesium.DataSource | undefined;
   private updateQueued = false;
   private trackedSources: Set<Cesium.DataSource> = new Set();
   private entityCollectionChangedListener: Cesium.EntityCollection.CollectionChangedEventCallback = () => this.scheduleUpdate();
@@ -61,8 +61,8 @@ class CrossLinesPlugin {
     }
 
     try {
-      this.drawLinesSource = this.layerManager.getOrCreateOverlay(DRAW_LINES_LAYER_NAME);
-      this.highlightSource = this.layerManager.getOrCreateOverlay(CROSS_LINES_LAYER_NAME);
+      this.drawLinesSource = this.layerManager.getOrCreateDataSource(DRAW_LINES_LAYER_NAME);
+      this.highlightSource = this.layerManager.getOrCreateDataSource(CROSS_LINES_LAYER_NAME);
       this.viewer.dataSources.dataSourceAdded.addEventListener(this.dataSourceAddedListener);
       this.viewer.dataSources.dataSourceRemoved.addEventListener(this.dataSourceRemovedListener);
       this.trackSource(this.drawLinesSource);
@@ -80,7 +80,7 @@ class CrossLinesPlugin {
       this.viewer?.dataSources.dataSourceRemoved.removeEventListener(this.dataSourceRemovedListener);
       this.trackedSources.forEach(source => this.untrackSource(source));
       this.trackedSources.clear();
-      this.layerManager.removeOverlay(CROSS_LINES_LAYER_NAME);
+      this.layerManager.removeDataSource(CROSS_LINES_LAYER_NAME);
       this.highlightSource = undefined;
       this.drawLinesSource = undefined;
       this.updateQueued = false;

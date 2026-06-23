@@ -12,7 +12,8 @@ import * as Cesium from "cesium";
 import { safeLocalStorage } from "../utils/storage.ts";
 
 const LOG_TAG = "DrawLines";
-const LAYER_NAME = "Draw Lines";
+const LINES_LAYER_NAME = "Draw Lines";
+const LINE_MARKERS_LAYER_NAME = "Draw Lines Markers";
 const STORAGE_KEY = "iitc-next-draw-lines";
 const PREVIEW_COLOR = "#cc823f";
 const LINE_COLOR = "#fa8525";
@@ -58,7 +59,8 @@ class DrawLinesPlugin {
   private lineStartMarkerEntity: Cesium.Entity | undefined;
   private lineEndMarkerEntity: Cesium.Entity | undefined;
   private lineMarkerRemovalTimeout: ReturnType<typeof setTimeout> | undefined;
-  private dataSource: Cesium.DataSource | undefined;
+  private linesDataSource: Cesium.DataSource | undefined;
+  private lineMarkersDataSource: Cesium.DataSource | undefined;
   private touchStartPositions = new Map<number, TouchStartPosition>();
   private isTouchGestureInProgress = false;
   private ignoreTouchGestureUntil = 0;
@@ -71,7 +73,7 @@ class DrawLinesPlugin {
     this.layerManager = iitc.layerManager!;
 
     if (!this.viewer || !this.logManager || !this.interfaceManager || !this.layerManager) {
-      console.warn(`[WARN][${LOG_TAG}] IITC Next core components missing`, {
+      console.warn(`[WARN]IITC Next core components missing`, {
         viewer: !!this.viewer,
         logManager: !!this.logManager,
         interfaceManager: !!this.interfaceManager,
@@ -93,12 +95,13 @@ class DrawLinesPlugin {
       this.interfaceManager.mountSidebarButton(this.exportLinesButtonEl);
       this.interfaceManager.mountSidebarButton(this.importLinesButtonEl);
 
-      this.dataSource = this.layerManager.getOrCreateOverlay(LAYER_NAME);
+      this.linesDataSource = this.layerManager.getOrCreateDataSource(LINES_LAYER_NAME);
+      this.lineMarkersDataSource = this.layerManager.getOrCreateOverlay(LINE_MARKERS_LAYER_NAME);
       this.handler = new Cesium.ScreenSpaceEventHandler(this.viewer.scene.canvas);
       this.bindEvents();
 
       const entities = this.readLinesFromKml(safeLocalStorage.getItem(STORAGE_KEY) || "");
-      if (entities) entities.forEach(line => this.dataSource?.entities.add(line));
+      if (entities) entities.forEach(line => this.linesDataSource?.entities.add(line));
     } catch (e) {
       this.logManager.error(LOG_TAG, "Failed to initialize draw lines plugin", e);
     }
@@ -108,7 +111,11 @@ class DrawLinesPlugin {
     try {
       this.unbindEvents();
       this.handler = undefined;
-      this.layerManager.removeOverlay(LAYER_NAME);
+
+      this.removeLineMarkers();
+
+      this.layerManager.removeOverlay(LINE_MARKERS_LAYER_NAME);
+      this.layerManager.removeDataSource(LINES_LAYER_NAME);
 
       if (this.importLinesButtonEl) this.interfaceManager.unmountSidebarButton(this.importLinesButtonEl);
       if (this.exportLinesButtonEl) this.interfaceManager.unmountSidebarButton(this.exportLinesButtonEl);
@@ -122,20 +129,19 @@ class DrawLinesPlugin {
 
       this.currentLine = undefined;
       this.currentLineEntity = undefined;
-      this.dataSource = undefined;
+      this.lineMarkersDataSource = undefined;
+      this.linesDataSource = undefined;
       this.isDrawing = false;
       this.isDeleting = false;
       this.isLineStarted = false;
-
-      this.removeLineMarkers();
     } catch (e) {
       this.logManager.error(LOG_TAG, "Failed to deinitialize draw lines plugin", e);
     }
   }
 
   private bindEvents() {
-    if (!this.viewer) throw new Error("draw-lines: viewer is undefined");
-    if (!this.handler) throw new Error("draw-lines: handler is undefined");
+    if (!this.viewer) throw new Error("viewer is undefined");
+    if (!this.handler) throw new Error("handler is undefined");
 
     // Avoid selection box when drawing or deleting line
     this.selectedEntityChangedListener = () => {
@@ -287,11 +293,11 @@ class DrawLinesPlugin {
   }
 
   private finishLine(pos: Cesium.Cartesian3) {
-    if (!this.dataSource) throw new Error("draw-lines: source is undefined");
-    if (!this.currentLine) throw new Error("draw-lines: current line is undefined");
+    if (!this.linesDataSource) throw new Error("linesDataSource is undefined");
+    if (!this.currentLine) throw new Error("currentLine is undefined");
 
     this.renderPreview(pos);  // Ensure this.currentLine has two vertices
-    this.dataSource.entities.add({
+    this.linesDataSource.entities.add({
       id: `draw-line-${crypto.randomUUID()}`,
       polyline: {
         positions: this.currentLine,
@@ -302,7 +308,7 @@ class DrawLinesPlugin {
     });
 
     // Save to storage
-    const entities = Array.from(this.dataSource.entities.values);
+    const entities = Array.from(this.linesDataSource.entities.values);
     const kml = this.writeLinesToKml(entities);
     safeLocalStorage.setItem(STORAGE_KEY, kml);
 
@@ -321,39 +327,39 @@ class DrawLinesPlugin {
   }
 
   private deleteLine(entity: Cesium.Entity) {
-    if (!this.dataSource) throw new Error("draw-lines: source is undefined");
-    if (!this.viewer) throw new Error("draw-lines: viewer is undefined");
+    if (!this.linesDataSource) throw new Error("linesDataSource is undefined");
+    if (!this.viewer) throw new Error("viewer is undefined");
 
-    this.dataSource.entities.remove(entity);
+    this.linesDataSource.entities.remove(entity);
     this.viewer.scene.requestRender();
 
     // Save to storage
-    const entities = Array.from(this.dataSource.entities.values);
+    const entities = Array.from(this.linesDataSource.entities.values);
     const kml = this.writeLinesToKml(entities);
     safeLocalStorage.setItem(STORAGE_KEY, kml);
   }
 
   private clearLines(): void {
-    if (!this.interfaceManager) throw new Error("draw-lines: InterfaceManager is missing");
-    if (!this.dataSource) throw new Error("draw-lines: dataSource is undefined");
-    if (!this.viewer) throw new Error("draw-lines: Viewer is missing");
+    if (!this.interfaceManager) throw new Error("interfaceManager is undefined");
+    if (!this.linesDataSource) throw new Error("linesDataSource is undefined");
+    if (!this.viewer) throw new Error("viewer is undefined");
 
     if (this.isDrawing) this.toggleDrawing();
     if (this.isDeleting) this.toggleDeleting();
     
-    const dataSource = this.dataSource;
+    const linesDataSource = this.linesDataSource;
     const container = this.interfaceManager.getContainer();
     const viewer = this.viewer;
 
     const confirmPane = ConfirmPane({
       msg: "Clear all the lines?",
       onConfirm: () => {
-        dataSource.entities.removeAll();
+        linesDataSource.entities.removeAll();
         container.removeChild(confirmPane);
         viewer.scene.requestRender();
 
         // Save to storage
-        const entities = Array.from(dataSource.entities.values);
+        const entities = Array.from(linesDataSource.entities.values);
         const kml = this.writeLinesToKml(entities);
         safeLocalStorage.setItem(STORAGE_KEY, kml);
       },
@@ -365,12 +371,12 @@ class DrawLinesPlugin {
   }
 
   private exportLines(): void {
-    if (!this.dataSource) throw new Error("Data source is missing");
+    if (!this.linesDataSource) throw new Error("linesDataSource is undefined");
     
     if (this.isDrawing) this.toggleDrawing();
     if (this.isDeleting) this.toggleDeleting();
     
-    const entities = Array.from(this.dataSource.entities.values);
+    const entities = Array.from(this.linesDataSource.entities.values);
     const kml = this.writeLinesToKml(entities);
 
     // Support for Android Wrapper
@@ -391,7 +397,7 @@ class DrawLinesPlugin {
   }
   
   private importLines(): void {
-    if (!this.interfaceManager) throw new Error("InterfaceManager is missing");
+    if (!this.interfaceManager) throw new Error("interfaceManager is undefined");
 
     if (this.isDrawing) this.toggleDrawing();
     if (this.isDeleting) this.toggleDeleting();
@@ -413,11 +419,11 @@ class DrawLinesPlugin {
   }
 
   private performImport(): void {
-    if (!this.interfaceManager) throw new Error("InterfaceManager is missing");
-    if (!this.dataSource) throw new Error("draw-lines: source is undefined");
-    if (!this.viewer) throw new Error("Viewer is missing");
+    if (!this.interfaceManager) throw new Error("interfaceManager is undefined");
+    if (!this.linesDataSource) throw new Error("linesDataSource is undefined");
+    if (!this.viewer) throw new Error("viewer is undefined");
 
-    const dataSource = this.dataSource;
+    const linesDataSource = this.linesDataSource;
     const viewer = this.viewer;
 
     const input = document.createElement("input");
@@ -433,11 +439,11 @@ class DrawLinesPlugin {
         if (content) {
           const entities = this.readLinesFromKml(content);
           if (entities) {
-            dataSource.entities.removeAll();
-            entities.forEach(line => dataSource.entities.add(line));
+            linesDataSource.entities.removeAll();
+            entities.forEach(line => linesDataSource.entities.add(line));
 
             // Save to storage
-            const updatedEntities = Array.from(dataSource.entities.values);
+            const updatedEntities = Array.from(linesDataSource.entities.values);
             const kml = this.writeLinesToKml(updatedEntities);
             safeLocalStorage.setItem(STORAGE_KEY, kml);
 
@@ -451,15 +457,15 @@ class DrawLinesPlugin {
   }
 
   private renderPreview(pos: Cesium.Cartesian3) {
-    if (!this.dataSource) throw new Error("draw-lines: data source is undefined");
-    if (!this.currentLine) throw new Error("draw-lines: current line is undefined");
-    if (!this.viewer) throw new Error("draw-lines: viewer is undefined");
+    if (!this.linesDataSource) throw new Error("linesDataSource is undefined");
+    if (!this.currentLine) throw new Error("currentLine is undefined");
+    if (!this.viewer) throw new Error("viewer is undefined");
 
     if (this.currentLine.length === 2) this.currentLine.pop();
     this.currentLine.push(pos);
 
     if (!this.currentLineEntity) {
-      this.currentLineEntity = this.dataSource.entities.add({
+      this.currentLineEntity = this.linesDataSource.entities.add({
         polyline: {
           positions: new Cesium.CallbackProperty(() => this.currentLine, false),
           material: Cesium.Color.fromCssColorString(PREVIEW_COLOR).withAlpha(0.8),
@@ -473,17 +479,18 @@ class DrawLinesPlugin {
   }
 
   private removePreview() {
-    if (!this.viewer) throw new Error("draw-lines: viewer is undefined");
-    if (!this.dataSource) throw new Error("draw-lines: data source is undefined");
+    if (!this.viewer) throw new Error("viewer is undefined");
+    if (!this.linesDataSource) throw new Error("linesDataSource is undefined");
 
-    if (this.currentLineEntity) this.dataSource.entities.remove(this.currentLineEntity);
+    if (this.currentLineEntity) this.linesDataSource.entities.remove(this.currentLineEntity);
     this.currentLineEntity = undefined;
 
     this.viewer.scene.requestRender();
   }
 
   private showLineMarker(marker: "start" | "end", pos: Cesium.Cartesian3) {
-    if (!this.viewer) throw new Error("draw-lines: viewer is undefined");
+    if (!this.viewer) throw new Error("viewer is undefined");
+    if (!this.lineMarkersDataSource) throw new Error("lineMarkersDataSource is undefined");
 
     if (!this.lineMarkerImage) this.lineMarkerImage = this.createLineMarkerImage();
 
@@ -491,7 +498,7 @@ class DrawLinesPlugin {
     if (existingMarker) {
       existingMarker.position = new Cesium.ConstantPositionProperty(pos);
     } else {
-      const entity = this.dataSource?.entities.add({
+      const entity = this.lineMarkersDataSource.entities.add({
         position: pos,
         billboard: {
           image: this.lineMarkerImage,
@@ -515,11 +522,12 @@ class DrawLinesPlugin {
   }
 
   private removeLineMarkers() {
-    if (!this.viewer) throw new Error("draw-lines: viewer is undefined");
+    if (!this.viewer) throw new Error("viewer is undefined");
+    if (!this.lineMarkersDataSource) throw new Error("lineMarkersDataSource is undefined");
 
     this.cancelLineMarkersRemoval();
-    if (this.lineStartMarkerEntity) this.dataSource?.entities.remove(this.lineStartMarkerEntity);
-    if (this.lineEndMarkerEntity) this.dataSource?.entities.remove(this.lineEndMarkerEntity);
+    if (this.lineStartMarkerEntity) this.lineMarkersDataSource.entities.remove(this.lineStartMarkerEntity);
+    if (this.lineEndMarkerEntity) this.lineMarkersDataSource.entities.remove(this.lineEndMarkerEntity);
     this.lineStartMarkerEntity = undefined;
     this.lineEndMarkerEntity = undefined;
     this.viewer.scene.requestRender();
@@ -546,7 +554,7 @@ class DrawLinesPlugin {
     canvas.height = LINE_MARKER_SIZE_PX;
 
     const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("draw-lines: marker canvas context is undefined");
+    if (!ctx) throw new Error("marker canvas context is undefined");
 
     ctx.fillStyle = LINE_MARKER_FILL_COLOR;
     ctx.fillRect(0, 0, LINE_MARKER_SIZE_PX, LINE_MARKER_SIZE_PX);
@@ -600,17 +608,17 @@ class DrawLinesPlugin {
   }
 
   private resolveLine(position: Cesium.Cartesian2): Cesium.Entity | undefined {
-    if (!this.viewer) throw new Error("draw-lines: viewer is undefined");
-    if (!this.dataSource) throw new Error("draw-lines: data source is undefined");
+    if (!this.viewer) throw new Error("viewer is undefined");
+    if (!this.linesDataSource) throw new Error("linesDataSource is undefined");
 
     const picked = this.viewer.scene.pick(position);
     if (picked && picked.id instanceof Cesium.Entity) {
-      return this.dataSource.entities.getById(picked.id.id);
+      return this.linesDataSource.entities.getById(picked.id.id);
     }
   }
 
   private resolvePosition(position: Cesium.Cartesian2, snap: boolean = true): Cesium.Cartesian3 | undefined {
-    if (!this.viewer) throw new Error("draw-lines: viewer is undefined");
+    if (!this.viewer) throw new Error("viewer is undefined");
 
     const picked = this.viewer.scene.pick(position);
     if (snap && picked && picked.id instanceof Cesium.Entity) {
@@ -703,7 +711,7 @@ class DrawLinesPlugin {
 
       return entities;
     } catch (error) {
-      this.logManager?.warn("Draw Lines", "Failed to parse lines from storage", error);
+      this.logManager?.warn(LOG_TAG, "Failed to parse lines from storage", error);
       safeLocalStorage.setItem(STORAGE_KEY, "");
     }
   }

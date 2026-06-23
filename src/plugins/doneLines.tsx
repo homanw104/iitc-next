@@ -13,7 +13,10 @@ import { IITCCore } from "../types/iitc";
 import { safeWindow } from "../utils/window";
 
 const LOG_TAG = "DoneLinesPlugin";
+
+// Done Lines doesn't have its own layer
 const DRAW_LINES_LAYER_NAME = "Draw Lines";
+
 const LINK_LAYER_NAMES = ["links-enlightened", "links-resistance", "links-machina", "links-neutral"];
 const HIGHLIGHT_WIDTH = 4;
 const DASH_LENGTH = 6;
@@ -46,7 +49,7 @@ class DoneLinesPlugin {
   private logManager!: NonNullable<IITCCore["logManager"]>;
   private layerManager!: NonNullable<IITCCore["layerManager"]>;
 
-  private drawLinesSource: Cesium.CustomDataSource | undefined;
+  private drawLinesSource: Cesium.DataSource | undefined;
   private updateQueued = false;
   private trackedSources: Set<Cesium.DataSource> = new Set();
   private originalLineStyles: Map<Cesium.Entity, LineStyle> = new Map();
@@ -73,7 +76,7 @@ class DoneLinesPlugin {
     }
 
     try {
-      this.drawLinesSource = this.layerManager.getOrCreateOverlay(DRAW_LINES_LAYER_NAME);
+      this.drawLinesSource = this.layerManager.getOrCreateDataSource(DRAW_LINES_LAYER_NAME);
       this.viewer.dataSources.dataSourceAdded.addEventListener(this.dataSourceAddedListener);
       this.viewer.dataSources.dataSourceRemoved.addEventListener(this.dataSourceRemovedListener);
       this.trackSource(this.drawLinesSource);
