@@ -5,33 +5,10 @@ import SplashTitle from "./SplashTitle.tsx";
 import SplashInitText from "./SplashInitText.tsx";
 import SplashDivider from "./SplashDivider.tsx";
 
-const scheduleClippedMessageUpdate = (logGrid: HTMLElement): void => {
-  requestAnimationFrame(() => {
-    const viewport = logGrid.parentElement;
-    if (!viewport || !logGrid.isConnected) return;
-
-    const viewportRect = viewport.getBoundingClientRect();
-    const contentRect = logGrid.getBoundingClientRect();
-
-    logGrid.style.alignSelf = contentRect.height <= viewportRect.height
-      ? "start"
-      : "end";
-
-    for (const message of Array.from(logGrid.children)) {
-      if (!(message instanceof HTMLElement)) continue;
-
-      const messageRect = message.getBoundingClientRect();
-      const isFullyVisible = messageRect.top >= viewportRect.top
-        && messageRect.bottom <= viewportRect.bottom;
-
-      message.style.visibility = isFullyVisible ? "visible" : "hidden";
-    }
-  });
-};
-
-const SplashScreen = ({ logEntries, fadeOutMs }: {
+const SplashScreen = ({ logEntries, fadeOutMs, onLogGridRef }: {
   logEntries: LogEntry[];
   fadeOutMs: number;
+  onLogGridRef?: (logGrid: HTMLElement) => void;
 }): HTMLElement => {
   return (
     <div
@@ -81,7 +58,7 @@ const SplashScreen = ({ logEntries, fadeOutMs }: {
           }}
         >
           <div
-            ref={scheduleClippedMessageUpdate}
+            ref={(el: HTMLElement) => onLogGridRef?.(el) }
             style={{
               width: "100%",
             }}

@@ -63,12 +63,8 @@ export function mountCoreControllersAndUI(viewer: Cesium.Viewer, container: HTML
 
   logManager.subscribe((entry) => {
     state.lastLogMsg = entry.args.join(" ");
-    state.portalDetailBar?.remove();
-
-    if (state.lastPortalData) {
-      state.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailPaneController: portalDetailPaneController, data: state.lastPortalData }));
-    } else {
-      state.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailPaneController: portalDetailPaneController, msg: state.lastLogMsg }));
+    if (state.portalDetailBar && !state.lastPortalData) {
+      portalDetailPaneController.updateDetailBarText(undefined, state.lastLogMsg);
     }
   });
 

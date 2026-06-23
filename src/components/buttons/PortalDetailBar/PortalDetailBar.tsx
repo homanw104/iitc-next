@@ -1,7 +1,7 @@
 import { h } from "../../../utils/dom.ts";
 import { getTeamColor } from "../../../utils/color.ts";
 import { PortalData } from "../../../types/ingress.ts";
-import { PortalDetailPaneController } from "../../../controllers/PortalDetailPaneController.tsx";
+import type { PortalDetailPaneController } from "../../../controllers/PortalDetailPaneController.tsx";
 
 const PortalDetailBar = ({ portalDetailPaneController, data, msg }: {
   portalDetailPaneController: PortalDetailPaneController,
@@ -40,11 +40,11 @@ const PortalDetailBar = ({ portalDetailPaneController, data, msg }: {
         overflow: "hidden",
         textOverflow: "ellipsis",
         whiteSpace: "nowrap",
-      }}>
-        {(data && data.title) || msg || "Loading..."}
+      }} ref={portalDetailPaneController.setDetailBarTitleElement}>
+        {portalDetailPaneController.getDetailBarTitleText(data, msg)}
       </div>
-      <div>
-        {data && data.level && "L" + data.level || ""}
+      <div ref={portalDetailPaneController.setDetailBarLevelElement}>
+        {portalDetailPaneController.getDetailBarLevelText(data)}
       </div>
     </div>
   ) as HTMLElement;
