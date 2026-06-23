@@ -26,17 +26,19 @@ const HEIGHT_SOURCE_RANK: Record<HeightSource, number> = {
   rendered: 1,
 };
 
+const heightSamplingCartographicScratch = new Cesium.Cartographic();
+
+export type EntityPositionCallback = (latE6: number, lngE6: number, position: Cesium.Cartesian3) => void;
+
 export interface EntityCoordinates {
   latE6: number;
   lngE6: number;
 }
 
-export type EntityPositionCallback = (latE6: number, lngE6: number, position: Cesium.Cartesian3) => void;
-
 interface EntityPositionState extends EntityCoordinates {
   position: Cesium.Cartesian3;
-  renderedHeightSampleGeneration: number;
   heightSource: HeightSource;
+  renderedHeightSampleGeneration: number;
 }
 
 export class EntityPositionManager {
@@ -51,8 +53,10 @@ export class EntityPositionManager {
   private renderedHeightSamplingScheduled = false;
   private renderedHeightSamplingTimeout: number | undefined;
   private cameraMoving = false;
-  private interactionActive = false;
+  private heightSamplingViewRectangle: Cesium.Rectangle | undefined;
+  private heightSamplingViewRectangleDirty = true;
   private heightSamplingGeneration = 0;
+  private lastTerrainRefreshGeneration = -1;
   private queueStatusLoggingActive = false;
 
   constructor(
@@ -64,30 +68,33 @@ export class EntityPositionManager {
 
     viewer.camera.moveStart.addEventListener(() => {
       this.cameraMoving = true;
+      this.heightSamplingViewRectangleDirty = true;
       this.heightSamplingGeneration++;
-      this.cancelRenderedHeightSample();
+      this.clearRenderedHeightWork();
     });
 
     viewer.camera.moveEnd.addEventListener(() => {
       this.cameraMoving = false;
-      this.resumeQueuedHeightSampling();
+      this.heightSamplingViewRectangleDirty = true;
+      this.queueVisibleRefreshableRenderedHeights();
     });
   }
 
   public async getPosition(data: EntityCoordinates): Promise<Cesium.Cartesian3> {
     await this.sceneEventManager.waitForInitSceneLoaded();
 
-    const key = getEntityPositionKey(data.latE6, data.lngE6);
-    let entityPositionState = this.positionStatesByKey.get(key);
-
-    if (!entityPositionState) {
-      const position = await this.getInitialPosition(key, data);
-      entityPositionState = this.positionStatesByKey.get(key)
-        ?? this.createWorldTerrainPositionState(data, position);
-    }
-
+    const entityPositionState = await this.getPositionState(data);
     this.queueRenderedHeight(entityPositionState);
     return entityPositionState.position;
+  }
+
+  private async getPositionState(data: EntityCoordinates): Promise<EntityPositionState> {
+    const key = getEntityPositionKey(data.latE6, data.lngE6);
+    const entityPositionState = this.positionStatesByKey.get(key);
+    if (entityPositionState) return entityPositionState;
+
+    const position = await this.getInitialPosition(key, data);
+    return this.positionStatesByKey.get(key) ?? this.createPositionState(data, position);
   }
 
   public setOnCoordinatePositionChangedCallback(data: EntityCoordinates, callback: EntityPositionCallback): void {
@@ -106,42 +113,29 @@ export class EntityPositionManager {
     if (callbacks.size === 0) this.entityPositionCallbacks.delete(key);
   }
 
-  public suppressHeightSampling(): void {
-    if (this.interactionActive) return;
-
-    this.interactionActive = true;
-    this.cancelRenderedHeightSample();
-  }
-
-  public resumeHeightSampling(): void {
-    if (!this.interactionActive) return;
-
-    this.interactionActive = false;
-    this.resumeQueuedHeightSampling();
-  }
-
   public refreshTerrainPositions(): boolean {
     if (this.isHeightSamplingSuppressed()) return false;
     if (this.hasQueuedOrSamplingTerrainHeights()) return false;
     if (this.refreshableHeightKeys.size === 0) return true;
+    if (this.lastTerrainRefreshGeneration === this.heightSamplingGeneration) return false;
 
     this.heightSamplingGeneration++;
-    this.queueRefreshableRenderedHeights();
-    return true;
+    this.lastTerrainRefreshGeneration = this.heightSamplingGeneration;
+    return this.queueVisibleRefreshableRenderedHeights();
   }
 
   public invalidateTerrainPositions(): boolean {
+    const canRefreshWorldTerrainPositions = !this.isHeightSamplingSuppressed();
+
     this.heightSamplingGeneration++;
     this.refreshableHeightKeys.clear();
-    this.renderedHeightQueuedKeys.clear();
-    this.renderedHeightSamplingKeys.clear();
-    this.cancelRenderedHeightSample();
+    this.clearRenderedHeightWork();
 
     this.positionStatesByKey.forEach((positionState) => {
       positionState.heightSource = "worldTerrain";
       positionState.renderedHeightSampleGeneration = -1;
       this.refreshableHeightKeys.add(getEntityPositionKey(positionState.latE6, positionState.lngE6));
-      if (!this.isHeightSamplingSuppressed()) this.refreshWorldTerrainPosition(positionState);
+      if (canRefreshWorldTerrainPositions) this.refreshWorldTerrainPosition(positionState);
     });
     return true;
   }
@@ -160,14 +154,14 @@ export class EntityPositionManager {
     return position;
   }
 
-  private createWorldTerrainPositionState(data: EntityCoordinates, position: Cesium.Cartesian3): EntityPositionState {
+  private createPositionState(data: EntityCoordinates, position: Cesium.Cartesian3): EntityPositionState {
     const key = getEntityPositionKey(data.latE6, data.lngE6);
     const positionState: EntityPositionState = {
       latE6: data.latE6,
       lngE6: data.lngE6,
       position,
-      renderedHeightSampleGeneration: -1,
       heightSource: "worldTerrain",
+      renderedHeightSampleGeneration: -1,
     };
     this.positionStatesByKey.set(key, positionState);
     this.refreshableHeightKeys.add(key);
@@ -202,7 +196,10 @@ export class EntityPositionManager {
       });
   }
 
-  private queueRefreshableRenderedHeights(): void {
+  private queueVisibleRefreshableRenderedHeights(): boolean {
+    const viewRectangle = this.getHeightSamplingViewRectangle();
+    let queuedAny = false;
+
     this.refreshableHeightKeys.forEach((key) => {
       const positionState = this.positionStatesByKey.get(key);
       if (!positionState) {
@@ -210,18 +207,25 @@ export class EntityPositionManager {
         return;
       }
 
-      this.queueRenderedHeight(positionState);
+      if (this.queueRenderedHeight(positionState, viewRectangle)) queuedAny = true;
     });
+
+    return queuedAny;
   }
 
-  private queueRenderedHeight(positionState: EntityPositionState): void {
-    if (positionState.renderedHeightSampleGeneration === this.heightSamplingGeneration) return;
+  private queueRenderedHeight(
+    positionState: EntityPositionState,
+    viewRectangle = this.getHeightSamplingViewRectangle(),
+  ): boolean {
+    if (positionState.renderedHeightSampleGeneration === this.heightSamplingGeneration) return false;
+    if (!this.isPositionInHeightSamplingView(positionState, viewRectangle)) return false;
 
     const key = getEntityPositionKey(positionState.latE6, positionState.lngE6);
-    if (this.renderedHeightQueuedKeys.has(key) || this.renderedHeightSamplingKeys.has(key)) return;
+    if (this.renderedHeightQueuedKeys.has(key) || this.renderedHeightSamplingKeys.has(key)) return false;
 
     this.renderedHeightQueuedKeys.add(key);
     this.scheduleRenderedHeights();
+    return true;
   }
 
   private scheduleRenderedHeights(delayMs = 0): void {
@@ -250,19 +254,12 @@ export class EntityPositionManager {
     return keys;
   }
 
-  private resumeQueuedHeightSampling(): void {
-    if (this.isHeightSamplingSuppressed()) return;
-
-    this.queueRefreshableRenderedHeights();
-    this.scheduleRenderedHeights();
-  }
-
-  private cancelRenderedHeightSample(): void {
-    if (this.renderedHeightSamplingTimeout === undefined) return;
-
-    window.clearTimeout(this.renderedHeightSamplingTimeout);
+  private clearRenderedHeightWork(): void {
+    if (this.renderedHeightSamplingTimeout !== undefined) window.clearTimeout(this.renderedHeightSamplingTimeout);
     this.renderedHeightSamplingTimeout = undefined;
     this.renderedHeightSamplingScheduled = false;
+    this.renderedHeightQueuedKeys.clear();
+    this.renderedHeightSamplingKeys.clear();
   }
 
   private flushRenderedHeightQueue(): void {
@@ -274,10 +271,13 @@ export class EntityPositionManager {
     if (keys.length === 0) return;
 
     const batchHeightSamplingGeneration = this.heightSamplingGeneration;
+    const viewRectangle = this.getHeightSamplingViewRectangle();
     const positionStates = keys
       .map((key) => this.positionStatesByKey.get(key))
       .filter((positionState): positionState is EntityPositionState => {
-        return !!positionState && positionState.renderedHeightSampleGeneration !== batchHeightSamplingGeneration;
+        return !!positionState &&
+          positionState.renderedHeightSampleGeneration !== batchHeightSamplingGeneration &&
+          this.isPositionInHeightSamplingView(positionState, viewRectangle);
       });
 
     if (positionStates.length === 0) {
@@ -368,11 +368,35 @@ export class EntityPositionManager {
   }
 
   private isHeightSamplingSuppressed(): boolean {
-    return this.cameraMoving || this.interactionActive;
+    return this.cameraMoving;
   }
 
   private hasQueuedOrSamplingTerrainHeights(): boolean {
     return this.renderedHeightQueuedKeys.size > 0 || this.renderedHeightSamplingKeys.size > 0;
+  }
+
+  private getHeightSamplingViewRectangle(): Cesium.Rectangle | undefined {
+    if (this.heightSamplingViewRectangleDirty) {
+      this.heightSamplingViewRectangle = this.viewer.camera.computeViewRectangle(this.viewer.scene.globe.ellipsoid);
+      this.heightSamplingViewRectangleDirty = false;
+    }
+
+    return this.heightSamplingViewRectangle;
+  }
+
+  private isPositionInHeightSamplingView(
+    positionState: EntityPositionState,
+    viewRectangle: Cesium.Rectangle | undefined,
+  ): boolean {
+    if (!viewRectangle) return true;
+
+    const cartographic = Cesium.Cartographic.fromDegrees(
+      positionState.lngE6 / 1e6,
+      positionState.latE6 / 1e6,
+      0,
+      heightSamplingCartographicScratch,
+    );
+    return Cesium.Rectangle.contains(viewRectangle, cartographic);
   }
 
   private logQueueStatus(isQueueStart = false): void {
