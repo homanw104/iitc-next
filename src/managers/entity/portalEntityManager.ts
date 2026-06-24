@@ -4,7 +4,7 @@
 
 import * as Cesium from "cesium";
 import { intelApiClient } from "../../api/intelApiClient";
-import type { PortalData } from "../../types/ingress";
+import type { FieldData, LinkData, PortalData } from "../../types/ingress";
 import { getTeamColor } from "../../utils/color";
 import type { LayerManager } from "../layer/layerManager";
 import { settingsManager } from "../system/settingsManager.ts";
@@ -129,6 +129,24 @@ export class PortalEntityManager {
 
   public getPortalData(guid: string): PortalData | undefined {
     return this.portals.get(guid)?.data;
+  }
+
+  public addPortalLink(guid: string, link: LinkData): boolean {
+    const portal = this.getPortalData(guid);
+    if (!portal) return false;
+    if (portal.links?.some((existingLink) => existingLink.guid === link.guid)) return true;
+
+    (portal.links ??= []).push(link);
+    return true;
+  }
+
+  public addPortalField(guid: string, field: FieldData): boolean {
+    const portal = this.getPortalData(guid);
+    if (!portal) return false;
+    if (portal.fields?.some((existingField) => existingField.guid === field.guid)) return true;
+
+    (portal.fields ??= []).push(field);
+    return true;
   }
 
   public getPortalDataByCoordinates(latE6: number, lngE6: number): PortalData | undefined {

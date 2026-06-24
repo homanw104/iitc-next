@@ -63,13 +63,9 @@ export class FieldEntityManager {
 
   private async addPlaceholderPortals(fields: FieldData[]): Promise<void> {
     const placeholders = new Map<string, PortalData>();
-    const portalUpdates: Promise<void>[] = [];
     fields.forEach((field) => {
       field.points.forEach((point) => {
-        const data = this.portalManager.getPortalData(point.guid);
-        if (data) {
-          if (addPortalField(data, field)) portalUpdates.push(this.portalManager.addOrUpdatePortal(data));
-        } else {
+        if (!this.portalManager.addPortalField(point.guid, field)) {
           setNewestPlaceholder(placeholders, {
             guid: point.guid,
             team: field.team,
@@ -82,8 +78,6 @@ export class FieldEntityManager {
         }
       });
     });
-
-    await Promise.all(portalUpdates);
 
     if (placeholders.size === 0) return;
 
