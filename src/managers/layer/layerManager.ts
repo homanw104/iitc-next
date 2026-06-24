@@ -105,6 +105,56 @@ export class LayerManager {
     return layer.source;
   }
 
+  public async withEntityCollectionEventsSuspended<T>(
+    layers: { name: string; type: "dataSource" | "overlay" }[],
+    callback: () => Promise<T>
+  ): Promise<T> {
+    const suspendedCollections = this.getEntityCollections(layers);
+
+    // Coalesce Cesium collection change notifications while an async batch adds,
+    // removes, or moves entities across the affected layers.
+    suspendedCollections.forEach((entities) => entities.suspendEvents());
+    try {
+      return await callback();
+    } finally {
+      Array.from(suspendedCollections).reverse().forEach((entities) => entities.resumeEvents());
+    }
+  }
+
+  public withEntityCollectionEventsSuspendedSync<T>(
+    layers: { name: string; type: "dataSource" | "overlay" }[],
+    callback: () => T
+  ): T {
+    const suspendedCollections = this.getEntityCollections(layers);
+
+    // Synchronous variant for non-awaiting mutation loops. Use this when all
+    // entity mutations happen before the callback returns, for example,
+    //
+    // withEntityCollectionEventsSuspendedSync(layers, () => ids.forEach(removeEntity));
+    //
+    // If the callback awaits terrain, network, or any other async work, use
+    // withEntityCollectionEventsSuspended so events stay suspended until done.
+    suspendedCollections.forEach((entities) => entities.suspendEvents());
+    try {
+      return callback();
+    } finally {
+      Array.from(suspendedCollections).reverse().forEach((entities) => entities.resumeEvents());
+    }
+  }
+
+  private getEntityCollections(layers: { name: string; type: "dataSource" | "overlay" }[]): Set<Cesium.EntityCollection> {
+    const collections = new Set<Cesium.EntityCollection>();
+
+    layers.forEach(({ name, type }) => {
+      const source = type === "dataSource" ?
+        this.getOrCreateDataSource(name) :
+        this.getOrCreateOverlay(name);
+      collections.add(source.entities);
+    });
+
+    return collections;
+  }
+
   public setOverlayZIndex(name: string, zIndex: number): void {
     const layer = this.overlays.get(name);
     if (!layer) return;

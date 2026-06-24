@@ -102,6 +102,9 @@ export class PortalLabelEntityManager {
   private lastVisibilityCameraPosition = new Cesium.Cartesian3();
   private lastVisibilityCameraDirection = new Cesium.Cartesian3();
   private lastVisibilityCameraUp = new Cesium.Cartesian3();
+  private deferredVisibilityUpdateDepth = 0;
+  private hasDeferredVisibilityUpdate = false;
+  private deferredVisibilityForceRefresh = false;
 
   constructor(
     private viewer: Cesium.Viewer,
@@ -181,6 +184,24 @@ export class PortalLabelEntityManager {
     }
   }
 
+  public async addOrUpdateLabels(portals: PortalData[]): Promise<void> {
+    const layers = new Set<string>();
+    portals.forEach((portal) => {
+      const existing = this.labels.get(portal.guid);
+      if (existing) layers.add(getPortalLabelLayerId(existing.data));
+      if (portal.title) layers.add(getPortalLabelLayerId(portal));
+    });
+
+    await this.deferVisibilityUpdates(async () => {
+      await this.layerManager.withEntityCollectionEventsSuspended(
+        Array.from(layers, (name) => ({ name, type: "overlay" as const })),
+        async () => {
+          await Promise.all(portals.map((portal) => this.addOrUpdateLabel(portal)));
+        }
+      );
+    });
+  }
+
   public removeLabel(guid: string): void {
     this.removeLabelEntity(guid);
   }
@@ -255,6 +276,7 @@ export class PortalLabelEntityManager {
 
   private removeLabelEntitiesInView(viewRect: Cesium.Rectangle): void {
     const toRemove: string[] = [];
+    const layers = new Set<string>();
     const time = Cesium.JulianDate.now();
     this.labels.forEach((info, guid) => {
       const position = getLabelPosition(info, time);
@@ -262,13 +284,26 @@ export class PortalLabelEntityManager {
         const cartographic = Cesium.Cartographic.fromCartesian(position);
         if (Cesium.Rectangle.contains(viewRect, cartographic)) {
           toRemove.push(guid);
+          layers.add(getPortalLabelLayerId(info.data));
         }
       }
     });
-    toRemove.forEach(guid => this.removeLabelEntity(guid));
+    if (toRemove.length === 0) return;
+
+    this.layerManager.withEntityCollectionEventsSuspendedSync(
+      Array.from(layers, (name) => ({ name, type: "overlay" as const })),
+      () => toRemove.forEach(guid => this.removeLabelEntity(guid))
+    );
   }
 
   private queueAllVisibilityUpdates(forceVisibilityRefresh = true): void {
+    if (this.deferredVisibilityUpdateDepth > 0) {
+      this.overlapDirty = true;
+      this.hasDeferredVisibilityUpdate = true;
+      if (forceVisibilityRefresh) this.deferredVisibilityForceRefresh = true;
+      return;
+    }
+
     this.captureVisibilityCameraSnapshot();
     this.overlapDirty = true;
     if (forceVisibilityRefresh) this.forceVisibilityRefresh = true;
@@ -278,7 +313,29 @@ export class PortalLabelEntityManager {
   private queueVisibilityUpdate(guid: string, overlapDirty = false): void {
     if (overlapDirty) this.overlapDirty = true;
     this.visibilityQueuedGuids.add(guid);
+    if (this.deferredVisibilityUpdateDepth > 0) {
+      this.hasDeferredVisibilityUpdate = true;
+      return;
+    }
     this.scheduleVisibilityUpdates();
+  }
+
+  private async deferVisibilityUpdates(callback: () => Promise<void>): Promise<void> {
+    this.deferredVisibilityUpdateDepth++;
+    try {
+      await callback();
+    } finally {
+      this.deferredVisibilityUpdateDepth--;
+      if (this.deferredVisibilityUpdateDepth === 0 && this.hasDeferredVisibilityUpdate) {
+        this.hasDeferredVisibilityUpdate = false;
+        this.captureVisibilityCameraSnapshot();
+        if (this.deferredVisibilityForceRefresh) {
+          this.forceVisibilityRefresh = true;
+          this.deferredVisibilityForceRefresh = false;
+        }
+        this.scheduleVisibilityUpdates();
+      }
+    }
   }
 
   private scheduleVisibilityUpdates(delayMs = 0): void {

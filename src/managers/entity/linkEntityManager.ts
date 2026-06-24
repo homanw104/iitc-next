@@ -13,22 +13,28 @@ export class LinkEntityManager {
 
   constructor(private layerManager: LayerManager, private portalManager: PortalEntityManager) {}
 
-  public addOrUpdateLink(data: LinkData): Cesium.Entity {
-    this.portalManager.addOrUpdatePortal({
-      guid: data.oGuid,
-      team: data.team,
-      latE6: data.oLatE6,
-      lngE6: data.oLngE6,
-      isPlaceholder: true,
-    } as PortalData).then();
+  public async addOrUpdateLinks(links: LinkData[]): Promise<void> {
+    await this.addPlaceholderPortals(links);
 
-    this.portalManager.addOrUpdatePortal({
-      guid: data.dGuid,
-      team: data.team,
-      latE6: data.dLatE6,
-      lngE6: data.dLngE6,
-      isPlaceholder: true,
-    } as PortalData).then();
+    const layers = new Set<string>();
+    links.forEach((link) => {
+      const existing = this.links.get(link.guid);
+      if (existing) layers.add(getLinkLayerId(existing.data));
+      layers.add(getLinkLayerId(link));
+    });
+
+    await this.layerManager.withEntityCollectionEventsSuspended(
+      Array.from(layers, (name) => ({ name, type: "dataSource" as const })),
+      async () => {
+        links.forEach((link) => this.addOrUpdateLink(link, false));
+      }
+    );
+  }
+
+  public addOrUpdateLink(data: LinkData, hydrateEndpointPortals = true): Cesium.Entity {
+    if (hydrateEndpointPortals) {
+      this.addPlaceholderPortals([data]).then();
+    }
 
     const existing = this.links.get(data.guid);
     if (existing) {
@@ -48,6 +54,37 @@ export class LinkEntityManager {
     const entity = this.createLinkEntity(data);
     this.links.set(data.guid, { data, entity });
     return entity;
+  }
+
+  private async addPlaceholderPortals(links: LinkData[]): Promise<void> {
+    const placeholders = new Map<string, PortalData>();
+    links.forEach((link) => {
+      if (!this.portalManager.hasPortal(link.oGuid)) {
+        setNewestPlaceholder(placeholders, {
+          guid: link.oGuid,
+          team: link.team,
+          latE6: link.oLatE6,
+          lngE6: link.oLngE6,
+          timestamp: link.timestamp,
+          isPlaceholder: true,
+        });
+      }
+
+      if (!this.portalManager.hasPortal(link.dGuid)) {
+        setNewestPlaceholder(placeholders, {
+          guid: link.dGuid,
+          team: link.team,
+          latE6: link.dLatE6,
+          lngE6: link.dLngE6,
+          timestamp: link.timestamp,
+          isPlaceholder: true,
+        });
+      }
+    });
+
+    if (placeholders.size === 0) return;
+
+    await this.portalManager.addOrUpdatePortals(Array.from(placeholders.values()));
   }
 
   public removeLink(guid: string): boolean {
@@ -88,6 +125,7 @@ export class LinkEntityManager {
 
   private removeLinkEntityInView(viewRect: Cesium.Rectangle): void {
     const toRemove: string[] = [];
+    const layers = new Set<string>();
     this.links.forEach((info, guid) => {
       if (info.entity.polyline && info.entity.polyline.positions) {
         const positions = info.entity.polyline.positions.getValue(Cesium.JulianDate.now()) as Cesium.Cartesian3[];
@@ -97,12 +135,18 @@ export class LinkEntityManager {
           const linkRect = Cesium.Rectangle.fromCartographicArray([carto1, carto2]);
           if (Cesium.Rectangle.intersection(viewRect, linkRect)) {
             toRemove.push(guid);
+            layers.add(getLinkLayerId(info.data));
           }
         }
       }
     });
 
-    toRemove.forEach(guid => this.removeLink(guid));
+    if (toRemove.length === 0) return;
+
+    this.layerManager.withEntityCollectionEventsSuspendedSync(
+      Array.from(layers, (name) => ({ name, type: "dataSource" as const })),
+      () => toRemove.forEach(guid => this.removeLink(guid))
+    );
   }
 
   private updateLinkEntity(entity: Cesium.Entity, data: LinkData): void {
@@ -121,4 +165,11 @@ export class LinkEntityManager {
 function getLinkLayerId(data: LinkData): string {
   const team = data.team.toLowerCase();
   return `links-${team}`;
+}
+
+function setNewestPlaceholder(placeholders: Map<string, PortalData>, placeholder: PortalData): void {
+  const existing = placeholders.get(placeholder.guid);
+  if (!existing || placeholder.timestamp > existing.timestamp) {
+    placeholders.set(placeholder.guid, placeholder);
+  }
 }

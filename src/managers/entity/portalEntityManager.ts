@@ -44,6 +44,26 @@ export class PortalEntityManager {
     await this.addOrUpdatePortal(portalData);
   }
 
+  public hasPortal(guid: string): boolean {
+    return this.portals.has(guid) || this.portalsPendingCreation.has(guid);
+  }
+
+  public async addOrUpdatePortals(portals: PortalData[]): Promise<void> {
+    const layers = new Set<string>();
+    portals.forEach((portal) => {
+      const existing = this.portals.get(portal.guid);
+      if (existing) layers.add(getPortalLayerId(existing.data));
+      layers.add(getPortalLayerId(portal));
+    });
+
+    await this.layerManager.withEntityCollectionEventsSuspended(
+      Array.from(layers, (name) => ({ name, type: "dataSource" as const })),
+      async () => {
+        await Promise.all(portals.map((portal) => this.addOrUpdatePortal(portal)));
+      }
+    );
+  }
+
   public async addOrUpdatePortal(data: PortalData): Promise<void> {
     const existing = this.portals.get(data.guid);
     if (existing) {
@@ -190,16 +210,23 @@ export class PortalEntityManager {
 
   private removePortalEntitiesInView(viewRect: Cesium.Rectangle): void {
     const toRemove: string[] = [];
+    const layers = new Set<string>();
     this.portals.forEach((info, guid) => {
       const position = info.entity.position?.getValue(Cesium.JulianDate.now());
       if (position) {
         const cartographic = Cesium.Cartographic.fromCartesian(position);
         if (Cesium.Rectangle.contains(viewRect, cartographic)) {
           toRemove.push(guid);
+          layers.add(getPortalLayerId(info.data));
         }
       }
     });
-    toRemove.forEach(guid => this.removePortalEntity(guid));
+    if (toRemove.length === 0) return;
+
+    this.layerManager.withEntityCollectionEventsSuspendedSync(
+      Array.from(layers, (name) => ({ name, type: "dataSource" as const })),
+      () => toRemove.forEach(guid => this.removePortalEntity(guid))
+    );
   }
 }
 

@@ -16,16 +16,28 @@ export class FieldEntityManager {
 
   constructor(private layerManager: LayerManager, private portalManager: PortalEntityManager) {}
 
-  public addOrUpdateField(data: FieldData): Cesium.Entity {
-    data.points.forEach((p) => {
-      this.portalManager.addOrUpdatePortal({
-        guid: p.guid,
-        team: data.team,
-        latE6: p.latE6,
-        lngE6: p.lngE6,
-        isPlaceholder: true,
-      } as PortalData).then();
+  public async addOrUpdateFields(fields: FieldData[]): Promise<void> {
+    await this.addPlaceholderPortals(fields);
+
+    const layers = new Set<string>();
+    fields.forEach((field) => {
+      const existing = this.fields.get(field.guid);
+      if (existing) layers.add(getFieldLayerId(existing.data));
+      layers.add(getFieldLayerId(field));
     });
+
+    await this.layerManager.withEntityCollectionEventsSuspended(
+      Array.from(layers, (name) => ({ name, type: "dataSource" as const })),
+      async () => {
+        fields.forEach((field) => this.addOrUpdateField(field, false));
+      }
+    );
+  }
+
+  public addOrUpdateField(data: FieldData, hydrateAnchorPortals = true): Cesium.Entity {
+    if (hydrateAnchorPortals) {
+      this.addPlaceholderPortals([data]).then();
+    }
 
     const existing = this.fields.get(data.guid);
     if (existing) {
@@ -45,6 +57,28 @@ export class FieldEntityManager {
     const entity = this.createFieldEntity(data);
     this.fields.set(data.guid, { data, entity });
     return entity;
+  }
+
+  private async addPlaceholderPortals(fields: FieldData[]): Promise<void> {
+    const placeholders = new Map<string, PortalData>();
+    fields.forEach((field) => {
+      field.points.forEach((point) => {
+        if (this.portalManager.hasPortal(point.guid)) return;
+
+        setNewestPlaceholder(placeholders, {
+          guid: point.guid,
+          team: field.team,
+          latE6: point.latE6,
+          lngE6: point.lngE6,
+          timestamp: field.timestamp,
+          isPlaceholder: true,
+        });
+      });
+    });
+
+    if (placeholders.size === 0) return;
+
+    await this.portalManager.addOrUpdatePortals(Array.from(placeholders.values()));
   }
 
   public removeField(guid: string): boolean {
@@ -82,6 +116,7 @@ export class FieldEntityManager {
 
   private removeFieldEntityInView(viewRect: Cesium.Rectangle): void {
     const toRemove: string[] = [];
+    const layers = new Set<string>();
     this.fields.forEach((info, guid) => {
       if (info.entity.polygon && info.entity.polygon.hierarchy) {
         const hierarchy = info.entity.polygon.hierarchy.getValue(Cesium.JulianDate.now()) as Cesium.PolygonHierarchy;
@@ -90,12 +125,18 @@ export class FieldEntityManager {
           const fieldRect = Cesium.Rectangle.fromCartographicArray(cartographics);
           if (Cesium.Rectangle.intersection(viewRect, fieldRect)) {
             toRemove.push(guid);
+            layers.add(getFieldLayerId(info.data));
           }
         }
       }
     });
 
-    toRemove.forEach(guid => this.removeField(guid));
+    if (toRemove.length === 0) return;
+
+    this.layerManager.withEntityCollectionEventsSuspendedSync(
+      Array.from(layers, (name) => ({ name, type: "dataSource" as const })),
+      () => toRemove.forEach(guid => this.removeField(guid))
+    );
   }
 
   private updateFieldEntity(entity: Cesium.Entity, data: FieldData): void {
@@ -113,15 +154,6 @@ export class FieldEntityManager {
   }
 }
 
-/**
- * Creates a field hierarchy from an array of points represented in degrees.
- *
- * @param points - An array of numbers representing the longitude and latitude pairs in degrees.
- *                 The array should be in the format [longitude1, latitude1, longitude2, latitude2, ...].
- *                 The number of elements must be even, as each point requires a longitude and latitude pair.
- *
- * @return A new Cesium.PolygonHierarchy object created from the provided points.
- */
 function createFieldHierarchy(points: number[]): Cesium.PolygonHierarchy {
   return new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray(points));
 }
@@ -129,4 +161,11 @@ function createFieldHierarchy(points: number[]): Cesium.PolygonHierarchy {
 function getFieldLayerId(data: FieldData): string {
   const team = data.team.toLowerCase();
   return `fields-${team}`;
+}
+
+function setNewestPlaceholder(placeholders: Map<string, PortalData>, placeholder: PortalData): void {
+  const existing = placeholders.get(placeholder.guid);
+  if (!existing || placeholder.timestamp > existing.timestamp) {
+    placeholders.set(placeholder.guid, placeholder);
+  }
 }

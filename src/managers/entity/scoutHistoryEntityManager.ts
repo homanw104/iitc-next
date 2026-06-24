@@ -76,6 +76,18 @@ export class ScoutHistoryEntityManager {
     }
   }
 
+  public async addOrUpdateScoutControlHalos(portals: PortalData[]): Promise<void> {
+    await this.layerManager.withEntityCollectionEventsSuspended(
+      [
+        { name: DATA_SOURCE_LAYER_NAME, type: "dataSource" },
+        { name: DATA_SOURCE_LAYER_NAME_REVERSE, type: "dataSource" },
+      ],
+      async () => {
+        await Promise.all(portals.map((portal) => this.addOrUpdateScoutControlHalo(portal)));
+      }
+    );
+  }
+
   public removeScoutControlHalo(guid: string): void {
     this.removeScoutControlHaloEntity(guid);
   }
@@ -219,7 +231,15 @@ export class ScoutHistoryEntityManager {
         }
       }
     });
-    toRemove.forEach(guid => this.removeScoutControlHalo(guid));
+    if (toRemove.length === 0) return;
+
+    this.layerManager.withEntityCollectionEventsSuspendedSync(
+      [
+        { name: DATA_SOURCE_LAYER_NAME, type: "dataSource" },
+        { name: DATA_SOURCE_LAYER_NAME_REVERSE, type: "dataSource" },
+      ],
+      () => toRemove.forEach(guid => this.removeScoutControlHalo(guid))
+    );
   }
 }
 

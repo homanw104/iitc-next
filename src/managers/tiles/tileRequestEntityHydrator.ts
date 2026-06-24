@@ -16,6 +16,10 @@ import type { TileRequestQueue } from "./tileRequestQueue";
 import { parseTileEntities } from "./tileRequestEntityParser";
 
 const LOG_TAG = "TileRequestEntityHydrator";
+const PORTAL_HYDRATION_BATCH_SIZE = 64;
+const DECORATION_HYDRATION_BATCH_SIZE = 64;
+const LINK_HYDRATION_BATCH_SIZE = 128;
+const FIELD_HYDRATION_BATCH_SIZE = 128;
 
 export class TileEntityHydrator {
   constructor(
@@ -108,15 +112,40 @@ export class TileEntityHydrator {
     }
 
     const portals = Array.from(portalsToHydrate.values());
-    await Promise.all(portals.map((p) => this.portalEntityManager.addOrUpdatePortal(p)));
-    await Promise.all(portals.map((p) => this.portalLabelEntityManager.addOrUpdateLabel(p)));
-    await Promise.all(portals.map((p) => this.portalOrnamentEntityManager.addOrUpdateOrnament(p)));
-    await Promise.all(portals.map((p) => this.portalHistoryEntityManager.addOrUpdateHistoryHalo(p)));
-    await Promise.all(portals.map((p) => this.scoutHistoryEntityManager.addOrUpdateScoutControlHalo(p)));
-    linksToHydrate.forEach((l) => this.linkEntityManager.addOrUpdateLink(l));
-    fieldsToHydrate.forEach((f) => this.fieldEntityManager.addOrUpdateField(f));
+    await hydrateInBatches(portals, PORTAL_HYDRATION_BATCH_SIZE, (batch) =>
+      this.portalEntityManager.addOrUpdatePortals(batch)
+    );
+    await hydrateInBatches(portals, DECORATION_HYDRATION_BATCH_SIZE, async (batch) => {
+      await Promise.all([
+        this.portalLabelEntityManager.addOrUpdateLabels(batch),
+        this.portalOrnamentEntityManager.addOrUpdateOrnaments(batch),
+        this.portalHistoryEntityManager.addOrUpdateHistoryHalos(batch),
+        this.scoutHistoryEntityManager.addOrUpdateScoutControlHalos(batch),
+      ]);
+    });
+    await hydrateInBatches(Array.from(linksToHydrate.values()), LINK_HYDRATION_BATCH_SIZE, (batch) =>
+      this.linkEntityManager.addOrUpdateLinks(batch)
+    );
+    await hydrateInBatches(Array.from(fieldsToHydrate.values()), FIELD_HYDRATION_BATCH_SIZE, (batch) =>
+      this.fieldEntityManager.addOrUpdateFields(batch)
+    );
 
     logManager.debug(LOG_TAG, `Processed ${entitiesFound} entities`);
     this.viewer.scene.requestRender();
   }
+}
+
+async function hydrateInBatches<T>(
+  items: T[],
+  batchSize: number,
+  hydrate: (batch: T[]) => Promise<void>,
+): Promise<void> {
+  for (let index = 0; index < items.length; index += batchSize) {
+    await hydrate(items.slice(index, index + batchSize));
+    if (index + batchSize < items.length) await waitForNextFrame();
+  }
+}
+
+function waitForNextFrame(): Promise<void> {
+  return new Promise(resolve => window.requestAnimationFrame(() => resolve()));
 }

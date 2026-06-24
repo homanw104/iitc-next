@@ -75,6 +75,22 @@ export class PortalOrnamentEntityManager {
     }
   }
 
+  public async addOrUpdateOrnaments(portals: PortalData[]): Promise<void> {
+    const layers = new Set<string>();
+    portals.forEach((portal) => {
+      const existing = this.ornaments.get(portal.guid);
+      if (existing) layers.add(getPortalOrnamentLayerId(existing.data));
+      if (portal.ornaments?.length) layers.add(getPortalOrnamentLayerId(portal));
+    });
+
+    await this.layerManager.withEntityCollectionEventsSuspended(
+      Array.from(layers, (name) => ({ name, type: "dataSource" as const })),
+      async () => {
+        await Promise.all(portals.map((portal) => this.addOrUpdateOrnament(portal)));
+      }
+    );
+  }
+
   public removeOrnament(guid: string): void {
     this.removeOrnamentEntity(guid);
   }
@@ -161,16 +177,23 @@ export class PortalOrnamentEntityManager {
 
   private removeOrnamentEntitiesInView(viewRect: Cesium.Rectangle): void {
     const toRemove: string[] = [];
+    const layers = new Set<string>();
     this.ornaments.forEach((info, guid) => {
       const position = info.entity.position?.getValue(Cesium.JulianDate.now());
       if (position) {
         const cartographic = Cesium.Cartographic.fromCartesian(position);
         if (Cesium.Rectangle.contains(viewRect, cartographic)) {
           toRemove.push(guid);
+          layers.add(getPortalOrnamentLayerId(info.data));
         }
       }
     });
-    toRemove.forEach(guid => this.removeOrnamentEntity(guid));
+    if (toRemove.length === 0) return;
+
+    this.layerManager.withEntityCollectionEventsSuspendedSync(
+      Array.from(layers, (name) => ({ name, type: "dataSource" as const })),
+      () => toRemove.forEach(guid => this.removeOrnamentEntity(guid))
+    );
   }
 }
 
