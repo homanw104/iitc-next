@@ -2,7 +2,7 @@ import * as Cesium from "cesium";
 import { Viewer } from "cesium";
 import { h } from "../../../utils/dom.ts";
 import { getTeamColor } from "../../../utils/color.ts";
-import { CommResponseItem } from "../../../managers/comm/commManager.ts";
+import { CommResponseItem } from "../../../types/intelApi.ts";
 import { PortalEntityManager } from "../../../managers/entity/portalEntityManager.ts";
 import { PortalHistoryEntityManager } from "../../../managers/entity/portalHistoryEntityManager.ts";
 import { ScoutHistoryEntityManager } from "../../../managers/entity/scoutHistoryEntityManager.ts";

@@ -6,22 +6,13 @@ import { intelApiClient } from "../../api/intelApiClient";
 import { logManager } from "../system/logManager";
 import * as Cesium from "cesium";
 import type { Channel } from "../../types/ingress";
-import type {
-  CommPlextData,
-  CommResponseItem,
-  GetPlextsPayload,
-  PlextMark,
-  PlextMarkData,
-  PlextMarkType,
-} from "../../types/intelApi";
+import type { CommResponseItem, GetPlextsPayload } from "../../types/intelApi";
 
 const LOG_TAG = "CommManager";
 const MIN_COMM_BOUNDS_KM = 10;
 const MIN_KM_PER_DEGREE = 110.574;
 const LATITUDE_DEGREES_RANGE = { min: -90, max: 90 };
 const LONGITUDE_DEGREES_RANGE = { min: -180, max: 180 };
-
-export type { CommPlextData, CommResponseItem, PlextMark, PlextMarkData, PlextMarkType };
 
 export class CommManager {
   private viewer: Cesium.Viewer;

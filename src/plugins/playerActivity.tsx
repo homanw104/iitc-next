@@ -11,7 +11,7 @@ import { safeWindow } from "../utils/window";
 import { getTeamColor } from "../utils/color";
 import type { Team } from "../types/ingress";
 import type { IITCCore } from "../types/iitc";
-import type { PlextMark } from "../managers/comm/commManager";
+import type { PlextMark } from "../types/intelApi";
 import type { EntityCoordinates, EntityPositionCallback } from "../managers/entity/entityPositionManager";
 
 const LOG_TAG = "PlayerActivityPlugin";
