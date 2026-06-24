@@ -2,10 +2,18 @@
  * Manages the comm messages and their storage.
  */
 
-import { apiRequest } from "../../utils/network";
+import { intelApiClient } from "../../api/intelApiClient";
 import { logManager } from "../system/logManager";
 import * as Cesium from "cesium";
-import type { Channel, Team } from "../../types/ingress";
+import type { Channel } from "../../types/ingress";
+import type {
+  CommPlextData,
+  CommResponseItem,
+  GetPlextsPayload,
+  PlextMark,
+  PlextMarkData,
+  PlextMarkType,
+} from "../../types/intelApi";
 
 const LOG_TAG = "CommManager";
 const MIN_COMM_BOUNDS_KM = 10;
@@ -13,60 +21,7 @@ const MIN_KM_PER_DEGREE = 110.574;
 const LATITUDE_DEGREES_RANGE = { min: -90, max: 90 };
 const LONGITUDE_DEGREES_RANGE = { min: -180, max: 180 };
 
-export type PlextMarkType =
-  "FACTION" |
-  "PLAYER" |
-  "PORTAL" |
-  "SECURE" |
-  "SENDER" |
-  "TEXT";
-
-export interface PlextMarkData {
-  plain: string;
-  team?: Team;
-  latE6?: number;
-  lngE6?: number;
-  name?: string;
-  address?: string;
-}
-
-export type PlextMark = [PlextMarkType, PlextMarkData];
-
-export interface CommPlextData {
-  text: string;
-  team: Team;
-  markup: PlextMark[];
-  plextType: string;
-  categories: number;
-}
-
-export type CommResponseItem = [
-  guid: string,
-  timestamp: number,
-  data: {
-    plext: CommPlextData;
-  },
-];
-
-export interface CommResponse {
-  result: CommResponseItem[];
-}
-
-interface SendPlextResponse {
-  error?: unknown;
-}
-
-interface GetPlextsPayload {
-  minLatE6: number;
-  minLngE6: number;
-  maxLatE6: number;
-  maxLngE6: number;
-  minTimestampMs: number;
-  maxTimestampMs: number;
-  tab: string;
-  ascendingTimestampOrder: boolean;
-  plexContinuationGuid?: string;
-}
+export type { CommPlextData, CommResponseItem, PlextMark, PlextMarkData, PlextMarkType };
 
 export class CommManager {
   private viewer: Cesium.Viewer;
@@ -232,7 +187,7 @@ export class CommManager {
         tab: channel
       };
 
-      const response = (await apiRequest("sendPlext", payload)) as SendPlextResponse;
+      const response = await intelApiClient.sendPlext(payload);
       if (response && response.error) {
         logManager.error(LOG_TAG, `Failed to send message to ${channel} channel`, response.error);
       }
@@ -289,7 +244,7 @@ export class CommManager {
 
       if (plextContinuationGuid) payload.plexContinuationGuid = plextContinuationGuid;
 
-      const data = (await apiRequest("getPlexts", payload)) as CommResponse;
+      const data = await intelApiClient.getPlexts(payload);
 
       if (data && data.result) {
         data.result.forEach(item => {

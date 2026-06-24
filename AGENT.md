@@ -31,6 +31,9 @@ Key findings for agents:
 
 * Make sure to blend in the coding style of the existing code.
 * Don't introduce helper functions that are too small and only used twice or so.
+* Every source file should begin with a JSDoc-style block comment describing the
+  file, without tags like `@param` or `@returns`. Files under `src/components/`
+  are exempt.
 * Any file that calls `logManager.debug/info/warn/error` should define a
   `const LOG_TAG = "PascalCaseName"` near the top of the file and pass
   `LOG_TAG` to `logManager`. The name should match the file, manager, or plugin

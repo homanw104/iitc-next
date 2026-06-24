@@ -7,7 +7,7 @@ import { PortalData, PortalLevel, PortalMod, PortalResonator, RawEntity } from "
 import { EntityPositionManager, EntityPositionCallback } from "./entityPositionManager";
 import { LayerManager } from "../layer/layerManager";
 import { getTeamColor } from "../../utils/color";
-import { apiRequest } from "../../utils/network";
+import { intelApiClient } from "../../api/intelApiClient";
 import { settingsManager } from "../system/settingsManager.ts";
 import { EntityTranslucencyManager } from "./entityTranslucencyManager";
 
@@ -27,37 +27,6 @@ interface Portal {
   positionCallback: EntityPositionCallback;
 }
 
-interface PortalDetailsResponse {
-  result: unknown[];
-}
-
-export class PortalRequest {
-  public portalGuid: string;
-  public active: boolean = false;
-  public retryCount: number = 0;
-  private maxRetries: number = 3;
-
-  public constructor(portalGuid: string) {
-    this.portalGuid = portalGuid;
-  }
-
-  public async send(): Promise<unknown> {
-    this.active = true;
-    try {
-      const response = await apiRequest("getPortalDetails", { guid: this.portalGuid });
-      this.active = false;
-      return response;
-    } catch (error) {
-      this.active = false;
-      if (this.retryCount < this.maxRetries) {
-        this.retryCount++;
-        return this.send();
-      }
-      throw error;
-    }
-  }
-}
-
 export class PortalEntityManager {
   private portals: Map<string, Portal> = new Map();
   private portalsPendingCreation: Set<string> = new Set();
@@ -69,9 +38,7 @@ export class PortalEntityManager {
   ) {}
 
   public async requestPortalDetails(guid: string): Promise<void> {
-    const request = new PortalRequest(guid);
-    const response = await request.send();
-    const data = response as PortalDetailsResponse;
+    const data = await intelApiClient.getPortalDetails(guid);
     const portalData = parsePortal([guid, data.result[13] as number, data.result]);
     await this.addOrUpdatePortal(portalData);
   }

@@ -2,15 +2,10 @@
  * Handle redeem requests.
  */
 
-import { apiRequest } from "../../utils/network";
+import { intelApiClient } from "../../api/intelApiClient";
 import { logManager } from "../system/logManager";
 
 const LOG_TAG = "RedeemManager";
-
-export interface RedeemResponse {
-  error?: string;
-  result?: string;
-}
 
 export class RedeemManager {
   public async requestRedeem(passcode: string): Promise<string> {
@@ -18,9 +13,9 @@ export class RedeemManager {
     if (!trimmedPasscode) return "Passcode is required.";
 
     try {
-      const response = (await apiRequest("redeemReward", { passcode: trimmedPasscode })) as RedeemResponse;
+      const response = await intelApiClient.redeemReward(trimmedPasscode);
       if (response.error) {
-        return response.error;
+        return String(response.error);
       } else {
         return "Passcode redeemed successfully!";
       }

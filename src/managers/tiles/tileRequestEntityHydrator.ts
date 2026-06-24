@@ -40,8 +40,7 @@ export class TileEntityHydrator {
     logManager.debug(LOG_TAG, "Removed entities from current view");
   }
 
-  public async handleResponse(response: unknown, tileKeys: string[], queue: TileRequestQueue): Promise<void> {
-    const data = response as TileResponse;
+  public async handleResponse(data: TileResponse, tileKeys: string[], queue: TileRequestQueue): Promise<void> {
     if (!data || !data.result) {
       logManager.warn(LOG_TAG, "Invalid response data:", data);
       tileKeys.forEach((key) => {

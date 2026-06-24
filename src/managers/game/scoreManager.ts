@@ -2,15 +2,10 @@
  * Class to manage and fetch game scores.
  */
 
-import { apiRequest } from "../../utils/network";
+import { intelApiClient } from "../../api/intelApiClient";
 import { logManager } from "../system/logManager";
 
 const LOG_TAG = "ScoreManager";
-
-interface ScoreResponse {
-  error?: string;
-  result: Array<string>;
-}
 
 export class ScoreManager {
   private enlScore: number = 0;
@@ -26,7 +21,7 @@ export class ScoreManager {
 
   public async fetchGameScore() {
     try {
-      const data = (await apiRequest("getGameScore", {})) as ScoreResponse;
+      const data = await intelApiClient.getGameScore();
       if (data && data.result) {
         this.enlScore = parseInt(data.result[0]);
         this.resScore = parseInt(data.result[1]);

@@ -2,8 +2,9 @@
  * Queue and concurrency control for Intel tile requests.
  */
 
-import { apiRequest } from "../../utils/network";
+import { intelApiClient } from "../../api/intelApiClient";
 import { logManager } from "../system/logManager";
+import type { TileResponse } from "../../types/ingress";
 
 const LOG_TAG = "TileRequestQueue";
 const MAX_REQUESTS: number = 5;
@@ -11,34 +12,7 @@ const TILES_PER_REQUEST: number = 25;
 
 export type TileStatus = "queued" | "requested" | "loaded" | "error";
 export type TileStatusCallback = (key: string, status: TileStatus) => void;
-export type TileResponseHandler = (response: unknown, tileKeys: string[], refreshExisting: boolean) => Promise<void>;
-
-export class TileRequest {
-  public tileKeys: string[];
-  public active: boolean = false;
-  private retryCount: number = 0;
-  private maxRetries: number = 3;
-
-  constructor(tileKeys: string[]) {
-    this.tileKeys = tileKeys;
-  }
-
-  public async send(): Promise<unknown> {
-    this.active = true;
-    try {
-      const response = await apiRequest("getEntities", { tileKeys: this.tileKeys });
-      this.active = false;
-      return response;
-    } catch (error) {
-      this.active = false;
-      if (this.retryCount < this.maxRetries) {
-        this.retryCount++;
-        return this.send();
-      }
-      throw error;
-    }
-  }
-}
+export type TileResponseHandler = (response: TileResponse, tileKeys: string[], refreshExisting: boolean) => Promise<void>;
 
 export class TileRequestQueue {
   private activeRequestCount: number = 0;
@@ -144,7 +118,6 @@ export class TileRequestQueue {
       this.setTileStatus(key, "requested");
     });
 
-    const request = new TileRequest(tilesToRequest);
     this.activeRequestCount++;
 
     logManager.debug(LOG_TAG, `Sending request for ${tilesToRequest.length} tiles`);
@@ -155,7 +128,7 @@ export class TileRequestQueue {
     );
 
     try {
-      const response = await request.send();
+      const response = await intelApiClient.getEntities(tilesToRequest);
       logManager.debug(LOG_TAG, `Received response for ${tilesToRequest.length} tile${tilesToRequest.length === 1 ? "" : "s"}`);
       await this.handleResponse(response, tilesToRequest, refreshExisting);
     } catch (error) {

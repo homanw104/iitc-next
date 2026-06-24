@@ -1,5 +1,5 @@
 /**
- * Modern network utilities for interacting with the Ingress API.
+ * Modern network utilities for interacting with the Intel API.
  */
 
 import { getCookie } from "./browser";
