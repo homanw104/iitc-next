@@ -3,8 +3,7 @@
  */
 
 import * as Cesium from "cesium";
-import { TileResponse } from "../../types/ingress";
-import { ParsedEntities } from "../../types/map";
+import { FieldData, LinkData, PortalData, TileResponse } from "../../types/ingress";
 import { FieldEntityManager } from "../entity/fieldEntityManager";
 import { LinkEntityManager } from "../entity/linkEntityManager";
 import { logManager } from "../system/logManager";
@@ -52,11 +51,9 @@ export class TileEntityHydrator {
     }
 
     let entitiesFound = 0;
-    const entitiesToHydrate: ParsedEntities = {
-      portals: [],
-      links: [],
-      fields: [],
-    };
+    const portalsToHydrate: Map<string, PortalData> = new Map();
+    const linksToHydrate: Map<string, LinkData> = new Map();
+    const fieldsToHydrate: Map<string, FieldData> = new Map();
 
     for (const tileKey of tileKeys) {
       const tileData = data.result.map[tileKey];
@@ -84,19 +81,40 @@ export class TileEntityHydrator {
       if (tileData.gameEntities) {
         entitiesFound += tileData.gameEntities.length;
         const { portals, links, fields } = parseTileEntities(tileData.gameEntities);
-        entitiesToHydrate.portals.push(...portals);
-        entitiesToHydrate.links.push(...links);
-        entitiesToHydrate.fields.push(...fields);
+        portals.forEach((portal) => {
+          const existing = portalsToHydrate.get(portal.guid);
+          if (
+            !existing ||
+            existing.isPlaceholder ||
+            portal.timestamp > existing.timestamp ||
+            (!existing.resonators && portal.resonators)
+          ) {
+            portalsToHydrate.set(portal.guid, portal);
+          }
+        });
+        links.forEach((link) => {
+          const existing = linksToHydrate.get(link.guid);
+          if (!existing || link.timestamp > existing.timestamp) {
+            linksToHydrate.set(link.guid, link);
+          }
+        });
+        fields.forEach((field) => {
+          const existing = fieldsToHydrate.get(field.guid);
+          if (!existing || field.timestamp > existing.timestamp) {
+            fieldsToHydrate.set(field.guid, field);
+          }
+        });
       }
     }
 
-    await Promise.all(entitiesToHydrate.portals.map((p) => this.portalEntityManager.addOrUpdatePortal(p)));
-    await Promise.all(entitiesToHydrate.portals.map((p) => this.portalLabelEntityManager.addOrUpdateLabel(p)));
-    await Promise.all(entitiesToHydrate.portals.map((p) => this.portalOrnamentEntityManager.addOrUpdateOrnament(p)));
-    await Promise.all(entitiesToHydrate.portals.map((p) => this.portalHistoryEntityManager.addOrUpdateHistoryHalo(p)));
-    await Promise.all(entitiesToHydrate.portals.map((p) => this.scoutHistoryEntityManager.addOrUpdateScoutControlHalo(p)));
-    entitiesToHydrate.links.forEach((l) => this.linkEntityManager.addOrUpdateLink(l));
-    entitiesToHydrate.fields.forEach((f) => this.fieldEntityManager.addOrUpdateField(f));
+    const portals = Array.from(portalsToHydrate.values());
+    await Promise.all(portals.map((p) => this.portalEntityManager.addOrUpdatePortal(p)));
+    await Promise.all(portals.map((p) => this.portalLabelEntityManager.addOrUpdateLabel(p)));
+    await Promise.all(portals.map((p) => this.portalOrnamentEntityManager.addOrUpdateOrnament(p)));
+    await Promise.all(portals.map((p) => this.portalHistoryEntityManager.addOrUpdateHistoryHalo(p)));
+    await Promise.all(portals.map((p) => this.scoutHistoryEntityManager.addOrUpdateScoutControlHalo(p)));
+    linksToHydrate.forEach((l) => this.linkEntityManager.addOrUpdateLink(l));
+    fieldsToHydrate.forEach((f) => this.fieldEntityManager.addOrUpdateField(f));
 
     logManager.debug(LOG_TAG, `Processed ${entitiesFound} entities`);
     this.viewer.scene.requestRender();
