@@ -103,7 +103,7 @@ export class DebugTileEntityManager {
     }
 
     if (status === "loaded" || status === "error") {
-      setTimeout(() => {
+      window.setTimeout(() => {
         const source = this.layerManager.getOrCreateDataSource(this.layerId);
         source.entities.remove(entity);
         // Find and remove from map

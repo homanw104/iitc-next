@@ -58,7 +58,7 @@ class DrawLinesPlugin {
   private lineMarkerImage: string | undefined;
   private lineStartMarkerEntity: Cesium.Entity | undefined;
   private lineEndMarkerEntity: Cesium.Entity | undefined;
-  private lineMarkerRemovalTimeout: ReturnType<typeof setTimeout> | undefined;
+  private lineMarkerRemovalTimeout: number | undefined;
   private linesDataSource: Cesium.DataSource | undefined;
   private lineMarkersDataSource: Cesium.DataSource | undefined;
   private touchStartPositions = new Map<number, TouchStartPosition>();
@@ -535,7 +535,7 @@ class DrawLinesPlugin {
 
   private scheduleLineMarkersRemoval() {
     this.cancelLineMarkersRemoval();
-    this.lineMarkerRemovalTimeout = setTimeout(() => {
+    this.lineMarkerRemovalTimeout = window.setTimeout(() => {
       this.lineMarkerRemovalTimeout = undefined;
       this.removeLineMarkers();
     }, LINE_MARKER_TIMEOUT_MS);
@@ -544,7 +544,7 @@ class DrawLinesPlugin {
   private cancelLineMarkersRemoval() {
     if (this.lineMarkerRemovalTimeout === undefined) return;
 
-    clearTimeout(this.lineMarkerRemovalTimeout);
+    window.clearTimeout(this.lineMarkerRemovalTimeout);
     this.lineMarkerRemovalTimeout = undefined;
   }
 
@@ -916,7 +916,7 @@ const register = () => {
   if (safeWindow && safeWindow.iitc && safeWindow.iitc.pluginManager) {
     safeWindow.iitc.pluginManager.registerPlugin(new DrawLinesPlugin());
   } else {
-    setTimeout(register, 1000);
+    window.setTimeout(register, 1000);
   }
 };
 

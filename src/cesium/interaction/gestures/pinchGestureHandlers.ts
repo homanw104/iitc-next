@@ -78,7 +78,7 @@ export function createPinchGestureHandlers(
   let hasPinchStartPositions = false;
   let pinchStartDistance = 0;
   let pinchStartAngle = 0;
-  let revertHasJustPinchedTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  let revertHasJustPinchedTimeoutId: number | null = null;
   const avgPosition = new Cesium.Cartesian2();
   const previousAvgPosition = new Cesium.Cartesian2();
   const centerPosition = new Cesium.Cartesian2();
@@ -102,7 +102,7 @@ export function createPinchGestureHandlers(
     lastPinchMoveTime = Date.now();
 
     if (gestureState.momentumRequestId) {
-      cancelAnimationFrame(gestureState.momentumRequestId);
+      window.cancelAnimationFrame(gestureState.momentumRequestId);
       gestureState.momentumRequestId = null;
     }
   };
@@ -263,8 +263,8 @@ export function createPinchGestureHandlers(
   const handlePinchEnd = () => {
     gestureState.isPinching = false;
     gestureState.hasJustPinched = true;
-    if (revertHasJustPinchedTimeoutId) clearTimeout(revertHasJustPinchedTimeoutId);
-    revertHasJustPinchedTimeoutId = setTimeout(() => gestureState.hasJustPinched = false, doubleTapThreshold);
+    if (revertHasJustPinchedTimeoutId) window.clearTimeout(revertHasJustPinchedTimeoutId);
+    revertHasJustPinchedTimeoutId = window.setTimeout(() => gestureState.hasJustPinched = false, doubleTapThreshold);
 
     if (Math.abs(pinchZoomVelocity) > 0.1 && (pinchMode === "pending" || pinchMode === "zoom" || pinchMode === "rotate")) {
       if (pinchZoomVelocity > 5) pinchZoomVelocity = 5;
@@ -300,9 +300,9 @@ export function createPinchGestureHandlers(
 
         pinchZoomVelocity *= 0.64;
 
-        gestureState.momentumRequestId = requestAnimationFrame(animateMomentum);
+        gestureState.momentumRequestId = window.requestAnimationFrame(animateMomentum);
       };
-      gestureState.momentumRequestId = requestAnimationFrame(animateMomentum);
+      gestureState.momentumRequestId = window.requestAnimationFrame(animateMomentum);
     }
   };
 

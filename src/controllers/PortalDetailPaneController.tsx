@@ -64,7 +64,7 @@ export class PortalDetailPaneController {
       await navigator.clipboard.writeText(link);
       linkButton.innerText = "Copied intel map link";
       linkButton.style.color = "white";
-      setTimeout(() => {
+      window.setTimeout(() => {
         linkButton.innerText = "Copy intel map link";
         linkButton.style.color = "#5091ff";
       }, 2000);

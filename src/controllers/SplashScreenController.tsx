@@ -36,7 +36,7 @@ export class SplashScreenController {
   }
 
   private scheduleClippedMessageUpdate = (logGrid: HTMLElement): void => {
-    requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
       const viewport = logGrid.parentElement;
       if (!viewport || !logGrid.isConnected) return;
 
@@ -64,7 +64,7 @@ export class SplashScreenController {
     this.logEntryCallback = null;
 
     if (this.splashEl) this.splashEl.style.opacity = "0";
-    setTimeout(() => {
+    window.setTimeout(() => {
       if (this.splashEl) {
         this.splashEl.remove();
         this.splashEl = null;

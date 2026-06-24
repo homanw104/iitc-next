@@ -138,7 +138,7 @@ class DoneLinesPlugin {
     if (this.updateQueued) return;
 
     this.updateQueued = true;
-    requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
       this.updateQueued = false;
       this.updateHighlights();
     });
@@ -297,7 +297,7 @@ const register = () => {
   if (safeWindow && safeWindow.iitc && safeWindow.iitc.pluginManager) {
     safeWindow.iitc.pluginManager.registerPlugin(new DoneLinesPlugin());
   } else {
-    setTimeout(register, 1000);
+    window.setTimeout(register, 1000);
   }
 };
 

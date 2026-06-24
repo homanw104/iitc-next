@@ -34,9 +34,9 @@ export function createTouchZoomHandlers(
   let hasMovedDuringTheSecondTap = false;
   let activeTouchCount = 0;
   let isSingleTouchPanning = false;
-  let inertiaResetTimeoutId: ReturnType<typeof setTimeout> | null = null;
-  let revertHasJustMovedTimeoutId: ReturnType<typeof setTimeout> | null = null;
-  let revertHasJustDoubleTappedTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  let inertiaResetTimeoutId: number | null = null;
+  let revertHasJustMovedTimeoutId: number | null = null;
+  let revertHasJustDoubleTappedTimeoutId: number | null = null;
 
   viewer.scene.canvas.addEventListener("touchstart", (event) => {
     activeTouchCount = event.touches.length;
@@ -67,12 +67,12 @@ export function createTouchZoomHandlers(
     gestureState.isDuringTheTap = true;
 
     if (gestureState.momentumRequestId) {
-      cancelAnimationFrame(gestureState.momentumRequestId);
+      window.cancelAnimationFrame(gestureState.momentumRequestId);
       gestureState.momentumRequestId = null;
     }
 
     if (inertiaResetTimeoutId) {
-      clearTimeout(inertiaResetTimeoutId);
+      window.clearTimeout(inertiaResetTimeoutId);
       inertiaResetTimeoutId = null;
     }
 
@@ -83,10 +83,10 @@ export function createTouchZoomHandlers(
       controller.enableInputs = false;
 
       if (revertHasJustDoubleTappedTimeoutId) {
-        clearTimeout(revertHasJustDoubleTappedTimeoutId);
+        window.clearTimeout(revertHasJustDoubleTappedTimeoutId);
         revertHasJustDoubleTappedTimeoutId = null;
       }
-      revertHasJustDoubleTappedTimeoutId = setTimeout(() => gestureState.hasJustDoubleTapped = false, doubleTapThreshold * 2);
+      revertHasJustDoubleTappedTimeoutId = window.setTimeout(() => gestureState.hasJustDoubleTapped = false, doubleTapThreshold * 2);
     } else {
       isDuringTheSecondTap = false;
       gestureState.pendingSingleTapTime = now;
@@ -107,10 +107,10 @@ export function createTouchZoomHandlers(
 
     if (totalMovementLength > DRAG_THRESHOLD_PIXELS) gestureState.hasJustMoved = true;
     if (revertHasJustMovedTimeoutId) {
-      clearTimeout(revertHasJustMovedTimeoutId);
+      window.clearTimeout(revertHasJustMovedTimeoutId);
       revertHasJustMovedTimeoutId = null;
     }
-    revertHasJustMovedTimeoutId = setTimeout(() => gestureState.hasJustMoved = false, doubleTapThreshold);
+    revertHasJustMovedTimeoutId = window.setTimeout(() => gestureState.hasJustMoved = false, doubleTapThreshold);
 
     if (isDuringTheSecondTap) {
       if (totalMovementLength > DOUBLE_TAP_AND_DRAG_ZOOM_THRESHOLD_PIXELS) hasMovedDuringTheSecondTap = true;
@@ -190,9 +190,9 @@ export function createTouchZoomHandlers(
 
           zoomVelocity *= ZOOM_VELOCITY_FRICTION_FACTOR;
 
-          gestureState.momentumRequestId = requestAnimationFrame(animateMomentum);
+          gestureState.momentumRequestId = window.requestAnimationFrame(animateMomentum);
         };
-        gestureState.momentumRequestId = requestAnimationFrame(animateMomentum);
+        gestureState.momentumRequestId = window.requestAnimationFrame(animateMomentum);
       } else {
         controller.enableInputs = true;
       }
@@ -200,7 +200,7 @@ export function createTouchZoomHandlers(
       controller.enableInputs = true;
     }
 
-    inertiaResetTimeoutId = setTimeout(() => {
+    inertiaResetTimeoutId = window.setTimeout(() => {
       viewer.scene.screenSpaceCameraController.inertiaSpin = 0.9;
       viewer.scene.screenSpaceCameraController.inertiaTranslate = 0.9;
       inertiaResetTimeoutId = null;

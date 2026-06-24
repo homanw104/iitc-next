@@ -377,7 +377,7 @@ export class LayerManager {
     if (this.pendingRenderFrame !== null) return;
 
     // Coalesce filter changes so one checkbox toggle only updates Cesium's data source display once.
-    this.pendingRenderFrame = requestAnimationFrame(() => {
+    this.pendingRenderFrame = window.requestAnimationFrame(() => {
       this.pendingRenderFrame = null;
       if (this.viewer.isDestroyed()) return;
 

@@ -656,7 +656,7 @@ const register = () => {
   if (safeWindow && safeWindow.iitc && safeWindow.iitc.pluginManager) {
     safeWindow.iitc.pluginManager.registerPlugin(new PlayerActivityPlugin());
   } else {
-    setTimeout(register, 1000);
+    window.setTimeout(register, 1000);
   }
 };
 

@@ -69,7 +69,7 @@ export class CommPaneController {
     this.refreshData().then(() => this.renderPane());
     this.renderPane();
 
-    setInterval(() => {
+    window.setInterval(() => {
       if (this.isInputFocused) return;
       this.refreshData().then(() => this.renderPane());
       this.renderPane();
@@ -90,7 +90,7 @@ export class CommPaneController {
 
       // Always tries to fetch "all" channel and wait for 0.2 seconds before the next possible request
       await this.commManager.requestAll(fetchOld);
-      await new Promise<void>(resolve => setTimeout(() => resolve(), 200));
+      await new Promise<void>(resolve => window.setTimeout(() => resolve(), 200));
 
       if (channel === "faction") await this.commManager.requestFaction(fetchOld);
       if (channel === "alerts") await this.commManager.requestAlerts(fetchOld);
@@ -204,13 +204,13 @@ export class CommPaneController {
 
   private handleSendMessage = async (message: string) => {
     if (this.currentChannel === "alerts") {
-      alert("__JARVIS__: A strange game. The only winning move is not to play. How about a nice game of chess?");
+      window.alert("__JARVIS__: A strange game. The only winning move is not to play. How about a nice game of chess?");
       return;
     }
 
     try {
       await this.commManager.sendMessage(this.currentChannel, message);
-      setTimeout(() => {
+      window.setTimeout(() => {
         this.refreshData().then(() => this.renderPane());
       }, 1000);
     } catch (e) {

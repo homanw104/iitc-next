@@ -83,7 +83,7 @@ export function handlePortalSelection({
     if (!portalData) return;
     let hasRenderedFreshPortalData = false;
 
-    setTimeout(() => {
+    window.setTimeout(() => {
       if (hasRenderedFreshPortalData) return;
       if (isPortalDisplaySuppressed(gestureState)) return;
       interfaceState.lastPortalData = portalData;
@@ -94,7 +94,7 @@ export function handlePortalSelection({
 
     selectionState.isPortalDetailLoading = true;
     portalEntityManager.requestPortalDetails(portalGuid).then(() => {
-      setTimeout(() => {
+      window.setTimeout(() => {
         if (isPortalDisplaySuppressed(gestureState)) {
           if (selectionState.hasCancelledDisplayPortalDetail) selectionState.hasCancelledDisplayPortalDetail = false;
           return;
@@ -119,7 +119,7 @@ export function handlePortalSelection({
       selectionState.isPortalDetailLoading = false;
     });
   } else {
-    setTimeout(() => {
+    window.setTimeout(() => {
       if (isPortalDisplaySuppressed(gestureState)) return;
 
       viewer.selectedEntity = undefined;

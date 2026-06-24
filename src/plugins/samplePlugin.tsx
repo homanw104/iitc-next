@@ -50,7 +50,7 @@ class SamplePlugin {
     // Remember to clean up when deinitializing
     try {
       if (this.interval) {
-        clearInterval(this.interval);
+        window.clearInterval(this.interval);
         this.interval = undefined;
       }
     } catch (e) {
@@ -70,7 +70,7 @@ const register = () => {
   if (safeWindow && safeWindow.iitc && safeWindow.iitc.pluginManager) {
     safeWindow.iitc.pluginManager.registerPlugin(new SamplePlugin());
   } else {
-    setTimeout(register, 1000);
+    window.setTimeout(register, 1000);
   }
 };
 
