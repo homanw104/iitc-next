@@ -82,6 +82,7 @@ export function handlePortalSelection({
     const portalData = portalEntityManager.getPortalData(portalGuid);
     if (!portalData) return;
     let hasRenderedFreshPortalData = false;
+    viewer.selectedEntity = portalEntity;
 
     window.setTimeout(() => {
       if (hasRenderedFreshPortalData) return;
@@ -104,7 +105,6 @@ export function handlePortalSelection({
 
         if (freshData) {
           hasRenderedFreshPortalData = true;
-          viewer.selectedEntity = portalEntityManager.getPortalEntity(portalGuid);
           interfaceState.lastPortalData = freshData;
           interfaceState.portalDetailBar?.remove();
           interfaceState.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailPaneController: portalDetailPaneController, data: freshData }));

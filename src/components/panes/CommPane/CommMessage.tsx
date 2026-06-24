@@ -35,13 +35,14 @@ async function selectLoadedPortal(
     if (!portalData) return false;
 
     const portalGuid = portalData.guid;
+    viewer.selectedEntity = portalEntityManager.getPortalEntity(portalGuid);
+
     await portalEntityManager.requestPortalDetails(portalGuid);
     if (requestId !== latestPortalSelectionRequest) return true;
 
     const freshData = portalEntityManager.getPortalData(portalGuid);
     if (!freshData) return false;
 
-    viewer.selectedEntity = portalEntityManager.getPortalEntity(portalGuid);
     portalDetailState.lastPortalData = freshData;
     portalDetailState.portalDetailBar?.remove();
     portalDetailState.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailPaneController: portalDetailPaneController, data: freshData }));
