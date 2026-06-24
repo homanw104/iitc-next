@@ -1,6 +1,6 @@
+import type { Player } from "../../../types/ingress.ts";
 import { getTeamColor } from "../../../utils/color.ts";
 import { h } from "../../../utils/dom.ts";
-import { Player } from "../../../types/ingress.ts";
 
 const PlayerInfo = ({ player }: {
   player?: Player;

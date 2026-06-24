@@ -3,8 +3,8 @@
  */
 
 import * as Cesium from "cesium";
-import { settingsManager } from "./settingsManager";
 import { logManager } from "./logManager";
+import { settingsManager } from "./settingsManager";
 
 const LOG_TAG = "SceneEventManager";
 

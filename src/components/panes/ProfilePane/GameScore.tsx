@@ -1,6 +1,6 @@
-import { h, Fragment } from "../../../utils/dom.ts";
+import type { ScoreManager } from "../../../managers/game/scoreManager.ts";
 import { getTeamColor } from "../../../utils/color.ts";
-import { ScoreManager } from "../../../managers/game/scoreManager.ts";
+import { h, Fragment } from "../../../utils/dom.ts";
 
 const GameScore = ({ scoreManager }: {
   scoreManager: ScoreManager,

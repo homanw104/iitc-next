@@ -1,12 +1,12 @@
-import { h } from "../../../utils/dom.ts";
+import type { PortalData } from "../../../types/ingress.ts";
 import { getTeamColor } from "../../../utils/color.ts";
-import { PortalData } from "../../../types/ingress.ts";
-import PortalTitle from "./PortalTitle.tsx";
+import { h } from "../../../utils/dom.ts";
+import PortalHistory from "./PortalHistory.tsx";
 import PortalImage from "./PortalImage.tsx";
+import PortalLink from "./PortalLink.tsx";
 import PortalMods from "./PortalMods.tsx";
 import PortalResonators from "./PortalResonators.tsx";
-import PortalHistory from "./PortalHistory.tsx";
-import PortalLink from "./PortalLink.tsx";
+import PortalTitle from "./PortalTitle.tsx";
 
 const PortalDetailPane = ({ data, onCopy }: {
   data: PortalData,

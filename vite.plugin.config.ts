@@ -8,10 +8,10 @@
  * with independent metadata and dependencies.
  */
 
-import { defineConfig } from "vite";
-import monkey, { cdn } from "vite-plugin-monkey";
 import { readdirSync } from "fs";
 import { join, parse } from "path";
+import { defineConfig } from "vite";
+import monkey, { cdn } from "vite-plugin-monkey";
 
 const pluginDir = "src/plugins";
 const files = readdirSync(pluginDir);

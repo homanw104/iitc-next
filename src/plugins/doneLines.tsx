@@ -9,7 +9,7 @@
 
 import "../types/iitc.ts";
 import * as Cesium from "cesium";
-import { IITCCore } from "../types/iitc";
+import type { IITCCore } from "../types/iitc";
 import { safeWindow } from "../utils/window";
 
 const LOG_TAG = "DoneLinesPlugin";

@@ -1,5 +1,5 @@
+import type { CommPaneController } from "../../../controllers/CommPaneController.tsx";
 import { h } from "../../../utils/dom.ts";
-import { CommPaneController } from "../../../controllers/CommPaneController.tsx";
 
 const CommButton = ({ commDetailPaneController }: {
   commDetailPaneController: CommPaneController,

@@ -6,7 +6,7 @@
  */
 
 import "../types/iitc.ts";
-import { IITCCore } from "../types/iitc";
+import type { IITCCore } from "../types/iitc";
 import { safeWindow } from "../utils/window";
 
 const LOG_TAG = "SamplePlugin";

@@ -1,6 +1,6 @@
-import { h } from "../../../utils/dom.ts";
 import type { RefreshIntervalMs } from "../../../managers/system/settingsManager.ts";
 import type { TileRequestManager } from "../../../managers/tiles/tileRequestManager.ts";
+import { h } from "../../../utils/dom.ts";
 import BackButton from "../../atoms/BackButton/BackButton.tsx";
 import CloseButton from "../../atoms/CloseButton/CloseButton.tsx";
 

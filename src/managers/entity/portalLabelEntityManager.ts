@@ -3,11 +3,11 @@
  */
 
 import * as Cesium from "cesium";
-import { PortalData } from "../../types/ingress";
-import { EntityPositionCallback, EntityPositionManager } from "./entityPositionManager";
-import { LayerManager } from "../layer/layerManager";
-import { logManager } from "../system/logManager.ts";
+import type { PortalData } from "../../types/ingress";
 import { wrapLabelText } from "../../utils/text.ts";
+import type { LayerManager } from "../layer/layerManager";
+import { logManager } from "../system/logManager.ts";
+import type { EntityPositionCallback, EntityPositionManager } from "./entityPositionManager";
 
 const LABEL_FONT_SIZE_PX = 12;
 const LABEL_LINE_HEIGHT_PX = 14;

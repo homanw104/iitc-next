@@ -1,5 +1,6 @@
+import { RESO_LEVEL_ENERGY } from "../../../types/ingress.ts";
+import type { PortalData} from "../../../types/ingress.ts";
 import { h, Fragment } from "../../../utils/dom.ts";
-import { PortalData, RESO_LEVEL_ENERGY } from "../../../types/ingress.ts";
 
 const PortalResonators = ({ data, teamColorHex }: { data: PortalData, teamColorHex: string }) => (
   <div style={{ alignSelf: "stretch" }}>

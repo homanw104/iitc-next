@@ -1,9 +1,9 @@
+import type { LogEntry } from "../../managers/system/logManager.ts";
 import { h } from "../../utils/dom.ts";
-import { LogEntry } from "../../managers/system/logManager.ts";
+import SplashDivider from "./SplashDivider.tsx";
+import SplashInitText from "./SplashInitText.tsx";
 import SplashMessage from "./SplashMessage.tsx";
 import SplashTitle from "./SplashTitle.tsx";
-import SplashInitText from "./SplashInitText.tsx";
-import SplashDivider from "./SplashDivider.tsx";
 
 const SplashScreen = ({ logEntries, fadeOutMs, onLogGridRef }: {
   logEntries: LogEntry[];

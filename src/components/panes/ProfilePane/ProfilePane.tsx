@@ -1,13 +1,13 @@
-import { h } from "../../../utils/dom.ts";
 import { playerInfoManager } from "../../../managers/game/playerInfoManager.ts";
-import { ScoreManager } from "../../../managers/game/scoreManager.ts";
-import { RedeemManager } from "../../../managers/game/redeemManager.ts";
+import type { RedeemManager } from "../../../managers/game/redeemManager.ts";
+import type { ScoreManager } from "../../../managers/game/scoreManager.ts";
+import { h } from "../../../utils/dom.ts";
+import CloseButton from "../../atoms/CloseButton/CloseButton.tsx";
+import GameRedeem from "./GameRedeem.tsx";
+import GameScore from "./GameScore.tsx";
 import PlayerInfo from "./PlayerInfo.tsx";
 import PlayerStatus from "./PlayerStatus.tsx";
-import GameScore from "./GameScore.tsx";
-import GameRedeem from "./GameRedeem.tsx";
 import ProfilePaneButtonBar from "./ProfilePaneButtonBar.tsx";
-import CloseButton from "../../atoms/CloseButton/CloseButton.tsx";
 
 const ProfilePane = ({
   scoreManager,

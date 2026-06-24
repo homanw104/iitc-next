@@ -3,14 +3,14 @@
  */
 
 import * as Cesium from "cesium";
-import { PortalData } from "../../types/ingress";
-import { EntityPositionManager, EntityPositionCallback } from "./entityPositionManager";
-import { LayerManager } from "../layer/layerManager";
-import { getTeamColor } from "../../utils/color";
 import { intelApiClient } from "../../api/intelApiClient";
+import type { PortalData } from "../../types/ingress";
+import { getTeamColor } from "../../utils/color";
+import type { LayerManager } from "../layer/layerManager";
 import { settingsManager } from "../system/settingsManager.ts";
-import { EntityTranslucencyManager } from "./entityTranslucencyManager";
 import { parsePortal } from "../tiles/tileRequestEntityParser";
+import type { EntityPositionManager, EntityPositionCallback } from "./entityPositionManager";
+import type { EntityTranslucencyManager } from "./entityTranslucencyManager";
 
 export const PORTAL_POINT_PIXEL_SIZE = 16;
 export const PORTAL_POINT_OUTLINE_WIDTH = 2;

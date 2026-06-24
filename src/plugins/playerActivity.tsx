@@ -6,13 +6,13 @@
  */
 
 import * as Cesium from "cesium";
+import type { EntityCoordinates, EntityPositionCallback } from "../managers/entity/entityPositionManager";
+import type { IITCCore } from "../types/iitc";
+import type { Team } from "../types/ingress";
+import type { PlextMark } from "../types/intelApi";
+import { getTeamColor } from "../utils/color";
 import { h } from "../utils/dom.ts";
 import { safeWindow } from "../utils/window";
-import { getTeamColor } from "../utils/color";
-import type { Team } from "../types/ingress";
-import type { IITCCore } from "../types/iitc";
-import type { PlextMark } from "../types/intelApi";
-import type { EntityCoordinates, EntityPositionCallback } from "../managers/entity/entityPositionManager";
 
 const LOG_TAG = "PlayerActivityPlugin";
 const PLAYER_ACTIVITY_ENL_LAYER_NAME = "Player Activity Enl";

@@ -2,7 +2,7 @@
  * Typed client for Intel API requests and response normalization.
  */
 
-import { apiRequest } from "../utils/network";
+import type { TileResponse } from "../types/ingress";
 import type {
   GameScoreResponse,
   GetPlextsPayload,
@@ -15,7 +15,7 @@ import type {
   SendPlextPayload,
   SendPlextResponse,
 } from "../types/intelApi";
-import type { TileResponse } from "../types/ingress";
+import { apiRequest } from "../utils/network";
 
 const DEFAULT_MAX_RETRIES = 3;
 

@@ -1,7 +1,7 @@
-import { h } from "../../../utils/dom.ts";
-import { getTeamColor } from "../../../utils/color.ts";
-import { PortalData } from "../../../types/ingress.ts";
 import type { PortalDetailPaneController } from "../../../controllers/PortalDetailPaneController.tsx";
+import type { PortalData } from "../../../types/ingress.ts";
+import { getTeamColor } from "../../../utils/color.ts";
+import { h } from "../../../utils/dom.ts";
 
 const PortalDetailBar = ({ portalDetailPaneController, data, msg }: {
   portalDetailPaneController: PortalDetailPaneController,

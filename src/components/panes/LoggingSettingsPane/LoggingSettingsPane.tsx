@@ -1,6 +1,6 @@
-import { h } from "../../../utils/dom.ts";
 import { logManager } from "../../../managers/system/logManager.ts";
 import { settingsManager } from "../../../managers/system/settingsManager.ts";
+import { h } from "../../../utils/dom.ts";
 import BackButton from "../../atoms/BackButton/BackButton.tsx";
 import CloseButton from "../../atoms/CloseButton/CloseButton.tsx";
 import RightArrowIcon from "../SettingsPane/RightArrowIcon.tsx";

@@ -1,7 +1,7 @@
 import { h } from "../../../utils/dom.ts";
-import AboutPaneButtonBar from "./AboutPaneButtonBar.tsx";
-import CloseButton from "../../atoms/CloseButton/CloseButton.tsx";
 import BackButton from "../../atoms/BackButton/BackButton.tsx";
+import CloseButton from "../../atoms/CloseButton/CloseButton.tsx";
+import AboutPaneButtonBar from "./AboutPaneButtonBar.tsx";
 
 const AboutPane = ({ onBack, onClose }: {
   onBack: () => void,

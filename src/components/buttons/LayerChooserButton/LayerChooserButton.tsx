@@ -1,5 +1,5 @@
+import type { LayerChooserPaneController } from "../../../controllers/LayerChooserPaneController.tsx";
 import { h } from "../../../utils/dom.ts";
-import { LayerChooserPaneController } from "../../../controllers/LayerChooserPaneController.tsx";
 
 const LayerChooserButton = ({ layerChooserPaneController }: {
   layerChooserPaneController: LayerChooserPaneController,

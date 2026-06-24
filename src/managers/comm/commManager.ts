@@ -2,11 +2,11 @@
  * Manages the comm messages and their storage.
  */
 
-import { intelApiClient } from "../../api/intelApiClient";
-import { logManager } from "../system/logManager";
 import * as Cesium from "cesium";
+import { intelApiClient } from "../../api/intelApiClient";
 import type { Channel } from "../../types/ingress";
 import type { CommResponseItem, GetPlextsPayload } from "../../types/intelApi";
+import { logManager } from "../system/logManager";
 
 const LOG_TAG = "CommManager";
 const MIN_COMM_BOUNDS_KM = 10;

@@ -2,27 +2,27 @@
  * Definitions of the iitc global object and plugin objects.
  */
 
-import * as Cesium from "cesium";
-import { LogManager } from "../managers/system/logManager";
-import { SettingsManager } from "../managers/system/settingsManager";
-import { PluginManager } from "../managers/system/pluginManager";
-import { LayerManager } from "../managers/layer/layerManager";
-import { SceneEventManager } from "../managers/system/sceneEventManager";
-import { EntityPositionManager } from "../managers/entity/entityPositionManager";
-import { EntityTranslucencyManager } from "../managers/entity/entityTranslucencyManager";
-import { PlayerInfoManager } from "../managers/game/playerInfoManager.ts";
-import { PortalEntityManager } from "../managers/entity/portalEntityManager";
-import { LinkEntityManager } from "../managers/entity/linkEntityManager";
-import { FieldEntityManager } from "../managers/entity/fieldEntityManager";
-import { PortalLabelEntityManager } from "../managers/entity/portalLabelEntityManager";
-import { PortalHistoryEntityManager } from "../managers/entity/portalHistoryEntityManager";
-import { ScoutHistoryEntityManager } from "../managers/entity/scoutHistoryEntityManager";
-import { TileRequestManager } from "../managers/tiles/tileRequestManager.ts";
-import { ScoreManager } from "../managers/game/scoreManager";
-import { RedeemManager } from "../managers/game/redeemManager";
-import { CommManager } from "../managers/comm/commManager";
-import { InterfaceManager } from "../managers/system/interfaceManager";
-import { PortalOrnamentEntityManager } from "../managers/entity/portalOrnamentEntityManager.ts";
+import type * as Cesium from "cesium";
+import type { CommManager } from "../managers/comm/commManager";
+import type { EntityPositionManager } from "../managers/entity/entityPositionManager";
+import type { EntityTranslucencyManager } from "../managers/entity/entityTranslucencyManager";
+import type { FieldEntityManager } from "../managers/entity/fieldEntityManager";
+import type { LinkEntityManager } from "../managers/entity/linkEntityManager";
+import type { PortalEntityManager } from "../managers/entity/portalEntityManager";
+import type { PortalHistoryEntityManager } from "../managers/entity/portalHistoryEntityManager";
+import type { PortalLabelEntityManager } from "../managers/entity/portalLabelEntityManager";
+import type { PortalOrnamentEntityManager } from "../managers/entity/portalOrnamentEntityManager.ts";
+import type { ScoutHistoryEntityManager } from "../managers/entity/scoutHistoryEntityManager";
+import type { PlayerInfoManager } from "../managers/game/playerInfoManager.ts";
+import type { RedeemManager } from "../managers/game/redeemManager";
+import type { ScoreManager } from "../managers/game/scoreManager";
+import type { LayerManager } from "../managers/layer/layerManager";
+import type { InterfaceManager } from "../managers/system/interfaceManager";
+import type { LogManager } from "../managers/system/logManager";
+import type { PluginManager } from "../managers/system/pluginManager";
+import type { SceneEventManager } from "../managers/system/sceneEventManager";
+import type { SettingsManager } from "../managers/system/settingsManager";
+import type { TileRequestManager } from "../managers/tiles/tileRequestManager.ts";
 
 export interface IITCPlugin {
   id: string;

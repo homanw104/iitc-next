@@ -1,7 +1,7 @@
 import SplashMessage from "../components/splash/SplashMessage.tsx";
 import SplashScreen from "../components/splash/SplashScreen.tsx";
-import type { LogEntry, LogEntryCallback } from "../managers/system/logManager";
 import { logManager } from "../managers/system/logManager";
+import type { LogEntry, LogEntryCallback } from "../managers/system/logManager";
 
 const FADE_OUT_MS = 200;
 

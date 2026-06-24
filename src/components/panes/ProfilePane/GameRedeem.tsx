@@ -1,5 +1,5 @@
+import type { RedeemManager } from "../../../managers/game/redeemManager.ts";
 import { h, Fragment } from "../../../utils/dom.ts";
-import { RedeemManager } from "../../../managers/game/redeemManager.ts";
 
 const GameRedeem = ({ redeemManager, onRedeemSuccess }: {
   redeemManager: RedeemManager,

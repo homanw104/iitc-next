@@ -2,9 +2,9 @@
  * Extract player information from the intel map.
  */
 
-import { Team } from "../types/ingress";
-import { logManager } from "../managers/system/logManager";
 import { playerInfoManager } from "../managers/game/playerInfoManager.ts";
+import { logManager } from "../managers/system/logManager";
+import type { Team } from "../types/ingress";
 import { safeWindow } from "../utils/window.ts";
 
 const LOG_TAG = "SetUpPlayerInfoManager";

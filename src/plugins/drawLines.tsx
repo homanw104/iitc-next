@@ -5,11 +5,11 @@
  */
 
 import "../types/iitc.ts";
-import { IITCCore } from "../types/iitc";
-import { safeWindow } from "../utils/window";
-import { h } from "../utils/dom.ts";
 import * as Cesium from "cesium";
+import type { IITCCore } from "../types/iitc";
+import { h } from "../utils/dom.ts";
 import { safeLocalStorage } from "../utils/storage.ts";
+import { safeWindow } from "../utils/window";
 
 const LOG_TAG = "DrawLines";
 const LINES_LAYER_NAME = "Draw Lines";

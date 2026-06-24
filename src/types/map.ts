@@ -2,7 +2,7 @@
  * Type definitions for the map.
  */
 
-import { FieldData, LinkData, PortalData } from "./ingress";
+import type { FieldData, LinkData, PortalData } from "./ingress";
 
 export interface MapPosition {
   lat: number;

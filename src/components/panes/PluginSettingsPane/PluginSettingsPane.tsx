@@ -1,5 +1,5 @@
-import { h } from "../../../utils/dom.ts";
 import { pluginManager } from "../../../managers/system/pluginManager.ts";
+import { h } from "../../../utils/dom.ts";
 import BackButton from "../../atoms/BackButton/BackButton.tsx";
 import CloseButton from "../../atoms/CloseButton/CloseButton.tsx";
 

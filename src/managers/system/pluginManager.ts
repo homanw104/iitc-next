@@ -2,9 +2,9 @@
  * Manages the lifecycle and state of IITC plugins.
  */
 
-import { IITCPlugin } from "../../types/iitc";
-import { logManager } from "./logManager";
+import type { IITCPlugin } from "../../types/iitc";
 import { safeLocalStorage } from "../../utils/storage";
+import { logManager } from "./logManager";
 
 const LOG_TAG = "PluginManager";
 const ENABLED_PLUGINS_STORAGE_KEY = "iitc-enabled-plugins";

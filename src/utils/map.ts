@@ -3,7 +3,7 @@
  */
 
 import * as Cesium from "cesium";
-import { Cartesian2, Ellipsoid } from "cesium";
+import type { Cartesian2, Ellipsoid } from "cesium";
 
 export class AmapMercatorTilingScheme extends Cesium.WebMercatorTilingScheme {
   constructor(options: {

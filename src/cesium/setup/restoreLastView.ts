@@ -3,9 +3,9 @@
  */
 
 import * as Cesium from "cesium";
-import { getMapPosition } from "../../utils/browser";
-import { HEIGHT_AT_ZOOM_ZERO } from "../../managers/tiles/tileRequestMath";
 import { settingsManager } from "../../managers/system/settingsManager.ts";
+import { HEIGHT_AT_ZOOM_ZERO } from "../../managers/tiles/tileRequestMath";
+import { getMapPosition } from "../../utils/browser";
 
 const BASE_LAYER_STORAGE_KEY = "iitc-next-base-layer";
 const MINIMUM_RESTORED_CAMERA_GROUND_CLEARANCE_METERS = 200;

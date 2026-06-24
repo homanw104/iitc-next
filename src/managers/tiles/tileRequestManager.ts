@@ -2,16 +2,16 @@
  * Facade for view-based Intel tile loading.
  */
 
-import * as Cesium from "cesium";
-import { FieldEntityManager } from "../entity/fieldEntityManager";
-import { LinkEntityManager } from "../entity/linkEntityManager";
+import type * as Cesium from "cesium";
+import type { TileResponse } from "../../types/ingress";
+import type { FieldEntityManager } from "../entity/fieldEntityManager";
+import type { LinkEntityManager } from "../entity/linkEntityManager";
+import type { PortalEntityManager } from "../entity/portalEntityManager";
+import type { PortalHistoryEntityManager } from "../entity/portalHistoryEntityManager";
+import type { PortalLabelEntityManager } from "../entity/portalLabelEntityManager";
+import type { PortalOrnamentEntityManager } from "../entity/portalOrnamentEntityManager";
+import type { ScoutHistoryEntityManager } from "../entity/scoutHistoryEntityManager";
 import { logManager } from "../system/logManager";
-import { TileResponse } from "../../types/ingress";
-import { PortalEntityManager } from "../entity/portalEntityManager";
-import { PortalHistoryEntityManager } from "../entity/portalHistoryEntityManager";
-import { PortalLabelEntityManager } from "../entity/portalLabelEntityManager";
-import { PortalOrnamentEntityManager } from "../entity/portalOrnamentEntityManager";
-import { ScoutHistoryEntityManager } from "../entity/scoutHistoryEntityManager";
 import { settingsManager, type RefreshIntervalMs } from "../system/settingsManager";
 import { TileEntityHydrator } from "./tileRequestEntityHydrator";
 import { TileRequestQueue, type TileStatusCallback } from "./tileRequestQueue";

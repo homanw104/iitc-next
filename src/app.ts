@@ -2,20 +2,20 @@
  * Entry point of the application.
  */
 
-import { CoreManagers } from "./core/coreManagers.ts";
-import { SplashScreenController } from "./controllers/SplashScreenController.tsx";
-import { safeWindow } from "./utils/window";
-import { safeLocalStorage } from "./utils/storage";
-import setUpLogManager from "./procedures/setUpLogManager";
-import loadSplashScreen from "./procedures/loadSplashScreen.ts";
+import type { SplashScreenController } from "./controllers/SplashScreenController.tsx";
+import type { CoreManagers } from "./core/coreManagers.ts";
 import extractVersionString from "./procedures/extractVersionString";
-import setUpSettingsManager from "./procedures/setUpSettingsManager.ts";
-import setUpPlayerInfoManager from "./procedures/setUpPlayerInfoManager.ts";
 import getLoginStatus from "./procedures/getLoginStatus.ts";
-import loadCesiumViewer from "./procedures/loadCesiumViewer";
-import registerPlugins from "./procedures/registerPlugins";
 import initPlugins from "./procedures/initPlugins";
+import loadCesiumViewer from "./procedures/loadCesiumViewer";
+import loadSplashScreen from "./procedures/loadSplashScreen.ts";
+import registerPlugins from "./procedures/registerPlugins";
 import scheduleUnloadSplashScreen from "./procedures/scheduleUnloadSplashScreen.ts";
+import setUpLogManager from "./procedures/setUpLogManager";
+import setUpPlayerInfoManager from "./procedures/setUpPlayerInfoManager.ts";
+import setUpSettingsManager from "./procedures/setUpSettingsManager.ts";
+import { safeLocalStorage } from "./utils/storage";
+import { safeWindow } from "./utils/window";
 
 export interface AppContext {
   initStarted: boolean;

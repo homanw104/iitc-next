@@ -2,20 +2,20 @@
  * Wires Cesium screen-space events to IITC touch, pinch, and portal handlers.
  */
 
-import * as Cesium from "cesium";
 import { ScreenSpaceEventType } from "cesium";
-import type { PortalEntityManager } from "../../managers/entity/portalEntityManager.ts";
-import type { PortalLabelEntityManager } from "../../managers/entity/portalLabelEntityManager.ts";
-import type { PortalOrnamentEntityManager } from "../../managers/entity/portalOrnamentEntityManager.ts";
-import type { PortalHistoryEntityManager } from "../../managers/entity/portalHistoryEntityManager.ts";
-import type { ScoutHistoryEntityManager } from "../../managers/entity/scoutHistoryEntityManager.ts";
+import * as Cesium from "cesium";
 import type { PortalDetailPaneController } from "../../controllers/PortalDetailPaneController.tsx";
 import type { PortalDetailState } from "../../core/coreControllers.ts";
-import type { PortalSelectionState } from "../interaction/portals/portalSelection.ts";
-import { createInteractionGestureState } from "../interaction/state/interactionGestureState.ts";
-import { handlePortalSelection } from "../interaction/portals/portalSelection.ts";
+import type { PortalEntityManager } from "../../managers/entity/portalEntityManager.ts";
+import type { PortalHistoryEntityManager } from "../../managers/entity/portalHistoryEntityManager.ts";
+import type { PortalLabelEntityManager } from "../../managers/entity/portalLabelEntityManager.ts";
+import type { PortalOrnamentEntityManager } from "../../managers/entity/portalOrnamentEntityManager.ts";
+import type { ScoutHistoryEntityManager } from "../../managers/entity/scoutHistoryEntityManager.ts";
 import { createPinchGestureHandlers } from "../interaction/gestures/pinchGestureHandlers.ts";
 import { createTouchZoomHandlers } from "../interaction/gestures/touchZoomHandlers.ts";
+import { handlePortalSelection } from "../interaction/portals/portalSelection.ts";
+import type { PortalSelectionState } from "../interaction/portals/portalSelection.ts";
+import { createInteractionGestureState } from "../interaction/state/interactionGestureState.ts";
 
 const DOUBLE_TAP_THRESHOLD = 300; // ms
 

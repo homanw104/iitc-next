@@ -3,10 +3,10 @@
  */
 
 import * as Cesium from "cesium";
-import { FieldData, PortalData } from "../../types/ingress";
+import type { FieldData, PortalData } from "../../types/ingress";
 import { getTeamColor } from "../../utils/color";
-import { LayerManager } from "../layer/layerManager";
-import { PortalEntityManager } from "./portalEntityManager";
+import type { LayerManager } from "../layer/layerManager";
+import type { PortalEntityManager } from "./portalEntityManager";
 
 const FIELD_Z_INDEX = 0;
 const FIELD_CLASSIFICATION_TYPE = Cesium.ClassificationType.BOTH;

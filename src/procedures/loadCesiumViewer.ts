@@ -3,17 +3,17 @@
  */
 
 import type { AppContext } from "../app.ts";
-import { safeWindow } from "../utils/window";
-import { logManager } from "../managers/system/logManager";
-import { createCoreManagers, exposeCoreManagers } from "../core/coreManagers";
-import { mountCoreControllersAndUI } from "../core/coreControllers.ts";
+import { configureCameraControls } from "../cesium/setup/configureCameraControls.ts";
 import { createCesiumContainer } from "../cesium/setup/createCesiumContainer";
 import { initCesiumViewer } from "../cesium/setup/initCesiumViewer";
 import { restoreLastView } from "../cesium/setup/restoreLastView.ts";
-import { configureCameraControls } from "../cesium/setup/configureCameraControls.ts";
-import { setUpInteractionHandlers } from "../cesium/setup/setUpInteractionHandlers.ts";
 import { setUpEntityPositionRefresh } from "../cesium/setup/setUpEntityPositionRefresh.ts";
+import { setUpInteractionHandlers } from "../cesium/setup/setUpInteractionHandlers.ts";
 import { setUpTileUpdateWhenMove } from "../cesium/setup/setUpTileUpdateWhenMove.ts";
+import { mountCoreControllersAndUI } from "../core/coreControllers.ts";
+import { createCoreManagers, exposeCoreManagers } from "../core/coreManagers";
+import { logManager } from "../managers/system/logManager";
+import { safeWindow } from "../utils/window";
 
 const LOG_TAG = "LoadCesiumViewer";
 

@@ -1,14 +1,14 @@
-import { RedeemManager } from "../managers/game/redeemManager";
-import { ScoreManager } from "../managers/game/scoreManager";
-import { TileRequestManager } from "../managers/tiles/tileRequestManager.ts";
-import ProfilePane from "../components/panes/ProfilePane/ProfilePane.tsx";
-import PluginSettingsPane from "../components/panes/PluginSettingsPane/PluginSettingsPane.tsx";
-import SettingsPane from "../components/panes/SettingsPane/SettingsPane.tsx";
-import LoggingSettingsPane from "../components/panes/LoggingSettingsPane/LoggingSettingsPane.tsx";
-import RefreshIntervalSettingsPane from "../components/panes/RefreshIntervalSettingsPane/RefreshIntervalSettingsPane.tsx";
-import GoogleTilesSettingsPane from "../components/panes/GoogleTilesSettingsPane/GoogleTilesSettingsPane.tsx";
 import AboutPane from "../components/panes/AboutPane/AboutPane.tsx";
+import GoogleTilesSettingsPane from "../components/panes/GoogleTilesSettingsPane/GoogleTilesSettingsPane.tsx";
+import LoggingSettingsPane from "../components/panes/LoggingSettingsPane/LoggingSettingsPane.tsx";
+import PluginSettingsPane from "../components/panes/PluginSettingsPane/PluginSettingsPane.tsx";
+import ProfilePane from "../components/panes/ProfilePane/ProfilePane.tsx";
 import RedeemResultPane from "../components/panes/RedeemResultPane/RedeemResultPane";
+import RefreshIntervalSettingsPane from "../components/panes/RefreshIntervalSettingsPane/RefreshIntervalSettingsPane.tsx";
+import SettingsPane from "../components/panes/SettingsPane/SettingsPane.tsx";
+import type { RedeemManager } from "../managers/game/redeemManager";
+import type { ScoreManager } from "../managers/game/scoreManager";
+import type { TileRequestManager } from "../managers/tiles/tileRequestManager.ts";
 
 export class ProfilePaneController {
   private activePane: HTMLElement | null = null;

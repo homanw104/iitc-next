@@ -1,5 +1,5 @@
+import type { ProfilePaneController } from "../../../controllers/ProfilePaneController.tsx";
 import { h } from "../../../utils/dom.ts";
-import { ProfilePaneController } from "../../../controllers/ProfilePaneController.tsx";
 
 const ProfileButton = ({ gameDetailPaneController }: {
   gameDetailPaneController: ProfilePaneController,

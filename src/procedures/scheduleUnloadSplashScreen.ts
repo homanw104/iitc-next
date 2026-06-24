@@ -2,7 +2,7 @@
  * Hides the startup splash once the initial scene is ready.
  */
 
-import { AppContext } from "../app.ts";
+import type { AppContext } from "../app.ts";
 import { logManager } from "../managers/system/logManager.ts";
 
 const LOG_TAG = "ScheduleUnloadSplashScreen";

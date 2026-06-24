@@ -2,18 +2,18 @@
  * Applies parsed tile data to Cesium entity managers.
  */
 
-import * as Cesium from "cesium";
-import { FieldData, LinkData, PortalData, TileResponse } from "../../types/ingress";
-import { FieldEntityManager } from "../entity/fieldEntityManager";
-import { LinkEntityManager } from "../entity/linkEntityManager";
+import type * as Cesium from "cesium";
+import type { FieldData, LinkData, PortalData, TileResponse } from "../../types/ingress";
+import type { FieldEntityManager } from "../entity/fieldEntityManager";
+import type { LinkEntityManager } from "../entity/linkEntityManager";
+import type { PortalEntityManager } from "../entity/portalEntityManager";
+import type { PortalHistoryEntityManager } from "../entity/portalHistoryEntityManager";
+import type { PortalLabelEntityManager } from "../entity/portalLabelEntityManager";
+import type { PortalOrnamentEntityManager } from "../entity/portalOrnamentEntityManager";
+import type { ScoutHistoryEntityManager } from "../entity/scoutHistoryEntityManager";
 import { logManager } from "../system/logManager";
-import { PortalEntityManager } from "../entity/portalEntityManager";
-import { PortalHistoryEntityManager } from "../entity/portalHistoryEntityManager";
-import { PortalLabelEntityManager } from "../entity/portalLabelEntityManager";
-import { PortalOrnamentEntityManager } from "../entity/portalOrnamentEntityManager";
-import { ScoutHistoryEntityManager } from "../entity/scoutHistoryEntityManager";
-import type { TileRequestQueue } from "./tileRequestQueue";
 import { parseTileEntities } from "./tileRequestEntityParser";
+import type { TileRequestQueue } from "./tileRequestQueue";
 
 const LOG_TAG = "TileRequestEntityHydrator";
 const PORTAL_HYDRATION_BATCH_SIZE = 64;

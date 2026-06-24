@@ -3,12 +3,12 @@
  */
 
 import * as Cesium from "cesium";
-import type { InteractionGestureState } from "../state/interactionGestureState";
 import {
   keepCameraAboveRenderedSurface,
   MINIMUM_3D_TILE_CAMERA_CLEARANCE_METERS,
   panCameraByOrbitingGlobe,
 } from "../camera/cameraGestures";
+import type { InteractionGestureState } from "../state/interactionGestureState";
 
 const DRAG_THRESHOLD_PIXELS = 8;
 const DOUBLE_TAP_AND_DRAG_ZOOM_THRESHOLD_PIXELS = 4;

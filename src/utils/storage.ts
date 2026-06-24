@@ -4,8 +4,8 @@
  * Bridges with Capacitor Preferences for persistence on mobile.
  */
 
-import { Preferences } from "@capacitor/preferences";
 import { Capacitor } from "@capacitor/core";
+import { Preferences } from "@capacitor/preferences";
 import { logManager } from "../managers/system/logManager";
 
 const LOG_TAG = "Storage";

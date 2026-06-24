@@ -2,25 +2,25 @@
  * Creates and exposes the core managers that coordinate IITC runtime behavior.
  */
 
-import * as Cesium from "cesium";
-import type { IITCCore } from "../types/iitc";
-import { LayerManager } from "../managers/layer/layerManager";
+import type * as Cesium from "cesium";
+import { CommManager } from "../managers/comm/commManager";
+import { DebugTileEntityManager } from "../managers/entity/debugTileEntityManager";
 import { EntityPositionManager } from "../managers/entity/entityPositionManager";
 import { EntityTranslucencyManager } from "../managers/entity/entityTranslucencyManager";
-import { SceneEventManager } from "../managers/system/sceneEventManager";
+import { FieldEntityManager } from "../managers/entity/fieldEntityManager";
+import { LinkEntityManager } from "../managers/entity/linkEntityManager";
 import { PortalEntityManager } from "../managers/entity/portalEntityManager";
+import { PortalHistoryEntityManager } from "../managers/entity/portalHistoryEntityManager";
 import { PortalLabelEntityManager } from "../managers/entity/portalLabelEntityManager";
 import { PortalOrnamentEntityManager } from "../managers/entity/portalOrnamentEntityManager.ts";
-import { PortalHistoryEntityManager } from "../managers/entity/portalHistoryEntityManager";
 import { ScoutHistoryEntityManager } from "../managers/entity/scoutHistoryEntityManager";
-import { LinkEntityManager } from "../managers/entity/linkEntityManager";
-import { FieldEntityManager } from "../managers/entity/fieldEntityManager";
-import { DebugTileEntityManager } from "../managers/entity/debugTileEntityManager";
-import { TileRequestManager } from "../managers/tiles/tileRequestManager.ts";
-import { CommManager } from "../managers/comm/commManager";
-import { ScoreManager } from "../managers/game/scoreManager";
 import { RedeemManager } from "../managers/game/redeemManager";
+import { ScoreManager } from "../managers/game/scoreManager";
+import { LayerManager } from "../managers/layer/layerManager";
 import { InterfaceManager } from "../managers/system/interfaceManager";
+import { SceneEventManager } from "../managers/system/sceneEventManager";
+import { TileRequestManager } from "../managers/tiles/tileRequestManager.ts";
+import type { IITCCore } from "../types/iitc";
 
 export interface CoreManagers {
   layerManager: LayerManager;

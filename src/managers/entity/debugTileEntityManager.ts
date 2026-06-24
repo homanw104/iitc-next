@@ -4,10 +4,10 @@
  */
 
 import * as Cesium from "cesium";
-import { TileStatus } from "../tiles/tileRequestManager.ts";
-import { getMapZoomTileParameters, tileToLat, tileToLng } from "../tiles/tileRequestMath";
-import { LayerManager } from "../layer/layerManager";
+import type { LayerManager } from "../layer/layerManager";
 import { settingsManager } from "../system/settingsManager.ts";
+import type { TileStatus } from "../tiles/tileRequestManager.ts";
+import { getMapZoomTileParameters, tileToLat, tileToLng } from "../tiles/tileRequestMath";
 
 const DEBUG_TILE_CLASSIFICATION_TYPE = Cesium.ClassificationType.BOTH;
 

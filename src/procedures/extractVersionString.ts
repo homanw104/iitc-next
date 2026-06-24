@@ -5,8 +5,8 @@
  * e.g., /jsc/gen_dashboard_1359f9c6382cf1583dc7b8fa7021b573dcdccf6a.js
  */
 
-import { getApiVersion, setApiVersion } from "../utils/network";
 import { logManager } from "../managers/system/logManager";
+import { getApiVersion, setApiVersion } from "../utils/network";
 
 const LOG_TAG = "ExtractVersionString";
 const VERSION_STORAGE_KEY = "iitc-next-api-version";

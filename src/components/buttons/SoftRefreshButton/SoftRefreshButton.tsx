@@ -1,5 +1,5 @@
+import type { SoftRefreshButtonController } from "../../../controllers/SoftRefreshButtonController.tsx";
 import { h } from "../../../utils/dom.ts";
-import { SoftRefreshButtonController } from "../../../controllers/SoftRefreshButtonController.tsx";
 
 const SoftRefreshButton = ({ softRefreshButtonController }: {
   softRefreshButtonController: SoftRefreshButtonController,

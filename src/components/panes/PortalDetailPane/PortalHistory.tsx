@@ -1,5 +1,5 @@
+import type { PortalData } from "../../../types/ingress.ts";
 import { h } from "../../../utils/dom.ts";
-import { PortalData } from "../../../types/ingress.ts";
 
 const PortalHistory = ({ data }: { data: PortalData }) => (
   <div style={{ alignSelf: "stretch" }}>

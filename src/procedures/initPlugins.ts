@@ -2,9 +2,9 @@
  * Define procedures for loading plugins.
  */
 
-import { AppContext } from "../app.ts";
-import { pluginManager } from "../managers/system/pluginManager";
+import type { AppContext } from "../app.ts";
 import { logManager } from "../managers/system/logManager.ts";
+import { pluginManager } from "../managers/system/pluginManager";
 
 const LOG_TAG = "InitPlugins";
 

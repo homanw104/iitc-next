@@ -3,8 +3,8 @@
  */
 
 import { intelApiClient } from "../../api/intelApiClient";
-import { logManager } from "../system/logManager";
 import type { TileResponse } from "../../types/ingress";
+import { logManager } from "../system/logManager";
 
 const LOG_TAG = "TileRequestQueue";
 const MAX_REQUESTS: number = 5;

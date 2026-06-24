@@ -1,23 +1,23 @@
-import { Viewer } from "cesium";
-import { h } from "../../../utils/dom.ts";
-import { Channel } from "../../../types/ingress.ts";
-import { CommManager } from "../../../managers/comm/commManager.ts";
-import { PortalEntityManager } from "../../../managers/entity/portalEntityManager.ts";
-import { PortalHistoryEntityManager } from "../../../managers/entity/portalHistoryEntityManager.ts";
-import { ScoutHistoryEntityManager } from "../../../managers/entity/scoutHistoryEntityManager.ts";
-import { TileRequestManager } from "../../../managers/tiles/tileRequestManager.ts";
+import type { Viewer } from "cesium";
 import type { PortalDetailPaneController } from "../../../controllers/PortalDetailPaneController.tsx";
 import type { PortalDetailState } from "../../../core/coreControllers.ts";
-import CommSendButton from "./CommSendButton.tsx";
+import type { CommManager } from "../../../managers/comm/commManager.ts";
+import type { PortalEntityManager } from "../../../managers/entity/portalEntityManager.ts";
+import type { PortalHistoryEntityManager } from "../../../managers/entity/portalHistoryEntityManager.ts";
+import type { PortalLabelEntityManager } from "../../../managers/entity/portalLabelEntityManager.ts";
+import type { PortalOrnamentEntityManager } from "../../../managers/entity/portalOrnamentEntityManager.ts";
+import type { ScoutHistoryEntityManager } from "../../../managers/entity/scoutHistoryEntityManager.ts";
+import type { TileRequestManager } from "../../../managers/tiles/tileRequestManager.ts";
+import type { Channel } from "../../../types/ingress.ts";
+import { h } from "../../../utils/dom.ts";
 import CommCloseButton from "./CommCloseButton.tsx";
-import CommTextInput from "./CommTextInput.tsx";
+import CommDateDivider from "./CommDateDivider.tsx";
 import CommFetchLatestButton from "./CommFetchLatestButton.tsx";
 import CommLoadingIndicator from "./CommLoadingIndicator.tsx";
 import CommMessage from "./CommMessage.tsx";
+import CommSendButton from "./CommSendButton.tsx";
 import CommTab from "./CommTab.tsx";
-import CommDateDivider from "./CommDateDivider.tsx";
-import { PortalLabelEntityManager } from "../../../managers/entity/portalLabelEntityManager.ts";
-import { PortalOrnamentEntityManager } from "../../../managers/entity/portalOrnamentEntityManager.ts";
+import CommTextInput from "./CommTextInput.tsx";
 
 const CommPane = ({
   viewer,

@@ -1,5 +1,5 @@
+import type { Channel } from "../../../types/ingress.ts";
 import { h } from "../../../utils/dom.ts";
-import { Channel } from "../../../types/ingress.ts";
 
 const CommTab = ({ id, label, isActive, onClick }: {
   id: Channel;

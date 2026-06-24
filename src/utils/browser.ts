@@ -62,7 +62,7 @@ export function deleteCookie(name: string): void {
  *
  * @return {MapPosition?} - Position of the map or undefined if it cannot be found.
  */
-import { MapPosition } from "../types/map";
+import type { MapPosition } from "../types/map";
 
 export function getMapPosition(): MapPosition | undefined {
   let lat: number, lng: number, zoom: number;

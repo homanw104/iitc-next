@@ -1,17 +1,17 @@
-import { Viewer } from "cesium";
-import { h } from "../utils/dom";
-import { Channel } from "../types/ingress";
-import { CommManager } from "../managers/comm/commManager";
-import { PortalEntityManager } from "../managers/entity/portalEntityManager";
-import { PortalLabelEntityManager } from "../managers/entity/portalLabelEntityManager.ts";
-import { PortalOrnamentEntityManager } from "../managers/entity/portalOrnamentEntityManager.ts";
-import { PortalHistoryEntityManager } from "../managers/entity/portalHistoryEntityManager";
-import { ScoutHistoryEntityManager } from "../managers/entity/scoutHistoryEntityManager";
-import { TileRequestManager } from "../managers/tiles/tileRequestManager.ts";
-import { logManager } from "../managers/system/logManager";
+import type { Viewer } from "cesium";
 import CommPane from "../components/panes/CommPane/CommPane.tsx";
-import type { PortalDetailPaneController } from "./PortalDetailPaneController.tsx";
 import type { PortalDetailState } from "../core/coreControllers";
+import type { CommManager } from "../managers/comm/commManager";
+import type { PortalEntityManager } from "../managers/entity/portalEntityManager";
+import type { PortalHistoryEntityManager } from "../managers/entity/portalHistoryEntityManager";
+import type { PortalLabelEntityManager } from "../managers/entity/portalLabelEntityManager.ts";
+import type { PortalOrnamentEntityManager } from "../managers/entity/portalOrnamentEntityManager.ts";
+import type { ScoutHistoryEntityManager } from "../managers/entity/scoutHistoryEntityManager";
+import { logManager } from "../managers/system/logManager";
+import type { TileRequestManager } from "../managers/tiles/tileRequestManager.ts";
+import type { Channel } from "../types/ingress";
+import { h } from "../utils/dom";
+import type { PortalDetailPaneController } from "./PortalDetailPaneController.tsx";
 
 const LOG_TAG = "CommPaneController";
 

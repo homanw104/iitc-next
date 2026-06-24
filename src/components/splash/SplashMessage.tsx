@@ -1,5 +1,5 @@
+import type { LogEntry } from "../../managers/system/logManager.ts";
 import { h } from "../../utils/dom.ts";
-import { LogEntry } from "../../managers/system/logManager.ts";
 
 const SplashMessage = ({ logEntry }: {
   logEntry: LogEntry,

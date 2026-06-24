@@ -2,8 +2,8 @@
  * Converts raw Intel tile entities into typed map entities.
  */
 
-import { FieldData, LinkData, PortalData, PortalLevel, PortalMod, PortalResonator, RawEntity } from "../../types/ingress";
-import { ParsedEntities } from "../../types/map";
+import type { FieldData, LinkData, PortalData, PortalLevel, PortalMod, PortalResonator, RawEntity } from "../../types/ingress";
+import type { ParsedEntities } from "../../types/map";
 
 export function parseTileEntities(entities: RawEntity[]): ParsedEntities {
   const portals: PortalData[] = [];

@@ -1,7 +1,7 @@
-import * as Cesium from "cesium";
 import { Cartesian3 } from "cesium";
-import { h } from "../../../utils/dom.ts";
+import type * as Cesium from "cesium";
 import { logManager } from "../../../managers/system/logManager.ts";
+import { h } from "../../../utils/dom.ts";
 
 const LOG_TAG = "GetLocationButton";
 

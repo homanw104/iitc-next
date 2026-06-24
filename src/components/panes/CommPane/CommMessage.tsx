@@ -1,18 +1,18 @@
 import * as Cesium from "cesium";
-import { Viewer } from "cesium";
-import { h } from "../../../utils/dom.ts";
-import { getTeamColor } from "../../../utils/color.ts";
-import { CommResponseItem } from "../../../types/intelApi.ts";
-import { PortalEntityManager } from "../../../managers/entity/portalEntityManager.ts";
-import { PortalHistoryEntityManager } from "../../../managers/entity/portalHistoryEntityManager.ts";
-import { ScoutHistoryEntityManager } from "../../../managers/entity/scoutHistoryEntityManager.ts";
-import { TileRequestManager } from "../../../managers/tiles/tileRequestManager.ts";
-import { Channel } from "../../../types/ingress.ts";
-import PortalDetailBar from "../../buttons/PortalDetailBar/PortalDetailBar.tsx";
+import type { Viewer } from "cesium";
 import type { PortalDetailPaneController } from "../../../controllers/PortalDetailPaneController.tsx";
 import type { PortalDetailState } from "../../../core/coreControllers.ts";
-import { PortalLabelEntityManager } from "../../../managers/entity/portalLabelEntityManager.ts";
-import { PortalOrnamentEntityManager } from "../../../managers/entity/portalOrnamentEntityManager.ts";
+import type { PortalEntityManager } from "../../../managers/entity/portalEntityManager.ts";
+import type { PortalHistoryEntityManager } from "../../../managers/entity/portalHistoryEntityManager.ts";
+import type { PortalLabelEntityManager } from "../../../managers/entity/portalLabelEntityManager.ts";
+import type { PortalOrnamentEntityManager } from "../../../managers/entity/portalOrnamentEntityManager.ts";
+import type { ScoutHistoryEntityManager } from "../../../managers/entity/scoutHistoryEntityManager.ts";
+import type { TileRequestManager } from "../../../managers/tiles/tileRequestManager.ts";
+import type { Channel } from "../../../types/ingress.ts";
+import type { CommResponseItem } from "../../../types/intelApi.ts";
+import { getTeamColor } from "../../../utils/color.ts";
+import { h } from "../../../utils/dom.ts";
+import PortalDetailBar from "../../buttons/PortalDetailBar/PortalDetailBar.tsx";
 
 let latestPortalSelectionRequest = 0;
 

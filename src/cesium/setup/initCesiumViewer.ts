@@ -4,9 +4,9 @@
 
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import * as Cesium from "cesium";
-import { AmapMercatorTilingScheme } from "../../utils/map";
 import { logManager } from "../../managers/system/logManager";
 import { settingsManager, type Google3dTilesRenderQuality } from "../../managers/system/settingsManager";
+import { AmapMercatorTilingScheme } from "../../utils/map";
 
 // Tell Cesium where to find its assets (Images, Workers, etc.).
 // Since we use the CDN for the main library, we should also use it for assets.
