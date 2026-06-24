@@ -61,12 +61,12 @@ export class FieldEntityManager {
 
   private async addPlaceholderPortals(fields: FieldData[]): Promise<void> {
     const placeholders = new Map<string, PortalData>();
+    const portalUpdates: Promise<void>[] = [];
     fields.forEach((field) => {
       field.points.forEach((point) => {
         const data = this.portalManager.getPortalData(point.guid);
         if (data) {
-          (data.fields ??= []).push(field);
-          this.portalManager.addOrUpdatePortal(data);
+          if (addPortalField(data, field)) portalUpdates.push(this.portalManager.addOrUpdatePortal(data));
         } else {
           setNewestPlaceholder(placeholders, {
             guid: point.guid,
@@ -80,6 +80,8 @@ export class FieldEntityManager {
         }
       });
     });
+
+    await Promise.all(portalUpdates);
 
     if (placeholders.size === 0) return;
 
@@ -170,7 +172,23 @@ function getFieldLayerId(data: FieldData): string {
 
 function setNewestPlaceholder(placeholders: Map<string, PortalData>, placeholder: PortalData): void {
   const existing = placeholders.get(placeholder.guid);
-  if (!existing || placeholder.timestamp > existing.timestamp) {
+  if (!existing) {
     placeholders.set(placeholder.guid, placeholder);
+    return;
   }
+
+  placeholder.fields?.forEach((field) => addPortalField(existing, field));
+  if (placeholder.timestamp > existing.timestamp) {
+    existing.team = placeholder.team;
+    existing.latE6 = placeholder.latE6;
+    existing.lngE6 = placeholder.lngE6;
+    existing.timestamp = placeholder.timestamp;
+  }
+}
+
+function addPortalField(portal: PortalData, field: FieldData): boolean {
+  if (portal.fields?.some((existingField) => existingField.guid === field.guid)) return false;
+
+  (portal.fields ??= []).push(field);
+  return true;
 }

@@ -58,11 +58,11 @@ export class LinkEntityManager {
 
   private async addPlaceholderPortals(links: LinkData[]): Promise<void> {
     const placeholders = new Map<string, PortalData>();
+    const portalUpdates: Promise<void>[] = [];
     links.forEach((link) => {
       const outPortalData = this.portalManager.getPortalData(link.oGuid);
       if (outPortalData) {
-        (outPortalData.links ??= []).push(link);
-        this.portalManager.addOrUpdatePortal(outPortalData);
+        if (addPortalLink(outPortalData, link)) portalUpdates.push(this.portalManager.addOrUpdatePortal(outPortalData));
       } else {
         setNewestPlaceholder(placeholders, {
           guid: link.oGuid,
@@ -77,8 +77,7 @@ export class LinkEntityManager {
 
       const inPortalData = this.portalManager.getPortalData(link.dGuid);
       if (inPortalData) {
-        (inPortalData.links ??= []).push(link);
-        this.portalManager.addOrUpdatePortal(inPortalData);
+        if (addPortalLink(inPortalData, link)) portalUpdates.push(this.portalManager.addOrUpdatePortal(inPortalData));
       } else {
         setNewestPlaceholder(placeholders, {
           guid: link.dGuid,
@@ -91,6 +90,8 @@ export class LinkEntityManager {
         });
       }
     });
+
+    await Promise.all(portalUpdates);
 
     if (placeholders.size === 0) return;
 
@@ -179,7 +180,23 @@ function getLinkLayerId(data: LinkData): string {
 
 function setNewestPlaceholder(placeholders: Map<string, PortalData>, placeholder: PortalData): void {
   const existing = placeholders.get(placeholder.guid);
-  if (!existing || placeholder.timestamp > existing.timestamp) {
+  if (!existing) {
     placeholders.set(placeholder.guid, placeholder);
+    return;
   }
+
+  placeholder.links?.forEach((link) => addPortalLink(existing, link));
+  if (placeholder.timestamp > existing.timestamp) {
+    existing.team = placeholder.team;
+    existing.latE6 = placeholder.latE6;
+    existing.lngE6 = placeholder.lngE6;
+    existing.timestamp = placeholder.timestamp;
+  }
+}
+
+function addPortalLink(portal: PortalData, link: LinkData): boolean {
+  if (portal.links?.some((existingLink) => existingLink.guid === link.guid)) return false;
+
+  (portal.links ??= []).push(link);
+  return true;
 }

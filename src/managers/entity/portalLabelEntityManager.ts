@@ -53,6 +53,7 @@ interface Label {
   wrappedText: string;
   screenBoxWidth: number;
   screenBoxHeight: number;
+  linkCount: number;
   opacity: number;
   targetOpacity: number;
   fadeStartOpacity: number;
@@ -69,6 +70,9 @@ interface LabelScreenBounds {
 interface LabelOverlapCandidate {
   guid: string;
   bounds: LabelScreenBounds;
+  linkCount: number;
+  level: number;
+  isCurrentlyVisible: boolean;
   distance: number;
 }
 
@@ -150,6 +154,7 @@ export class PortalLabelEntityManager {
       existing.wrappedText = layout.wrappedText;
       existing.screenBoxWidth = layout.screenBoxWidth;
       existing.screenBoxHeight = layout.screenBoxHeight;
+      existing.linkCount = getPortalLinkCount(data);
       existing.data = data;
       this.queueAllVisibilityUpdates(true);
     } else {
@@ -170,6 +175,7 @@ export class PortalLabelEntityManager {
           wrappedText: layout.wrappedText,
           screenBoxWidth: layout.screenBoxWidth,
           screenBoxHeight: layout.screenBoxHeight,
+          linkCount: getPortalLinkCount(data),
           opacity: LABEL_INITIAL_OPACITY,
           targetOpacity: LABEL_INITIAL_OPACITY,
           fadeStartOpacity: LABEL_INITIAL_OPACITY,
@@ -514,11 +520,14 @@ function getNonOverlappingLabelGuids(
     candidates.push({
       guid,
       bounds,
+      linkCount: label.linkCount,
+      level: label.data.level ?? 0,
+      isCurrentlyVisible: isLabelCurrentlyVisible(label),
       distance: Cesium.Cartesian3.distance(viewer.camera.positionWC, labelPosition),
     });
   });
 
-  candidates.sort((a, b) => a.distance - b.distance || a.guid.localeCompare(b.guid));
+  candidates.sort(compareLabelOverlapCandidates);
 
   const acceptedGuids = new Set<string>();
   const acceptedBoundsGrid = new Map<string, LabelOverlapCandidate[]>();
@@ -529,6 +538,24 @@ function getNonOverlappingLabelGuids(
     addAcceptedCandidateToGrid(candidate, acceptedBoundsGrid);
   });
   return acceptedGuids;
+}
+
+function compareLabelOverlapCandidates(a: LabelOverlapCandidate, b: LabelOverlapCandidate): number {
+  return b.linkCount - a.linkCount ||
+    b.level - a.level ||
+    a.distance - b.distance ||
+    Number(b.isCurrentlyVisible) - Number(a.isCurrentlyVisible) ||
+    a.guid.localeCompare(b.guid);
+}
+
+function getPortalLinkCount(data: PortalData): number {
+  if (!data.links) return 0;
+
+  return new Set(data.links.map((link) => link.guid)).size;
+}
+
+function isLabelCurrentlyVisible(label: Label): boolean {
+  return label.entity.show && label.targetOpacity === LABEL_VISIBLE_OPACITY;
 }
 
 function getLabelPosition(label: Label, time: Cesium.JulianDate): Cesium.Cartesian3 | undefined {
