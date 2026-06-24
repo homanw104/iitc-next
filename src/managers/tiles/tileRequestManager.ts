@@ -6,6 +6,7 @@ import * as Cesium from "cesium";
 import { FieldEntityManager } from "../entity/fieldEntityManager";
 import { LinkEntityManager } from "../entity/linkEntityManager";
 import { logManager } from "../system/logManager";
+import { TileResponse } from "../../types/ingress";
 import { PortalEntityManager } from "../entity/portalEntityManager";
 import { PortalHistoryEntityManager } from "../entity/portalHistoryEntityManager";
 import { PortalLabelEntityManager } from "../entity/portalLabelEntityManager";
@@ -97,7 +98,7 @@ export class TileRequestManager {
   }
 
   private handleQueuedResponse = async (
-    response: unknown,
+    response: TileResponse,
     tileKeys: string[],
     refreshExisting: boolean
   ): Promise<void> => {

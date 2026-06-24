@@ -4,6 +4,7 @@
 
 import * as Cesium from "cesium";
 import { TileResponse } from "../../types/ingress";
+import { ParsedEntities } from "../../types/map";
 import { FieldEntityManager } from "../entity/fieldEntityManager";
 import { LinkEntityManager } from "../entity/linkEntityManager";
 import { logManager } from "../system/logManager";
@@ -41,21 +42,26 @@ export class TileEntityHydrator {
   }
 
   public async handleResponse(data: TileResponse, tileKeys: string[], queue: TileRequestQueue): Promise<void> {
-    if (!data || !data.result) {
+    if (!data || !data.result?.map) {
       logManager.warn(LOG_TAG, "Invalid response data:", data);
       tileKeys.forEach((key) => {
-        queue.forgetRequestedTiles([key]);
+        queue.forgetRequestedTile(key);
         queue.setTileStatus(key, "error");
       });
       return;
     }
 
     let entitiesFound = 0;
+    const entitiesToHydrate: ParsedEntities = {
+      portals: [],
+      links: [],
+      fields: [],
+    };
 
     for (const tileKey of tileKeys) {
       const tileData = data.result.map[tileKey];
       if (!tileData) {
-        queue.forgetRequestedTiles([tileKey]);
+        queue.forgetRequestedTile(tileKey);
         queue.setTileStatus(tileKey, "error");
         continue;
       }
@@ -69,7 +75,7 @@ export class TileEntityHydrator {
           logManager.warn(LOG_TAG, `Tile ${tileKey} failed: ${tileData.error}`);
           queue.setTileStatus(tileKey, "error");
         }
-        queue.forgetRequestedTiles([tileKey]);
+        queue.forgetRequestedTile(tileKey);
         continue;
       }
 
@@ -78,15 +84,19 @@ export class TileEntityHydrator {
       if (tileData.gameEntities) {
         entitiesFound += tileData.gameEntities.length;
         const { portals, links, fields } = parseTileEntities(tileData.gameEntities);
-        await Promise.all(portals.map((p) => this.portalEntityManager.addOrUpdatePortal(p)));
-        await Promise.all(portals.map((p) => this.portalLabelEntityManager.addOrUpdateLabel(p)));
-        await Promise.all(portals.map((p) => this.portalOrnamentEntityManager.addOrUpdateOrnament(p)));
-        await Promise.all(portals.map((p) => this.portalHistoryEntityManager.addOrUpdateHistoryHalo(p)));
-        await Promise.all(portals.map((p) => this.scoutHistoryEntityManager.addOrUpdateScoutControlHalo(p)));
-        links.forEach((l) => this.linkEntityManager.addOrUpdateLink(l));
-        fields.forEach((f) => this.fieldEntityManager.addOrUpdateField(f));
+        entitiesToHydrate.portals.push(...portals);
+        entitiesToHydrate.links.push(...links);
+        entitiesToHydrate.fields.push(...fields);
       }
     }
+
+    await Promise.all(entitiesToHydrate.portals.map((p) => this.portalEntityManager.addOrUpdatePortal(p)));
+    await Promise.all(entitiesToHydrate.portals.map((p) => this.portalLabelEntityManager.addOrUpdateLabel(p)));
+    await Promise.all(entitiesToHydrate.portals.map((p) => this.portalOrnamentEntityManager.addOrUpdateOrnament(p)));
+    await Promise.all(entitiesToHydrate.portals.map((p) => this.portalHistoryEntityManager.addOrUpdateHistoryHalo(p)));
+    await Promise.all(entitiesToHydrate.portals.map((p) => this.scoutHistoryEntityManager.addOrUpdateScoutControlHalo(p)));
+    entitiesToHydrate.links.forEach((l) => this.linkEntityManager.addOrUpdateLink(l));
+    entitiesToHydrate.fields.forEach((f) => this.fieldEntityManager.addOrUpdateField(f));
 
     logManager.debug(LOG_TAG, `Processed ${entitiesFound} entities`);
     this.viewer.scene.requestRender();

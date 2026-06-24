@@ -3,7 +3,7 @@
  */
 
 import * as Cesium from "cesium";
-import { FieldData, PortalData, RawEntity } from "../../types/ingress";
+import { FieldData, PortalData } from "../../types/ingress";
 import { getTeamColor } from "../../utils/color";
 import { LayerManager } from "../layer/layerManager";
 import { PortalEntityManager } from "./portalEntityManager";
@@ -129,24 +129,4 @@ function createFieldHierarchy(points: number[]): Cesium.PolygonHierarchy {
 function getFieldLayerId(data: FieldData): string {
   const team = data.team.toLowerCase();
   return `fields-${team}`;
-}
-
-export function parseField(ent: RawEntity): FieldData {
-  const [guid, timestamp, data] = ent;
-  const teamCode = data[1] as string;
-  const team = teamCode === "E" ? "ENLIGHTENED" :
-    teamCode === "R" ? "RESISTANCE" :
-      teamCode === "M" ? "MACHINA" : "NEUTRAL";
-  const points = (data[2] as unknown[][]).map((p) => ({
-    guid: p[0] as string,
-    latE6: p[1] as number,
-    lngE6: p[2] as number,
-  }));
-
-  return {
-    guid,
-    timestamp,
-    team,
-    points,
-  };
 }

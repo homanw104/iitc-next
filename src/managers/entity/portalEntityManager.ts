@@ -3,13 +3,14 @@
  */
 
 import * as Cesium from "cesium";
-import { PortalData, PortalLevel, PortalMod, PortalResonator, RawEntity } from "../../types/ingress";
+import { PortalData } from "../../types/ingress";
 import { EntityPositionManager, EntityPositionCallback } from "./entityPositionManager";
 import { LayerManager } from "../layer/layerManager";
 import { getTeamColor } from "../../utils/color";
 import { intelApiClient } from "../../api/intelApiClient";
 import { settingsManager } from "../system/settingsManager.ts";
 import { EntityTranslucencyManager } from "./entityTranslucencyManager";
+import { parsePortal } from "../tiles/tileRequestEntityParser";
 
 export const PORTAL_POINT_PIXEL_SIZE = 16;
 export const PORTAL_POINT_OUTLINE_WIDTH = 2;
@@ -215,70 +216,4 @@ export function getPortalDisableDepthTestDistance(): number {
   return settingsManager.getUseGoogle3dTiles() ?
     PORTAL_DISABLE_DEPTH_TEST_DISTANCE_GOOGLE :
     PORTAL_DISABLE_DEPTH_TEST_DISTANCE_DEFAULT;
-}
-
-export function parsePortal(ent: RawEntity): PortalData {
-  const [guid, timestamp, data] = ent;
-  const teamCode = data[1] as string;
-  const portal: PortalData = {
-    guid,
-    timestamp,
-    team: teamCode === "E" ? "ENLIGHTENED" :
-      teamCode === "R" ? "RESISTANCE" :
-        teamCode === "M" ? "MACHINA" : "NEUTRAL",
-    latE6: data[2] as number,
-    lngE6: data[3] as number,
-  };
-
-  if (data.length >= 14) {
-    portal.level = data[4] as PortalLevel;
-    portal.health = data[5] as number;
-    portal.resCount = data[6] as number;
-    portal.image = data[7] as string;
-    portal.title = data[8] as string;
-    if (Array.isArray(data[9])) {
-      portal.ornaments = data[9] as string[];
-    }
-  }
-
-  if (data.length >= 18) {
-    if (data[14]) {
-      portal.mods = (data[14] as unknown[]).map((m): PortalMod | null => {
-        if (!Array.isArray(m)) return null;
-        return {
-          owner: m[0] as string,
-          name: m[1] as string,
-          rarity: m[2] as string,
-          stats: m[3] as Record<string, string>,
-        };
-      });
-    }
-
-    if (data[15]) {
-      portal.resonators = (data[15] as unknown[]).map((r): PortalResonator | null => {
-        if (!Array.isArray(r)) return null;
-        return {
-          owner: r[0] as string,
-          level: r[1] as number,
-          energy: r[2] as number,
-        };
-      });
-    }
-
-    if (data[16]) {
-      portal.owner = data[16] as string | undefined;
-    }
-  }
-
-  if (data.length >= 19) {
-    const historyBitArray = (data[18] as number) || 0;
-    portal.history = {
-      _raw: historyBitArray,
-      visited: !!(historyBitArray & 1),
-      captured: !!(historyBitArray & 2),
-      scoutControlled: !!(historyBitArray & 4),
-    };
-  }
-
-  return portal;
 }

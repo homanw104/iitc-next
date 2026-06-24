@@ -14,6 +14,11 @@ export type TileStatus = "queued" | "requested" | "loaded" | "error";
 export type TileStatusCallback = (key: string, status: TileStatus) => void;
 export type TileResponseHandler = (response: TileResponse, tileKeys: string[], refreshExisting: boolean) => Promise<void>;
 
+interface TileRequestBatch {
+  tileKeys: string[];
+  refreshExisting: boolean;
+}
+
 export class TileRequestQueue {
   private activeRequestCount: number = 0;
   private queuedTiles: Set<string> = new Set();
@@ -71,8 +76,14 @@ export class TileRequestQueue {
     this.tileStatusListeners.forEach((cb) => cb(key, status));
   }
 
-  public forgetRequestedTiles(tileKeys: string[]): void {
-    tileKeys.forEach((key) => this.requestedTiles.delete(key));
+  public forgetRequestedTile(tileKey: string): void {
+    this.requestedTiles.delete(tileKey);
+  }
+
+  public forgetRequestedTiles(tileKeys: Iterable<string>): void {
+    for (const key of tileKeys) {
+      this.requestedTiles.delete(key);
+    }
   }
 
   private isIdle(): boolean {
@@ -95,11 +106,12 @@ export class TileRequestQueue {
       const shouldRefreshExisting = this.scheduledRefreshExisting;
       this.queueProcessingScheduled = false;
       this.scheduledRefreshExisting = false;
-      this.processQueue(shouldRefreshExisting).then(() => this.resolveIdleWaiters());
+      this.processQueue(shouldRefreshExisting);
+      this.resolveIdleWaiters();
     });
   }
 
-  private async processQueue(refreshExisting: boolean = false): Promise<void> {
+  private processQueue(refreshExisting: boolean = false): void {
     if (this.activeRequestCount >= MAX_REQUESTS) {
       logManager.info(LOG_TAG, `Max request count of ${MAX_REQUESTS} reached`);
       return;
@@ -111,29 +123,44 @@ export class TileRequestQueue {
       return;
     }
 
-    const tilesToRequest = Array.from(this.queuedTiles).slice(0, TILES_PER_REQUEST);
-    tilesToRequest.forEach((key) => {
+    let shouldRefreshExisting = refreshExisting;
+    while (this.activeRequestCount < MAX_REQUESTS && this.queuedTiles.size > 0) {
+      const batch = this.takeNextBatch(shouldRefreshExisting);
+      shouldRefreshExisting = false;
+      this.processBatch(batch).then();
+    }
+  }
+
+  private takeNextBatch(refreshExisting: boolean): TileRequestBatch {
+    const tileKeys: string[] = [];
+    for (const key of this.queuedTiles) {
+      tileKeys.push(key);
       this.queuedTiles.delete(key);
       this.requestedTiles.add(key);
       this.setTileStatus(key, "requested");
-    });
+      if (tileKeys.length >= TILES_PER_REQUEST) break;
+    }
 
+    return { tileKeys, refreshExisting };
+  }
+
+  private async processBatch(batch: TileRequestBatch): Promise<void> {
     this.activeRequestCount++;
 
-    logManager.debug(LOG_TAG, `Sending request for ${tilesToRequest.length} tiles`);
-    const size = this.queuedTiles.size + tilesToRequest.length;
+    logManager.debug(LOG_TAG, `Sending request for ${batch.tileKeys.length} tiles`);
+    const size = this.queuedTiles.size + batch.tileKeys.length;
     logManager.info(
       LOG_TAG,
       `Loading ${size} tile${size === 1 ? "" : "s"}`
     );
 
     try {
-      const response = await intelApiClient.getEntities(tilesToRequest);
-      logManager.debug(LOG_TAG, `Received response for ${tilesToRequest.length} tile${tilesToRequest.length === 1 ? "" : "s"}`);
-      await this.handleResponse(response, tilesToRequest, refreshExisting);
+      const response = await intelApiClient.getEntities(batch.tileKeys);
+      logManager.debug(LOG_TAG, `Received response for ${batch.tileKeys.length} tile${batch.tileKeys.length === 1 ? "" : "s"}`);
+      await this.handleResponse(response, batch.tileKeys, batch.refreshExisting);
     } catch (error) {
       logManager.error(LOG_TAG, "Tile request failed:", error);
-      tilesToRequest.forEach((key) => {
+      batch.tileKeys.forEach((key) => {
         this.requestedTiles.delete(key);
         this.setTileStatus(key, "error");
       });
