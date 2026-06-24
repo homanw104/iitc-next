@@ -5,6 +5,7 @@
 import * as Cesium from "cesium";
 import { PortalData } from "../types/ingress";
 import { EntityPositionCallback, EntityPositionManager } from "./entityPositionManager";
+import { EntityTranslucencyManager } from "./entityTranslucencyManager";
 import { LayerManager } from "./layerManager";
 import {
   PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
@@ -30,7 +31,8 @@ export class PortalLabelEntityManager {
 
   constructor(
     private layerManager: LayerManager,
-    private entityPositionManager: EntityPositionManager
+    private entityPositionManager: EntityPositionManager,
+    private entityTranslucencyManager: EntityTranslucencyManager
   ) {}
 
   public async addOrUpdateLabel(data: PortalData): Promise<void> {
@@ -125,7 +127,7 @@ export class PortalLabelEntityManager {
         horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
         pixelOffset: new Cesium.Cartesian2(0, LABEL_PIXEL_OFFSET_Y),
-        translucencyByDistance: LABEL_TRANSLUCENCY_NEAR_FAR_SCALAR,
+        translucencyByDistance: this.entityTranslucencyManager.getOccludedTranslucencyByDistance(),
       },
       properties: {
         selectable: false,

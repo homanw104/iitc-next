@@ -5,6 +5,7 @@
 import * as Cesium from "cesium";
 import { PortalData } from "../types/ingress";
 import { EntityPositionCallback, EntityPositionManager } from "./entityPositionManager";
+import { EntityTranslucencyManager } from "./entityTranslucencyManager";
 import { LayerManager } from "./layerManager";
 import {
   PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
@@ -33,7 +34,8 @@ export class PortalOrnamentEntityManager {
 
   constructor(
     private layerManager: LayerManager,
-    private entityPositionManager: EntityPositionManager
+    private entityPositionManager: EntityPositionManager,
+    private entityTranslucencyManager: EntityTranslucencyManager
   ) {}
 
   public async addOrUpdateOrnament(data: PortalData): Promise<void> {
@@ -103,7 +105,7 @@ export class PortalOrnamentEntityManager {
     });
 
     const occlusionEntity = entities.add({
-      id: `ornament-${data.guid}-occluded`,
+      id: `ornament-occluded-${data.guid}`,
       position: position,
       billboard: {
         image: getOrnamentImage(data),
@@ -113,7 +115,7 @@ export class PortalOrnamentEntityManager {
         horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
         verticalOrigin: Cesium.VerticalOrigin.CENTER,
         scaleByDistance: PORTAL_NEAR_FAR_SCALAR,
-        translucencyByDistance: PORTAL_NEAR_FAR_SCALAR,
+        translucencyByDistance: this.entityTranslucencyManager.getOccludedTranslucencyByDistance(),
       },
     });
     return { entity, occlusionEntity };

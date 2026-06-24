@@ -5,6 +5,7 @@
 import * as Cesium from "cesium";
 import { PortalData } from "../types/ingress";
 import { EntityPositionCallback, EntityPositionManager } from "./entityPositionManager";
+import { EntityTranslucencyManager } from "./entityTranslucencyManager";
 import { LayerManager } from "./layerManager";
 import {
   PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
@@ -40,7 +41,8 @@ export class PortalHistoryEntityManager {
 
   constructor(
     private layerManager: LayerManager,
-    private entityPositionManager: EntityPositionManager
+    private entityPositionManager: EntityPositionManager,
+    private entityTranslucencyManager: EntityTranslucencyManager
   ) {}
 
   public async addOrUpdateHistoryHalo(data: PortalData): Promise<void> {
@@ -124,7 +126,7 @@ export class PortalHistoryEntityManager {
           outlineColor: Cesium.Color.fromCssColorString(color).withAlpha(HALO_POINT_ALPHA * PORTAL_OCCLUDED_ALPHA),
           outlineWidth: HALO_POINT_OUTLINE_WIDTH,
           scaleByDistance: PORTAL_NEAR_FAR_SCALAR,
-          translucencyByDistance: PORTAL_NEAR_FAR_SCALAR,
+          translucencyByDistance: this.entityTranslucencyManager.getOccludedTranslucencyByDistance(),
           heightReference: Cesium.HeightReference.NONE,
           disableDepthTestDistance: PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
         },
@@ -156,7 +158,7 @@ export class PortalHistoryEntityManager {
           outlineColor: Cesium.Color.fromCssColorString(color).withAlpha(HALO_POINT_ALPHA * PORTAL_OCCLUDED_ALPHA),
           outlineWidth: HALO_POINT_OUTLINE_WIDTH,
           scaleByDistance: PORTAL_NEAR_FAR_SCALAR,
-          translucencyByDistance: PORTAL_NEAR_FAR_SCALAR,
+          translucencyByDistance: this.entityTranslucencyManager.getOccludedTranslucencyByDistance(),
           heightReference: Cesium.HeightReference.NONE,
           disableDepthTestDistance: PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
         },

@@ -6,6 +6,7 @@ import * as Cesium from "cesium";
 import type { IITCCore } from "../types/iitc";
 import { LayerManager } from "../managers/layerManager";
 import { EntityPositionManager } from "../managers/entityPositionManager";
+import { EntityTranslucencyManager } from "../managers/entityTranslucencyManager";
 import { SceneEventManager } from "../managers/sceneEventManager";
 import { PortalEntityManager } from "../managers/portalEntityManager";
 import { PortalLabelEntityManager } from "../managers/portalLabelEntityManager";
@@ -25,6 +26,7 @@ export interface CoreManagers {
   layerManager: LayerManager;
   sceneEventManager: SceneEventManager;
   entityPositionManager: EntityPositionManager;
+  entityTranslucencyManager: EntityTranslucencyManager;
   portalEntityManager: PortalEntityManager;
   portalLabelEntityManager: PortalLabelEntityManager;
   portalOrnamentEntityManager: PortalOrnamentEntityManager;
@@ -44,11 +46,12 @@ export function createCoreManagers(viewer: Cesium.Viewer, container: HTMLElement
   const layerManager = new LayerManager(viewer);
   const sceneEventManager = new SceneEventManager(viewer);
   const entityPositionManager = new EntityPositionManager(viewer, sceneEventManager);
-  const portalEntityManager = new PortalEntityManager(layerManager, entityPositionManager);
-  const portalLabelEntityManager = new PortalLabelEntityManager(layerManager, entityPositionManager);
-  const portalOrnamentEntityManager = new PortalOrnamentEntityManager(layerManager, entityPositionManager);
-  const portalHistoryEntityManager = new PortalHistoryEntityManager(layerManager, entityPositionManager);
-  const scoutHistoryEntityManager = new ScoutHistoryEntityManager(layerManager, entityPositionManager);
+  const entityTranslucencyManager = new EntityTranslucencyManager(viewer);
+  const portalEntityManager = new PortalEntityManager(layerManager, entityPositionManager, entityTranslucencyManager);
+  const portalLabelEntityManager = new PortalLabelEntityManager(layerManager, entityPositionManager, entityTranslucencyManager);
+  const portalOrnamentEntityManager = new PortalOrnamentEntityManager(layerManager, entityPositionManager, entityTranslucencyManager);
+  const portalHistoryEntityManager = new PortalHistoryEntityManager(layerManager, entityPositionManager, entityTranslucencyManager);
+  const scoutHistoryEntityManager = new ScoutHistoryEntityManager(layerManager, entityPositionManager, entityTranslucencyManager);
   const linkEntityManager = new LinkEntityManager(layerManager, portalEntityManager);
   const fieldEntityManager = new FieldEntityManager(layerManager, portalEntityManager);
   const debugTileEntityManager = new DebugTileEntityManager(viewer, layerManager);
@@ -64,6 +67,7 @@ export function createCoreManagers(viewer: Cesium.Viewer, container: HTMLElement
     layerManager,
     sceneEventManager,
     entityPositionManager,
+    entityTranslucencyManager,
     portalEntityManager,
     portalLabelEntityManager,
     portalOrnamentEntityManager,
@@ -85,6 +89,7 @@ export function exposeCoreManagers(iitc: IITCCore, viewer: Cesium.Viewer, manage
   iitc.layerManager = managers.layerManager;
   iitc.sceneEventManager = managers.sceneEventManager;
   iitc.entityPositionManager = managers.entityPositionManager;
+  iitc.entityTranslucencyManager = managers.entityTranslucencyManager;
   iitc.portalEntityManager = managers.portalEntityManager;
   iitc.portalLabelEntityManager = managers.portalLabelEntityManager;
   iitc.portalOrnamentEntityManager = managers.portalOrnamentEntityManager;

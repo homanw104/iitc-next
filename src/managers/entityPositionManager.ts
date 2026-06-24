@@ -441,14 +441,6 @@ function takeHeightKeyBatch(
 }
 
 function sampleRenderedGoogleHeight(scene: Cesium.Scene, cartographic: Cesium.Cartographic): number | undefined {
-  if (scene.sampleHeightSupported) {
-    try {
-      return scene.sampleHeight(cartographic);
-    } catch {
-      logManager.debug(LOG_TAG, "Rendered heights failed to load");
-    }
-  }
-
   const sceneWithGetHeight = scene as Cesium.Scene & {
     getHeight: (cartographic: Cesium.Cartographic, heightReference?: Cesium.HeightReference) => number | undefined;
   };

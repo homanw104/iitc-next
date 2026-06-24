@@ -9,6 +9,7 @@ import { PluginManager } from "../managers/pluginManager";
 import { LayerManager } from "../managers/layerManager";
 import { SceneEventManager } from "../managers/sceneEventManager";
 import { EntityPositionManager } from "../managers/entityPositionManager";
+import { EntityTranslucencyManager } from "../managers/entityTranslucencyManager";
 import { PlayerInfoManager } from "../managers/playerInfoManager.ts";
 import { PortalEntityManager } from "../managers/portalEntityManager";
 import { LinkEntityManager } from "../managers/linkEntityManager";
@@ -39,6 +40,7 @@ export interface IITCCore {
   layerManager?: LayerManager;
   sceneEventManager?: SceneEventManager;
   entityPositionManager?: EntityPositionManager;
+  entityTranslucencyManager?: EntityTranslucencyManager;
   playerInfoManager?: PlayerInfoManager;
   portalEntityManager?: PortalEntityManager;
   linkEntityManager?: LinkEntityManager;

@@ -9,6 +9,7 @@ import { LayerManager } from "./layerManager";
 import { getTeamColor } from "../utils/color";
 import { apiRequest } from "../utils/network";
 import { settingsManager } from "./settingsManager.ts";
+import { EntityTranslucencyManager } from "./entityTranslucencyManager";
 
 export const PORTAL_POINT_PIXEL_SIZE = 16;
 export const PORTAL_POINT_OUTLINE_WIDTH = 2;
@@ -63,7 +64,8 @@ export class PortalEntityManager {
 
   constructor(
     private layerManager: LayerManager,
-    private entityPositionManager: EntityPositionManager
+    private entityPositionManager: EntityPositionManager,
+    private entityTranslucencyManager: EntityTranslucencyManager
   ) {}
 
   public async requestPortalDetails(guid: string): Promise<void> {
@@ -167,7 +169,7 @@ export class PortalEntityManager {
         heightReference: Cesium.HeightReference.NONE,
         disableDepthTestDistance: PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
         scaleByDistance: PORTAL_NEAR_FAR_SCALAR,
-        translucencyByDistance: PORTAL_NEAR_FAR_SCALAR,
+        translucencyByDistance: this.entityTranslucencyManager.getOccludedTranslucencyByDistance(),
         color: getTeamColor(data.team).withAlpha(PORTAL_OCCLUDED_ALPHA),
         outlineColor: Cesium.Color.BLACK.withAlpha(PORTAL_OCCLUDED_ALPHA),
         outlineWidth: PORTAL_POINT_OUTLINE_WIDTH,
