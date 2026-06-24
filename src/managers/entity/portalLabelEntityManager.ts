@@ -58,6 +58,7 @@ interface Label {
   targetOpacity: number;
   fadeStartOpacity: number;
   fadeStartTime: number;
+  currentLayerId: string;
 }
 
 interface LabelScreenBounds {
@@ -143,12 +144,8 @@ export class PortalLabelEntityManager {
     const existing = this.labels.get(data.guid);
     if (existing) {
       const layout = getLabelTextLayout(data.title || "");
-      const oldLayerId = getPortalLabelLayerId(existing.data);
       const newLayerId = getPortalLabelLayerId(data);
-      if (oldLayerId !== newLayerId) {
-        this.layerManager.getOrCreateOverlay(oldLayerId).entities.remove(existing.entity);
-        this.layerManager.getOrCreateOverlay(newLayerId).entities.add(existing.entity);
-      }
+      this.moveLabelToLayer(existing, newLayerId);
       await this.updateLabelEntity(existing.entity, data, layout.wrappedText);
       this.updateLabelPositionSubscription(existing, data);
       existing.wrappedText = layout.wrappedText;
@@ -180,6 +177,7 @@ export class PortalLabelEntityManager {
           targetOpacity: LABEL_INITIAL_OPACITY,
           fadeStartOpacity: LABEL_INITIAL_OPACITY,
           fadeStartTime: 0,
+          currentLayerId: getPortalLabelLayerId(data),
         };
         setLabelColorCallbackProperties(label);
         this.labels.set(data.guid, label);
@@ -194,7 +192,7 @@ export class PortalLabelEntityManager {
     const layers = new Set<string>();
     portals.forEach((portal) => {
       const existing = this.labels.get(portal.guid);
-      if (existing) layers.add(getPortalLabelLayerId(existing.data));
+      if (existing) layers.add(existing.currentLayerId);
       if (portal.title) layers.add(getPortalLabelLayerId(portal));
     });
 
@@ -267,8 +265,7 @@ export class PortalLabelEntityManager {
   private removeLabelEntity(guid: string): void {
     const labelInfo = this.labels.get(guid);
     if (labelInfo) {
-      const layerId = getPortalLabelLayerId(labelInfo.data);
-      const entities = this.layerManager.getOrCreateOverlay(layerId).entities;
+      const entities = this.layerManager.getOrCreateOverlay(labelInfo.currentLayerId).entities;
 
       entities.remove(labelInfo.entity);
       this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(labelInfo.data, labelInfo.positionCallback);
@@ -290,7 +287,7 @@ export class PortalLabelEntityManager {
         const cartographic = Cesium.Cartographic.fromCartesian(position);
         if (Cesium.Rectangle.contains(viewRect, cartographic)) {
           toRemove.push(guid);
-          layers.add(getPortalLabelLayerId(info.data));
+          layers.add(info.currentLayerId);
         }
       }
     });
@@ -300,6 +297,14 @@ export class PortalLabelEntityManager {
       Array.from(layers, (name) => ({ name, type: "overlay" as const })),
       () => toRemove.forEach(guid => this.removeLabelEntity(guid))
     );
+  }
+
+  private moveLabelToLayer(labelInfo: Label, newLayerId: string): void {
+    if (labelInfo.currentLayerId === newLayerId) return;
+
+    this.layerManager.getOrCreateOverlay(labelInfo.currentLayerId).entities.remove(labelInfo.entity);
+    this.layerManager.getOrCreateOverlay(newLayerId).entities.add(labelInfo.entity);
+    labelInfo.currentLayerId = newLayerId;
   }
 
   private queueAllVisibilityUpdates(forceVisibilityRefresh = true): void {

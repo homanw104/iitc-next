@@ -26,17 +26,29 @@ interface Portal {
   entity: Cesium.Entity;
   occlusionEntity: Cesium.Entity;
   positionCallback: EntityPositionCallback;
+  currentLayerId: string;
+  pendingLayerId?: string;
 }
 
 export class PortalEntityManager {
   private portals: Map<string, Portal> = new Map();
   private portalsPendingCreation: Set<string> = new Set();
+  private selectedPortalGuid?: string;
 
   constructor(
+    private viewer: Cesium.Viewer,
     private layerManager: LayerManager,
     private entityPositionManager: EntityPositionManager,
     private entityTranslucencyManager: EntityTranslucencyManager
-  ) {}
+  ) {
+    this.viewer.selectedEntityChanged.addEventListener((selectedEntity) => {
+      const selectedPortalGuid = this.getSelectablePortalGuid(selectedEntity);
+      if (this.selectedPortalGuid && this.selectedPortalGuid !== selectedPortalGuid) {
+        this.flushPendingLayerMove(this.selectedPortalGuid);
+      }
+      this.selectedPortalGuid = selectedPortalGuid;
+    });
+  }
 
   public async requestPortalDetails(guid: string): Promise<void> {
     const data = await intelApiClient.getPortalDetails(guid);
@@ -52,7 +64,7 @@ export class PortalEntityManager {
     const layers = new Set<string>();
     portals.forEach((portal) => {
       const existing = this.portals.get(portal.guid);
-      if (existing) layers.add(getPortalLayerId(existing.data));
+      if (existing) layers.add(existing.currentLayerId);
       layers.add(getPortalLayerId(portal));
     });
 
@@ -73,13 +85,17 @@ export class PortalEntityManager {
         data.timestamp > existing.data.timestamp ||
         data.resonators
       ) {
-        const oldLayerId = getPortalLayerId(existing.data);
+        const oldLayerId = existing.currentLayerId;
         const newLayerId = getPortalLayerId(data);
         if (oldLayerId !== newLayerId) {
-          this.layerManager.getOrCreateDataSource(oldLayerId).entities.remove(existing.entity);
-          this.layerManager.getOrCreateDataSource(oldLayerId).entities.remove(existing.occlusionEntity);
-          this.layerManager.getOrCreateDataSource(newLayerId).entities.add(existing.entity);
-          this.layerManager.getOrCreateDataSource(newLayerId).entities.add(existing.occlusionEntity);
+          if (this.viewer.selectedEntity === existing.entity) {
+            existing.pendingLayerId = newLayerId;
+          } else {
+            this.movePortalToLayer(existing, newLayerId);
+            existing.pendingLayerId = undefined;
+          }
+        } else {
+          existing.pendingLayerId = undefined;
         }
         await this.updatePortalEntity(existing.entity, existing.occlusionEntity, data);
         this.updatePortalPositionSubscription(existing, data);
@@ -95,7 +111,13 @@ export class PortalEntityManager {
           occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
         };
         this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, positionCallback);
-        this.portals.set(data.guid, { data, entity, occlusionEntity, positionCallback });
+        this.portals.set(data.guid, {
+          data,
+          entity,
+          occlusionEntity,
+          positionCallback,
+          currentLayerId: getPortalLayerId(data),
+        });
       } finally {
         this.portalsPendingCreation.delete(data.guid);
       }
@@ -196,7 +218,7 @@ export class PortalEntityManager {
   private removePortalEntity(guid: string): void {
     const portalInfo = this.portals.get(guid);
     if (portalInfo) {
-      const layerId = getPortalLayerId(portalInfo.data);
+      const layerId = portalInfo.currentLayerId;
       const entities = this.layerManager.getOrCreateDataSource(layerId).entities;
 
       entities.remove(portalInfo.entity);
@@ -217,7 +239,7 @@ export class PortalEntityManager {
         const cartographic = Cesium.Cartographic.fromCartesian(position);
         if (Cesium.Rectangle.contains(viewRect, cartographic)) {
           toRemove.push(guid);
-          layers.add(getPortalLayerId(info.data));
+          layers.add(info.currentLayerId);
         }
       }
     });
@@ -227,6 +249,31 @@ export class PortalEntityManager {
       Array.from(layers, (name) => ({ name, type: "dataSource" as const })),
       () => toRemove.forEach(guid => this.removePortalEntity(guid))
     );
+  }
+
+  private getSelectablePortalGuid(entity: Cesium.Entity | undefined): string | undefined {
+    if (!entity?.id.startsWith("portal-")) return undefined;
+    if (!entity.properties?.selectable?.getValue()) return undefined;
+
+    return entity.id.substring(7);
+  }
+
+  private flushPendingLayerMove(guid: string): void {
+    const portalInfo = this.portals.get(guid);
+    if (!portalInfo?.pendingLayerId) return;
+
+    this.movePortalToLayer(portalInfo, portalInfo.pendingLayerId);
+    portalInfo.pendingLayerId = undefined;
+  }
+
+  private movePortalToLayer(portalInfo: Portal, newLayerId: string): void {
+    if (portalInfo.currentLayerId === newLayerId) return;
+
+    this.layerManager.getOrCreateDataSource(portalInfo.currentLayerId).entities.remove(portalInfo.entity);
+    this.layerManager.getOrCreateDataSource(portalInfo.currentLayerId).entities.remove(portalInfo.occlusionEntity);
+    this.layerManager.getOrCreateDataSource(newLayerId).entities.add(portalInfo.entity);
+    this.layerManager.getOrCreateDataSource(newLayerId).entities.add(portalInfo.occlusionEntity);
+    portalInfo.currentLayerId = newLayerId;
   }
 }
 

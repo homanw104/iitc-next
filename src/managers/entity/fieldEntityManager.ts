@@ -11,8 +11,14 @@ import { PortalEntityManager } from "./portalEntityManager";
 const FIELD_Z_INDEX = 0;
 const FIELD_CLASSIFICATION_TYPE = Cesium.ClassificationType.BOTH;
 
+interface Field {
+  data: FieldData;
+  entity: Cesium.Entity;
+  currentLayerId: string;
+}
+
 export class FieldEntityManager {
-  private fields: Map<string, { data: FieldData; entity: Cesium.Entity }> = new Map();
+  private fields: Map<string, Field> = new Map();
 
   constructor(private layerManager: LayerManager, private portalManager: PortalEntityManager) {}
 
@@ -22,7 +28,7 @@ export class FieldEntityManager {
     const layers = new Set<string>();
     fields.forEach((field) => {
       const existing = this.fields.get(field.guid);
-      if (existing) layers.add(getFieldLayerId(existing.data));
+      if (existing) layers.add(existing.currentLayerId);
       layers.add(getFieldLayerId(field));
     });
 
@@ -42,12 +48,8 @@ export class FieldEntityManager {
     const existing = this.fields.get(data.guid);
     if (existing) {
       if (data.timestamp > existing.data.timestamp) {
-        const oldLayerId = getFieldLayerId(existing.data);
         const newLayerId = getFieldLayerId(data);
-        if (oldLayerId !== newLayerId) {
-          this.layerManager.getOrCreateDataSource(oldLayerId).entities.remove(existing.entity);
-          this.layerManager.getOrCreateDataSource(newLayerId).entities.add(existing.entity);
-        }
+        this.moveFieldToLayer(existing, newLayerId);
         this.updateFieldEntity(existing.entity, data);
         existing.data = data;
       }
@@ -55,7 +57,7 @@ export class FieldEntityManager {
     }
 
     const entity = this.createFieldEntity(data);
-    this.fields.set(data.guid, { data, entity });
+    this.fields.set(data.guid, { data, entity, currentLayerId: getFieldLayerId(data) });
     return entity;
   }
 
@@ -91,8 +93,7 @@ export class FieldEntityManager {
   public removeField(guid: string): boolean {
     const fieldInfo = this.fields.get(guid);
     if (fieldInfo) {
-      const layerId = getFieldLayerId(fieldInfo.data);
-      this.layerManager.getOrCreateDataSource(layerId).entities.remove(fieldInfo.entity);
+      this.layerManager.getOrCreateDataSource(fieldInfo.currentLayerId).entities.remove(fieldInfo.entity);
       this.fields.delete(guid);
       return true;
     }
@@ -132,7 +133,7 @@ export class FieldEntityManager {
           const fieldRect = Cesium.Rectangle.fromCartographicArray(cartographics);
           if (Cesium.Rectangle.intersection(viewRect, fieldRect)) {
             toRemove.push(guid);
-            layers.add(getFieldLayerId(info.data));
+            layers.add(info.currentLayerId);
           }
         }
       }
@@ -158,6 +159,14 @@ export class FieldEntityManager {
       entity.polygon.classificationType = new Cesium.ConstantProperty(FIELD_CLASSIFICATION_TYPE);
       entity.polygon.zIndex = new Cesium.ConstantProperty(FIELD_Z_INDEX);
     }
+  }
+
+  private moveFieldToLayer(fieldInfo: Field, newLayerId: string): void {
+    if (fieldInfo.currentLayerId === newLayerId) return;
+
+    this.layerManager.getOrCreateDataSource(fieldInfo.currentLayerId).entities.remove(fieldInfo.entity);
+    this.layerManager.getOrCreateDataSource(newLayerId).entities.add(fieldInfo.entity);
+    fieldInfo.currentLayerId = newLayerId;
   }
 }
 

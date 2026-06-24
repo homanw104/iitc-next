@@ -8,8 +8,14 @@ import { getTeamColor } from "../../utils/color";
 import { LayerManager } from "../layer/layerManager";
 import { PortalEntityManager } from "./portalEntityManager";
 
+interface Link {
+  data: LinkData;
+  entity: Cesium.Entity;
+  currentLayerId: string;
+}
+
 export class LinkEntityManager {
-  private links: Map<string, { data: LinkData; entity: Cesium.Entity }> = new Map();
+  private links: Map<string, Link> = new Map();
 
   constructor(private layerManager: LayerManager, private portalManager: PortalEntityManager) {}
 
@@ -19,7 +25,7 @@ export class LinkEntityManager {
     const layers = new Set<string>();
     links.forEach((link) => {
       const existing = this.links.get(link.guid);
-      if (existing) layers.add(getLinkLayerId(existing.data));
+      if (existing) layers.add(existing.currentLayerId);
       layers.add(getLinkLayerId(link));
     });
 
@@ -39,12 +45,8 @@ export class LinkEntityManager {
     const existing = this.links.get(data.guid);
     if (existing) {
       if (data.timestamp > existing.data.timestamp) {
-        const oldLayerId = getLinkLayerId(existing.data);
         const newLayerId = getLinkLayerId(data);
-        if (oldLayerId !== newLayerId) {
-          this.layerManager.getOrCreateDataSource(oldLayerId).entities.remove(existing.entity);
-          this.layerManager.getOrCreateDataSource(newLayerId).entities.add(existing.entity);
-        }
+        this.moveLinkToLayer(existing, newLayerId);
         this.updateLinkEntity(existing.entity, data);
         existing.data = data;
       }
@@ -52,7 +54,7 @@ export class LinkEntityManager {
     }
 
     const entity = this.createLinkEntity(data);
-    this.links.set(data.guid, { data, entity });
+    this.links.set(data.guid, { data, entity, currentLayerId: getLinkLayerId(data) });
     return entity;
   }
 
@@ -101,8 +103,7 @@ export class LinkEntityManager {
   public removeLink(guid: string): boolean {
     const linkInfo = this.links.get(guid);
     if (linkInfo) {
-      const layerId = getLinkLayerId(linkInfo.data);
-      this.layerManager.getOrCreateDataSource(layerId).entities.remove(linkInfo.entity);
+      this.layerManager.getOrCreateDataSource(linkInfo.currentLayerId).entities.remove(linkInfo.entity);
       this.links.delete(guid);
       return true;
     }
@@ -146,7 +147,7 @@ export class LinkEntityManager {
           const linkRect = Cesium.Rectangle.fromCartographicArray([carto1, carto2]);
           if (Cesium.Rectangle.intersection(viewRect, linkRect)) {
             toRemove.push(guid);
-            layers.add(getLinkLayerId(info.data));
+            layers.add(info.currentLayerId);
           }
         }
       }
@@ -170,6 +171,14 @@ export class LinkEntityManager {
       entity.polyline.clampToGround = new Cesium.ConstantProperty(true);
       entity.polyline.zIndex = new Cesium.ConstantProperty(10);
     }
+  }
+
+  private moveLinkToLayer(linkInfo: Link, newLayerId: string): void {
+    if (linkInfo.currentLayerId === newLayerId) return;
+
+    this.layerManager.getOrCreateDataSource(linkInfo.currentLayerId).entities.remove(linkInfo.entity);
+    this.layerManager.getOrCreateDataSource(newLayerId).entities.add(linkInfo.entity);
+    linkInfo.currentLayerId = newLayerId;
   }
 }
 
