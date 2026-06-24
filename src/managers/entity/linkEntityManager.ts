@@ -59,7 +59,11 @@ export class LinkEntityManager {
   private async addPlaceholderPortals(links: LinkData[]): Promise<void> {
     const placeholders = new Map<string, PortalData>();
     links.forEach((link) => {
-      if (!this.portalManager.hasPortal(link.oGuid)) {
+      const outPortalData = this.portalManager.getPortalData(link.oGuid);
+      if (outPortalData) {
+        (outPortalData.links ??= []).push(link);
+        this.portalManager.addOrUpdatePortal(outPortalData);
+      } else {
         setNewestPlaceholder(placeholders, {
           guid: link.oGuid,
           team: link.team,
@@ -67,10 +71,15 @@ export class LinkEntityManager {
           lngE6: link.oLngE6,
           timestamp: link.timestamp,
           isPlaceholder: true,
+          links: [link],
         });
       }
 
-      if (!this.portalManager.hasPortal(link.dGuid)) {
+      const inPortalData = this.portalManager.getPortalData(link.dGuid);
+      if (inPortalData) {
+        (inPortalData.links ??= []).push(link);
+        this.portalManager.addOrUpdatePortal(inPortalData);
+      } else {
         setNewestPlaceholder(placeholders, {
           guid: link.dGuid,
           team: link.team,
@@ -78,6 +87,7 @@ export class LinkEntityManager {
           lngE6: link.dLngE6,
           timestamp: link.timestamp,
           isPlaceholder: true,
+          links: [link],
         });
       }
     });

@@ -30,6 +30,8 @@ export interface PortalData {
   resonators?: (PortalResonator | null)[];
   owner?: string;
   history?: PortalHistory;
+  links?: LinkData[];
+  fields?: FieldData[];
 }
 
 export interface PortalMod {

@@ -63,16 +63,21 @@ export class FieldEntityManager {
     const placeholders = new Map<string, PortalData>();
     fields.forEach((field) => {
       field.points.forEach((point) => {
-        if (this.portalManager.hasPortal(point.guid)) return;
-
-        setNewestPlaceholder(placeholders, {
-          guid: point.guid,
-          team: field.team,
-          latE6: point.latE6,
-          lngE6: point.lngE6,
-          timestamp: field.timestamp,
-          isPlaceholder: true,
-        });
+        const data = this.portalManager.getPortalData(point.guid);
+        if (data) {
+          (data.fields ??= []).push(field);
+          this.portalManager.addOrUpdatePortal(data);
+        } else {
+          setNewestPlaceholder(placeholders, {
+            guid: point.guid,
+            team: field.team,
+            latE6: point.latE6,
+            lngE6: point.lngE6,
+            timestamp: field.timestamp,
+            isPlaceholder: true,
+            fields: [field],
+          });
+        }
       });
     });
 
