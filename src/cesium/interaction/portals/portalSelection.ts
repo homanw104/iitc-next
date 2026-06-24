@@ -81,12 +81,19 @@ export function handlePortalSelection({
     const portalGuid = portalEntity.id.substring(7);
     const portalData = portalEntityManager.getPortalData(portalGuid);
     if (!portalData) return;
+    let hasFreshPortalData = false;
     let hasRenderedFreshPortalData = false;
-    viewer.selectedEntity = portalEntity;
+    portalEntityManager.postponeLayerMove(portalGuid);
 
     window.setTimeout(() => {
-      if (hasRenderedFreshPortalData) return;
-      if (isPortalDisplaySuppressed(gestureState)) return;
+      if (hasFreshPortalData || hasRenderedFreshPortalData) return;
+      if (selectionState.lastPortalEntity !== portalEntity || isPortalDisplaySuppressed(gestureState)) {
+        portalEntityManager.releasePostponedLayerMove(portalGuid);
+        return;
+      }
+
+      viewer.selectedEntity = portalEntityManager.getPortalEntity(portalGuid) ?? portalEntity;
+      portalEntityManager.releasePostponedLayerMove(portalGuid);
       interfaceState.lastPortalData = portalData;
       interfaceState.portalDetailBar?.remove();
       interfaceState.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailPaneController: portalDetailPaneController, data: portalData }));
@@ -95,9 +102,11 @@ export function handlePortalSelection({
 
     selectionState.isPortalDetailLoading = true;
     portalEntityManager.requestPortalDetails(portalGuid).then(() => {
+      hasFreshPortalData = true;
       window.setTimeout(() => {
-        if (isPortalDisplaySuppressed(gestureState)) {
+        if (selectionState.lastPortalEntity !== portalEntity || isPortalDisplaySuppressed(gestureState)) {
           if (selectionState.hasCancelledDisplayPortalDetail) selectionState.hasCancelledDisplayPortalDetail = false;
+          portalEntityManager.releasePostponedLayerMove(portalGuid);
           return;
         }
 
@@ -105,6 +114,8 @@ export function handlePortalSelection({
 
         if (freshData) {
           hasRenderedFreshPortalData = true;
+          viewer.selectedEntity = portalEntityManager.getPortalEntity(portalGuid) ?? portalEntity;
+          portalEntityManager.releasePostponedLayerMove(portalGuid);
           interfaceState.lastPortalData = freshData;
           interfaceState.portalDetailBar?.remove();
           interfaceState.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailPaneController: portalDetailPaneController, data: freshData }));
@@ -113,6 +124,8 @@ export function handlePortalSelection({
           portalOrnamentEntityManager.addOrUpdateOrnament(freshData).then();
           portalHistoryEntityManager.addOrUpdateHistoryHalo(freshData).then();
           scoutHistoryEntityManager.addOrUpdateScoutControlHalo(freshData).then();
+        } else {
+          portalEntityManager.releasePostponedLayerMove(portalGuid);
         }
       }, Math.max(0, displayPortalDetailAfter - Date.now()));
     }).finally(() => {

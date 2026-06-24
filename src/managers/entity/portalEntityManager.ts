@@ -37,6 +37,7 @@ export class PortalEntityManager {
   private portals: Map<string, Portal> = new Map();
   private portalsPendingCreation: Set<string> = new Set();
   private selectedPortalGuid?: string;
+  private layerMovePostponedPortalGuids: Set<string> = new Set();
 
   constructor(
     private viewer: Cesium.Viewer,
@@ -47,6 +48,7 @@ export class PortalEntityManager {
     this.viewer.selectedEntityChanged.addEventListener((selectedEntity) => {
       const selectedPortalGuid = this.getSelectablePortalGuid(selectedEntity);
       if (this.selectedPortalGuid && this.selectedPortalGuid !== selectedPortalGuid) {
+        this.layerMovePostponedPortalGuids.delete(this.selectedPortalGuid);
         this.flushPendingLayerMove(this.selectedPortalGuid);
       }
       this.selectedPortalGuid = selectedPortalGuid;
@@ -91,7 +93,7 @@ export class PortalEntityManager {
         const oldLayerId = existing.currentLayerId;
         const newLayerId = getPortalLayerId(data);
         if (oldLayerId !== newLayerId) {
-          if (this.viewer.selectedEntity === existing.entity) {
+          if (this.shouldPostponeLayerMove(existing, data.guid)) {
             existing.pendingLayerId = newLayerId;
           } else {
             this.movePortalToLayer(existing, newLayerId);
@@ -125,6 +127,18 @@ export class PortalEntityManager {
         this.portalsPendingCreation.delete(data.guid);
       }
     }
+  }
+
+  public postponeLayerMove(guid: string): void {
+    this.layerMovePostponedPortalGuids.add(guid);
+  }
+
+  public releasePostponedLayerMove(guid: string): void {
+    this.layerMovePostponedPortalGuids.delete(guid);
+    const portalInfo = this.portals.get(guid);
+    if (!portalInfo || this.viewer.selectedEntity === portalInfo.entity) return;
+
+    this.flushPendingLayerMove(guid);
   }
 
   public getPortalData(guid: string): PortalData | undefined {
@@ -285,6 +299,11 @@ export class PortalEntityManager {
 
     this.movePortalToLayer(portalInfo, portalInfo.pendingLayerId);
     portalInfo.pendingLayerId = undefined;
+  }
+
+  private shouldPostponeLayerMove(portalInfo: Portal, guid: string): boolean {
+    return this.viewer.selectedEntity === portalInfo.entity ||
+      this.layerMovePostponedPortalGuids.has(guid);
   }
 
   private movePortalToLayer(portalInfo: Portal, newLayerId: string): void {
