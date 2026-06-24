@@ -16,8 +16,11 @@ export const PORTAL_POINT_PIXEL_SIZE = 16;
 export const PORTAL_POINT_OUTLINE_WIDTH = 2;
 export const PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE = 2e4;
 export const PORTAL_OCCLUDED_ALPHA = 0.5;
-export const PORTAL_NEAR_FAR_SCALAR = new Cesium.NearFarScalar(1e1, 1, 2e4, 0.125);
 
+const PORTAL_NEAR_FAR_SCALAR_NEAR = 1e1;
+const PORTAL_NEAR_FAR_SCALAR_NEAR_VALUE = 1;
+const PORTAL_NEAR_FAR_SCALAR_FAR = 2e4;
+const PORTAL_NEAR_FAR_SCALAR_FAR_VALUE = 0.125;
 const PORTAL_DISABLE_DEPTH_TEST_DISTANCE_DEFAULT = 2e4;
 const PORTAL_DISABLE_DEPTH_TEST_DISTANCE_GOOGLE = 0;
 
@@ -161,7 +164,7 @@ export class PortalEntityManager {
         pixelSize: PORTAL_POINT_PIXEL_SIZE,
         heightReference: Cesium.HeightReference.NONE,
         disableDepthTestDistance: getPortalDisableDepthTestDistance(),
-        scaleByDistance: PORTAL_NEAR_FAR_SCALAR,
+        scaleByDistance: createPortalNearFarScalar(),
         color: getTeamColor(data.team),
         outlineColor: Cesium.Color.BLACK,
         outlineWidth: PORTAL_POINT_OUTLINE_WIDTH,
@@ -178,7 +181,7 @@ export class PortalEntityManager {
         pixelSize: PORTAL_POINT_PIXEL_SIZE,
         heightReference: Cesium.HeightReference.NONE,
         disableDepthTestDistance: PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
-        scaleByDistance: PORTAL_NEAR_FAR_SCALAR,
+        scaleByDistance: createPortalNearFarScalar(),
         translucencyByDistance: this.entityTranslucencyManager.getOccludedTranslucencyByDistance(),
         color: getTeamColor(data.team).withAlpha(PORTAL_OCCLUDED_ALPHA),
         outlineColor: Cesium.Color.BLACK.withAlpha(PORTAL_OCCLUDED_ALPHA),
@@ -290,4 +293,13 @@ export function getPortalDisableDepthTestDistance(): number {
   return settingsManager.getUseGoogle3dTiles() ?
     PORTAL_DISABLE_DEPTH_TEST_DISTANCE_GOOGLE :
     PORTAL_DISABLE_DEPTH_TEST_DISTANCE_DEFAULT;
+}
+
+export function createPortalNearFarScalar(): Cesium.NearFarScalar {
+  return new Cesium.NearFarScalar(
+    PORTAL_NEAR_FAR_SCALAR_NEAR,
+    PORTAL_NEAR_FAR_SCALAR_NEAR_VALUE,
+    PORTAL_NEAR_FAR_SCALAR_FAR,
+    PORTAL_NEAR_FAR_SCALAR_FAR_VALUE,
+  );
 }

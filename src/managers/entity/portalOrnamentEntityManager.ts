@@ -10,7 +10,7 @@ import { LayerManager } from "../layer/layerManager";
 import {
   PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
   PORTAL_OCCLUDED_ALPHA,
-  PORTAL_NEAR_FAR_SCALAR,
+  createPortalNearFarScalar,
   getPortalDisableDepthTestDistance,
 } from "./portalEntityManager.ts";
 
@@ -117,7 +117,7 @@ export class PortalOrnamentEntityManager {
         disableDepthTestDistance: getPortalDisableDepthTestDistance(),
         horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
         verticalOrigin: Cesium.VerticalOrigin.CENTER,
-        scaleByDistance: PORTAL_NEAR_FAR_SCALAR,
+        scaleByDistance: createPortalNearFarScalar(),
       },
     });
 
@@ -131,7 +131,7 @@ export class PortalOrnamentEntityManager {
         disableDepthTestDistance: PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
         horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
         verticalOrigin: Cesium.VerticalOrigin.CENTER,
-        scaleByDistance: PORTAL_NEAR_FAR_SCALAR,
+        scaleByDistance: createPortalNearFarScalar(),
         translucencyByDistance: this.entityTranslucencyManager.getOccludedTranslucencyByDistance(),
       },
     });
