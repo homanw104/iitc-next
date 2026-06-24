@@ -2,8 +2,10 @@
  * Handle redeem requests.
  */
 
-import { apiRequest } from "../utils/network";
-import { logManager } from "./logManager";
+import { apiRequest } from "../../utils/network";
+import { logManager } from "../system/logManager";
+
+const LOG_TAG = "RedeemManager";
 
 export interface RedeemResponse {
   error?: string;
@@ -23,7 +25,7 @@ export class RedeemManager {
         return "Passcode redeemed successfully!";
       }
     } catch (e) {
-      logManager.error("GameDetail", "Failed to redeem passcode", JSON.stringify(e));
+      logManager.error(LOG_TAG, "Failed to redeem passcode", JSON.stringify(e));
       return "Failed to redeem passcode.";
     }
   }

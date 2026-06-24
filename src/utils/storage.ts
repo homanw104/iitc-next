@@ -6,7 +6,9 @@
 
 import { Preferences } from "@capacitor/preferences";
 import { Capacitor } from "@capacitor/core";
-import { logManager } from "../managers/logManager";
+import { logManager } from "../managers/system/logManager";
+
+const LOG_TAG = "Storage";
 
 class SafeStorage implements Storage {
   private memoryStorage: Record<string, string> = {};
@@ -38,7 +40,7 @@ class SafeStorage implements Storage {
       }
     } catch (e) {
       this.useLocalStorage = false;
-      logManager.warn("Storage", "window.localStorage is NOT accessible. Using memory fallback.", e);
+      logManager.warn(LOG_TAG, "window.localStorage is NOT accessible. Using memory fallback.", e);
     }
   }
 
@@ -70,9 +72,9 @@ class SafeStorage implements Storage {
         }
       }
       this.initialized = true;
-      logManager.debug("Storage", "Initialization complete.");
+      logManager.debug(LOG_TAG, "Initialization complete.");
     } catch (e) {
-      logManager.debug("Storage", "Failed to initialize Capacitor Preferences", e);
+      logManager.debug(LOG_TAG, "Failed to initialize Capacitor Preferences", e);
     }
   }
 
@@ -144,9 +146,9 @@ class SafeStorage implements Storage {
         enumerable: true,
         writable: true
       });
-      logManager.debug("Storage", "window.localStorage shadowed by SafeStorage.");
+      logManager.debug(LOG_TAG, "window.localStorage shadowed by SafeStorage.");
     } catch (e) {
-      logManager.error("Storage", "Failed to shadow window.localStorage", e);
+      logManager.error(LOG_TAG, "Failed to shadow window.localStorage", e);
     }
   }
 }

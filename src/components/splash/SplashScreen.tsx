@@ -1,5 +1,5 @@
 import { h } from "../../utils/dom.ts";
-import { LogEntry } from "../../managers/logManager.ts";
+import { LogEntry } from "../../managers/system/logManager.ts";
 import SplashMessage from "./SplashMessage.tsx";
 import SplashTitle from "./SplashTitle.tsx";
 import SplashInitText from "./SplashInitText.tsx";

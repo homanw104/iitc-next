@@ -3,7 +3,7 @@
  */
 
 import { safeWindow } from "../utils/window.ts";
-import { settingsManager } from "../managers/settingsManager.ts";
+import { settingsManager } from "../managers/system/settingsManager.ts";
 
 export default function setUpSettingsManager(): void {
   settingsManager.initialize();

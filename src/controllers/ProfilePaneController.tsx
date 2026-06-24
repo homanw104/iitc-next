@@ -1,6 +1,6 @@
-import { RedeemManager } from "../managers/redeemManager";
-import { ScoreManager } from "../managers/scoreManager";
-import { TileRequestManager } from "../managers/tileRequestManager";
+import { RedeemManager } from "../managers/game/redeemManager";
+import { ScoreManager } from "../managers/game/scoreManager";
+import { TileRequestManager } from "../managers/tiles/tileRequestManager.ts";
 import ProfilePane from "../components/panes/ProfilePane/ProfilePane.tsx";
 import PluginSettingsPane from "../components/panes/PluginSettingsPane/PluginSettingsPane.tsx";
 import SettingsPane from "../components/panes/SettingsPane/SettingsPane.tsx";

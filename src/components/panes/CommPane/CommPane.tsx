@@ -1,11 +1,11 @@
 import { Viewer } from "cesium";
 import { h } from "../../../utils/dom.ts";
 import { Channel } from "../../../types/ingress.ts";
-import { CommManager } from "../../../managers/commManager.ts";
-import { PortalEntityManager } from "../../../managers/portalEntityManager.ts";
-import { PortalHistoryEntityManager } from "../../../managers/portalHistoryEntityManager.ts";
-import { ScoutHistoryEntityManager } from "../../../managers/scoutHistoryEntityManager.ts";
-import { TileRequestManager } from "../../../managers/tileRequestManager.ts";
+import { CommManager } from "../../../managers/comm/commManager.ts";
+import { PortalEntityManager } from "../../../managers/entity/portalEntityManager.ts";
+import { PortalHistoryEntityManager } from "../../../managers/entity/portalHistoryEntityManager.ts";
+import { ScoutHistoryEntityManager } from "../../../managers/entity/scoutHistoryEntityManager.ts";
+import { TileRequestManager } from "../../../managers/tiles/tileRequestManager.ts";
 import type { PortalDetailPaneController } from "../../../controllers/PortalDetailPaneController.tsx";
 import type { PortalDetailState } from "../../../core/coreControllers.ts";
 import CommSendButton from "./CommSendButton.tsx";
@@ -16,8 +16,8 @@ import CommLoadingIndicator from "./CommLoadingIndicator.tsx";
 import CommMessage from "./CommMessage.tsx";
 import CommTab from "./CommTab.tsx";
 import CommDateDivider from "./CommDateDivider.tsx";
-import { PortalLabelEntityManager } from "../../../managers/portalLabelEntityManager.ts";
-import { PortalOrnamentEntityManager } from "../../../managers/portalOrnamentEntityManager.ts";
+import { PortalLabelEntityManager } from "../../../managers/entity/portalLabelEntityManager.ts";
+import { PortalOrnamentEntityManager } from "../../../managers/entity/portalOrnamentEntityManager.ts";
 
 const CommPane = ({
   viewer,

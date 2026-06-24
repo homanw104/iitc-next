@@ -1,7 +1,9 @@
 import * as Cesium from "cesium";
 import { Cartesian3 } from "cesium";
 import { h } from "../../../utils/dom.ts";
-import { logManager } from "../../../managers/logManager.ts";
+import { logManager } from "../../../managers/system/logManager.ts";
+
+const LOG_TAG = "GetLocationButton";
 
 const GetLocationButton = ({ viewer }: {
   viewer: Cesium.Viewer,
@@ -18,11 +20,11 @@ const GetLocationButton = ({ viewer }: {
           });
         },
         (error) => {
-          logManager.error("CesiumViewer", "Failed to get location", error);
+          logManager.error(LOG_TAG, "Failed to get location", error);
         }
       );
     } else {
-      logManager.error("CesiumViewer", "Geolocation is not supported by this browser");
+      logManager.error(LOG_TAG, "Geolocation is not supported by this browser");
     }
   };
 

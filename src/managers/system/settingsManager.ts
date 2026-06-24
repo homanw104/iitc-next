@@ -2,9 +2,10 @@
  * Settings Manager manages settings and has methods to load/save them.
  */
 
-import { safeLocalStorage } from "../utils/storage";
+import { safeLocalStorage } from "../../utils/storage";
 import { logManager } from "./logManager";
 
+const LOG_TAG = "SettingsManager";
 const SETTINGS_STORAGE_KEY = "iitc-settings";
 
 export interface Settings {
@@ -120,9 +121,9 @@ export class SettingsManager {
           intervalMs: this.normalizeRefreshIntervalMs(parsed.refresh?.intervalMs),
         },
       };
-      logManager.debug("SettingsManager", "Loaded settings from storage.");
+      logManager.debug(LOG_TAG, "Loaded settings from storage.");
     } catch (e) {
-      logManager.error("SettingsManager", "Failed to load settings", e);
+      logManager.error(LOG_TAG, "Failed to load settings", e);
       this.removeState();
     }
   }

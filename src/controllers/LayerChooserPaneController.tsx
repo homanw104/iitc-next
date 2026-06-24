@@ -1,4 +1,4 @@
-import { LayerManager } from "../managers/layerManager";
+import { LayerManager } from "../managers/layer/layerManager";
 import LayerChooserPane from "../components/panes/LayerChooserPane/LayerChooserPane";
 
 export class LayerChooserPaneController {

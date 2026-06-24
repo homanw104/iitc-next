@@ -3,7 +3,7 @@
  */
 
 import { safeWindow } from "../utils/window";
-import { pluginManager } from "../managers/pluginManager";
+import { pluginManager } from "../managers/system/pluginManager";
 
 export default async function registerPlugins() {
   if (safeWindow) safeWindow.iitc.pluginManager = pluginManager;

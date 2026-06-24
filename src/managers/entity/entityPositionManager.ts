@@ -3,9 +3,9 @@
  */
 
 import * as Cesium from "cesium";
-import { logManager } from "./logManager";
-import { settingsManager } from "./settingsManager";
-import { SceneEventManager } from "./sceneEventManager";
+import { logManager } from "../system/logManager";
+import { settingsManager } from "../system/settingsManager";
+import { SceneEventManager } from "../system/sceneEventManager";
 
 const LOG_TAG = "EntityPositionManager";
 

@@ -3,7 +3,7 @@
  */
 
 import * as Cesium from "cesium";
-import type { TileRequestManager } from "../../managers/tileRequestManager";
+import type { TileRequestManager } from "../../managers/tiles/tileRequestManager.ts";
 
 export function setUpTileUpdateWhenMove(viewer: Cesium.Viewer, tileRequestManager: TileRequestManager): void {
   viewer.camera.moveEnd.addEventListener(() => {

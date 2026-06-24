@@ -3,11 +3,11 @@
  */
 
 import * as Cesium from "cesium";
-import { PortalData } from "../types/ingress";
+import { PortalData } from "../../types/ingress";
 import { EntityPositionCallback, EntityPositionManager } from "./entityPositionManager";
-import { LayerManager } from "./layerManager";
-import { logManager } from "./logManager.ts";
-import { wrapLabelText } from "../utils/text.ts";
+import { LayerManager } from "../layer/layerManager";
+import { logManager } from "../system/logManager.ts";
+import { wrapLabelText } from "../../utils/text.ts";
 
 const LABEL_FONT_SIZE_PX = 12;
 const LABEL_LINE_HEIGHT_PX = 14;
@@ -46,6 +46,19 @@ const labelWindowPositionScratch = new Cesium.Cartesian2();
 const labelCameraCartographicScratch = new Cesium.Cartographic();
 const labelOverlapCartographicScratch = new Cesium.Cartographic();
 
+interface Label {
+  data: PortalData;
+  entity: Cesium.Entity;
+  positionCallback: EntityPositionCallback;
+  wrappedText: string;
+  screenBoxWidth: number;
+  screenBoxHeight: number;
+  opacity: number;
+  targetOpacity: number;
+  fadeStartOpacity: number;
+  fadeStartTime: number;
+}
+
 interface LabelScreenBounds {
   left: number;
   top: number;
@@ -72,19 +85,6 @@ type ScenePickFromRayResult = {
 type SceneWithPickFromRay = Cesium.Scene & {
   pickFromRay?: (ray: Cesium.Ray, objectsToExclude?: object[], width?: number) => ScenePickFromRayResult | undefined;
 };
-
-interface Label {
-  data: PortalData;
-  entity: Cesium.Entity;
-  positionCallback: EntityPositionCallback;
-  wrappedText: string;
-  screenBoxWidth: number;
-  screenBoxHeight: number;
-  opacity: number;
-  targetOpacity: number;
-  fadeStartOpacity: number;
-  fadeStartTime: number;
-}
 
 export class PortalLabelEntityManager {
   private labels: Map<string, Label> = new Map();

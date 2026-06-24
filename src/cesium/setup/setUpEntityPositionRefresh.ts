@@ -3,8 +3,10 @@
  */
 
 import * as Cesium from "cesium";
-import type { EntityPositionManager } from "../../managers/entityPositionManager";
-import { logManager } from "../../managers/logManager.ts";
+import type { EntityPositionManager } from "../../managers/entity/entityPositionManager";
+import { logManager } from "../../managers/system/logManager.ts";
+
+const LOG_TAG = "SetUpEntityPositionRefresh";
 
 export function setUpEntityPositionRefresh(
   viewer: Cesium.Viewer,
@@ -20,7 +22,7 @@ export function setUpEntityPositionRefresh(
       : entityPositionManager.refreshTerrainPositions();
 
     if (!refreshed) return;
-    logManager.debug("EntityPositionRefresh", "Requested entity position refresh");
+    logManager.debug(LOG_TAG, "Requested entity position refresh");
     viewer.scene.requestRender();
   };
 

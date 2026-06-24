@@ -1,4 +1,4 @@
-import { TileRequestManager } from "../managers/tileRequestManager";
+import { TileRequestManager } from "../managers/tiles/tileRequestManager.ts";
 
 export class SoftRefreshButtonController {
   private readonly tileRequestManager: TileRequestManager;

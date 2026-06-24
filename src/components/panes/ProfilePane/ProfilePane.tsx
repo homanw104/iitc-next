@@ -1,7 +1,7 @@
 import { h } from "../../../utils/dom.ts";
-import { playerInfoManager } from "../../../managers/playerInfoManager.ts";
-import { ScoreManager } from "../../../managers/scoreManager.ts";
-import { RedeemManager } from "../../../managers/redeemManager.ts";
+import { playerInfoManager } from "../../../managers/game/playerInfoManager.ts";
+import { ScoreManager } from "../../../managers/game/scoreManager.ts";
+import { RedeemManager } from "../../../managers/game/redeemManager.ts";
 import PlayerInfo from "./PlayerInfo.tsx";
 import PlayerStatus from "./PlayerStatus.tsx";
 import GameScore from "./GameScore.tsx";

@@ -6,8 +6,9 @@
  */
 
 import { getApiVersion, setApiVersion } from "../utils/network";
-import { logManager } from "../managers/logManager";
+import { logManager } from "../managers/system/logManager";
 
+const LOG_TAG = "ExtractVersionString";
 const VERSION_STORAGE_KEY = "iitc-next-api-version";
 
 export default function extractVersionString(): void {
@@ -15,15 +16,15 @@ export default function extractVersionString(): void {
   if (version) {
     setApiVersion(version);
     storeVersion(version);
-    logManager.debug("Version", `Extracted version string ${version}`);
+    logManager.debug(LOG_TAG, `Extracted version string ${version}`);
   } else if (getStoredVersion()) {
     const storedVersion = getStoredVersion()!;
     setApiVersion(storedVersion);
-    logManager.debug("Version", `Using stored version string ${storedVersion}`);
+    logManager.debug(LOG_TAG, `Using stored version string ${storedVersion}`);
   } else if (getApiVersion()) {
-    logManager.debug("Version", "Using previously extracted version string");
+    logManager.debug(LOG_TAG, "Using previously extracted version string");
   } else {
-    logManager.warn("Version", "Could not extract version: Requests may fail");
+    logManager.warn(LOG_TAG, "Could not extract version: Requests may fail");
   }
 }
 

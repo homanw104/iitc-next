@@ -2,11 +2,12 @@
  * Manages the comm messages and their storage.
  */
 
-import { apiRequest } from "../utils/network";
-import { logManager } from "./logManager";
+import { apiRequest } from "../../utils/network";
+import { logManager } from "../system/logManager";
 import * as Cesium from "cesium";
-import type { Channel, Team } from "../types/ingress";
+import type { Channel, Team } from "../../types/ingress";
 
+const LOG_TAG = "CommManager";
 const MIN_COMM_BOUNDS_KM = 10;
 const MIN_KM_PER_DEGREE = 110.574;
 const LATITUDE_DEGREES_RANGE = { min: -90, max: 90 };
@@ -233,10 +234,10 @@ export class CommManager {
 
       const response = (await apiRequest("sendPlext", payload)) as SendPlextResponse;
       if (response && response.error) {
-        logManager.error("CommManager", `Failed to send message to ${channel} channel`, response.error);
+        logManager.error(LOG_TAG, `Failed to send message to ${channel} channel`, response.error);
       }
     } catch (e) {
-      logManager.error("CommManager", `Failed to send message to ${channel} channel`, e);
+      logManager.error(LOG_TAG, `Failed to send message to ${channel} channel`, e);
     }
   }
 
@@ -306,7 +307,7 @@ export class CommManager {
         }
       }
     } catch (e) {
-      logManager.error("CommManager", `Failed to fetch ${channel} comms`, e);
+      logManager.error(LOG_TAG, `Failed to fetch ${channel} comms`, e);
     }
   }
 }

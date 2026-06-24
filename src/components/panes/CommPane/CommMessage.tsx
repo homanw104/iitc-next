@@ -2,17 +2,17 @@ import * as Cesium from "cesium";
 import { Viewer } from "cesium";
 import { h } from "../../../utils/dom.ts";
 import { getTeamColor } from "../../../utils/color.ts";
-import { CommResponseItem } from "../../../managers/commManager.ts";
-import { PortalEntityManager } from "../../../managers/portalEntityManager.ts";
-import { PortalHistoryEntityManager } from "../../../managers/portalHistoryEntityManager.ts";
-import { ScoutHistoryEntityManager } from "../../../managers/scoutHistoryEntityManager.ts";
-import { TileRequestManager } from "../../../managers/tileRequestManager.ts";
+import { CommResponseItem } from "../../../managers/comm/commManager.ts";
+import { PortalEntityManager } from "../../../managers/entity/portalEntityManager.ts";
+import { PortalHistoryEntityManager } from "../../../managers/entity/portalHistoryEntityManager.ts";
+import { ScoutHistoryEntityManager } from "../../../managers/entity/scoutHistoryEntityManager.ts";
+import { TileRequestManager } from "../../../managers/tiles/tileRequestManager.ts";
 import { Channel } from "../../../types/ingress.ts";
 import PortalDetailBar from "../../buttons/PortalDetailBar/PortalDetailBar.tsx";
 import type { PortalDetailPaneController } from "../../../controllers/PortalDetailPaneController.tsx";
 import type { PortalDetailState } from "../../../core/coreControllers.ts";
-import { PortalLabelEntityManager } from "../../../managers/portalLabelEntityManager.ts";
-import { PortalOrnamentEntityManager } from "../../../managers/portalOrnamentEntityManager.ts";
+import { PortalLabelEntityManager } from "../../../managers/entity/portalLabelEntityManager.ts";
+import { PortalOrnamentEntityManager } from "../../../managers/entity/portalOrnamentEntityManager.ts";
 
 let latestPortalSelectionRequest = 0;
 

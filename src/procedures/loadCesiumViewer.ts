@@ -4,7 +4,7 @@
 
 import type { AppContext } from "../app.ts";
 import { safeWindow } from "../utils/window";
-import { logManager } from "../managers/logManager";
+import { logManager } from "../managers/system/logManager";
 import { createCoreManagers, exposeCoreManagers } from "../core/coreManagers";
 import { mountCoreControllersAndUI } from "../core/coreControllers.ts";
 import { createCesiumContainer } from "../cesium/setup/createCesiumContainer";
@@ -15,8 +15,10 @@ import { setUpInteractionHandlers } from "../cesium/setup/setUpInteractionHandle
 import { setUpEntityPositionRefresh } from "../cesium/setup/setUpEntityPositionRefresh.ts";
 import { setUpTileUpdateWhenMove } from "../cesium/setup/setUpTileUpdateWhenMove.ts";
 
+const LOG_TAG = "LoadCesiumViewer";
+
 export default function loadCesiumViewer(appContext: AppContext): void {
-  logManager.debug("CesiumViewer", "Loading");
+  logManager.debug(LOG_TAG, "Loading");
 
   const container = createCesiumContainer();
   const viewer = initCesiumViewer(container.id);

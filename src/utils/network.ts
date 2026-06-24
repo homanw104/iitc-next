@@ -6,28 +6,14 @@ import { getCookie } from "./browser";
 
 let apiVersion: string | undefined;
 
-/**
- * Sets the API version to be used in subsequent requests.
- * @param version The Niantic version string.
- */
 export function setApiVersion(version: string): void {
   apiVersion = version;
 }
 
-/**
- * Returns the API version currently used for requests.
- */
 export function getApiVersion(): string | undefined {
   return apiVersion;
 }
 
-/**
- * Sends a POST request to the Ingress API.
- * 
- * @param action The API action (e.g., 'getEntities').
- * @param data The JSON data to send.
- * @returns A promise that resolves with the response JSON.
- */
 export async function apiRequest(action: string, data: object): Promise<unknown> {
   const url = `/r/${action}`;
   const csrfToken = getCookie("csrftoken");

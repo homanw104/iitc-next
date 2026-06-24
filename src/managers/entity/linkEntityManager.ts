@@ -3,9 +3,9 @@
  */
 
 import * as Cesium from "cesium";
-import { LinkData, PortalData, RawEntity } from "../types/ingress";
-import { getTeamColor } from "../utils/color";
-import { LayerManager } from "./layerManager";
+import { LinkData, PortalData, RawEntity } from "../../types/ingress";
+import { getTeamColor } from "../../utils/color";
+import { LayerManager } from "../layer/layerManager";
 import { PortalEntityManager } from "./portalEntityManager";
 
 export class LinkEntityManager {

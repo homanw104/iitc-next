@@ -1,6 +1,6 @@
 import { h } from "../../../utils/dom.ts";
 import { TEAMS } from "../../../types/ingress.ts";
-import { LayerManager } from "../../../managers/layerManager.ts";
+import { LayerManager } from "../../../managers/layer/layerManager.ts";
 import LayerCheckbox from "./LayerCheckbox.tsx";
 import LayerSection from "./LayerSection.tsx";
 

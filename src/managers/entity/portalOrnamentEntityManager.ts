@@ -3,10 +3,10 @@
  */
 
 import * as Cesium from "cesium";
-import { PortalData } from "../types/ingress";
+import { PortalData } from "../../types/ingress";
 import { EntityPositionCallback, EntityPositionManager } from "./entityPositionManager";
 import { EntityTranslucencyManager } from "./entityTranslucencyManager";
-import { LayerManager } from "./layerManager";
+import { LayerManager } from "../layer/layerManager";
 import {
   PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
   PORTAL_OCCLUDED_ALPHA,

@@ -3,9 +3,9 @@
  */
 
 import * as Cesium from "cesium";
-import { FieldData, PortalData, RawEntity } from "../types/ingress";
-import { getTeamColor } from "../utils/color";
-import { LayerManager } from "./layerManager";
+import { FieldData, PortalData, RawEntity } from "../../types/ingress";
+import { getTeamColor } from "../../utils/color";
+import { LayerManager } from "../layer/layerManager";
 import { PortalEntityManager } from "./portalEntityManager";
 
 const FIELD_Z_INDEX = 0;

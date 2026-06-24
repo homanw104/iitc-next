@@ -4,11 +4,11 @@
 
 import * as Cesium from "cesium";
 import { ScreenSpaceEventType } from "cesium";
-import type { PortalEntityManager } from "../../managers/portalEntityManager.ts";
-import type { PortalLabelEntityManager } from "../../managers/portalLabelEntityManager.ts";
-import type { PortalOrnamentEntityManager } from "../../managers/portalOrnamentEntityManager.ts";
-import type { PortalHistoryEntityManager } from "../../managers/portalHistoryEntityManager.ts";
-import type { ScoutHistoryEntityManager } from "../../managers/scoutHistoryEntityManager.ts";
+import type { PortalEntityManager } from "../../managers/entity/portalEntityManager.ts";
+import type { PortalLabelEntityManager } from "../../managers/entity/portalLabelEntityManager.ts";
+import type { PortalOrnamentEntityManager } from "../../managers/entity/portalOrnamentEntityManager.ts";
+import type { PortalHistoryEntityManager } from "../../managers/entity/portalHistoryEntityManager.ts";
+import type { ScoutHistoryEntityManager } from "../../managers/entity/scoutHistoryEntityManager.ts";
 import type { PortalDetailPaneController } from "../../controllers/PortalDetailPaneController.tsx";
 import type { PortalDetailState } from "../../core/coreControllers.ts";
 import type { PortalSelectionState } from "../interaction/portals/portalSelection.ts";

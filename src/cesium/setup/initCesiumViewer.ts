@@ -5,8 +5,8 @@
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import * as Cesium from "cesium";
 import { AmapMercatorTilingScheme } from "../../utils/map";
-import { logManager } from "../../managers/logManager";
-import { settingsManager, type Google3dTilesRenderQuality } from "../../managers/settingsManager";
+import { logManager } from "../../managers/system/logManager";
+import { settingsManager, type Google3dTilesRenderQuality } from "../../managers/system/settingsManager";
 
 // Tell Cesium where to find its assets (Images, Workers, etc.).
 // Since we use the CDN for the main library, we should also use it for assets.
@@ -39,6 +39,8 @@ type Google3dTilesRenderSettings = {
 const DARKEN_GOOGLE_3D_TILES_STYLE = new Cesium.Cesium3DTileStyle({
   color: "color('#808080')",
 });
+
+const LOG_TAG = "InitCesiumViewer";
 
 const GOOGLE_3D_TILES_RENDER_SETTINGS: Record<Google3dTilesRenderQuality, Google3dTilesRenderSettings> = {
   performance: {
@@ -262,9 +264,9 @@ async function addGoogle3dTiles(viewer: Cesium.Viewer, renderSettings: Google3dT
     }
     viewer.scene.primitives.add(tileset);
     viewer.scene.requestRender();
-    logManager.debug("InitCesiumViewer", "Google 3D Tiles enabled");
+    logManager.debug(LOG_TAG, "Google 3D Tiles enabled");
   } catch (error) {
-    logManager.error("InitCesiumViewer", "Failed to load Google 3D Tiles", error);
+    logManager.error(LOG_TAG, "Failed to load Google 3D Tiles", error);
     viewer.scene.globe.show = true;
     viewer.scene.requestRender();
   }

@@ -3,9 +3,11 @@
  */
 
 import { Team } from "../types/ingress";
-import { logManager } from "../managers/logManager";
-import { playerInfoManager } from "../managers/playerInfoManager.ts";
+import { logManager } from "../managers/system/logManager";
+import { playerInfoManager } from "../managers/game/playerInfoManager.ts";
 import { safeWindow } from "../utils/window.ts";
+
+const LOG_TAG = "SetUpPlayerInfoManager";
 
 declare global {
   interface Window {
@@ -26,11 +28,11 @@ declare global {
 
 export default function setUpPlayerInfoManager() {
   if (!window.PLAYER || !window.PLAYER.nickname) {
-    logManager.warn("User not logged in. Initialization will be skipped");
+    logManager.warn(LOG_TAG, "User not logged in. Initialization will be skipped");
 
     if (document.getElementById("header_email")) {
       // Ingress Intel page seems to be in a weird state, it has email but no player data
-      logManager.error("Logged in but page doesn't have player data");
+      logManager.error(LOG_TAG, "Logged in but page doesn't have player data");
     }
   } else {
     playerInfoManager.setPlayerInfo({

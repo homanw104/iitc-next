@@ -1,5 +1,5 @@
 import { h } from "../../../utils/dom.ts";
-import { settingsManager, type Google3dTilesRenderQuality } from "../../../managers/settingsManager.ts";
+import { settingsManager, type Google3dTilesRenderQuality } from "../../../managers/system/settingsManager.ts";
 import { safeWindow } from "../../../utils/window.ts";
 import BackButton from "../../atoms/BackButton/BackButton.tsx";
 import CloseButton from "../../atoms/CloseButton/CloseButton.tsx";

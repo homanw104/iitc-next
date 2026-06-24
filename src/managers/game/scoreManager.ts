@@ -2,8 +2,10 @@
  * Class to manage and fetch game scores.
  */
 
-import { apiRequest } from "../utils/network";
-import { logManager } from "./logManager";
+import { apiRequest } from "../../utils/network";
+import { logManager } from "../system/logManager";
+
+const LOG_TAG = "ScoreManager";
 
 interface ScoreResponse {
   error?: string;
@@ -16,9 +18,9 @@ export class ScoreManager {
 
   constructor() {
     this.fetchGameScore().then(() => {
-      logManager.debug("ScoreManager", "Game score fetched");
+      logManager.debug(LOG_TAG, "Game score fetched");
     }).catch(e => {
-      logManager.error("ScoreManager", "Failed to fetch game score", JSON.stringify(e));
+      logManager.error(LOG_TAG, "Failed to fetch game score", JSON.stringify(e));
     });
   }
 
@@ -30,7 +32,7 @@ export class ScoreManager {
         this.resScore = parseInt(data.result[1]);
       }
     } catch (e) {
-      logManager.error("ScoreManager", "Failed to fetch game score", e);
+      logManager.error(LOG_TAG, "Failed to fetch game score", e);
     }
   }
 

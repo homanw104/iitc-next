@@ -1,5 +1,5 @@
 import { h } from "../../../utils/dom.ts";
-import { LayerManager } from "../../../managers/layerManager.ts";
+import { LayerManager } from "../../../managers/layer/layerManager.ts";
 
 const LayerCheckbox = ({ id, label, layerManager, onToggle, indent = 0 }: {
   id: string;

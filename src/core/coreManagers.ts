@@ -4,23 +4,23 @@
 
 import * as Cesium from "cesium";
 import type { IITCCore } from "../types/iitc";
-import { LayerManager } from "../managers/layerManager";
-import { EntityPositionManager } from "../managers/entityPositionManager";
-import { EntityTranslucencyManager } from "../managers/entityTranslucencyManager";
-import { SceneEventManager } from "../managers/sceneEventManager";
-import { PortalEntityManager } from "../managers/portalEntityManager";
-import { PortalLabelEntityManager } from "../managers/portalLabelEntityManager";
-import { PortalOrnamentEntityManager } from "../managers/portalOrnamentEntityManager.ts";
-import { PortalHistoryEntityManager } from "../managers/portalHistoryEntityManager";
-import { ScoutHistoryEntityManager } from "../managers/scoutHistoryEntityManager";
-import { LinkEntityManager } from "../managers/linkEntityManager";
-import { FieldEntityManager } from "../managers/fieldEntityManager";
-import { DebugTileEntityManager } from "../managers/debugTileEntityManager";
-import { TileRequestManager } from "../managers/tileRequestManager";
-import { CommManager } from "../managers/commManager";
-import { ScoreManager } from "../managers/scoreManager";
-import { RedeemManager } from "../managers/redeemManager";
-import { InterfaceManager } from "../managers/interfaceManager";
+import { LayerManager } from "../managers/layer/layerManager";
+import { EntityPositionManager } from "../managers/entity/entityPositionManager";
+import { EntityTranslucencyManager } from "../managers/entity/entityTranslucencyManager";
+import { SceneEventManager } from "../managers/system/sceneEventManager";
+import { PortalEntityManager } from "../managers/entity/portalEntityManager";
+import { PortalLabelEntityManager } from "../managers/entity/portalLabelEntityManager";
+import { PortalOrnamentEntityManager } from "../managers/entity/portalOrnamentEntityManager.ts";
+import { PortalHistoryEntityManager } from "../managers/entity/portalHistoryEntityManager";
+import { ScoutHistoryEntityManager } from "../managers/entity/scoutHistoryEntityManager";
+import { LinkEntityManager } from "../managers/entity/linkEntityManager";
+import { FieldEntityManager } from "../managers/entity/fieldEntityManager";
+import { DebugTileEntityManager } from "../managers/entity/debugTileEntityManager";
+import { TileRequestManager } from "../managers/tiles/tileRequestManager.ts";
+import { CommManager } from "../managers/comm/commManager";
+import { ScoreManager } from "../managers/game/scoreManager";
+import { RedeemManager } from "../managers/game/redeemManager";
+import { InterfaceManager } from "../managers/system/interfaceManager";
 
 export interface CoreManagers {
   layerManager: LayerManager;

@@ -3,11 +3,12 @@
  */
 
 import * as Cesium from "cesium";
-import { TEAMS, PORTAL_LEVELS } from "../types/ingress";
-import { safeLocalStorage } from "../utils/storage";
-import { logManager } from "./logManager";
+import { TEAMS, PORTAL_LEVELS } from "../../types/ingress";
+import { safeLocalStorage } from "../../utils/storage";
+import { logManager } from "../system/logManager";
 
 const CESIUM_PASS_OVERLAY = 13;
+const LOG_TAG = "LayerManager";
 const FILTER_STATES_STORAGE_KEY = "iitc-next-filter-states";
 const MUTUALLY_EXCLUSIVE_HISTORY_FILTERS = [
   "history",
@@ -214,11 +215,11 @@ export class LayerManager {
               this.filterState.set(name, enabled);
             }
           });
-          logManager.debug("LayerManager", `Loaded ${states.length} filters from storage.`);
+          logManager.debug(LOG_TAG, `Loaded ${states.length} filters from storage.`);
         }
       }
     } catch (e) {
-      logManager.warn("LayerManager", "Failed to load filters from storage", e);
+      logManager.warn(LOG_TAG, "Failed to load filters from storage", e);
       this.removeStorageState();
     } finally {
       this.normalizeMutuallyExclusiveFilters();

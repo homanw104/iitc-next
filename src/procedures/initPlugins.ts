@@ -3,8 +3,10 @@
  */
 
 import { AppContext } from "../app.ts";
-import { pluginManager } from "../managers/pluginManager";
-import { logManager } from "../managers/logManager.ts";
+import { pluginManager } from "../managers/system/pluginManager";
+import { logManager } from "../managers/system/logManager.ts";
+
+const LOG_TAG = "InitPlugins";
 
 export default function initPlugins(appContext: AppContext): void {
   pluginManager.initEnabledPlugins();
@@ -12,6 +14,6 @@ export default function initPlugins(appContext: AppContext): void {
   if (appContext.coreManagers) {
     appContext.coreManagers.layerManager.finalizePluginFilterRegistration();
   } else {
-    logManager.error("InitPlugins", "App context doesn't have core managers");
+    logManager.error(LOG_TAG, "App context doesn't have core managers");
   }
 }

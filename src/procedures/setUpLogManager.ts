@@ -3,7 +3,7 @@
  */
 
 import { safeWindow } from "../utils/window";
-import { logManager } from "../managers/logManager";
+import { logManager } from "../managers/system/logManager";
 
 export default function setUpLogManager(): void {
   logManager.setLevel("DEBUG");

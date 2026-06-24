@@ -2,14 +2,16 @@
  * Functions to manage player info.
  */
 
-import { Player } from "../types/ingress.ts";
-import { logManager } from "./logManager.ts";
+import { Player } from "../../types/ingress.ts";
+import { logManager } from "../system/logManager.ts";
+
+const LOG_TAG = "PlayerInfoManager";
 
 export class PlayerInfoManager {
   private player: Player | undefined;
 
   public setPlayerInfo(player: Player): void {
-    logManager.debug("PlayerInfo", "Setting player info");
+    logManager.debug(LOG_TAG, "Setting player info");
     this.player = player;
   }
 

@@ -15,7 +15,7 @@ import { ProfilePaneController } from "../controllers/ProfilePaneController.tsx"
 import { PortalDetailPaneController } from "../controllers/PortalDetailPaneController.tsx";
 import { SoftRefreshButtonController } from "../controllers/SoftRefreshButtonController.tsx";
 import { LayerChooserPaneController } from "../controllers/LayerChooserPaneController.tsx";
-import { logManager } from "../managers/logManager";
+import { logManager } from "../managers/system/logManager";
 import type { CoreManagers } from "./coreManagers";
 
 export interface PortalDetailState {

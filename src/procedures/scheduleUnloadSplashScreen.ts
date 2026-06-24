@@ -3,7 +3,9 @@
  */
 
 import { AppContext } from "../app.ts";
-import { logManager } from "../managers/logManager.ts";
+import { logManager } from "../managers/system/logManager.ts";
+
+const LOG_TAG = "ScheduleUnloadSplashScreen";
 
 export default function scheduleUnloadSplashScreen(appContext: AppContext): void {
   if (appContext.coreManagers) {
@@ -12,10 +14,10 @@ export default function scheduleUnloadSplashScreen(appContext: AppContext): void
         if (appContext.splashController) {
           appContext.splashController.deinit();
         } else {
-          logManager.error("ScheduleUnloadSplash", "App context has no splash controller");
+          logManager.error(LOG_TAG, "App context has no splash controller");
         }
       });
   } else {
-    logManager.error("ScheduleUnloadSplash", "App context doesn't have core managers");
+    logManager.error(LOG_TAG, "App context doesn't have core managers");
   }
 }

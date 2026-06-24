@@ -1,17 +1,19 @@
 import { Viewer } from "cesium";
 import { h } from "../utils/dom";
 import { Channel } from "../types/ingress";
-import { CommManager } from "../managers/commManager";
-import { PortalEntityManager } from "../managers/portalEntityManager";
-import { PortalLabelEntityManager } from "../managers/portalLabelEntityManager.ts";
-import { PortalOrnamentEntityManager } from "../managers/portalOrnamentEntityManager.ts";
-import { PortalHistoryEntityManager } from "../managers/portalHistoryEntityManager";
-import { ScoutHistoryEntityManager } from "../managers/scoutHistoryEntityManager";
-import { TileRequestManager } from "../managers/tileRequestManager";
-import { logManager } from "../managers/logManager";
+import { CommManager } from "../managers/comm/commManager";
+import { PortalEntityManager } from "../managers/entity/portalEntityManager";
+import { PortalLabelEntityManager } from "../managers/entity/portalLabelEntityManager.ts";
+import { PortalOrnamentEntityManager } from "../managers/entity/portalOrnamentEntityManager.ts";
+import { PortalHistoryEntityManager } from "../managers/entity/portalHistoryEntityManager";
+import { ScoutHistoryEntityManager } from "../managers/entity/scoutHistoryEntityManager";
+import { TileRequestManager } from "../managers/tiles/tileRequestManager.ts";
+import { logManager } from "../managers/system/logManager";
 import CommPane from "../components/panes/CommPane/CommPane.tsx";
 import type { PortalDetailPaneController } from "./PortalDetailPaneController.tsx";
 import type { PortalDetailState } from "../core/coreControllers";
+
+const LOG_TAG = "CommPaneController";
 
 export class CommPaneController {
   private readonly viewer: Viewer;
@@ -94,7 +96,7 @@ export class CommPaneController {
       if (channel === "alerts") await this.commManager.requestAlerts(fetchOld);
 
       const newMsgCount = this.commManager.getMessages(channel, false).length - msgCount;
-      logManager.info("CommPane", `Received ${newMsgCount} new message${newMsgCount === 1 ? "" : "s"} from ${channel.toUpperCase()}`);
+      logManager.info(LOG_TAG, `Received ${newMsgCount} new message${newMsgCount === 1 ? "" : "s"} from ${channel.toUpperCase()}`);
     } finally {
       this.isFetchingNew = false;
       this.isFetchingOld = false;
@@ -212,7 +214,7 @@ export class CommPaneController {
         this.refreshData().then(() => this.renderPane());
       }, 1000);
     } catch (e) {
-      logManager.warn("CommUI", "Error sending message:", e);
+      logManager.warn(LOG_TAG, "Error sending message:", e);
     }
   };
 
