@@ -25,8 +25,7 @@ const LABEL_HIDDEN_OPACITY = 0;
 const LABEL_FADE_DURATION_MS = 200;
 
 const LABEL_OVERLAP_PADDING_PX = 32;
-const LABEL_VISIBILITY_EPSILON_METERS = 25;
-const LABEL_GOOGLE_VISIBILITY_TEST_HEIGHT_METERS = 100;
+const LABEL_OVERLAP_GRID_CELL_SIZE_PX = 128;
 
 const LABEL_CAMERA_MOVE_VISIBILITY_UPDATE_INTERVAL_MS = 3000;
 const LABEL_CAMERA_MOVE_MIN_POSITION_METERS = 5;
@@ -35,6 +34,7 @@ const LABEL_CAMERA_MOVE_MIN_ANGLE_RADIANS = Cesium.Math.toRadians(0.5);
 
 const LABEL_VISIBILITY_BATCH_SIZE = 16;
 const LABEL_VISIBILITY_BATCH_DELAY_MS = 10;
+const LABEL_VISIBILITY_EPSILON_METERS = 25;
 
 const LOG_TAG = "PortalLabelEntityManager";
 
@@ -42,10 +42,9 @@ const loggedVisibilityFailures = new Set<string>();
 const labelTerrainPickScratch = new Cesium.Cartesian3();
 const labelRayDirectionScratch = new Cesium.Cartesian3();
 const labelVisibilityRayScratch = new Cesium.Ray();
-const labelVisibilityNormalScratch = new Cesium.Cartesian3();
-const labelVisibilityPositionScratch = new Cesium.Cartesian3();
 const labelWindowPositionScratch = new Cesium.Cartesian2();
 const labelCameraCartographicScratch = new Cesium.Cartographic();
+const labelOverlapCartographicScratch = new Cesium.Cartographic();
 
 interface LabelScreenBounds {
   left: number;
@@ -60,14 +59,11 @@ interface LabelOverlapCandidate {
   distance: number;
 }
 
-type EllipsoidalOccluder = {
-  cameraPosition: Cesium.Cartesian3;
-  isPointVisible: (occludee: Cesium.Cartesian3) => boolean;
-};
-
-type CesiumWithEllipsoidalOccluder = typeof Cesium & {
-  EllipsoidalOccluder: new (ellipsoid: Cesium.Ellipsoid, cameraPosition?: Cesium.Cartesian3) => EllipsoidalOccluder;
-};
+interface LabelTextLayout {
+  wrappedText: string;
+  screenBoxWidth: number;
+  screenBoxHeight: number;
+}
 
 type ScenePickFromRayResult = {
   position?: Cesium.Cartesian3;
@@ -77,12 +73,13 @@ type SceneWithPickFromRay = Cesium.Scene & {
   pickFromRay?: (ray: Cesium.Ray, objectsToExclude?: object[], width?: number) => ScenePickFromRayResult | undefined;
 };
 
-let globeOccluder: EllipsoidalOccluder | undefined;
-
 interface Label {
   data: PortalData;
   entity: Cesium.Entity;
   positionCallback: EntityPositionCallback;
+  wrappedText: string;
+  screenBoxWidth: number;
+  screenBoxHeight: number;
   opacity: number;
   targetOpacity: number;
   fadeStartOpacity: number;
@@ -94,6 +91,7 @@ export class PortalLabelEntityManager {
   private labelsPendingCreation: Set<string> = new Set();
   private visibilityQueuedGuids: Set<string> = new Set();
   private visibilityUpdateScheduled = false;
+  private forceVisibilityRefresh = false;
   private isCameraMoving = false;
   private lastMovingVisibilityUpdate = 0;
   private overlapVisibleGuids: Set<string> = new Set();
@@ -125,7 +123,7 @@ export class PortalLabelEntityManager {
       if (!this.hasCameraMovedEnoughForVisibility()) return;
 
       this.lastMovingVisibilityUpdate = now;
-      this.queueAllVisibilityUpdates();
+      this.queueAllVisibilityUpdates(false);
     });
   }
 
@@ -137,38 +135,46 @@ export class PortalLabelEntityManager {
 
     const existing = this.labels.get(data.guid);
     if (existing) {
+      const layout = getLabelTextLayout(data.title || "");
       const oldLayerId = getPortalLabelLayerId(existing.data);
       const newLayerId = getPortalLabelLayerId(data);
       if (oldLayerId !== newLayerId) {
         this.layerManager.getOrCreateOverlay(oldLayerId).entities.remove(existing.entity);
         this.layerManager.getOrCreateOverlay(newLayerId).entities.add(existing.entity);
       }
-      await this.updateLabelEntity(existing.entity, data);
+      await this.updateLabelEntity(existing.entity, data, layout.wrappedText);
       this.updateLabelPositionSubscription(existing, data);
-      this.queueAllVisibilityUpdates();
+      existing.wrappedText = layout.wrappedText;
+      existing.screenBoxWidth = layout.screenBoxWidth;
+      existing.screenBoxHeight = layout.screenBoxHeight;
       existing.data = data;
+      this.queueAllVisibilityUpdates(true);
     } else {
       if (this.labelsPendingCreation.has(data.guid)) return;
       this.labelsPendingCreation.add(data.guid);
       try {
-        const entity = await this.createLabelEntity(data);
+        const layout = getLabelTextLayout(data.title || "");
+        const entity = await this.createLabelEntity(data, layout.wrappedText);
         const positionCallback: EntityPositionCallback = (_latE6, _lngE6, position) => {
           entity.position = new Cesium.ConstantPositionProperty(position);
-          this.queueAllVisibilityUpdates();
+          this.queueAllVisibilityUpdates(true);
         };
         this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, positionCallback);
         const label: Label = {
           data,
           entity,
           positionCallback,
+          wrappedText: layout.wrappedText,
+          screenBoxWidth: layout.screenBoxWidth,
+          screenBoxHeight: layout.screenBoxHeight,
           opacity: LABEL_INITIAL_OPACITY,
           targetOpacity: LABEL_INITIAL_OPACITY,
           fadeStartOpacity: LABEL_INITIAL_OPACITY,
           fadeStartTime: 0,
         };
         setLabelColorCallbackProperties(label);
-        this.queueVisibilityUpdate(data.guid, true);
         this.labels.set(data.guid, label);
+        this.queueVisibilityUpdate(data.guid, true);
       } finally {
         this.labelsPendingCreation.delete(data.guid);
       }
@@ -183,7 +189,7 @@ export class PortalLabelEntityManager {
     this.removeLabelEntitiesInView(viewRect);
   }
 
-  private async createLabelEntity(data: PortalData): Promise<Cesium.Entity> {
+  private async createLabelEntity(data: PortalData, wrappedText: string): Promise<Cesium.Entity> {
     const layerId = getPortalLabelLayerId(data);
     const entities = this.layerManager.getOrCreateOverlay(layerId).entities;
     const position = await this.entityPositionManager.getPosition(data);
@@ -193,7 +199,7 @@ export class PortalLabelEntityManager {
       position: position,
       show: false,
       label: {
-        text: wrapLabelText(data.title || "", LABEL_MAX_LINE_LENGTH),
+        text: wrappedText,
         font: LABEL_FONT,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         fillColor: Cesium.Color.WHITE.withAlpha(LABEL_INITIAL_OPACITY),
@@ -212,12 +218,12 @@ export class PortalLabelEntityManager {
     });
   }
 
-  private async updateLabelEntity(entity: Cesium.Entity, data: PortalData): Promise<void> {
+  private async updateLabelEntity(entity: Cesium.Entity, data: PortalData, wrappedText: string): Promise<void> {
     const position = await this.entityPositionManager.getPosition(data);
 
     entity.position = new Cesium.ConstantPositionProperty(position);
     if (entity.label) {
-      entity.label.text = new Cesium.ConstantProperty(wrapLabelText(data.title || "", LABEL_MAX_LINE_LENGTH));
+      entity.label.text = new Cesium.ConstantProperty(wrappedText);
     }
   }
 
@@ -240,7 +246,7 @@ export class PortalLabelEntityManager {
       entities.remove(labelInfo.entity);
       this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(labelInfo.data, labelInfo.positionCallback);
       this.labels.delete(guid);
-      this.queueAllVisibilityUpdates();
+      this.queueAllVisibilityUpdates(false);
     }
     this.labelsPendingCreation.delete(guid);
     this.visibilityQueuedGuids.delete(guid);
@@ -249,8 +255,9 @@ export class PortalLabelEntityManager {
 
   private removeLabelEntitiesInView(viewRect: Cesium.Rectangle): void {
     const toRemove: string[] = [];
+    const time = Cesium.JulianDate.now();
     this.labels.forEach((info, guid) => {
-      const position = info.entity.position?.getValue(Cesium.JulianDate.now());
+      const position = getLabelPosition(info, time);
       if (position) {
         const cartographic = Cesium.Cartographic.fromCartesian(position);
         if (Cesium.Rectangle.contains(viewRect, cartographic)) {
@@ -261,10 +268,10 @@ export class PortalLabelEntityManager {
     toRemove.forEach(guid => this.removeLabelEntity(guid));
   }
 
-  private queueAllVisibilityUpdates(): void {
+  private queueAllVisibilityUpdates(forceVisibilityRefresh = true): void {
     this.captureVisibilityCameraSnapshot();
     this.overlapDirty = true;
-    this.labels.forEach((_label, guid) => this.visibilityQueuedGuids.add(guid));
+    if (forceVisibilityRefresh) this.forceVisibilityRefresh = true;
     this.scheduleVisibilityUpdates();
   }
 
@@ -284,8 +291,9 @@ export class PortalLabelEntityManager {
   private flushVisibilityQueue(): void {
     this.visibilityUpdateScheduled = false;
 
+    const time = Cesium.JulianDate.now();
     let changed = false;
-    if (this.overlapDirty) changed = this.refreshLabelOverlaps();
+    if (this.overlapDirty) changed = this.refreshLabelOverlaps(time);
 
     const guids = takeGuidBatch(this.visibilityQueuedGuids, LABEL_VISIBILITY_BATCH_SIZE);
     if (guids.length === 0) {
@@ -302,7 +310,7 @@ export class PortalLabelEntityManager {
         return;
       }
 
-      const labelPosition = label.entity.position?.getValue();
+      const labelPosition = getLabelPosition(label, time);
       if (!labelPosition) {
         if (this.setLabelTargetVisibility(label, false)) changed = true;
         return;
@@ -316,14 +324,19 @@ export class PortalLabelEntityManager {
     if (this.visibilityQueuedGuids.size > 0) this.scheduleVisibilityUpdates(LABEL_VISIBILITY_BATCH_DELAY_MS);
   }
 
-  private refreshLabelOverlaps(): boolean {
+  private refreshLabelOverlaps(time: Cesium.JulianDate): boolean {
     this.overlapDirty = false;
-    this.overlapVisibleGuids = getNonOverlappingLabelGuids(this.viewer, this.labels);
+    const previousOverlapVisibleGuids = this.overlapVisibleGuids;
+    const forceVisibilityRefresh = this.forceVisibilityRefresh;
+    this.forceVisibilityRefresh = false;
+    this.overlapVisibleGuids = getNonOverlappingLabelGuids(this.viewer, this.labels, time);
 
     let changed = false;
     this.labels.forEach((label, guid) => {
       if (this.overlapVisibleGuids.has(guid)) {
-        this.visibilityQueuedGuids.add(guid);
+        if (forceVisibilityRefresh || !previousOverlapVisibleGuids.has(guid)) {
+          this.visibilityQueuedGuids.add(guid);
+        }
         return;
       }
 
@@ -421,12 +434,15 @@ function getPortalLabelLayerId(data: PortalData): string {
 function getNonOverlappingLabelGuids(
   viewer: Cesium.Viewer,
   labels: Map<string, Label>,
+  time: Cesium.JulianDate,
 ): Set<string> {
   const candidates: LabelOverlapCandidate[] = [];
+  const viewRectangle = viewer.camera.computeViewRectangle(viewer.scene.globe.ellipsoid);
 
   labels.forEach((label, guid) => {
-    const labelPosition = label.entity.position?.getValue();
+    const labelPosition = getLabelPosition(label, time);
     if (!labelPosition) return;
+    if (!isLabelPositionInViewRectangle(viewer, labelPosition, viewRectangle)) return;
 
     const windowPosition = Cesium.SceneTransforms.worldToWindowCoordinates(
       viewer.scene,
@@ -435,7 +451,7 @@ function getNonOverlappingLabelGuids(
     );
     if (!windowPosition) return;
 
-    const bounds = getLabelScreenBounds(label.data.title || "", windowPosition);
+    const bounds = getLabelScreenBounds(label, windowPosition);
     if (!isLabelScreenBoundsInCanvas(bounds, viewer.scene.canvas)) return;
 
     candidates.push({
@@ -448,27 +464,38 @@ function getNonOverlappingLabelGuids(
   candidates.sort((a, b) => a.distance - b.distance || a.guid.localeCompare(b.guid));
 
   const acceptedGuids = new Set<string>();
-  const acceptedBounds: LabelScreenBounds[] = [];
+  const acceptedBoundsGrid = new Map<string, LabelOverlapCandidate[]>();
   candidates.forEach((candidate) => {
-    if (acceptedBounds.some((bounds) => doScreenBoundsOverlap(bounds, candidate.bounds))) return;
+    if (doesOverlapAcceptedCandidate(candidate.bounds, acceptedBoundsGrid)) return;
 
     acceptedGuids.add(candidate.guid);
-    acceptedBounds.push(candidate.bounds);
+    addAcceptedCandidateToGrid(candidate, acceptedBoundsGrid);
   });
   return acceptedGuids;
 }
 
-function getLabelScreenBounds(text: string, windowPosition: Cesium.Cartesian2): LabelScreenBounds {
-  const lines = wrapLabelText(text, LABEL_MAX_LINE_LENGTH).split("\n");
-  const maxLineLength = lines.reduce((maxLength, line) => Math.max(maxLength, line.length), 0);
-  const width = maxLineLength * LABEL_AVERAGE_CHARACTER_WIDTH_PX + LABEL_OUTLINE_WIDTH * 2;
-  const height = lines.length * LABEL_LINE_HEIGHT_PX + LABEL_OUTLINE_WIDTH * 2;
+function getLabelPosition(label: Label, time: Cesium.JulianDate): Cesium.Cartesian3 | undefined {
+  return label.entity.position?.getValue(time);
+}
+
+function isLabelPositionInViewRectangle(
+  viewer: Cesium.Viewer,
+  labelPosition: Cesium.Cartesian3,
+  viewRectangle: Cesium.Rectangle | undefined,
+): boolean {
+  if (!viewRectangle) return true;
+
+  const cartographic = viewer.scene.globe.ellipsoid.cartesianToCartographic(labelPosition, labelOverlapCartographicScratch);
+  return !!cartographic && Cesium.Rectangle.contains(viewRectangle, cartographic);
+}
+
+function getLabelScreenBounds(label: Label, windowPosition: Cesium.Cartesian2): LabelScreenBounds {
   const anchorY = windowPosition.y + LABEL_PIXEL_OFFSET_Y;
 
   return {
-    left: windowPosition.x - width / 2 - LABEL_OVERLAP_PADDING_PX,
-    top: anchorY - height - LABEL_OVERLAP_PADDING_PX,
-    right: windowPosition.x + width / 2 + LABEL_OVERLAP_PADDING_PX,
+    left: windowPosition.x - label.screenBoxWidth / 2 - LABEL_OVERLAP_PADDING_PX,
+    top: anchorY - label.screenBoxHeight - LABEL_OVERLAP_PADDING_PX,
+    right: windowPosition.x + label.screenBoxWidth / 2 + LABEL_OVERLAP_PADDING_PX,
     bottom: anchorY + LABEL_OVERLAP_PADDING_PX,
   };
 }
@@ -485,6 +512,76 @@ function doScreenBoundsOverlap(a: LabelScreenBounds, b: LabelScreenBounds): bool
     a.right > b.left &&
     a.top < b.bottom &&
     a.bottom > b.top;
+}
+
+function doesOverlapAcceptedCandidate(
+  bounds: LabelScreenBounds,
+  acceptedBoundsGrid: Map<string, LabelOverlapCandidate[]>,
+): boolean {
+  const seenGuids = new Set<string>();
+  const range = getScreenBoundsGridRange(bounds);
+
+  for (let x = range.minX; x <= range.maxX; x++) {
+    for (let y = range.minY; y <= range.maxY; y++) {
+      const candidates = acceptedBoundsGrid.get(getOverlapGridKey(x, y));
+      if (!candidates) continue;
+
+      for (const candidate of candidates) {
+        if (seenGuids.has(candidate.guid)) continue;
+
+        seenGuids.add(candidate.guid);
+        if (doScreenBoundsOverlap(bounds, candidate.bounds)) return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+function addAcceptedCandidateToGrid(
+  candidate: LabelOverlapCandidate,
+  acceptedBoundsGrid: Map<string, LabelOverlapCandidate[]>,
+): void {
+  const range = getScreenBoundsGridRange(candidate.bounds);
+
+  for (let x = range.minX; x <= range.maxX; x++) {
+    for (let y = range.minY; y <= range.maxY; y++) {
+      const key = getOverlapGridKey(x, y);
+      const candidates = acceptedBoundsGrid.get(key) ?? [];
+      candidates.push(candidate);
+      acceptedBoundsGrid.set(key, candidates);
+    }
+  }
+}
+
+function getScreenBoundsGridRange(bounds: LabelScreenBounds): {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number
+} {
+  return {
+    minX: Math.floor(bounds.left / LABEL_OVERLAP_GRID_CELL_SIZE_PX),
+    maxX: Math.floor(bounds.right / LABEL_OVERLAP_GRID_CELL_SIZE_PX),
+    minY: Math.floor(bounds.top / LABEL_OVERLAP_GRID_CELL_SIZE_PX),
+    maxY: Math.floor(bounds.bottom / LABEL_OVERLAP_GRID_CELL_SIZE_PX),
+  };
+}
+
+function getOverlapGridKey(x: number, y: number): string {
+  return `${x},${y}`;
+}
+
+function getLabelTextLayout(text: string): LabelTextLayout {
+  const wrappedText = wrapLabelText(text, LABEL_MAX_LINE_LENGTH);
+  const lines = wrappedText.split("\n");
+  const maxLineLength = lines.reduce((maxLength, line) => Math.max(maxLength, line.length), 0);
+
+  return {
+    wrappedText,
+    screenBoxWidth: maxLineLength * LABEL_AVERAGE_CHARACTER_WIDTH_PX + LABEL_OUTLINE_WIDTH * 2,
+    screenBoxHeight: lines.length * LABEL_LINE_HEIGHT_PX + LABEL_OUTLINE_WIDTH * 2,
+  };
 }
 
 function setLabelColorCallbackProperties(label: Label): void {
@@ -536,8 +633,6 @@ function isLabelPositionVisibleAgainstRenderedTiles(
   labelPosition: Cesium.Cartesian3,
   ray: Cesium.Ray,
 ): boolean {
-  if (!isLabelPositionVisibleAgainstHorizon(viewer, labelPosition)) return false;
-
   const tilePosition = pickRenderedTilePosition(viewer.scene, ray);
   if (!tilePosition) {
     warnVisibilityFailure("rendered-tile-pick-unavailable", "Label visibility check failed because rendered 3D tile pick is unavailable.");
@@ -590,28 +685,6 @@ function getCameraToPositionRay(camera: Cesium.Camera, position: Cesium.Cartesia
   labelVisibilityRayScratch.origin = camera.positionWC;
   labelVisibilityRayScratch.direction = direction;
   return labelVisibilityRayScratch;
-}
-
-function isLabelPositionVisibleAgainstHorizon(viewer: Cesium.Viewer, labelPosition: Cesium.Cartesian3): boolean {
-  const ellipsoid = viewer.scene.globe.ellipsoid;
-  const visibilityPosition = getRaisedVisibilityPosition(ellipsoid, labelPosition);
-  const EllipsoidalOccluderConstructor = (Cesium as CesiumWithEllipsoidalOccluder).EllipsoidalOccluder;
-
-  if (!globeOccluder) {
-    globeOccluder = new EllipsoidalOccluderConstructor(ellipsoid, viewer.camera.positionWC);
-  } else {
-    globeOccluder.cameraPosition = viewer.camera.positionWC;
-  }
-  return globeOccluder.isPointVisible(visibilityPosition);
-}
-
-function getRaisedVisibilityPosition(ellipsoid: Cesium.Ellipsoid, position: Cesium.Cartesian3): Cesium.Cartesian3 {
-  const normal = ellipsoid.geodeticSurfaceNormal(position, labelVisibilityNormalScratch);
-  return Cesium.Cartesian3.add(
-    position,
-    Cesium.Cartesian3.multiplyByScalar(normal, LABEL_GOOGLE_VISIBILITY_TEST_HEIGHT_METERS, labelVisibilityPositionScratch),
-    labelVisibilityPositionScratch,
-  );
 }
 
 function warnVisibilityFailure(reason: string, message: string, error?: unknown): void {
