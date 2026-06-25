@@ -22,17 +22,16 @@ import {
   setPortalLabelEntityOpacity,
 } from "./portalLabelEntityLayout";
 import { getNonOverlappingPortalLabelEntityGuids } from "./portalLabelEntityOverlap";
-import type { PortalLabelEntity } from "./portalLabelEntityTypes";
+import type { PortalLabel } from "./portalLabelEntityTypes";
 import {
   PORTAL_LABEL_ENTITY_VISIBILITY_BATCH_DELAY_MS,
   PORTAL_LABEL_ENTITY_VISIBILITY_BATCH_SIZE,
-  isPortalLabelEntityPositionVisible,
   takePortalLabelEntityGuidBatch,
 } from "./portalLabelEntityVisibility";
 
 const LABEL_FADE_DURATION_MS = 200;
 
-const LABEL_CAMERA_MOVE_VISIBILITY_UPDATE_INTERVAL_MS = 3000;
+const LABEL_CAMERA_MOVE_VISIBILITY_UPDATE_INTERVAL_MS = 1000;
 const LABEL_CAMERA_MOVE_MIN_POSITION_METERS = 5;
 const LABEL_CAMERA_MOVE_HEIGHT_FACTOR = 0.01;
 const LABEL_CAMERA_MOVE_MIN_ANGLE_RADIANS = Cesium.Math.toRadians(0.5);
@@ -40,24 +39,23 @@ const LABEL_CAMERA_MOVE_MIN_ANGLE_RADIANS = Cesium.Math.toRadians(0.5);
 const labelCameraCartographicScratch = new Cesium.Cartographic();
 
 export class PortalLabelEntityManager {
-  private labels: Map<string, PortalLabelEntity> = new Map();
+  private labels: Map<string, PortalLabel> = new Map();
   private labelsPendingCreation: Set<string> = new Set();
   private visibilityQueuedGuids: Set<string> = new Set();
   private visibilityUpdateScheduled = false;
-  private forceVisibilityRefresh = false;
   private isCameraMoving = false;
   private lastMovingVisibilityUpdate = 0;
   private overlapVisibleGuids: Set<string> = new Set();
   private overlapDirty = true;
   private fadingLabelGuids: Set<string> = new Set();
   private fadeFrame: number | undefined;
-  private hasVisibilityCameraSnapshot = false;
+  private hasLastVisibilityCameraSnapshot = false;
   private lastVisibilityCameraPosition = new Cesium.Cartesian3();
   private lastVisibilityCameraDirection = new Cesium.Cartesian3();
   private lastVisibilityCameraUp = new Cesium.Cartesian3();
-  private deferredVisibilityUpdateDepth = 0;
   private hasDeferredVisibilityUpdate = false;
-  private deferredVisibilityForceRefresh = false;
+  private deferredVisibilityUpdateDepth = 0;
+  private overlapRefreshGeneration = 0;
 
   constructor(
     private viewer: Cesium.Viewer,
@@ -79,7 +77,7 @@ export class PortalLabelEntityManager {
       if (!this.hasCameraMovedEnoughForVisibility()) return;
 
       this.lastMovingVisibilityUpdate = now;
-      this.queueAllVisibilityUpdates(false);
+      this.queueAllVisibilityUpdates();
     });
   }
 
@@ -101,7 +99,7 @@ export class PortalLabelEntityManager {
       existing.screenBoxHeight = layout.screenBoxHeight;
       existing.linkCount = getPortalLabelEntityLinkCount(data);
       existing.data = data;
-      this.queueAllVisibilityUpdates(true);
+      this.queueAllVisibilityUpdates();
     } else {
       if (this.labelsPendingCreation.has(data.guid)) return;
       this.labelsPendingCreation.add(data.guid);
@@ -110,10 +108,10 @@ export class PortalLabelEntityManager {
         const entity = await this.createLabelEntity(data, layout.wrappedText);
         const positionCallback: EntityPositionCallback = (_latE6, _lngE6, position) => {
           entity.position = new Cesium.ConstantPositionProperty(position);
-          this.queueAllVisibilityUpdates(true);
+          this.queueAllVisibilityUpdates();
         };
         this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, positionCallback);
-        const label: PortalLabelEntity = {
+        const label: PortalLabel = {
           data,
           entity,
           positionCallback,
@@ -125,6 +123,7 @@ export class PortalLabelEntityManager {
           targetOpacity: PORTAL_LABEL_ENTITY_INITIAL_OPACITY,
           fadeStartOpacity: PORTAL_LABEL_ENTITY_INITIAL_OPACITY,
           fadeStartTime: 0,
+          firstShownAt: undefined,
           currentLayerId: getPortalLabelEntityLayerId(data),
         };
         setPortalLabelEntityColorCallbackProperties(label);
@@ -218,7 +217,7 @@ export class PortalLabelEntityManager {
       entities.remove(labelInfo.entity);
       this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(labelInfo.data, labelInfo.positionCallback);
       this.labels.delete(guid);
-      this.queueAllVisibilityUpdates(false);
+      this.queueAllVisibilityUpdates();
     }
     this.labelsPendingCreation.delete(guid);
     this.visibilityQueuedGuids.delete(guid);
@@ -247,7 +246,7 @@ export class PortalLabelEntityManager {
     );
   }
 
-  private moveLabelToLayer(labelInfo: PortalLabelEntity, newLayerId: string): void {
+  private moveLabelToLayer(labelInfo: PortalLabel, newLayerId: string): void {
     if (labelInfo.currentLayerId === newLayerId) return;
 
     this.layerManager.getOrCreateOverlay(labelInfo.currentLayerId).entities.remove(labelInfo.entity);
@@ -255,17 +254,15 @@ export class PortalLabelEntityManager {
     labelInfo.currentLayerId = newLayerId;
   }
 
-  private queueAllVisibilityUpdates(forceVisibilityRefresh = true): void {
+  private queueAllVisibilityUpdates(): void {
     if (this.deferredVisibilityUpdateDepth > 0) {
       this.overlapDirty = true;
       this.hasDeferredVisibilityUpdate = true;
-      if (forceVisibilityRefresh) this.deferredVisibilityForceRefresh = true;
       return;
     }
 
     this.captureVisibilityCameraSnapshot();
     this.overlapDirty = true;
-    if (forceVisibilityRefresh) this.forceVisibilityRefresh = true;
     this.scheduleVisibilityUpdates();
   }
 
@@ -288,10 +285,6 @@ export class PortalLabelEntityManager {
       if (this.deferredVisibilityUpdateDepth === 0 && this.hasDeferredVisibilityUpdate) {
         this.hasDeferredVisibilityUpdate = false;
         this.captureVisibilityCameraSnapshot();
-        if (this.deferredVisibilityForceRefresh) {
-          this.forceVisibilityRefresh = true;
-          this.deferredVisibilityForceRefresh = false;
-        }
         this.scheduleVisibilityUpdates();
       }
     }
@@ -304,12 +297,12 @@ export class PortalLabelEntityManager {
     window.setTimeout(() => this.flushVisibilityQueue(), delayMs);
   }
 
-  private flushVisibilityQueue(): void {
+  private async flushVisibilityQueue(): Promise<void> {
     this.visibilityUpdateScheduled = false;
 
     const time = Cesium.JulianDate.now();
     let changed = false;
-    if (this.overlapDirty) changed = this.refreshLabelOverlaps(time);
+    if (this.overlapDirty) changed = await this.refreshLabelOverlaps(time);
 
     const guids = takePortalLabelEntityGuidBatch(this.visibilityQueuedGuids, PORTAL_LABEL_ENTITY_VISIBILITY_BATCH_SIZE);
     if (guids.length === 0) {
@@ -326,33 +319,35 @@ export class PortalLabelEntityManager {
         return;
       }
 
-      const labelPosition = getPortalLabelEntityPosition(label, time);
-      if (!labelPosition) {
-        if (this.setLabelTargetVisibility(label, false)) changed = true;
-        return;
-      }
-
-      const visible = isPortalLabelEntityPositionVisible(this.viewer, labelPosition);
-      if (this.setLabelTargetVisibility(label, visible)) changed = true;
+      if (this.setLabelTargetVisibility(label, true)) changed = true;
     });
 
     if (changed) this.viewer.scene.requestRender();
     if (this.visibilityQueuedGuids.size > 0) this.scheduleVisibilityUpdates(PORTAL_LABEL_ENTITY_VISIBILITY_BATCH_DELAY_MS);
   }
 
-  private refreshLabelOverlaps(time: Cesium.JulianDate): boolean {
+  private async refreshLabelOverlaps(time: Cesium.JulianDate): Promise<boolean> {
+    const overlapRefreshGeneration = ++this.overlapRefreshGeneration;
     this.overlapDirty = false;
-    const previousOverlapVisibleGuids = this.overlapVisibleGuids;
-    const forceVisibilityRefresh = this.forceVisibilityRefresh;
-    this.forceVisibilityRefresh = false;
-    this.overlapVisibleGuids = getNonOverlappingPortalLabelEntityGuids(this.viewer, this.labels, time);
 
     let changed = false;
+    this.overlapVisibleGuids = await getNonOverlappingPortalLabelEntityGuids(this.viewer, this.labels, time, (guid) => {
+      if (overlapRefreshGeneration !== this.overlapRefreshGeneration) return;
+
+      const label = this.labels.get(guid);
+      if (!label) return;
+
+      this.visibilityQueuedGuids.delete(guid);
+      if (this.setLabelTargetVisibility(label, true)) {
+        changed = true;
+        this.viewer.scene.requestRender();
+      }
+    });
+    if (overlapRefreshGeneration !== this.overlapRefreshGeneration) return changed;
+
     this.labels.forEach((label, guid) => {
       if (this.overlapVisibleGuids.has(guid)) {
-        if (forceVisibilityRefresh || !previousOverlapVisibleGuids.has(guid)) {
-          this.visibilityQueuedGuids.add(guid);
-        }
+        this.visibilityQueuedGuids.delete(guid);
         return;
       }
 
@@ -362,14 +357,17 @@ export class PortalLabelEntityManager {
     return changed;
   }
 
-  private setLabelTargetVisibility(label: PortalLabelEntity, visible: boolean): boolean {
+  private setLabelTargetVisibility(label: PortalLabel, visible: boolean): boolean {
     const targetOpacity = visible ? PORTAL_LABEL_ENTITY_VISIBLE_OPACITY : PORTAL_LABEL_ENTITY_HIDDEN_OPACITY;
     if (label.targetOpacity === targetOpacity) return false;
 
     label.targetOpacity = targetOpacity;
     label.fadeStartOpacity = label.opacity;
     label.fadeStartTime = performance.now();
-    if (visible) label.entity.show = true;
+    if (visible) {
+      label.entity.show = true;
+      label.firstShownAt ??= label.fadeStartTime;
+    }
 
     this.fadingLabelGuids.add(label.data.guid);
     this.scheduleLabelFade();
@@ -414,7 +412,7 @@ export class PortalLabelEntityManager {
   }
 
   private hasCameraMovedEnoughForVisibility(): boolean {
-    if (!this.hasVisibilityCameraSnapshot) return true;
+    if (!this.hasLastVisibilityCameraSnapshot) return true;
 
     const camera = this.viewer.camera;
     const height = this.viewer.scene.globe.ellipsoid.cartesianToCartographic(
@@ -438,7 +436,7 @@ export class PortalLabelEntityManager {
     Cesium.Cartesian3.clone(this.viewer.camera.positionWC, this.lastVisibilityCameraPosition);
     Cesium.Cartesian3.clone(this.viewer.camera.directionWC, this.lastVisibilityCameraDirection);
     Cesium.Cartesian3.clone(this.viewer.camera.upWC, this.lastVisibilityCameraUp);
-    this.hasVisibilityCameraSnapshot = true;
+    this.hasLastVisibilityCameraSnapshot = true;
   }
 
 }

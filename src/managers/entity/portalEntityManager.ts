@@ -12,16 +12,16 @@ import { parsePortal } from "../tiles/tileRequestEntityParser";
 import type { EntityPositionManager, EntityPositionCallback } from "./entityPositionManager";
 import type { EntityTranslucencyManager } from "./entityTranslucencyManager";
 
-export const PORTAL_POINT_PIXEL_SIZE = 16;
+export const PORTAL_POINT_PIXEL_SIZE = 18;
 export const PORTAL_POINT_OUTLINE_WIDTH = 2;
-export const PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE = 2e4;
+export const PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE = 1e4;
 export const PORTAL_OCCLUDED_ALPHA = 0.5;
 
 const PORTAL_NEAR_FAR_SCALAR_NEAR = 1e1;
 const PORTAL_NEAR_FAR_SCALAR_NEAR_VALUE = 1;
-const PORTAL_NEAR_FAR_SCALAR_FAR = 2e4;
+const PORTAL_NEAR_FAR_SCALAR_FAR = 1e4;
 const PORTAL_NEAR_FAR_SCALAR_FAR_VALUE = 0.125;
-const PORTAL_DISABLE_DEPTH_TEST_DISTANCE_DEFAULT = 2e4;
+const PORTAL_DISABLE_DEPTH_TEST_DISTANCE_DEFAULT = 3e3;
 const PORTAL_DISABLE_DEPTH_TEST_DISTANCE_GOOGLE = 0;
 
 interface Portal {

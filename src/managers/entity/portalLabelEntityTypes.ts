@@ -1,8 +1,12 @@
+/**
+ * Manage portal label entity types.
+ */
+
 import type * as Cesium from "cesium";
 import type { PortalData } from "../../types/ingress";
 import type { EntityPositionCallback } from "./entityPositionManager";
 
-export interface PortalLabelEntity {
+export interface PortalLabel {
   data: PortalData;
   entity: Cesium.Entity;
   positionCallback: EntityPositionCallback;
@@ -14,6 +18,7 @@ export interface PortalLabelEntity {
   targetOpacity: number;
   fadeStartOpacity: number;
   fadeStartTime: number;
+  firstShownAt: number | undefined;
   currentLayerId: string;
 }
 

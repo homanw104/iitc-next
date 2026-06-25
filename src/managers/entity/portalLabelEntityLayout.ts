@@ -1,7 +1,11 @@
+/**
+ * Utilities for getting portal label entity layout size.
+ */
+
 import * as Cesium from "cesium";
 import type { PortalData } from "../../types/ingress";
 import { wrapLabelText } from "../../utils/text.ts";
-import type { PortalLabelEntity, PortalLabelEntityTextLayout } from "./portalLabelEntityTypes";
+import type { PortalLabel, PortalLabelEntityTextLayout } from "./portalLabelEntityTypes";
 
 export const PORTAL_LABEL_ENTITY_FONT_SIZE_PX = 12;
 export const PORTAL_LABEL_ENTITY_LINE_HEIGHT_PX = 14;
@@ -39,7 +43,7 @@ export function getPortalLabelEntityTextLayout(text: string): PortalLabelEntityT
   };
 }
 
-export function setPortalLabelEntityColorCallbackProperties(label: PortalLabelEntity): void {
+export function setPortalLabelEntityColorCallbackProperties(label: PortalLabel): void {
   if (!label.entity.label) return;
 
   label.entity.label.fillColor = new Cesium.CallbackProperty((_time, result) =>
@@ -48,7 +52,7 @@ export function setPortalLabelEntityColorCallbackProperties(label: PortalLabelEn
     Cesium.Color.BLACK.withAlpha(label.opacity, result), false);
 }
 
-export function setPortalLabelEntityOpacity(label: PortalLabelEntity, opacity: number): boolean {
+export function setPortalLabelEntityOpacity(label: PortalLabel, opacity: number): boolean {
   const clampedOpacity = Cesium.Math.clamp(
     opacity,
     PORTAL_LABEL_ENTITY_HIDDEN_OPACITY,
@@ -61,7 +65,7 @@ export function setPortalLabelEntityOpacity(label: PortalLabelEntity, opacity: n
 }
 
 export function getPortalLabelEntityPosition(
-  label: PortalLabelEntity,
+  label: PortalLabel,
   time: Cesium.JulianDate,
 ): Cesium.Cartesian3 | undefined {
   return label.entity.position?.getValue(time);
