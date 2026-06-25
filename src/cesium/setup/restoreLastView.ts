@@ -101,7 +101,7 @@ function isInitialTerrainReady(viewer: Cesium.Viewer, useGoogle3dTiles: boolean)
   if (useGoogle3dTiles) {
     return viewer.scene.globe.show || getScene3dTileset(viewer.scene)?.tilesLoaded === true;
   } else {
-    return viewer.terrainProvider instanceof Cesium.EllipsoidTerrainProvider || viewer.scene.globe.tilesLoaded;
+    return viewer.scene.globe.tilesLoaded;
   }
 }
 

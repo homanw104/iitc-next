@@ -7,6 +7,8 @@ import { logManager } from "./logManager";
 import { settingsManager } from "./settingsManager";
 
 const LOG_TAG = "SceneEventManager";
+const GLOBE_TILES_QUALITY_SETTLE_MS = 750;
+const GLOBE_TILES_QUALITY_STABLE_FRAMES = 3;
 const GOOGLE_3D_TILES_QUALITY_SETTLE_MS = 750;
 const GOOGLE_3D_TILES_QUALITY_STABLE_FRAMES = 3;
 
@@ -15,6 +17,8 @@ export class SceneEventManager {
   private readonly initSceneLoadedPromise: Promise<void>;
   private initSceneLoaded = false;
   private watchedGoogleTilesets = new WeakSet<Cesium.Cesium3DTileset>();
+  private maxGlobeTilesLoadingCountObserved = 1;
+  private lastGlobeTilesProgress = -1;
   private maxGoogleTilesLoadingCountObserved = 1;
   private lastGoogleTilesProgress = -1;
 
@@ -37,6 +41,7 @@ export class SceneEventManager {
         if (this.initSceneLoaded) return;
 
         this.initSceneLoaded = true;
+        this.logGlobeTilesProgress(100);
         this.logGoogleTilesProgress(100);
         cleanup();
         resolve();
@@ -60,11 +65,16 @@ export class SceneEventManager {
       };
 
       const waitForTerrainTiles = () => {
-        if (this.isTerrainReady()) resolveOnce();
+        if (this.viewer.scene.globe.tilesLoaded) waitForGlobeTilesQuality();
       };
 
+      const trackGlobeTilesProgress = (tilesLoading: number) => {
+        this.logGlobeTilesLoadProgress(tilesLoading);
+        waitForTerrainTiles();
+      };
+      const waitForGlobeTilesQuality = this.waitForGlobeTilesQuality(resolveOnce);
       const removeTerrainProviderChangedListener = this.viewer.scene.globe.terrainProviderChanged.addEventListener(waitForTerrainTiles);
-      const removeTileLoadProgressListener = this.viewer.scene.globe.tileLoadProgressEvent.addEventListener(waitForTerrainTiles);
+      const removeTileLoadProgressListener = this.viewer.scene.globe.tileLoadProgressEvent.addEventListener(trackGlobeTilesProgress);
       const removePostRenderListener = this.viewer.scene.postRender.addEventListener(() => {
         if (this.useGoogle3dTiles) {
           waitForGoogleTiles();
@@ -76,6 +86,7 @@ export class SceneEventManager {
         cleanupCallbacks.push(this.viewer.scene.primitives.primitiveAdded.addEventListener(waitForGoogleTiles));
       }
       cleanupCallbacks.push(
+        waitForGlobeTilesQuality.cancel,
         removeTerrainProviderChangedListener,
         removeTileLoadProgressListener,
         removePostRenderListener
@@ -84,6 +95,7 @@ export class SceneEventManager {
       if (this.useGoogle3dTiles) {
         waitForGoogleTiles();
       } else {
+        this.logGlobeTilesProgress(0);
         waitForTerrainTiles();
       }
       this.viewer.scene.requestRender();
@@ -92,11 +104,6 @@ export class SceneEventManager {
         cleanupCallbacks.splice(0).forEach((cleanupCallback) => cleanupCallback());
       }
     });
-  }
-
-  private isTerrainReady(): boolean {
-    return this.viewer.terrainProvider instanceof Cesium.EllipsoidTerrainProvider
-      || this.viewer.scene.globe.tilesLoaded;
   }
 
   private watchGoogleTilesets(): void {
@@ -126,6 +133,66 @@ export class SceneEventManager {
       const percent = Math.max(1, Math.min(95, Math.round(1 + completedRatio * 94)));
       this.logGoogleTilesProgress(percent);
     });
+  }
+
+  private waitForGlobeTilesQuality(resolve: () => void): (() => void) & { cancel: () => void } {
+    let isWaiting = false;
+    let settleStartTime = 0;
+    let stableFrames = 0;
+    let removePostRenderListener: (() => void) | undefined;
+    let renderTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const cancel = () => {
+      if (removePostRenderListener) {
+        removePostRenderListener();
+        removePostRenderListener = undefined;
+      }
+      if (renderTimer) {
+        clearTimeout(renderTimer);
+        renderTimer = undefined;
+      }
+    };
+
+    const requestSettlingRender = () => {
+      if (!isWaiting || this.initSceneLoaded) return;
+
+      this.viewer.scene.requestRender();
+      renderTimer = setTimeout(requestSettlingRender, 100);
+    };
+
+    const checkSettled = () => {
+      if (this.initSceneLoaded) {
+        cancel();
+        return;
+      }
+
+      if (!this.viewer.scene.globe.tilesLoaded) {
+        settleStartTime = 0;
+        stableFrames = 0;
+        return;
+      }
+
+      if (settleStartTime === 0) settleStartTime = performance.now();
+      stableFrames += 1;
+
+      if (performance.now() - settleStartTime < GLOBE_TILES_QUALITY_SETTLE_MS) return;
+      if (stableFrames < GLOBE_TILES_QUALITY_STABLE_FRAMES) return;
+
+      cancel();
+      resolve();
+    };
+
+    const waitForQuality = () => {
+      if (isWaiting || this.initSceneLoaded) return;
+
+      isWaiting = true;
+      removePostRenderListener = this.viewer.scene.postRender.addEventListener(checkSettled);
+      requestSettlingRender();
+      checkSettled();
+    };
+
+    waitForQuality.cancel = cancel;
+    return waitForQuality;
   }
 
   private waitForGoogleTilesQuality(tileset: Cesium.Cesium3DTileset, resolve: () => void): (() => void) & { cancel: () => void } {
@@ -186,6 +253,26 @@ export class SceneEventManager {
 
     waitForQuality.cancel = cancel;
     return waitForQuality;
+  }
+
+  private logGlobeTilesLoadProgress(tilesLoading: number): void {
+    this.maxGlobeTilesLoadingCountObserved = Math.max(this.maxGlobeTilesLoadingCountObserved, tilesLoading);
+    if (tilesLoading === 0) {
+      this.logGlobeTilesProgress(95);
+      return;
+    }
+
+    const completedRatio = 1 - tilesLoading / this.maxGlobeTilesLoadingCountObserved;
+    const percent = Math.max(1, Math.min(95, Math.round(1 + completedRatio * 94)));
+    this.logGlobeTilesProgress(percent);
+  }
+
+  private logGlobeTilesProgress(percent: number): void {
+    if (this.useGoogle3dTiles) return;
+    if (percent <= this.lastGlobeTilesProgress) return;
+
+    this.lastGlobeTilesProgress = percent;
+    logManager.info(LOG_TAG, `Loading Globe Tiles ${percent}%`);
   }
 
   private logGoogleTilesProgress(percent: number): void {
