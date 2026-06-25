@@ -4,8 +4,6 @@
 
 import * as Cesium from "cesium";
 
-export const MINIMUM_3D_TILE_CAMERA_CLEARANCE_METERS = 5;
-
 const panStartScratch = new Cesium.Cartesian3();
 const panEndScratch = new Cesium.Cartesian3();
 const panStartNormalScratch = new Cesium.Cartesian3();
@@ -14,8 +12,6 @@ const panAxisScratch = new Cesium.Cartesian3();
 const pitchTransformScratch = new Cesium.Matrix4();
 const pitchInverseTransformScratch = new Cesium.Matrix4();
 const pitchLocalDirectionScratch = new Cesium.Cartesian3();
-const correctedCameraCartographicScratch = new Cesium.Cartographic();
-const correctedCameraPositionScratch = new Cesium.Cartesian3();
 const gesturePickRayScratch = new Cesium.Ray();
 const gesturePickTerrainScratch = new Cesium.Cartesian3();
 const gesturePickEllipsoidScratch = new Cesium.Cartesian3();
@@ -159,36 +155,6 @@ function pickGestureEllipsoidPosition(
 
 export function zoomCameraAlongViewDirection(camera: Cesium.Camera, amount: number): void {
   camera.zoomIn(amount);
-}
-
-export function keepCameraAboveRenderedSurface(scene: Cesium.Scene): void {
-  if (!scene.sampleHeightSupported) return;
-
-  const camera = scene.camera;
-  const cartographic = camera.positionCartographic;
-  const surfaceHeight = scene.sampleHeight(cartographic);
-
-  if (surfaceHeight === undefined) return;
-
-  const minimumCameraHeight = surfaceHeight + MINIMUM_3D_TILE_CAMERA_CLEARANCE_METERS;
-  if (cartographic.height >= minimumCameraHeight) return;
-
-  correctedCameraCartographicScratch.longitude = cartographic.longitude;
-  correctedCameraCartographicScratch.latitude = cartographic.latitude;
-  correctedCameraCartographicScratch.height = minimumCameraHeight;
-
-  camera.setView({
-    destination: Cesium.Cartographic.toCartesian(
-      correctedCameraCartographicScratch,
-      scene.globe.ellipsoid,
-      correctedCameraPositionScratch,
-    ),
-    orientation: {
-      heading: camera.heading,
-      pitch: camera.pitch,
-      roll: camera.roll,
-    },
-  });
 }
 
 export function getCameraPitchRelativeToGlobePoint(camera: Cesium.Camera, center: Cesium.Cartesian3): number {

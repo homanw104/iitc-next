@@ -5,8 +5,6 @@
 import * as Cesium from "cesium";
 import {
   createGestureSurfacePicker,
-  keepCameraAboveRenderedSurface,
-  MINIMUM_3D_TILE_CAMERA_CLEARANCE_METERS,
   panCameraByOrbitingSurface,
 } from "../camera/cameraGestures";
 import type { InteractionGestureState } from "../state/interactionGestureState";
@@ -15,6 +13,7 @@ const DRAG_THRESHOLD_PIXELS = 8;
 const DOUBLE_TAP_AND_DRAG_ZOOM_THRESHOLD_PIXELS = 4;
 const ZOOM_VELOCITY_FRICTION_FACTOR = 0.84;
 const RESET_INERTIA_TIMEOUT_MS = 1500;
+const MINIMUM_3D_TILE_CAMERA_CLEARANCE_METERS = 5;
 
 interface TouchZoomHandlers {
   handleTouchStart: (event: Cesium.ScreenSpaceEventHandler.PositionedEvent) => void;
@@ -158,7 +157,6 @@ export function createTouchZoomHandlers(
       const height = viewer.camera.positionCartographic.height;
       const zoomFactor = height * 0.003;
       viewer.camera.zoomIn(dy * zoomFactor);
-      keepCameraAboveRenderedSurface(viewer.scene);
     } else if (activeTouchCount === 1 && totalMovementLength > DRAG_THRESHOLD_PIXELS) {
       isSingleTouchPanning = true;
       controller.enableInputs = false;
@@ -224,7 +222,6 @@ export function createTouchZoomHandlers(
           const height = viewer.camera.positionCartographic.height;
           const zoomFactor = height * 0.003;
           viewer.camera.zoomIn(dy * zoomFactor);
-          keepCameraAboveRenderedSurface(viewer.scene);
 
           zoomVelocity *= ZOOM_VELOCITY_FRICTION_FACTOR;
 
