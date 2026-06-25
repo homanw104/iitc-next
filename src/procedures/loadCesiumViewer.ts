@@ -19,6 +19,7 @@ const LOG_TAG = "LoadCesiumViewer";
 
 export default function loadCesiumViewer(appContext: AppContext): void {
   logManager.debug(LOG_TAG, "Loading");
+  document.body = document.createElement("body");
 
   const container = createCesiumContainer();
   const viewer = initCesiumViewer(container.id);

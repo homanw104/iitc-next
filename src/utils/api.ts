@@ -2,7 +2,7 @@
  * Typed client for Intel API requests and response normalization.
  */
 
-import type { TileResponse } from "../types/ingress";
+import type { TileResponse } from "../types/ingress.ts";
 import type {
   GameScoreResponse,
   GetPlextsPayload,
@@ -14,8 +14,8 @@ import type {
   RedeemResponse,
   SendPlextPayload,
   SendPlextResponse,
-} from "../types/intelApi";
-import { apiRequest } from "../utils/network";
+} from "../types/api.ts";
+import { apiRequest } from "./network.ts";
 
 const DEFAULT_MAX_RETRIES = 3;
 
@@ -25,7 +25,7 @@ interface RequestOptions {
 
 type ResponseValidator<T> = (response: unknown) => T;
 
-export class IntelApiClient {
+export class Api {
   public getGameScore(): Promise<GameScoreResponse> {
     return this.request("getGameScore", {}, validateGameScoreResponse);
   }
@@ -76,7 +76,7 @@ export class IntelApiClient {
   }
 }
 
-export const intelApiClient = new IntelApiClient();
+export const intelApiClient = new Api();
 
 function validateGameScoreResponse(response: unknown): GameScoreResponse {
   const normalized = normalizeRecord(response, "getGameScore");

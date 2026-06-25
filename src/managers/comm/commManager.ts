@@ -3,9 +3,9 @@
  */
 
 import * as Cesium from "cesium";
-import { intelApiClient } from "../../api/intelApiClient";
+import { intelApiClient } from "../../utils/api.ts";
 import type { Channel } from "../../types/ingress";
-import type { CommResponseItem, GetPlextsPayload } from "../../types/intelApi";
+import type { CommResponseItem, GetPlextsPayload } from "../../types/api.ts";
 import { logManager } from "../system/logManager";
 
 const LOG_TAG = "CommManager";

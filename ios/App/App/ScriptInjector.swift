@@ -11,6 +11,48 @@ class ScriptInjector {
 
     private var userScript: String?
 
+    func getSplashBootstrapJs() -> String {
+        return """
+        (function() {
+          if (window.IITC_NEXT_SPLASH_BOOTSTRAPPED) return;
+          if (location.hostname !== 'intel.ingress.com' || location.pathname.indexOf('/login') === 0 || location.pathname.indexOf('/signinhandler') === 0) return;
+          window.IITC_NEXT_SPLASH_BOOTSTRAPPED = true;
+          function mount() {
+            if (document.getElementById('iitc-next-startup-splash')) return;
+            var root = document.body || document.documentElement;
+            if (!root) return;
+            var splash = document.createElement('div');
+            splash.id = 'iitc-next-startup-splash';
+            splash.style.cssText = 'position:fixed;inset:0;padding:0;z-index:2147483647;background:#0b0c0c;font-family:coda_regular,arial,helvetica,sans-serif;font-size:12px;line-height:1.55;letter-spacing:0;pointer-events:auto;';
+            var container = document.createElement('div');
+            container.id = 'iitc-next-startup-splash-container';
+            container.style.cssText = 'position:absolute;left:calc(var(--iitc-left-control-padding,0px) + 20px);right:calc(var(--iitc-right-control-padding,0px) + 20px);top:calc(var(--iitc-top-control-padding,0px) + 65px);bottom:calc(var(--iitc-bottom-control-padding,0px) + 65px);border:1px solid #499399;padding:40px;display:grid;grid-template-rows:auto auto minmax(0,1fr);overflow:hidden;';
+            var title = document.createElement('div');
+            title.textContent = 'IITC Next';
+            title.style.cssText = 'margin-bottom:40px;flex-shrink:0;font-size:48px;font-weight:700;font-family:Open Sans,sans-serif;white-space:nowrap;color:#eeff77;';
+            var divider = document.createElement('div');
+            divider.style.cssText = 'height:1px;background:#499399;';
+            var text = document.createElement('pre');
+            text.textContent = 'Initializing...';
+            text.style.cssText = 'margin-top:60px;min-height:37.8px;color:#59fbea;white-space:pre-wrap;overflow:hidden;flex-shrink:0;';
+            container.appendChild(title);
+            container.appendChild(divider);
+            container.appendChild(text);
+            splash.appendChild(container);
+            root.appendChild(splash);
+            if (window.IITC_Native && window.IITC_Native.hideStartupSplash) window.IITC_Native.hideStartupSplash();
+          }
+          mount();
+          if (!document.getElementById('iitc-next-startup-splash')) {
+            new MutationObserver(function(_, observer) {
+              mount();
+              if (document.getElementById('iitc-next-startup-splash')) observer.disconnect();
+            }).observe(document.documentElement, { childList: true });
+          }
+        })();
+        """
+    }
+
     func loadUserScript() {
         if let path = Bundle.main.path(forResource: "public/iitc-next.user", ofType: "js") {
             do {
@@ -117,6 +159,7 @@ class ScriptInjector {
           try {
             if (window.IITC_NEXT_INJECTED) return;
             if (window.IITC_NEXT_INJECTING) return;
+            \(getSplashBootstrapJs())
             window.IITC_NEXT_INJECTING = true;
             window.unsafeWindow = window;
 

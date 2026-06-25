@@ -71,6 +71,13 @@ class IITCViewController: CAPBridgeViewController, WKUIDelegate {
         """, injectionTime: .atDocumentStart, forMainFrameOnly: false)
         webView.configuration.userContentController.addUserScript(interceptorScript)
 
+        let splashScript = WKUserScript(
+            source: scriptInjector.getSplashBootstrapJs(),
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true
+        )
+        webView.configuration.userContentController.addUserScript(splashScript)
+
         let native = IITCNativeInterface(webView: webView)
         self.nativeInterface = native
         webView.configuration.userContentController.add(native, name: "IITC_Native")

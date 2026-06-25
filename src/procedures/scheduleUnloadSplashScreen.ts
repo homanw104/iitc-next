@@ -11,8 +11,8 @@ export default function scheduleUnloadSplashScreen(appContext: AppContext): void
   if (appContext.coreManagers) {
     appContext.coreManagers.sceneEventManager.waitForInitSceneLoaded()
       .then(() => {
-        if (appContext.splashController) {
-          appContext.splashController.deinit();
+        if (appContext.splashScreenController) {
+          appContext.splashScreenController.deinit();
         } else {
           logManager.error(LOG_TAG, "App context has no splash controller");
         }

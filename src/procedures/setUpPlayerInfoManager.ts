@@ -28,8 +28,6 @@ declare global {
 
 export default function setUpPlayerInfoManager() {
   if (!window.PLAYER || !window.PLAYER.nickname) {
-    logManager.warn(LOG_TAG, "User not logged in. Initialization will be skipped");
-
     if (document.getElementById("header_email")) {
       // Ingress Intel page seems to be in a weird state, it has email but no player data
       logManager.error(LOG_TAG, "Logged in but page doesn't have player data");

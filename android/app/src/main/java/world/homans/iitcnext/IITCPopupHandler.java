@@ -27,6 +27,25 @@ public class IITCPopupHandler extends BridgeWebChromeClient {
         this.activity = activity;
     }
 
+    private boolean isAllowedAuthHost(Uri uri) {
+        String host = uri.getHost();
+        if (host == null) return false;
+
+        String normalizedHost = host.toLowerCase();
+        return normalizedHost.equals("intel.ingress.com")
+            || normalizedHost.endsWith(".google.com")
+            || normalizedHost.equals("google.com")
+            || normalizedHost.endsWith(".googleusercontent.com")
+            || normalizedHost.equals("googleusercontent.com")
+            || normalizedHost.equals("signin.nianticspatial.com")
+            || normalizedHost.endsWith(".nianticspatial.com");
+    }
+
+    private boolean isIntelReturnUrl(String url) {
+        Uri uri = Uri.parse(url);
+        return "intel.ingress.com".equalsIgnoreCase(uri.getHost());
+    }
+
     @Override
     public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
         callback.invoke(origin, true, false);
@@ -53,23 +72,23 @@ public class IITCPopupHandler extends BridgeWebChromeClient {
         newWebView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                if (IngressLinkHandler.openInApp(activity, request.getUrl())) {
+                Uri uri = request.getUrl();
+                if (IngressLinkHandler.openInApp(activity, uri)) {
                     dismissPopup();
                     return true;
                 }
 
-                String url = request.getUrl().toString();
-                if (url.contains("google.com") || url.contains("nianticspatial.com") || url.contains("ingress.com")) {
+                if (isAllowedAuthHost(uri)) {
                     return false;
                 }
 
                 try {
                     CustomTabsIntent.Builder builder = new CustomTabsIntent.Builder();
                     CustomTabsIntent customTabsIntent = builder.build();
-                    customTabsIntent.launchUrl(activity, Uri.parse(url));
+                    customTabsIntent.launchUrl(activity, uri);
                     return true;
                 } catch (Exception e) {
-                    Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                    Intent intent = new Intent(Intent.ACTION_VIEW, uri);
                     activity.startActivity(intent);
                     return true;
                 }
@@ -78,7 +97,7 @@ public class IITCPopupHandler extends BridgeWebChromeClient {
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
-                if (url.contains("intel.ingress.com") && !url.contains("auth")) {
+                if (isIntelReturnUrl(url)) {
                     CookieManager.getInstance().flush();
                     activity.getBridge().getWebView().loadUrl(url);
                     dismissPopup();
@@ -105,6 +124,8 @@ public class IITCPopupHandler extends BridgeWebChromeClient {
         settings.setSupportMultipleWindows(true);
         settings.setJavaScriptCanOpenWindowsAutomatically(true);
         settings.setDomStorageEnabled(true);
+        settings.setDatabaseEnabled(true);
+        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
 
         String cleanedUA = MainActivity.getCleanedUserAgent(activity);
         settings.setUserAgentString(cleanedUA);
@@ -113,6 +134,7 @@ public class IITCPopupHandler extends BridgeWebChromeClient {
         try {
             CookieManager cookieManager = CookieManager.getInstance();
             cookieManager.setAcceptCookie(true);
+            cookieManager.setAcceptThirdPartyCookies(webView, true);
             cookieManager.setCookie("https://signin.nianticspatial.com", "_ncc=0; Path=/; Domain=.nianticspatial.com");
         } catch (Exception e) {
             Log.w("IITCPopupHandler", "Could not set _ncc cookie: " + e.getMessage());

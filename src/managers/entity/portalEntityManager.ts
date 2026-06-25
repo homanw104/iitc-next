@@ -3,7 +3,7 @@
  */
 
 import * as Cesium from "cesium";
-import { intelApiClient } from "../../api/intelApiClient";
+import { intelApiClient } from "../../utils/api.ts";
 import type { FieldData, LinkData, PortalData } from "../../types/ingress";
 import { getTeamColor } from "../../utils/color";
 import type { LayerManager } from "../layer/layerManager";

@@ -43,6 +43,11 @@ public class IITCNativeInterface {
     }
 
     @JavascriptInterface
+    public void hideStartupSplash() {
+        // Compatibility shim for older injected bootstrap code.
+    }
+
+    @JavascriptInterface
     public void getCurrentPosition() {
         webView.post(() -> {
             try {

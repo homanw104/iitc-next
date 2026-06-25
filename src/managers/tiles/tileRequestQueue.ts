@@ -2,7 +2,7 @@
  * Queue and concurrency control for Intel tile requests.
  */
 
-import { intelApiClient } from "../../api/intelApiClient";
+import { intelApiClient } from "../../utils/api.ts";
 import type { TileResponse } from "../../types/ingress";
 import { logManager } from "../system/logManager";
 

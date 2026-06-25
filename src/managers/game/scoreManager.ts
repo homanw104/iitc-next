@@ -2,7 +2,7 @@
  * Class to manage and fetch game scores.
  */
 
-import { intelApiClient } from "../../api/intelApiClient";
+import { intelApiClient } from "../../utils/api.ts";
 import { logManager } from "../system/logManager";
 
 const LOG_TAG = "ScoreManager";

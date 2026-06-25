@@ -5,9 +5,14 @@
 import type { SplashScreenController } from "./controllers/SplashScreenController.tsx";
 import type { CoreManagers } from "./core/coreManagers.ts";
 import extractVersionString from "./procedures/extractVersionString";
+import getPageRoute from "./procedures/getPageRoute.ts";
 import getLoginStatus from "./procedures/getLoginStatus.ts";
+import setUpResponsivePage from "./procedures/setUpResponsivePage.ts";
+import disableStyleSheets from "./procedures/disableStyleSheets.ts";
+import enableStyleSheets from "./procedures/enableStyleSheets.ts";
 import initPlugins from "./procedures/initPlugins";
 import loadCesiumViewer from "./procedures/loadCesiumViewer";
+import loadLoginScreen from "./procedures/loadLoginScreen.ts";
 import loadSplashScreen from "./procedures/loadSplashScreen.ts";
 import registerPlugins from "./procedures/registerPlugins";
 import scheduleUnloadSplashScreen from "./procedures/scheduleUnloadSplashScreen.ts";
@@ -19,14 +24,16 @@ import { safeWindow } from "./utils/window";
 
 export interface AppContext {
   initStarted: boolean;
-  splashController: SplashScreenController | undefined;
   coreManagers: CoreManagers | undefined;
+  splashScreenController: SplashScreenController | undefined;
+  styleSheets: NodeListOf<HTMLLinkElement> | undefined;
 }
 
 const appContext: AppContext = {
   initStarted: false,
-  splashController: undefined,
   coreManagers: undefined,
+  splashScreenController: undefined,
+  styleSheets: undefined,
 };
 
 const init = async () => {
@@ -43,23 +50,33 @@ const init = async () => {
   setUpPlayerInfoManager();
 
   if (!getLoginStatus()) {
-    return;   // Load login screen
+    loadLoginScreen(appContext);
   } else {
+    enableStyleSheets(appContext);
     loadCesiumViewer(appContext);
-    loadSplashScreen(appContext);
     await registerPlugins();
     initPlugins(appContext);
     scheduleUnloadSplashScreen(appContext);
   }
 };
 
-// Disable vanilla JS
-window.onload = function () {};
-document.body.onload = function () {};
+// To know on which page we are
+const pageRoute = getPageRoute();
 
-// Initialize once the DOM content is loaded
-if (document.readyState === "complete") {
-  init().then();
-} else {
-  window.addEventListener("load", init);
+if (pageRoute && pageRoute !== "/signinhandler") {
+  // Set up splash screen at the very start
+  setUpResponsivePage();
+  disableStyleSheets(appContext);
+  loadSplashScreen(appContext);
+
+  // Disable vanilla JS
+  window.onload = function () {};
+  if (document.body) document.body.onload = function () {};
+
+  // Initialize once the DOM content is loaded
+  if (document.readyState === "complete") {
+    init().then();
+  } else {
+    window.addEventListener("load", init);
+  }
 }

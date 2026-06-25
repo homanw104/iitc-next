@@ -9,7 +9,7 @@ import type { PortalOrnamentEntityManager } from "../../../managers/entity/porta
 import type { ScoutHistoryEntityManager } from "../../../managers/entity/scoutHistoryEntityManager.ts";
 import type { TileRequestManager } from "../../../managers/tiles/tileRequestManager.ts";
 import type { Channel } from "../../../types/ingress.ts";
-import type { CommResponseItem } from "../../../types/intelApi.ts";
+import type { CommResponseItem } from "../../../types/api.ts";
 import { getTeamColor } from "../../../utils/color.ts";
 import { h } from "../../../utils/dom.ts";
 import PortalDetailBar from "../../buttons/PortalDetailBar/PortalDetailBar.tsx";

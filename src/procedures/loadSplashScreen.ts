@@ -6,7 +6,9 @@ import type { AppContext } from "../app.ts";
 import { SplashScreenController } from "../controllers/SplashScreenController.tsx";
 
 export default function loadSplashScreen(appContext: AppContext): void {
-  const splashController = new SplashScreenController(document.body);
-  appContext.splashController = splashController;
-  splashController.init();
+  if (appContext.splashScreenController) return;
+
+  const container = document.documentElement;
+  appContext.splashScreenController = new SplashScreenController(container);
+  appContext.splashScreenController.init();
 }

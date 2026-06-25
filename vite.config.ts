@@ -31,7 +31,10 @@ export default defineConfig({
         description: "IITC Next",
         namespace: "npm/vite-plugin-monkey",
         match: ["https://intel.ingress.com/*"],
-        "run-at": "document-end",
+        exclude: [
+          "https://intel.ingress.com/signinhandler*",
+        ],
+        "run-at": "document-start",
       },
       build: {
         externalGlobals: {
