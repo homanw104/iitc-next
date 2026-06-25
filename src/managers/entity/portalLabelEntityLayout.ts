@@ -5,6 +5,7 @@
 import * as Cesium from "cesium";
 import type { PortalData } from "../../types/ingress";
 import { wrapLabelText } from "../../utils/text.ts";
+import { getPortalNearFarScale, PORTAL_POINT_PIXEL_SIZE } from "./portalEntityManager.ts";
 import type { PortalLabel, PortalLabelEntityTextLayout } from "./portalLabelEntityTypes";
 
 export const PORTAL_LABEL_ENTITY_FONT_SIZE_PX = 12;
@@ -14,7 +15,7 @@ export const PORTAL_LABEL_ENTITY_FONT = `${PORTAL_LABEL_ENTITY_FONT_SIZE_PX}px/$
 export const PORTAL_LABEL_ENTITY_MAX_LINE_LENGTH = 24;
 export const PORTAL_LABEL_ENTITY_AVERAGE_CHARACTER_WIDTH_PX = 7;
 export const PORTAL_LABEL_ENTITY_OUTLINE_WIDTH = 8;
-export const PORTAL_LABEL_ENTITY_PIXEL_OFFSET_Y = -16;
+export const PORTAL_LABEL_ENTITY_POINT_GAP_PX = 6;
 export const PORTAL_LABEL_ENTITY_DISABLE_DEPTH_TEST_DISTANCE = Number.POSITIVE_INFINITY;
 
 export const PORTAL_LABEL_ENTITY_INITIAL_OPACITY = 0;
@@ -62,6 +63,27 @@ export function setPortalLabelEntityOpacity(label: PortalLabel, opacity: number)
 
   label.opacity = clampedOpacity;
   return true;
+}
+
+export function createPortalLabelEntityPixelOffsetCallback(
+  viewer: Cesium.Viewer,
+  getPosition: (time: Cesium.JulianDate) => Cesium.Cartesian3 | undefined,
+): Cesium.CallbackProperty {
+  return new Cesium.CallbackProperty((time, result) => {
+    const offset = result ?? new Cesium.Cartesian2();
+    const position = getPosition(time ?? viewer.clock.currentTime);
+    const distance = position ? Cesium.Cartesian3.distance(viewer.camera.positionWC, position) : 0;
+
+    offset.x = 0;
+    offset.y = getPortalLabelEntityPixelOffsetY(distance);
+    return offset;
+  }, false);
+}
+
+export function getPortalLabelEntityPixelOffsetY(distance: number): number {
+  const scale = getPortalNearFarScale(distance);
+
+  return -(PORTAL_POINT_PIXEL_SIZE * scale / 2 + PORTAL_LABEL_ENTITY_POINT_GAP_PX);
 }
 
 export function getPortalLabelEntityPosition(

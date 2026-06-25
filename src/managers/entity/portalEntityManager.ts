@@ -340,3 +340,14 @@ export function createPortalNearFarScalar(): Cesium.NearFarScalar {
     PORTAL_NEAR_FAR_SCALAR_FAR_VALUE,
   );
 }
+
+export function getPortalNearFarScale(distance: number): number {
+  if (distance <= PORTAL_NEAR_FAR_SCALAR_NEAR) return PORTAL_NEAR_FAR_SCALAR_NEAR_VALUE;
+  if (distance >= PORTAL_NEAR_FAR_SCALAR_FAR) return PORTAL_NEAR_FAR_SCALAR_FAR_VALUE;
+
+  return Cesium.Math.lerp(
+    PORTAL_NEAR_FAR_SCALAR_NEAR_VALUE,
+    PORTAL_NEAR_FAR_SCALAR_FAR_VALUE,
+    (distance - PORTAL_NEAR_FAR_SCALAR_NEAR) / (PORTAL_NEAR_FAR_SCALAR_FAR - PORTAL_NEAR_FAR_SCALAR_NEAR),
+  );
+}

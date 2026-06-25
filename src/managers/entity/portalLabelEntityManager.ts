@@ -12,8 +12,8 @@ import {
   PORTAL_LABEL_ENTITY_HIDDEN_OPACITY,
   PORTAL_LABEL_ENTITY_INITIAL_OPACITY,
   PORTAL_LABEL_ENTITY_OUTLINE_WIDTH,
-  PORTAL_LABEL_ENTITY_PIXEL_OFFSET_Y,
   PORTAL_LABEL_ENTITY_VISIBLE_OPACITY,
+  createPortalLabelEntityPixelOffsetCallback,
   getPortalLabelEntityLayerId,
   getPortalLabelEntityLinkCount,
   getPortalLabelEntityPosition,
@@ -165,8 +165,9 @@ export class PortalLabelEntityManager {
     const layerId = getPortalLabelEntityLayerId(data);
     const entities = this.layerManager.getOrCreateOverlay(layerId).entities;
     const position = await this.entityPositionManager.getPosition(data);
+    const entityReference: { entity?: Cesium.Entity } = {};
 
-    return entities.add({
+    const entity = entities.add({
       id: `label-${data.guid}`,
       position: position,
       show: false,
@@ -182,12 +183,18 @@ export class PortalLabelEntityManager {
         disableDepthTestDistance: PORTAL_LABEL_ENTITY_DISABLE_DEPTH_TEST_DISTANCE,
         horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-        pixelOffset: new Cesium.Cartesian2(0, PORTAL_LABEL_ENTITY_PIXEL_OFFSET_Y),
+        pixelOffset: createPortalLabelEntityPixelOffsetCallback(
+          this.viewer,
+          (time) => entityReference.entity?.position?.getValue(time) ?? position,
+        ),
       },
       properties: {
         selectable: false,
       },
     });
+    entityReference.entity = entity;
+
+    return entity;
   }
 
   private async updateLabelEntity(entity: Cesium.Entity, data: PortalData, wrappedText: string): Promise<void> {

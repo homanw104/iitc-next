@@ -4,9 +4,9 @@
 
 import * as Cesium from "cesium";
 import {
-  PORTAL_LABEL_ENTITY_PIXEL_OFFSET_Y,
   PORTAL_LABEL_ENTITY_VISIBLE_OPACITY,
   getPortalLabelEntityPosition,
+  getPortalLabelEntityPixelOffsetY,
 } from "./portalLabelEntityLayout";
 import type { PortalLabel, PortalLabelEntityScreenBounds } from "./portalLabelEntityTypes";
 import { isPortalLabelEntityPositionVisible } from "./portalLabelEntityVisibility";
@@ -51,7 +51,8 @@ export async function getNonOverlappingPortalLabelEntityGuids(
     );
     if (!windowPosition) return;
 
-    const bounds = getPortalLabelEntityScreenBounds(label, windowPosition);
+    const distance = Cesium.Cartesian3.distance(viewer.camera.positionWC, labelPosition);
+    const bounds = getPortalLabelEntityScreenBounds(label, windowPosition, distance);
     if (!isPortalLabelEntityScreenBoundsInCanvas(bounds, viewer.scene.canvas)) return;
 
     candidates.push({
@@ -62,7 +63,7 @@ export async function getNonOverlappingPortalLabelEntityGuids(
       linkCount: label.linkCount,
       level: label.data.level ?? 0,
       isCurrentlyVisible: isPortalLabelEntityCurrentlyVisible(label),
-      distance: Cesium.Cartesian3.distance(viewer.camera.positionWC, labelPosition),
+      distance,
     });
   });
 
@@ -154,8 +155,9 @@ function isPortalLabelEntityPositionInViewRectangle(
 function getPortalLabelEntityScreenBounds(
   label: PortalLabel,
   windowPosition: Cesium.Cartesian2,
+  distance: number,
 ): PortalLabelEntityScreenBounds {
-  const anchorY = windowPosition.y + PORTAL_LABEL_ENTITY_PIXEL_OFFSET_Y;
+  const anchorY = windowPosition.y + getPortalLabelEntityPixelOffsetY(distance);
 
   return {
     left: windowPosition.x - label.screenBoxWidth / 2 - PORTAL_LABEL_ENTITY_OVERLAP_PADDING_PX,
