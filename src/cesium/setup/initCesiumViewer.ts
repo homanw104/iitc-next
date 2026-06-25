@@ -163,7 +163,7 @@ export function initCesiumViewer(container: string): Cesium.Viewer {
     fullscreenButton: false,
     infoBox: false,
     baseLayerPicker: !useGoogle3dTiles,
-    sceneModePicker: !useGoogle3dTiles,
+    sceneModePicker: false,
     geocoder: useGoogle3dTiles ? Cesium.IonGeocodeProviderType.GOOGLE : undefined,
     requestRenderMode: true,
     maximumRenderTimeChange: Infinity,

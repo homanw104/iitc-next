@@ -82,6 +82,7 @@ export class DebugTileEntityManager {
           finalNorth
         ),
         fill: true,
+        height: 0,
         material: color.withAlpha(0.1),
         outline: !settingsManager.getUseGoogle3dTiles(),
         outlineColor: color,
