@@ -14,9 +14,16 @@ const panAxisScratch = new Cesium.Cartesian3();
 const pitchTransformScratch = new Cesium.Matrix4();
 const pitchInverseTransformScratch = new Cesium.Matrix4();
 const pitchLocalDirectionScratch = new Cesium.Cartesian3();
+const correctedCameraCartographicScratch = new Cesium.Cartographic();
+const correctedCameraPositionScratch = new Cesium.Cartesian3();
 const gesturePickRayScratch = new Cesium.Ray();
 const gesturePickTerrainScratch = new Cesium.Cartesian3();
 const gesturePickEllipsoidScratch = new Cesium.Cartesian3();
+const zoomTransformScratch = new Cesium.Matrix4();
+const zoomInverseTransformScratch = new Cesium.Matrix4();
+const zoomLocalPositionScratch = new Cesium.Cartesian3();
+const zoomLocalDirectionScratch = new Cesium.Cartesian3();
+const zoomLocalUpScratch = new Cesium.Cartesian3();
 
 export interface GestureSurfacePicker {
   pick(windowPosition: Cesium.Cartesian2): Cesium.Cartesian3 | undefined;
@@ -166,14 +173,16 @@ export function keepCameraAboveRenderedSurface(scene: Cesium.Scene): void {
   const minimumCameraHeight = surfaceHeight + MINIMUM_3D_TILE_CAMERA_CLEARANCE_METERS;
   if (cartographic.height >= minimumCameraHeight) return;
 
-  const correctedPosition = new Cesium.Cartographic(
-    cartographic.longitude,
-    cartographic.latitude,
-    minimumCameraHeight,
-  );
+  correctedCameraCartographicScratch.longitude = cartographic.longitude;
+  correctedCameraCartographicScratch.latitude = cartographic.latitude;
+  correctedCameraCartographicScratch.height = minimumCameraHeight;
 
   camera.setView({
-    destination: Cesium.Cartographic.toCartesian(correctedPosition, scene.globe.ellipsoid),
+    destination: Cesium.Cartographic.toCartesian(
+      correctedCameraCartographicScratch,
+      scene.globe.ellipsoid,
+      correctedCameraPositionScratch,
+    ),
     orientation: {
       heading: camera.heading,
       pitch: camera.pitch,
@@ -198,20 +207,28 @@ export function getCameraPitchRelativeToGlobePoint(camera: Cesium.Camera, center
 export function zoomCameraAroundGlobePoint(camera: Cesium.Camera, center: Cesium.Cartesian3, amount: number): void {
   // Work in the picked point's ENU frame so zoom keeps the pinch anchor while preserving
   // the camera's local direction/up, i.e., its angle relative to the nearby ground.
-  const transform = Cesium.Transforms.eastNorthUpToFixedFrame(center);
-  const inverseTransform = Cesium.Matrix4.inverseTransformation(transform, new Cesium.Matrix4());
+  const transform = Cesium.Transforms.eastNorthUpToFixedFrame(center, undefined, zoomTransformScratch);
+  const inverseTransform = Cesium.Matrix4.inverseTransformation(transform, zoomInverseTransformScratch);
 
   // localPosition is the vector from the pinch anchor to the camera, expressed in
   // local east/north/up coordinates. Its length is the anchor-to-camera distance.
-  const localPosition = Cesium.Matrix4.multiplyByPoint(inverseTransform, camera.positionWC, new Cesium.Cartesian3());
+  const localPosition = Cesium.Matrix4.multiplyByPoint(inverseTransform, camera.positionWC, zoomLocalPositionScratch);
   const distance = Cesium.Cartesian3.magnitude(localPosition);
 
   if (distance <= 0) return;
 
   // Direction and up are vectors, not points, so ignore translation while converting them.
   // Keeping these vectors in the anchor frame preserves the ground-relative view angle.
-  const localDirection = Cesium.Matrix4.multiplyByPointAsVector(inverseTransform, camera.directionWC, new Cesium.Cartesian3());
-  const localUp = Cesium.Matrix4.multiplyByPointAsVector(inverseTransform, camera.upWC, new Cesium.Cartesian3());
+  const localDirection = Cesium.Matrix4.multiplyByPointAsVector(
+    inverseTransform,
+    camera.directionWC,
+    zoomLocalDirectionScratch,
+  );
+  const localUp = Cesium.Matrix4.multiplyByPointAsVector(
+    inverseTransform,
+    camera.upWC,
+    zoomLocalUpScratch,
+  );
   const targetDistance = Math.max(1, distance - amount);
   const scale = targetDistance / distance;
 

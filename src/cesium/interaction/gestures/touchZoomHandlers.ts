@@ -40,8 +40,9 @@ export function createTouchZoomHandlers(
   let revertHasJustMovedTimeoutId: number | null = null;
   let revertHasJustDoubleTappedTimeoutId: number | null = null;
   let dragFrameRequestId: number | null = null;
-  let pendingDragStartPosition: Cesium.Cartesian2 | null = null;
-  let pendingDragEndPosition: Cesium.Cartesian2 | null = null;
+  let hasPendingDragFrame = false;
+  const pendingDragStartPosition = new Cesium.Cartesian2();
+  const pendingDragEndPosition = new Cesium.Cartesian2();
   let pendingDragEventTime = 0;
 
   viewer.scene.canvas.addEventListener("touchstart", (event) => {
@@ -122,10 +123,11 @@ export function createTouchZoomHandlers(
   };
 
   const queueDragFrame = (event: Cesium.ScreenSpaceEventHandler.MotionEvent, now: number) => {
-    if (!pendingDragStartPosition) {
-      pendingDragStartPosition = Cesium.Cartesian2.clone(event.startPosition);
+    if (!hasPendingDragFrame) {
+      Cesium.Cartesian2.clone(event.startPosition, pendingDragStartPosition);
+      hasPendingDragFrame = true;
     }
-    pendingDragEndPosition = Cesium.Cartesian2.clone(event.endPosition, pendingDragEndPosition ?? new Cesium.Cartesian2());
+    Cesium.Cartesian2.clone(event.endPosition, pendingDragEndPosition);
     pendingDragEventTime = now;
 
     if (dragFrameRequestId !== null) return;
@@ -135,15 +137,11 @@ export function createTouchZoomHandlers(
   const applyQueuedDragFrame = () => {
     dragFrameRequestId = null;
 
-    if (!pendingDragStartPosition || !pendingDragEndPosition) return;
-
-    const startPosition = pendingDragStartPosition;
-    const endPosition = pendingDragEndPosition;
-    pendingDragStartPosition = null;
-    pendingDragEndPosition = null;
+    if (!hasPendingDragFrame) return;
+    hasPendingDragFrame = false;
 
     const dt = pendingDragEventTime - lastMoveTime;
-    const dy = endPosition.y - startPosition.y;
+    const dy = pendingDragEndPosition.y - pendingDragStartPosition.y;
     lastMoveTime = pendingDragEventTime;
 
     if (isDuringTheSecondTap) {
@@ -166,8 +164,8 @@ export function createTouchZoomHandlers(
       controller.enableInputs = false;
       panCameraByOrbitingSurface(
         viewer.scene,
-        startPosition,
-        endPosition,
+        pendingDragStartPosition,
+        pendingDragEndPosition,
         gestureSurfacePicker,
       );
     }
