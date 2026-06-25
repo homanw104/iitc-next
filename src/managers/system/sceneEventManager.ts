@@ -7,6 +7,8 @@ import { logManager } from "./logManager";
 import { settingsManager } from "./settingsManager";
 
 const LOG_TAG = "SceneEventManager";
+const GOOGLE_3D_TILES_QUALITY_SETTLE_MS = 750;
+const GOOGLE_3D_TILES_QUALITY_STABLE_FRAMES = 3;
 
 export class SceneEventManager {
   private readonly useGoogle3dTiles = settingsManager.getUseGoogle3dTiles();
@@ -47,13 +49,14 @@ export class SceneEventManager {
         if (!tileset || tileset === initTileset) return;
 
         initTileset = tileset;
-        const removeInitialTilesLoadedListener = tileset.initialTilesLoaded.addEventListener(resolveOnce);
+        const waitForQuality = this.waitForGoogleTilesQuality(tileset, resolveOnce);
+        const removeAllTilesLoadedListener = tileset.allTilesLoaded.addEventListener(waitForQuality);
         const removeLoadProgressListener = tileset.loadProgress.addEventListener((pendingRequests: number, tilesProcessing: number) => {
-          if (pendingRequests === 0 && tilesProcessing === 0 && tileset.tilesLoaded) resolveOnce();
+          if (pendingRequests === 0 && tilesProcessing === 0 && tileset.tilesLoaded) waitForQuality();
         });
-        cleanupCallbacks.push(removeInitialTilesLoadedListener, removeLoadProgressListener);
+        cleanupCallbacks.push(waitForQuality.cancel, removeAllTilesLoadedListener, removeLoadProgressListener);
 
-        if (tileset.tilesLoaded) resolveOnce();
+        if (tileset.tilesLoaded) waitForQuality();
       };
 
       const waitForTerrainTiles = () => {
@@ -123,6 +126,66 @@ export class SceneEventManager {
       const percent = Math.max(1, Math.min(95, Math.round(1 + completedRatio * 94)));
       this.logGoogleTilesProgress(percent);
     });
+  }
+
+  private waitForGoogleTilesQuality(tileset: Cesium.Cesium3DTileset, resolve: () => void): (() => void) & { cancel: () => void } {
+    let isWaiting = false;
+    let settleStartTime = 0;
+    let stableFrames = 0;
+    let removePostRenderListener: (() => void) | undefined;
+    let renderTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const cancel = () => {
+      if (removePostRenderListener) {
+        removePostRenderListener();
+        removePostRenderListener = undefined;
+      }
+      if (renderTimer) {
+        clearTimeout(renderTimer);
+        renderTimer = undefined;
+      }
+    };
+
+    const requestSettlingRender = () => {
+      if (!isWaiting || this.initSceneLoaded) return;
+
+      this.viewer.scene.requestRender();
+      renderTimer = setTimeout(requestSettlingRender, 100);
+    };
+
+    const checkSettled = () => {
+      if (this.initSceneLoaded) {
+        cancel();
+        return;
+      }
+
+      if (!tileset.tilesLoaded) {
+        settleStartTime = 0;
+        stableFrames = 0;
+        return;
+      }
+
+      if (settleStartTime === 0) settleStartTime = performance.now();
+      stableFrames += 1;
+
+      if (performance.now() - settleStartTime < GOOGLE_3D_TILES_QUALITY_SETTLE_MS) return;
+      if (stableFrames < GOOGLE_3D_TILES_QUALITY_STABLE_FRAMES) return;
+
+      cancel();
+      resolve();
+    };
+
+    const waitForQuality = () => {
+      if (isWaiting || this.initSceneLoaded) return;
+
+      isWaiting = true;
+      removePostRenderListener = this.viewer.scene.postRender.addEventListener(checkSettled);
+      requestSettlingRender();
+      checkSettled();
+    };
+
+    waitForQuality.cancel = cancel;
+    return waitForQuality;
   }
 
   private logGoogleTilesProgress(percent: number): void {

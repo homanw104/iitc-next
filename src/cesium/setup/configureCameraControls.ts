@@ -17,9 +17,6 @@ export function configureCameraControls(viewer: Cesium.Viewer): void {
   // Prefer ellipsoid-based drag handling even near the ground. Cesium's default
   // near-ground terrain pick can fail during main-thread stalls, which makes it
   // fall back to free-look in the middle of a normal left-drag pan.
-  //
-  // No longer needed since we don't limit the tilt angle anymore
-  //
-  // controller.minimumPickingTerrainHeight = 0;
-  // controller.minimumTrackBallHeight = 0;
+  controller.minimumPickingTerrainHeight = 0;
+  controller.minimumTrackBallHeight = 0;
 }

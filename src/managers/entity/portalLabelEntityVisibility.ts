@@ -16,30 +16,30 @@ const RAY_CAST_CALCULATION_HEIGHT_COMPENSATE = 5;
 
 const loggedVisibilityFailures = new Set<string>();
 const portalLabelEntityTerrainPickScratch = new Cesium.Cartesian3();
+const portalLabelEntityDepthPickScratch = new Cesium.Cartesian3();
 const portalLabelEntityRayTargetScratch = new Cesium.Cartesian3();
 const portalLabelEntityRayDirectionScratch = new Cesium.Cartesian3();
 const portalLabelEntityVisibilityRayScratch = new Cesium.Ray();
 
-type ScenePickFromRayResult = {
-  position?: Cesium.Cartesian3;
-};
-
-type SceneWithPickFromRay = Cesium.Scene & {
-  pickFromRay?: (ray: Cesium.Ray, objectsToExclude?: object[], width?: number) => ScenePickFromRayResult | undefined;
-};
-
 export function isPortalLabelEntityPositionVisible(
   viewer: Cesium.Viewer,
   labelPosition: Cesium.Cartesian3,
+  windowPosition?: Cesium.Cartesian2,
 ): boolean {
   const globe = viewer.scene.globe;
   const rayTargetPosition = getRayTargetPosition(labelPosition);
-  const ray = getCameraToPositionRay(viewer.camera, rayTargetPosition);
-  if (!ray) return false;
 
   if (!globe.show) {
-    return isPortalLabelEntityPositionVisibleAgainstRenderedTiles(viewer, rayTargetPosition, ray);
+    if (!windowPosition) {
+      warnVisibilityFailure("rendered-depth-position-unavailable", "Label visibility check failed because the label window position is unavailable.");
+      return false;
+    }
+
+    return isPortalLabelEntityPositionVisibleAgainstRenderedDepth(viewer, rayTargetPosition, windowPosition);
   }
+
+  const ray = getCameraToPositionRay(viewer.camera, rayTargetPosition);
+  if (!ray) return false;
 
   const terrainPosition = globe.pick(ray, viewer.scene, portalLabelEntityTerrainPickScratch);
   if (!terrainPosition) {
@@ -66,35 +66,34 @@ export function takePortalLabelEntityGuidBatch(queuedGuids: Set<string>, limit: 
   return batch;
 }
 
-function isPortalLabelEntityPositionVisibleAgainstRenderedTiles(
+function isPortalLabelEntityPositionVisibleAgainstRenderedDepth(
   viewer: Cesium.Viewer,
   labelPosition: Cesium.Cartesian3,
-  ray: Cesium.Ray,
+  windowPosition: Cesium.Cartesian2,
 ): boolean {
-  const tilePosition = pickRenderedTilePosition(viewer.scene, ray);
-  if (!tilePosition) {
-    warnVisibilityFailure("rendered-tile-pick-unavailable", "Label visibility check failed because rendered 3D tile pick is unavailable.");
+  const depthPosition = pickRenderedDepthPosition(viewer.scene, windowPosition);
+  if (!depthPosition) {
+    warnVisibilityFailure("rendered-depth-pick-unavailable", "Label visibility check failed because rendered depth pick is unavailable.");
     return false;
   }
 
   return isPickedPositionVisible(
     viewer.camera,
-    tilePosition,
+    depthPosition,
     labelPosition,
   );
 }
 
-function pickRenderedTilePosition(scene: Cesium.Scene, ray: Cesium.Ray): Cesium.Cartesian3 | undefined {
-  const sceneWithPickFromRay = scene as SceneWithPickFromRay;
-  if (!sceneWithPickFromRay.pickFromRay) {
-    warnVisibilityFailure("rendered-tile-pick-unavailable", "Label visibility check failed because rendered 3D tile pick is unavailable.");
+function pickRenderedDepthPosition(scene: Cesium.Scene, windowPosition: Cesium.Cartesian2): Cesium.Cartesian3 | undefined {
+  if (!scene.pickPositionSupported) {
+    warnVisibilityFailure("rendered-depth-pick-unavailable", "Label visibility check failed because rendered depth pick is unavailable.");
     return undefined;
   }
 
   try {
-    return sceneWithPickFromRay.pickFromRay(ray)?.position;
+    return scene.pickPosition(windowPosition, portalLabelEntityDepthPickScratch);
   } catch (error) {
-    warnVisibilityFailure("rendered-tile-pick-error", "Label visibility check failed while picking rendered 3D tiles.", error);
+    warnVisibilityFailure("rendered-depth-pick-error", "Label visibility check failed while picking rendered depth.", error);
     return undefined;
   }
 }
