@@ -60,6 +60,16 @@ interface PendingPinchGesture {
   finger2Current: Cesium.Cartesian2;
 }
 
+interface QueuedPinchMove {
+  position1: Cesium.Cartesian2;
+  position2: Cesium.Cartesian2;
+  previousPosition1: Cesium.Cartesian2;
+  previousPosition2: Cesium.Cartesian2;
+  angleAndHeightStartPosition: Cesium.Cartesian2;
+  angleAndHeightEndPosition: Cesium.Cartesian2;
+  eventTime: number;
+}
+
 export function createPinchGestureHandlers(
   viewer: Cesium.Viewer,
   handler: Cesium.ScreenSpaceEventHandler,
@@ -79,6 +89,8 @@ export function createPinchGestureHandlers(
   let pinchStartDistance = 0;
   let pinchStartAngle = 0;
   let revertHasJustPinchedTimeoutId: number | null = null;
+  let pinchMoveFrameRequestId: number | null = null;
+  let queuedPinchMove: QueuedPinchMove | null = null;
   const avgPosition = new Cesium.Cartesian2();
   const previousAvgPosition = new Cesium.Cartesian2();
   const centerPosition = new Cesium.Cartesian2();
@@ -100,6 +112,11 @@ export function createPinchGestureHandlers(
     pinchStartDistance = 0;
     pinchStartAngle = 0;
     lastPinchMoveTime = Date.now();
+    queuedPinchMove = null;
+    if (pinchMoveFrameRequestId !== null) {
+      window.cancelAnimationFrame(pinchMoveFrameRequestId);
+      pinchMoveFrameRequestId = null;
+    }
 
     if (gestureState.momentumRequestId) {
       window.cancelAnimationFrame(gestureState.momentumRequestId);
@@ -108,6 +125,10 @@ export function createPinchGestureHandlers(
   };
 
   const handlePinchMove = (event: PinchMoveEvent) => {
+    queuePinchMoveFrame(event);
+  };
+
+  const queuePinchMoveFrame = (event: PinchMoveEvent) => {
     // @ts-expect-error - We need to access the handler's internal properties to get the screen positions.
     const handlerInternal = handler as {
       _positions: { values: Cesium.Cartesian2[] };
@@ -119,6 +140,40 @@ export function createPinchGestureHandlers(
     const position2 = positions.values[1];
     const previousPosition1 = previousPositions.values[0];
     const previousPosition2 = previousPositions.values[1];
+    if (!position1 || !position2 || !previousPosition1 || !previousPosition2) return;
+
+    if (!queuedPinchMove) {
+      queuedPinchMove = {
+        position1: Cesium.Cartesian2.clone(position1),
+        position2: Cesium.Cartesian2.clone(position2),
+        previousPosition1: Cesium.Cartesian2.clone(previousPosition1),
+        previousPosition2: Cesium.Cartesian2.clone(previousPosition2),
+        angleAndHeightStartPosition: Cesium.Cartesian2.clone(event.angleAndHeight.startPosition),
+        angleAndHeightEndPosition: Cesium.Cartesian2.clone(event.angleAndHeight.endPosition),
+        eventTime: Date.now(),
+      };
+    } else {
+      Cesium.Cartesian2.clone(position1, queuedPinchMove.position1);
+      Cesium.Cartesian2.clone(position2, queuedPinchMove.position2);
+      Cesium.Cartesian2.clone(event.angleAndHeight.endPosition, queuedPinchMove.angleAndHeightEndPosition);
+      queuedPinchMove.eventTime = Date.now();
+    }
+
+    if (pinchMoveFrameRequestId !== null) return;
+    pinchMoveFrameRequestId = window.requestAnimationFrame(applyQueuedPinchMoveFrame);
+  };
+
+  const applyQueuedPinchMoveFrame = () => {
+    pinchMoveFrameRequestId = null;
+    if (!queuedPinchMove) return;
+
+    const queuedMove = queuedPinchMove;
+    queuedPinchMove = null;
+
+    const position1 = queuedMove.position1;
+    const position2 = queuedMove.position2;
+    const previousPosition1 = queuedMove.previousPosition1;
+    const previousPosition2 = queuedMove.previousPosition2;
 
     const currentDistance = Cesium.Cartesian2.distance(position1, position2);
     const previousDistance = Cesium.Cartesian2.distance(previousPosition1, previousPosition2);
@@ -143,8 +198,8 @@ export function createPinchGestureHandlers(
     centerPosition.x = (avgPosition.x + previousAvgPosition.x) / 2;
     centerPosition.y = (avgPosition.y + previousAvgPosition.y) / 2;
 
-    let angleDelta = event.angleAndHeight.endPosition.x - event.angleAndHeight.startPosition.x;
-    const heightDelta = event.angleAndHeight.endPosition.y - event.angleAndHeight.startPosition.y;
+    let angleDelta = queuedMove.angleAndHeightEndPosition.x - queuedMove.angleAndHeightStartPosition.x;
+    const heightDelta = queuedMove.angleAndHeightEndPosition.y - queuedMove.angleAndHeightStartPosition.y;
 
     if (angleDelta > Math.PI) {
       angleDelta -= 2 * Math.PI;
@@ -185,7 +240,7 @@ export function createPinchGestureHandlers(
       const distanceDelta = currentDistance - previousDistance;
 
       if (Math.abs(distanceDelta) > 0) {
-        const now = Date.now();
+        const now = queuedMove.eventTime;
         const dt = now - lastPinchMoveTime;
         lastPinchMoveTime = now;
 
@@ -261,6 +316,12 @@ export function createPinchGestureHandlers(
   };
 
   const handlePinchEnd = () => {
+    if (pinchMoveFrameRequestId !== null) {
+      window.cancelAnimationFrame(pinchMoveFrameRequestId);
+      pinchMoveFrameRequestId = null;
+      applyQueuedPinchMoveFrame();
+    }
+
     gestureState.isPinching = false;
     gestureState.hasJustPinched = true;
     if (revertHasJustPinchedTimeoutId) window.clearTimeout(revertHasJustPinchedTimeoutId);
