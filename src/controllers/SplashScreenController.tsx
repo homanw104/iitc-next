@@ -3,10 +3,12 @@ import SplashScreen from "../components/splash/SplashScreen.tsx";
 import { logManager } from "../managers/system/logManager";
 import type { LogEntry, LogEntryCallback } from "../managers/system/logManager";
 
-const FADE_OUT_MS = 200;
+const FADE_OUT_WAIT_MS = 500;
+const FADE_OUT_ANIMATION_MS = 200;
 
 export class SplashScreenController {
   private splashEl: HTMLElement | null = null;
+  private initTextEl: HTMLElement | null = null;
   private logGridEl: HTMLElement | null = null;
   private logEntryCallback: LogEntryCallback | null = null;
 
@@ -17,7 +19,10 @@ export class SplashScreenController {
   public init(): void {
     this.splashEl = this.container.appendChild(SplashScreen({
       logEntries: logManager.getRecordedLogs(),
-      fadeOutMs: FADE_OUT_MS,
+      fadeOutMs: FADE_OUT_ANIMATION_MS,
+      onInitTextRef: (initText) => {
+        this.initTextEl = initText;
+      },
       onLogGridRef: (logGrid) => {
         this.logGridEl = logGrid;
         this.scheduleClippedMessageUpdate(logGrid);
@@ -63,13 +68,17 @@ export class SplashScreenController {
     if (this.logEntryCallback) logManager.unsubscribe(this.logEntryCallback);
     this.logEntryCallback = null;
 
-    if (this.splashEl) this.splashEl.style.opacity = "0";
+    if (this.initTextEl) this.initTextEl.textContent = "Initialization complete.";
+    window.setTimeout(() => {
+      if (this.splashEl) this.splashEl.style.opacity = "0";
+    }, FADE_OUT_WAIT_MS);
     window.setTimeout(() => {
       if (this.splashEl) {
         this.splashEl.remove();
         this.splashEl = null;
+        this.initTextEl = null;
         this.logGridEl = null;
       }
-    }, FADE_OUT_MS);
+    },  FADE_OUT_WAIT_MS + FADE_OUT_ANIMATION_MS);
   }
 }

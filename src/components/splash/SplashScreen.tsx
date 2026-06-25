@@ -5,9 +5,10 @@ import SplashInitText from "./SplashInitText.tsx";
 import SplashMessage from "./SplashMessage.tsx";
 import SplashTitle from "./SplashTitle.tsx";
 
-const SplashScreen = ({ logEntries, fadeOutMs, onLogGridRef }: {
+const SplashScreen = ({ logEntries, fadeOutMs, onInitTextRef, onLogGridRef }: {
   logEntries: LogEntry[];
   fadeOutMs: number;
+  onInitTextRef?: (initText: HTMLElement) => void;
   onLogGridRef?: (logGrid: HTMLElement) => void;
 }): HTMLElement => {
   return (
@@ -44,7 +45,7 @@ const SplashScreen = ({ logEntries, fadeOutMs, onLogGridRef }: {
       >
         <SplashTitle />
         <SplashDivider />
-        <SplashInitText />
+        <SplashInitText ref={(el: HTMLElement) => onInitTextRef?.(el)} />
         <div
           style={{
             margin: "0",

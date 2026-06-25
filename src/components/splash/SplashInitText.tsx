@@ -1,8 +1,11 @@
 import { h } from "../../utils/dom.ts";
 
-const SplashInitText = (): HTMLElement => {
+const SplashInitText = ({ ref }: {
+  ref?: (el: HTMLElement) => void,
+}): HTMLElement => {
   return (
     <pre
+      ref={ref}
       style={{
         marginTop: "60px",
         minHeight: "37.8px",
