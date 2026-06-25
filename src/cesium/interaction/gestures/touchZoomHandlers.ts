@@ -4,6 +4,7 @@
 
 import * as Cesium from "cesium";
 import {
+  createGestureSurfacePicker,
   keepCameraAboveRenderedSurface,
   MINIMUM_3D_TILE_CAMERA_CLEARANCE_METERS,
   panCameraByOrbitingSurface,
@@ -27,6 +28,7 @@ export function createTouchZoomHandlers(
   gestureState: InteractionGestureState,
   doubleTapThreshold: number,
 ): TouchZoomHandlers {
+  const gestureSurfacePicker = createGestureSurfacePicker(viewer.scene);
   let lastMoveTime = 0;
   let zoomVelocity = 0;
   let totalMovementLength = 0;
@@ -44,6 +46,7 @@ export function createTouchZoomHandlers(
 
   viewer.scene.canvas.addEventListener("touchstart", (event) => {
     activeTouchCount = event.touches.length;
+    gestureSurfacePicker.reset();
     if (activeTouchCount === 1) {
       controller.enableInputs = false;
     } else {
@@ -58,6 +61,7 @@ export function createTouchZoomHandlers(
 
   viewer.scene.canvas.addEventListener("touchcancel", (event) => {
     activeTouchCount = event.touches.length;
+    gestureSurfacePicker.reset();
     if (activeTouchCount === 0) {
       isSingleTouchPanning = false;
       controller.enableInputs = true;
@@ -164,6 +168,7 @@ export function createTouchZoomHandlers(
         viewer.scene,
         startPosition,
         endPosition,
+        gestureSurfacePicker,
       );
     }
   };
@@ -175,6 +180,7 @@ export function createTouchZoomHandlers(
       dragFrameRequestId = null;
       applyQueuedDragFrame();
     }
+    gestureSurfacePicker.reset();
 
     if (isSingleTouchPanning) {
       isSingleTouchPanning = false;

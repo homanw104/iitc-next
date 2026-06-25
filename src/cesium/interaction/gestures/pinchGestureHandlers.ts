@@ -4,6 +4,7 @@
 
 import * as Cesium from "cesium";
 import {
+  createGestureSurfacePicker,
   getCameraPitchRelativeToGlobePoint,
   keepCameraAboveRenderedSurface,
   panCameraByOrbitingSurface,
@@ -78,6 +79,7 @@ export function createPinchGestureHandlers(
   doubleTapThreshold: number,
 ): PinchGestureHandlers {
   const camera = viewer.camera;
+  const gestureSurfacePicker = createGestureSurfacePicker(viewer.scene);
 
   let pinchMode: PinchMode = "pending";
   let lastPinchMoveTime = 0;
@@ -109,6 +111,7 @@ export function createPinchGestureHandlers(
     rotationCenter = null;
     tiltCenter = null;
     hasPinchStartPositions = false;
+    gestureSurfacePicker.reset();
     pinchStartDistance = 0;
     pinchStartAngle = 0;
     lastPinchMoveTime = Date.now();
@@ -227,15 +230,19 @@ export function createPinchGestureHandlers(
       const dy = avgPosition.y - previousAvgPosition.y;
 
       if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
-        panCameraByOrbitingSurface(viewer.scene, previousAvgPosition, avgPosition);
+        panCameraByOrbitingSurface(viewer.scene, previousAvgPosition, avgPosition, gestureSurfacePicker);
       }
 
       const center = pinchMode === "rotate"
-        ? rotationCenter ?? pickGestureSurfacePosition(viewer.scene, centerPosition)
-        : pickGestureSurfacePosition(viewer.scene, centerPosition);
-      if (pinchMode === "rotate" && center) rotationCenter = center;
+        ? rotationCenter ?? pickGestureSurfacePosition(viewer.scene, centerPosition, gestureSurfacePicker)
+        : pickGestureSurfacePosition(viewer.scene, centerPosition, gestureSurfacePicker);
+      if (pinchMode === "rotate" && center) {
+        rotationCenter = Cesium.Cartesian3.clone(center, rotationCenter ?? new Cesium.Cartesian3());
+      }
       // Momentum keeps using the last valid anchor if the fingers leave the visible globe.
-      if (center) lastPinchCenter = center;
+      if (center) {
+        lastPinchCenter = Cesium.Cartesian3.clone(center, lastPinchCenter ?? new Cesium.Cartesian3());
+      }
 
       const distanceDelta = currentDistance - previousDistance;
 
@@ -273,10 +280,14 @@ export function createPinchGestureHandlers(
         const canvas = viewer.scene.canvas;
         tiltCenterPosition.x = canvas.clientWidth / 2;
         tiltCenterPosition.y = canvas.clientHeight / 2;
-        tiltCenter = pickGestureSurfacePosition(
+        const pickedTiltCenter = pickGestureSurfacePosition(
           viewer.scene,
           tiltCenterPosition,
-        ) ?? null;
+          gestureSurfacePicker,
+        );
+        tiltCenter = pickedTiltCenter
+          ? Cesium.Cartesian3.clone(pickedTiltCenter, tiltCenter ?? new Cesium.Cartesian3())
+          : null;
       }
 
       if (!tiltCenter) return;
@@ -323,6 +334,7 @@ export function createPinchGestureHandlers(
     }
 
     gestureState.isPinching = false;
+    gestureSurfacePicker.reset();
     gestureState.hasJustPinched = true;
     if (revertHasJustPinchedTimeoutId) window.clearTimeout(revertHasJustPinchedTimeoutId);
     revertHasJustPinchedTimeoutId = window.setTimeout(() => gestureState.hasJustPinched = false, doubleTapThreshold);

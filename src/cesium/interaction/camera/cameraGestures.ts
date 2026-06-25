@@ -18,10 +18,77 @@ const gesturePickRayScratch = new Cesium.Ray();
 const gesturePickTerrainScratch = new Cesium.Cartesian3();
 const gesturePickEllipsoidScratch = new Cesium.Cartesian3();
 
+export interface GestureSurfacePicker {
+  pick(windowPosition: Cesium.Cartesian2): Cesium.Cartesian3 | undefined;
+  reset(): void;
+}
+
+export function createGestureSurfacePicker(scene: Cesium.Scene): GestureSurfacePicker {
+  const renderedPositionScratch = new Cesium.Cartesian3();
+  const tangentPositionScratch = new Cesium.Cartesian3();
+  const tangentRayScratch = new Cesium.Ray();
+  const planePoint = new Cesium.Cartesian3();
+  const planeNormal = new Cesium.Cartesian3();
+  const rayToPlanePointScratch = new Cesium.Cartesian3();
+  let hasTangentPlane = false;
+
+  const reset = () => {
+    hasTangentPlane = false;
+  };
+
+  const pick = (windowPosition: Cesium.Cartesian2): Cesium.Cartesian3 | undefined => {
+    if (scene.globe.show) return pickGestureSurfacePosition(scene, windowPosition);
+
+    if (!scene.pickPositionSupported) return pickGestureEllipsoidPosition(scene, windowPosition);
+
+    if (!hasTangentPlane) {
+      const renderedPosition = scene.pickPosition(windowPosition, renderedPositionScratch);
+      if (renderedPosition) {
+        updateTangentPlane(renderedPosition);
+        return renderedPosition;
+      }
+    }
+
+    const tangentPosition = pickTangentPlanePosition(windowPosition);
+    if (tangentPosition) return tangentPosition;
+
+    return pickGestureEllipsoidPosition(scene, windowPosition);
+  };
+
+  const updateTangentPlane = (
+    renderedPosition: Cesium.Cartesian3,
+  ) => {
+    Cesium.Cartesian3.clone(renderedPosition, planePoint);
+    scene.globe.ellipsoid.geodeticSurfaceNormal(renderedPosition, planeNormal);
+    hasTangentPlane = true;
+  };
+
+  const pickTangentPlanePosition = (windowPosition: Cesium.Cartesian2): Cesium.Cartesian3 | undefined => {
+    if (!hasTangentPlane) return undefined;
+
+    const ray = scene.camera.getPickRay(windowPosition, tangentRayScratch);
+    if (!ray) return undefined;
+
+    const denominator = Cesium.Cartesian3.dot(planeNormal, ray.direction);
+    if (Math.abs(denominator) < Cesium.Math.EPSILON6) return undefined;
+
+    Cesium.Cartesian3.subtract(planePoint, ray.origin, rayToPlanePointScratch);
+    const distance = Cesium.Cartesian3.dot(rayToPlanePointScratch, planeNormal) / denominator;
+    if (distance <= 0) return undefined;
+
+    return Cesium.Ray.getPoint(ray, distance, tangentPositionScratch);
+  };
+
+  return { pick, reset };
+}
+
 export function pickGestureSurfacePosition(
   scene: Cesium.Scene,
   windowPosition: Cesium.Cartesian2,
+  surfacePicker?: GestureSurfacePicker,
 ): Cesium.Cartesian3 | undefined {
+  if (surfacePicker) return surfacePicker.pick(windowPosition);
+
   const camera = scene.camera;
   const globe = scene.globe;
 
@@ -46,14 +113,15 @@ export function panCameraByOrbitingSurface(
   scene: Cesium.Scene,
   startPosition: Cesium.Cartesian2,
   endPosition: Cesium.Cartesian2,
+  surfacePicker?: GestureSurfacePicker,
 ): void {
   const camera = scene.camera;
-  const start = pickGestureSurfacePosition(scene, startPosition);
+  const start = pickGestureSurfacePosition(scene, startPosition, surfacePicker);
   if (!start) return;
 
   Cesium.Cartesian3.clone(start, panStartScratch);
 
-  const end = pickGestureSurfacePosition(scene, endPosition);
+  const end = pickGestureSurfacePosition(scene, endPosition, surfacePicker);
   if (!end) return;
 
   Cesium.Cartesian3.clone(end, panEndScratch);
@@ -70,6 +138,16 @@ export function panCameraByOrbitingSurface(
 
   Cesium.Cartesian3.normalize(axis, axis);
   camera.rotate(axis, Cesium.Math.acosClamped(dot));
+}
+
+function pickGestureEllipsoidPosition(
+  scene: Cesium.Scene,
+  windowPosition: Cesium.Cartesian2,
+): Cesium.Cartesian3 | undefined {
+  const globe = scene.globe;
+  return globe
+    ? scene.camera.pickEllipsoid(windowPosition, globe.ellipsoid, gesturePickEllipsoidScratch)
+    : undefined;
 }
 
 export function zoomCameraAlongViewDirection(camera: Cesium.Camera, amount: number): void {
