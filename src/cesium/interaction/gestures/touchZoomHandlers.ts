@@ -6,7 +6,7 @@ import * as Cesium from "cesium";
 import {
   keepCameraAboveRenderedSurface,
   MINIMUM_3D_TILE_CAMERA_CLEARANCE_METERS,
-  panCameraByOrbitingGlobe,
+  panCameraByOrbitingSurface,
 } from "../camera/cameraGestures";
 import type { InteractionGestureState } from "../state/interactionGestureState";
 
@@ -160,9 +160,8 @@ export function createTouchZoomHandlers(
     } else if (activeTouchCount === 1 && totalMovementLength > DRAG_THRESHOLD_PIXELS) {
       isSingleTouchPanning = true;
       controller.enableInputs = false;
-      panCameraByOrbitingGlobe(
-        viewer.camera,
-        viewer.scene.globe.ellipsoid,
+      panCameraByOrbitingSurface(
+        viewer.scene,
         startPosition,
         endPosition,
       );

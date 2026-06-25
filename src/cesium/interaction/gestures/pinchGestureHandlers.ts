@@ -6,8 +6,8 @@ import * as Cesium from "cesium";
 import {
   getCameraPitchRelativeToGlobePoint,
   keepCameraAboveRenderedSurface,
-  panCameraByOrbitingGlobe,
-  pickRenderedGlobeOrTilePosition,
+  panCameraByOrbitingSurface,
+  pickGestureSurfacePosition,
   zoomCameraAlongViewDirection,
   zoomCameraAroundGlobePoint,
 } from "../camera/cameraGestures";
@@ -227,12 +227,12 @@ export function createPinchGestureHandlers(
       const dy = avgPosition.y - previousAvgPosition.y;
 
       if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
-        panCameraByOrbitingGlobe(camera, viewer.scene.globe.ellipsoid, previousAvgPosition, avgPosition);
+        panCameraByOrbitingSurface(viewer.scene, previousAvgPosition, avgPosition);
       }
 
       const center = pinchMode === "rotate"
-        ? rotationCenter ?? pickRenderedGlobeOrTilePosition(viewer.scene, centerPosition)
-        : pickRenderedGlobeOrTilePosition(viewer.scene, centerPosition);
+        ? rotationCenter ?? pickGestureSurfacePosition(viewer.scene, centerPosition)
+        : pickGestureSurfacePosition(viewer.scene, centerPosition);
       if (pinchMode === "rotate" && center) rotationCenter = center;
       // Momentum keeps using the last valid anchor if the fingers leave the visible globe.
       if (center) lastPinchCenter = center;
@@ -250,7 +250,7 @@ export function createPinchGestureHandlers(
         }
 
         const height = camera.positionCartographic.height;
-        const zoomFactor = height * 0.003;
+        const zoomFactor = height * 0.0015;
         if (center) {
           // Prefer anchored zoom, so pinching near an edge still zooms around that point.
           zoomCameraAroundGlobePoint(camera, center, distanceDelta * zoomFactor);
@@ -273,7 +273,7 @@ export function createPinchGestureHandlers(
         const canvas = viewer.scene.canvas;
         tiltCenterPosition.x = canvas.clientWidth / 2;
         tiltCenterPosition.y = canvas.clientHeight / 2;
-        tiltCenter = pickRenderedGlobeOrTilePosition(
+        tiltCenter = pickGestureSurfacePosition(
           viewer.scene,
           tiltCenterPosition,
         ) ?? null;

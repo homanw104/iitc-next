@@ -14,55 +14,55 @@ const panAxisScratch = new Cesium.Cartesian3();
 const pitchTransformScratch = new Cesium.Matrix4();
 const pitchInverseTransformScratch = new Cesium.Matrix4();
 const pitchLocalDirectionScratch = new Cesium.Cartesian3();
+const gesturePickRayScratch = new Cesium.Ray();
+const gesturePickTerrainScratch = new Cesium.Cartesian3();
+const gesturePickEllipsoidScratch = new Cesium.Cartesian3();
 
-export function pickRenderedGlobeOrTilePosition(
+export function pickGestureSurfacePosition(
   scene: Cesium.Scene,
   windowPosition: Cesium.Cartesian2,
 ): Cesium.Cartesian3 | undefined {
   const camera = scene.camera;
   const globe = scene.globe;
 
-  let depthIntersection: Cesium.Cartesian3 | undefined;
-  if (scene.pickPositionSupported) {
-    depthIntersection = scene.pickPosition(windowPosition);
+  if (!globe.show && scene.pickPositionSupported) {
+    const renderedPosition = scene.pickPosition(windowPosition);
+    if (renderedPosition) return renderedPosition;
   }
 
-  const ray = camera.getPickRay(windowPosition);
-  const terrainIntersection = globe && ray
-    ? globe.pick(ray, scene)
-    : undefined;
+  const ray = camera.getPickRay(windowPosition, gesturePickRayScratch);
 
-  const depthDistance = depthIntersection
-    ? Cesium.Cartesian3.distance(depthIntersection, camera.positionWC)
-    : Number.POSITIVE_INFINITY;
-  const terrainDistance = terrainIntersection
-    ? Cesium.Cartesian3.distance(terrainIntersection, camera.positionWC)
-    : Number.POSITIVE_INFINITY;
+  if (ray && globe) {
+    const terrainIntersection = globe.pick(ray, scene, gesturePickTerrainScratch);
+    if (terrainIntersection) return terrainIntersection;
+  }
 
-  if (depthDistance < terrainDistance) return depthIntersection;
-  if (terrainIntersection) return terrainIntersection;
-
-  return ray && globe
-    ? camera.pickEllipsoid(windowPosition, globe.ellipsoid)
+  return globe
+    ? camera.pickEllipsoid(windowPosition, globe.ellipsoid, gesturePickEllipsoidScratch)
     : undefined;
 }
 
-export function panCameraByOrbitingGlobe(
-  camera: Cesium.Camera,
-  ellipsoid: Cesium.Ellipsoid,
+export function panCameraByOrbitingSurface(
+  scene: Cesium.Scene,
   startPosition: Cesium.Cartesian2,
   endPosition: Cesium.Cartesian2,
 ): void {
-  const start = camera.pickEllipsoid(startPosition, ellipsoid, panStartScratch);
-  const end = camera.pickEllipsoid(endPosition, ellipsoid, panEndScratch);
+  const camera = scene.camera;
+  const start = pickGestureSurfacePosition(scene, startPosition);
+  if (!start) return;
 
-  if (!start || !end) return;
+  Cesium.Cartesian3.clone(start, panStartScratch);
+
+  const end = pickGestureSurfacePosition(scene, endPosition);
+  if (!end) return;
+
+  Cesium.Cartesian3.clone(end, panEndScratch);
 
   // Treat the two picked surface points as unit vectors from the globe center.
   // Rotating the camera around their cross-product axis makes the ground slide
   // under the fingers without changing camera height.
-  const startNormal = Cesium.Cartesian3.normalize(start, panStartNormalScratch);
-  const endNormal = Cesium.Cartesian3.normalize(end, panEndNormalScratch);
+  const startNormal = Cesium.Cartesian3.normalize(panStartScratch, panStartNormalScratch);
+  const endNormal = Cesium.Cartesian3.normalize(panEndScratch, panEndNormalScratch);
   const dot = Cesium.Cartesian3.dot(startNormal, endNormal);
   const axis = Cesium.Cartesian3.cross(startNormal, endNormal, panAxisScratch);
 
