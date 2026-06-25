@@ -165,7 +165,6 @@ export function initCesiumViewer(container: string): Cesium.Viewer {
     baseLayerPicker: !useGoogle3dTiles,
     sceneModePicker: !useGoogle3dTiles,
     geocoder: useGoogle3dTiles ? Cesium.IonGeocodeProviderType.GOOGLE : undefined,
-    terrain: Cesium.Terrain.fromWorldTerrain(),
     requestRenderMode: true,
     maximumRenderTimeChange: Infinity,
   });

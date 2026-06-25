@@ -13,16 +13,16 @@ const LOG_TAG = "EntityPositionManager";
 const GOOGLE_GROUND_TERRAIN_COMPENSATION_METER = 1;
 
 // Fast terrain-network sample used before an entity is first shown.
-const WORLD_TERRAIN_SAMPLE_LEVEL = 11;
+const TERRAIN_SAMPLE_LEVEL = 11;
 
 // Height sampling from currently rendered Google 3D Tiles.
 const GOOGLE_RENDERED_SAMPLE_BATCH_SIZE = 16;
 const GOOGLE_RENDERED_SAMPLE_BATCH_DELAY_MS = 10;
 
-type HeightSource = "worldTerrain" | "rendered";
+type HeightSource = "terrain" | "rendered";
 
 const HEIGHT_SOURCE_RANK: Record<HeightSource, number> = {
-  worldTerrain: 0,
+  terrain: 0,
   rendered: 1,
 };
 
@@ -45,7 +45,6 @@ export class EntityPositionManager {
   private readonly useGoogle3dTiles = settingsManager.getUseGoogle3dTiles();
   private readonly positionStatesByKey = new Map<string, EntityPositionState>();
   private readonly pendingPositionPromisesByKey = new Map<string, Promise<Cesium.Cartesian3>>();
-  private readonly worldTerrainProviderPromise: Promise<Cesium.TerrainProvider | undefined>;
   private readonly refreshableHeightKeys = new Set<string>();
   private readonly renderedHeightQueuedKeys = new Set<string>();
   private readonly renderedHeightSamplingKeys = new Set<string>();
@@ -63,9 +62,6 @@ export class EntityPositionManager {
     private readonly viewer: Cesium.Viewer,
     private readonly sceneEventManager: SceneEventManager,
   ) {
-    this.worldTerrainProviderPromise = Cesium.createWorldTerrainAsync()
-      .catch(() => undefined);
-
     viewer.camera.moveStart.addEventListener(() => {
       this.cameraMoving = true;
       this.heightSamplingViewRectangleDirty = true;
@@ -125,17 +121,17 @@ export class EntityPositionManager {
   }
 
   public invalidateTerrainPositions(): boolean {
-    const canRefreshWorldTerrainPositions = !this.isHeightSamplingSuppressed();
+    const canRefreshTerrainProviderPositions = !this.isHeightSamplingSuppressed();
 
     this.heightSamplingGeneration++;
     this.refreshableHeightKeys.clear();
     this.clearRenderedHeightWork();
 
     this.positionStatesByKey.forEach((positionState) => {
-      positionState.heightSource = "worldTerrain";
+      positionState.heightSource = "terrain";
       positionState.renderedHeightSampleGeneration = -1;
       this.refreshableHeightKeys.add(getEntityPositionKey(positionState.latE6, positionState.lngE6));
-      if (canRefreshWorldTerrainPositions) this.refreshWorldTerrainPosition(positionState);
+      if (canRefreshTerrainProviderPositions) this.refreshTerrainProviderPosition(positionState);
     });
     return true;
   }
@@ -148,7 +144,7 @@ export class EntityPositionManager {
     const pendingPosition = this.pendingPositionPromisesByKey.get(key);
     if (pendingPosition) return pendingPosition;
 
-    const position = this.getWorldTerrainPosition(data)
+    const position = this.getTerrainProviderPosition(data)
       .finally(() => this.pendingPositionPromisesByKey.delete(key));
     this.pendingPositionPromisesByKey.set(key, position);
     return position;
@@ -160,7 +156,7 @@ export class EntityPositionManager {
       latE6: data.latE6,
       lngE6: data.lngE6,
       position,
-      heightSource: "worldTerrain",
+      heightSource: "terrain",
       renderedHeightSampleGeneration: -1,
     };
     this.positionStatesByKey.set(key, positionState);
@@ -168,31 +164,32 @@ export class EntityPositionManager {
     return positionState;
   }
 
-  private async getWorldTerrainPosition(data: EntityCoordinates): Promise<Cesium.Cartesian3> {
+  private async getTerrainProviderPosition(data: EntityCoordinates): Promise<Cesium.Cartesian3> {
     const cartographic = Cesium.Cartographic.fromDegrees(data.lngE6 / 1e6, data.latE6 / 1e6);
     const height = this.viewer.scene.globe.getHeight(cartographic);
     if (height !== undefined) return getTerrainPosition(cartographic.longitude, cartographic.latitude, height);
 
-    const terrainProvider = await this.worldTerrainProviderPromise;
-    if (!terrainProvider) throw new Error("World terrain provider is unavailable");
+    if (this.viewer.terrainProvider instanceof Cesium.EllipsoidTerrainProvider) {
+      return getTerrainPosition(cartographic.longitude, cartographic.latitude, 0);
+    }
 
-    const [sampled] = await Cesium.sampleTerrain(terrainProvider, WORLD_TERRAIN_SAMPLE_LEVEL, [cartographic]);
-    if (sampled.height === undefined) throw new Error("World terrain height is unavailable");
+    const [sampled] = await Cesium.sampleTerrain(this.viewer.terrainProvider, TERRAIN_SAMPLE_LEVEL, [cartographic]);
+    if (sampled.height === undefined) throw new Error("Terrain height is unavailable");
 
     return getTerrainPosition(sampled.longitude, sampled.latitude, sampled.height);
   }
 
-  private refreshWorldTerrainPosition(positionState: EntityPositionState): void {
+  private refreshTerrainProviderPosition(positionState: EntityPositionState): void {
     const batchHeightSamplingGeneration = this.heightSamplingGeneration;
-    this.getWorldTerrainPosition(positionState)
+    this.getTerrainProviderPosition(positionState)
       .then((position) => {
         if (batchHeightSamplingGeneration !== this.heightSamplingGeneration || this.isHeightSamplingSuppressed()) return;
 
-        this.updatePositionState(positionState, position, "worldTerrain");
+        this.updatePositionState(positionState, position, "terrain");
         this.queueRenderedHeight(positionState);
       })
       .catch(() => {
-        logManager.warn(LOG_TAG, "World terrain height failed");
+        logManager.warn(LOG_TAG, "Terrain height failed");
       });
   }
 

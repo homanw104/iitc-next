@@ -68,6 +68,10 @@ async function getInitialSurfaceHeight(
   await waitForInitialTerrain(viewer, useGoogle3dTiles);
   const positionToSample = new Cesium.Cartographic(position.longitude, position.latitude);
 
+  if (viewer.terrainProvider instanceof Cesium.EllipsoidTerrainProvider) {
+    return 0;
+  }
+
   try {
     const [sampled] = useGoogle3dTiles
       ? await viewer.scene.sampleHeightMostDetailed([positionToSample])
@@ -97,7 +101,7 @@ function isInitialTerrainReady(viewer: Cesium.Viewer, useGoogle3dTiles: boolean)
   if (useGoogle3dTiles) {
     return viewer.scene.globe.show || getScene3dTileset(viewer.scene)?.tilesLoaded === true;
   } else {
-    return !(viewer.terrainProvider instanceof Cesium.EllipsoidTerrainProvider) && viewer.scene.globe.tilesLoaded;
+    return viewer.terrainProvider instanceof Cesium.EllipsoidTerrainProvider || viewer.scene.globe.tilesLoaded;
   }
 }
 

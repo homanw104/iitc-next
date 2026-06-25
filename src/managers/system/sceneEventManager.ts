@@ -92,8 +92,8 @@ export class SceneEventManager {
   }
 
   private isTerrainReady(): boolean {
-    return !(this.viewer.terrainProvider instanceof Cesium.EllipsoidTerrainProvider)
-      && this.viewer.scene.globe.tilesLoaded;
+    return this.viewer.terrainProvider instanceof Cesium.EllipsoidTerrainProvider
+      || this.viewer.scene.globe.tilesLoaded;
   }
 
   private watchGoogleTilesets(): void {
