@@ -3,8 +3,9 @@
  */
 
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
-import monkey, { cdn } from "vite-plugin-monkey";
+import monkey from "vite-plugin-monkey";
 
 const packageJson = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")) as {
   version: string,
@@ -17,6 +18,14 @@ const cesiumWidgetsCssUrl = `${cesiumBaseUrl}Widgets/widgets.css`;
 const cesiumWidgetsCssImport = "cesium/Build/Cesium/Widgets/widgets.css";
 
 export default defineConfig({
+  resolve: {
+    alias: [
+      {
+        find: /^cesium$/,
+        replacement: fileURLToPath(new URL("./src/cesium/global/cesium.ts", import.meta.url)),
+      },
+    ],
+  },
   define: {
     __IITC_NEXT_VERSION__: JSON.stringify(packageJson.version),
     __CESIUM_BASE_URL__: JSON.stringify(cesiumBaseUrl),
@@ -29,17 +38,13 @@ export default defineConfig({
         author: "Homan",
         version: packageJson.version,
         description: "IITC Next",
-        namespace: "npm/vite-plugin-monkey",
+        namespace: "https://github.com/homanw104/iitc-next",
         match: ["https://intel.ingress.com/*"],
-        exclude: [
-          "https://intel.ingress.com/signinhandler*",
-        ],
+        exclude: ["https://intel.ingress.com/signinhandler*"],
         "run-at": "document-start",
       },
       build: {
-        externalGlobals: {
-          cesium: cdn.jsdelivr("Cesium", "Build/Cesium/Cesium.js"),
-        },
+        systemjs: "inline",
         externalResource: {
           [cesiumWidgetsCssImport]: {
             resourceName: "cesiumWidgets",
