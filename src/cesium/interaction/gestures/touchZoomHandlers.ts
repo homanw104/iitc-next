@@ -14,6 +14,7 @@ const DOUBLE_TAP_AND_DRAG_ZOOM_THRESHOLD_PIXELS = 4;
 const ZOOM_VELOCITY_FRICTION_FACTOR = 0.84;
 const RESET_INERTIA_TIMEOUT_MS = 1500;
 const MINIMUM_3D_TILE_CAMERA_CLEARANCE_METERS = 5;
+const TOUCH_EVENT_OPTIONS: AddEventListenerOptions = { passive: true };
 
 interface TouchZoomHandlers {
   handleTouchStart: (event: Cesium.ScreenSpaceEventHandler.PositionedEvent) => void;
@@ -40,33 +41,75 @@ export function createTouchZoomHandlers(
   let revertHasJustDoubleTappedTimeoutId: number | null = null;
   let dragFrameRequestId: number | null = null;
   let hasPendingDragFrame = false;
+  let trackedTouchIdentifier: number | null = null;
+  let hasLastTouchPosition = false;
+  let hasActiveSingleTouchGesture = false;
   const pendingDragStartPosition = new Cesium.Cartesian2();
   const pendingDragEndPosition = new Cesium.Cartesian2();
+  const lastTouchPosition = new Cesium.Cartesian2();
+  const currentTouchPosition = new Cesium.Cartesian2();
   let pendingDragEventTime = 0;
 
   viewer.scene.canvas.addEventListener("touchstart", (event) => {
     activeTouchCount = event.touches.length;
     gestureSurfacePicker.reset();
     if (activeTouchCount === 1) {
+      const touch = event.touches[0];
+      trackedTouchIdentifier = touch.identifier;
+      getCanvasTouchPosition(viewer.scene.canvas, touch, lastTouchPosition);
+      hasLastTouchPosition = true;
+      hasActiveSingleTouchGesture = true;
       controller.enableInputs = false;
     } else {
+      cancelQueuedDragFrame();
+      trackedTouchIdentifier = null;
+      hasLastTouchPosition = false;
+      hasActiveSingleTouchGesture = false;
       isSingleTouchPanning = false;
       controller.enableInputs = true;
     }
-  }, { passive: true });
+  }, TOUCH_EVENT_OPTIONS);
+
+  viewer.scene.canvas.addEventListener("touchmove", (event) => {
+    activeTouchCount = event.touches.length;
+    if (activeTouchCount !== 1 || trackedTouchIdentifier === null) return;
+
+    const touch = findTouchByIdentifier(event.touches, trackedTouchIdentifier);
+    if (!touch) return;
+
+    getCanvasTouchPosition(viewer.scene.canvas, touch, currentTouchPosition);
+    if (!hasLastTouchPosition) {
+      Cesium.Cartesian2.clone(currentTouchPosition, lastTouchPosition);
+      hasLastTouchPosition = true;
+      return;
+    }
+
+    handleDragPositions(lastTouchPosition, currentTouchPosition, Date.now());
+    Cesium.Cartesian2.clone(currentTouchPosition, lastTouchPosition);
+  }, TOUCH_EVENT_OPTIONS);
 
   viewer.scene.canvas.addEventListener("touchend", (event) => {
     activeTouchCount = event.touches.length;
-  }, { passive: true });
+    if (trackedTouchIdentifier !== null && findTouchByIdentifier(event.changedTouches, trackedTouchIdentifier)) {
+      trackedTouchIdentifier = null;
+      hasLastTouchPosition = false;
+    }
+  }, TOUCH_EVENT_OPTIONS);
 
   viewer.scene.canvas.addEventListener("touchcancel", (event) => {
     activeTouchCount = event.touches.length;
+    if (trackedTouchIdentifier !== null && findTouchByIdentifier(event.changedTouches, trackedTouchIdentifier)) {
+      trackedTouchIdentifier = null;
+      hasLastTouchPosition = false;
+      hasActiveSingleTouchGesture = false;
+    }
     gestureSurfacePicker.reset();
     if (activeTouchCount === 0) {
+      cancelQueuedDragFrame();
       isSingleTouchPanning = false;
       controller.enableInputs = true;
     }
-  }, { passive: true });
+  }, TOUCH_EVENT_OPTIONS);
 
   const handleTouchStart = () => {
     const now = Date.now();
@@ -104,11 +147,22 @@ export function createTouchZoomHandlers(
   };
 
   const handleDrag = (event: Cesium.ScreenSpaceEventHandler.MotionEvent) => {
-    const now = Date.now();
-    const dx = event.endPosition.x - event.startPosition.x;
-    const dy = event.endPosition.y - event.startPosition.y;
+    if (activeTouchCount > 0) return;
+
+    handleDragPositions(event.startPosition, event.endPosition, Date.now());
+  };
+
+  const handleDragPositions = (
+    startPosition: Cesium.Cartesian2,
+    endPosition: Cesium.Cartesian2,
+    now: number,
+  ) => {
+    const dx = endPosition.x - startPosition.x;
+    const dy = endPosition.y - startPosition.y;
 
     const movement = Math.sqrt(dx * dx + dy * dy);
+    if (movement === 0) return;
+
     totalMovementLength += movement;
 
     if (totalMovementLength > DRAG_THRESHOLD_PIXELS) gestureState.hasJustMoved = true;
@@ -118,19 +172,31 @@ export function createTouchZoomHandlers(
     }
     revertHasJustMovedTimeoutId = window.setTimeout(() => gestureState.hasJustMoved = false, doubleTapThreshold);
 
-    queueDragFrame(event, now);
+    queueDragFrame(startPosition, endPosition, now);
   };
 
-  const queueDragFrame = (event: Cesium.ScreenSpaceEventHandler.MotionEvent, now: number) => {
+  const queueDragFrame = (
+    startPosition: Cesium.Cartesian2,
+    endPosition: Cesium.Cartesian2,
+    now: number,
+  ) => {
     if (!hasPendingDragFrame) {
-      Cesium.Cartesian2.clone(event.startPosition, pendingDragStartPosition);
+      Cesium.Cartesian2.clone(startPosition, pendingDragStartPosition);
       hasPendingDragFrame = true;
     }
-    Cesium.Cartesian2.clone(event.endPosition, pendingDragEndPosition);
+    Cesium.Cartesian2.clone(endPosition, pendingDragEndPosition);
     pendingDragEventTime = now;
 
     if (dragFrameRequestId !== null) return;
     dragFrameRequestId = window.requestAnimationFrame(applyQueuedDragFrame);
+  };
+
+  const cancelQueuedDragFrame = () => {
+    if (dragFrameRequestId !== null) {
+      window.cancelAnimationFrame(dragFrameRequestId);
+      dragFrameRequestId = null;
+    }
+    hasPendingDragFrame = false;
   };
 
   const applyQueuedDragFrame = () => {
@@ -157,7 +223,7 @@ export function createTouchZoomHandlers(
       const height = viewer.camera.positionCartographic.height;
       const zoomFactor = height * 0.003;
       viewer.camera.zoomIn(dy * zoomFactor);
-    } else if (activeTouchCount === 1 && totalMovementLength > DRAG_THRESHOLD_PIXELS) {
+    } else if (hasActiveSingleTouchGesture && totalMovementLength > DRAG_THRESHOLD_PIXELS) {
       isSingleTouchPanning = true;
       controller.enableInputs = false;
       panCameraByOrbitingSurface(
@@ -171,6 +237,8 @@ export function createTouchZoomHandlers(
 
   const handleTouchEnd = (event: Cesium.ScreenSpaceEventHandler.PositionedEvent) => {
     gestureState.isDuringTheTap = false;
+    trackedTouchIdentifier = null;
+    hasLastTouchPosition = false;
     if (dragFrameRequestId !== null) {
       window.cancelAnimationFrame(dragFrameRequestId);
       dragFrameRequestId = null;
@@ -180,9 +248,11 @@ export function createTouchZoomHandlers(
 
     if (isSingleTouchPanning) {
       isSingleTouchPanning = false;
+      hasActiveSingleTouchGesture = false;
       controller.enableInputs = true;
     } else if (isDuringTheSecondTap) {
       isDuringTheSecondTap = false;
+      hasActiveSingleTouchGesture = false;
 
       if (!hasMovedDuringTheSecondTap) {
         const camera = viewer.camera;
@@ -232,6 +302,7 @@ export function createTouchZoomHandlers(
         controller.enableInputs = true;
       }
     } else {
+      hasActiveSingleTouchGesture = false;
       controller.enableInputs = true;
     }
 
@@ -247,4 +318,23 @@ export function createTouchZoomHandlers(
     handleDrag,
     handleTouchEnd,
   };
+}
+
+function findTouchByIdentifier(touchList: TouchList, identifier: number): Touch | undefined {
+  for (let i = 0; i < touchList.length; i += 1) {
+    const touch = touchList.item(i);
+    if (touch?.identifier === identifier) return touch;
+  }
+  return undefined;
+}
+
+function getCanvasTouchPosition(
+  canvas: HTMLCanvasElement,
+  touch: Touch,
+  result: Cesium.Cartesian2,
+): Cesium.Cartesian2 {
+  const rect = canvas.getBoundingClientRect();
+  result.x = touch.clientX - rect.left;
+  result.y = touch.clientY - rect.top;
+  return result;
 }
