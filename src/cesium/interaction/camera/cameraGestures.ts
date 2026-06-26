@@ -42,20 +42,16 @@ export function createGestureSurfacePicker(scene: Cesium.Scene): GestureSurfaceP
   const pick = (windowPosition: Cesium.Cartesian2): Cesium.Cartesian3 | undefined => {
     if (scene.globe.show) return pickGestureSurfacePosition(scene, windowPosition);
 
-    if (!scene.pickPositionSupported) return pickGestureEllipsoidPosition(scene, windowPosition);
+    if (!scene.pickPositionSupported) return undefined;
 
     if (!hasTangentPlane) {
       const renderedPosition = scene.pickPosition(windowPosition, renderedPositionScratch);
       if (renderedPosition) {
         updateTangentPlane(renderedPosition);
-        return renderedPosition;
       }
     }
 
-    const tangentPosition = pickTangentPlanePosition(windowPosition);
-    if (tangentPosition) return tangentPosition;
-
-    return pickGestureEllipsoidPosition(scene, windowPosition);
+    return pickTangentPlanePosition(windowPosition);
   };
 
   const updateTangentPlane = (
@@ -141,16 +137,6 @@ export function panCameraByOrbitingSurface(
 
   Cesium.Cartesian3.normalize(axis, axis);
   camera.rotate(axis, Cesium.Math.acosClamped(dot));
-}
-
-function pickGestureEllipsoidPosition(
-  scene: Cesium.Scene,
-  windowPosition: Cesium.Cartesian2,
-): Cesium.Cartesian3 | undefined {
-  const globe = scene.globe;
-  return globe
-    ? scene.camera.pickEllipsoid(windowPosition, globe.ellipsoid, gesturePickEllipsoidScratch)
-    : undefined;
 }
 
 export function zoomCameraAlongViewDirection(camera: Cesium.Camera, amount: number): void {
