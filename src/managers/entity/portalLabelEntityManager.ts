@@ -377,7 +377,6 @@ export class PortalLabelEntityManager {
         this.visibilityQueuedGuids.delete(guid);
         if (this.setLabelTargetVisibility(label, true)) {
           changed = true;
-          this.viewer.scene.requestRender();
         }
       },
       () => overlapRefreshGeneration === this.overlapRefreshGeneration,
