@@ -118,6 +118,7 @@ export function createTouchZoomHandlers(
       isSingleTouchPanning = false;
       resetPanVelocity();
       enableInputsAfterCesiumInputReset();
+      scheduleCesiumPanInertiaReset();
     }
   }, TOUCH_EVENT_OPTIONS);
 
@@ -213,6 +214,23 @@ export function createTouchZoomHandlers(
     hasPendingDragFrame = false;
   };
 
+  const disableCesiumPanInertia = () => {
+    viewer.scene.screenSpaceCameraController.inertiaSpin = 0.0;
+    viewer.scene.screenSpaceCameraController.inertiaTranslate = 0.0;
+  };
+
+  const scheduleCesiumPanInertiaReset = () => {
+    if (inertiaResetTimeoutId) {
+      window.clearTimeout(inertiaResetTimeoutId);
+      inertiaResetTimeoutId = null;
+    }
+    inertiaResetTimeoutId = window.setTimeout(() => {
+      viewer.scene.screenSpaceCameraController.inertiaSpin = 0.9;
+      viewer.scene.screenSpaceCameraController.inertiaTranslate = 0.9;
+      inertiaResetTimeoutId = null;
+    }, RESET_INERTIA_TIMEOUT_MS);
+  };
+
   const cancelScheduledInputReenable = () => {
     if (removeEnableInputsPostRenderListener) {
       removeEnableInputsPostRenderListener();
@@ -251,8 +269,7 @@ export function createTouchZoomHandlers(
     if (isDuringTheSecondTap) {
       if (totalMovementLength > DOUBLE_TAP_AND_DRAG_ZOOM_THRESHOLD_PIXELS) hasMovedDuringTheSecondTap = true;
 
-      viewer.scene.screenSpaceCameraController.inertiaSpin = 0.0;
-      viewer.scene.screenSpaceCameraController.inertiaTranslate = 0.0;
+      disableCesiumPanInertia();
 
       if (dt > 0) {
         const currentVelocity = dy / dt;
@@ -265,6 +282,7 @@ export function createTouchZoomHandlers(
     } else if (hasActiveSingleTouchGesture && totalMovementLength > DRAG_THRESHOLD_PIXELS) {
       isSingleTouchPanning = true;
       controller.enableInputs = false;
+      disableCesiumPanInertia();
       if (dt > 0) {
         panVelocity.x = panVelocity.x * 0.4 + (dx / dt) * 0.6;
         panVelocity.y = panVelocity.y * 0.4 + (dy / dt) * 0.6;
@@ -392,11 +410,7 @@ export function createTouchZoomHandlers(
       controller.enableInputs = true;
     }
 
-    inertiaResetTimeoutId = window.setTimeout(() => {
-      viewer.scene.screenSpaceCameraController.inertiaSpin = 0.9;
-      viewer.scene.screenSpaceCameraController.inertiaTranslate = 0.9;
-      inertiaResetTimeoutId = null;
-    }, RESET_INERTIA_TIMEOUT_MS);
+    scheduleCesiumPanInertiaReset();
   };
 
   return {
