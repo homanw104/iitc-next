@@ -37,25 +37,28 @@ export async function getNonOverlappingPortalLabelEntityGuids(
   labels: Map<string, PortalLabel>,
   time: Cesium.JulianDate,
   onAcceptedGuid?: (guid: string) => void,
+  shouldContinue: () => boolean = () => true,
 ): Promise<Set<string>> {
   const candidates: PortalLabelEntityOverlapCandidate[] = [];
   const viewRectangle = getPortalLabelEntityViewRectangle(viewer);
 
-  labels.forEach((label, guid) => {
+  for (const [guid, label] of labels) {
+    if (!shouldContinue()) return new Set<string>();
+
     const labelPosition = getPortalLabelEntityPosition(label, time);
-    if (!labelPosition) return;
-    if (!isPortalLabelEntityPositionInViewRectangle(viewer, labelPosition, viewRectangle)) return;
+    if (!labelPosition) continue;
+    if (!isPortalLabelEntityPositionInViewRectangle(viewer, labelPosition, viewRectangle)) continue;
 
     const windowPosition = Cesium.SceneTransforms.worldToWindowCoordinates(
       viewer.scene,
       labelPosition,
       portalLabelEntityWindowPositionScratch,
     );
-    if (!windowPosition) return;
+    if (!windowPosition) continue;
 
     const distance = Cesium.Cartesian3.distance(viewer.camera.positionWC, labelPosition);
     const bounds = getPortalLabelEntityScreenBounds(label, windowPosition, distance);
-    if (!isPortalLabelEntityScreenBoundsInCanvas(bounds, viewer.scene.canvas)) return;
+    if (!isPortalLabelEntityScreenBoundsInCanvas(bounds, viewer.scene.canvas)) continue;
 
     candidates.push({
       guid,
@@ -68,7 +71,7 @@ export async function getNonOverlappingPortalLabelEntityGuids(
       isCurrentlyVisible: isPortalLabelEntityCurrentlyVisible(label),
       distance,
     });
-  });
+  }
 
   candidates.sort(comparePortalLabelEntityOverlapCandidates);
 
@@ -77,12 +80,14 @@ export async function getNonOverlappingPortalLabelEntityGuids(
   let acceptedSinceLastFrame = 0;
   let occlusionChecksSinceLastFrame = 0;
   for (const candidate of candidates) {
+    if (!shouldContinue()) return acceptedGuids;
     if (doesOverlapAcceptedCandidate(candidate.bounds, acceptedBoundsGrid)) continue;
 
     occlusionChecksSinceLastFrame++;
     if (occlusionChecksSinceLastFrame >= PORTAL_LABEL_ENTITY_OCCLUSION_CHECKS_PER_FRAME) {
       occlusionChecksSinceLastFrame = 0;
       await waitForNextFrame();
+      if (!shouldContinue()) return acceptedGuids;
     }
     if (!isPortalLabelEntityPositionVisible(viewer, candidate.position, candidate.windowPosition)) continue;
 
@@ -94,6 +99,7 @@ export async function getNonOverlappingPortalLabelEntityGuids(
     if (acceptedSinceLastFrame >= PORTAL_LABEL_ENTITY_OVERLAP_ACCEPTED_LABELS_PER_FRAME) {
       acceptedSinceLastFrame = 0;
       await waitForNextFrame();
+      if (!shouldContinue()) return acceptedGuids;
     }
   }
   return acceptedGuids;

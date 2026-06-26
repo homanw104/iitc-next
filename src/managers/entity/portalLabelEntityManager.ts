@@ -65,6 +65,7 @@ export class PortalLabelEntityManager {
     this.viewer.camera.moveStart.addEventListener(() => {
       this.isCameraMoving = true;
       this.lastMovingVisibilityUpdate = performance.now();
+      this.overlapRefreshGeneration++;
     });
     this.viewer.camera.moveEnd.addEventListener(() => {
       this.isCameraMoving = false;
@@ -338,18 +339,24 @@ export class PortalLabelEntityManager {
     this.overlapDirty = false;
 
     let changed = false;
-    this.overlapVisibleGuids = await getNonOverlappingPortalLabelEntityGuids(this.viewer, this.labels, time, (guid) => {
-      if (overlapRefreshGeneration !== this.overlapRefreshGeneration) return;
+    this.overlapVisibleGuids = await getNonOverlappingPortalLabelEntityGuids(
+      this.viewer,
+      this.labels,
+      time,
+      (guid) => {
+        if (overlapRefreshGeneration !== this.overlapRefreshGeneration) return;
 
-      const label = this.labels.get(guid);
-      if (!label) return;
+        const label = this.labels.get(guid);
+        if (!label) return;
 
-      this.visibilityQueuedGuids.delete(guid);
-      if (this.setLabelTargetVisibility(label, true)) {
-        changed = true;
-        this.viewer.scene.requestRender();
-      }
-    });
+        this.visibilityQueuedGuids.delete(guid);
+        if (this.setLabelTargetVisibility(label, true)) {
+          changed = true;
+          this.viewer.scene.requestRender();
+        }
+      },
+      () => overlapRefreshGeneration === this.overlapRefreshGeneration,
+    );
     if (overlapRefreshGeneration !== this.overlapRefreshGeneration) return changed;
 
     this.labels.forEach((label, guid) => {
