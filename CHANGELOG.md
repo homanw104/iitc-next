@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.2.0
+
+* Added a splash screen for initial loading
+* Added total conversion of the login page
+* Improved clicking on portals responsiveness
+* Improved portal label display
+* Improved portal display behind the terrain
+* Improved pinch gesture recognition
+* Improved logging messages display
+* Improved player activity marker clarity
+* Fixed tilting from causing the camera to glitch
+* Fixed log export on Android
+* Other performance improvements
+* Other minor improvements
+ 
 ## 2.1.0
 
 * Added fullscreen (edge-to-edge) support
