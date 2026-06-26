@@ -57,6 +57,7 @@ export class EntityPositionManager {
   private heightSamplingGeneration = 0;
   private lastTerrainRefreshGeneration = -1;
   private queueStatusLoggingActive = false;
+  private renderedHeightIdleCallbacks = new Set<() => void>();
 
   constructor(
     private readonly viewer: Cesium.Viewer,
@@ -73,6 +74,7 @@ export class EntityPositionManager {
       this.cameraMoving = false;
       this.heightSamplingViewRectangleDirty = true;
       this.queueVisibleRefreshableRenderedHeights();
+      this.notifyRenderedHeightIdleIfNeeded();
     });
   }
 
@@ -138,6 +140,15 @@ export class EntityPositionManager {
 
   public hasRefreshableTerrainPositions(): boolean {
     return this.refreshableHeightKeys.size > 0;
+  }
+
+  public runAfterRenderedHeightRefresh(callback: () => void): void {
+    if (!this.isRenderedHeightRefreshActive()) {
+      callback();
+      return;
+    }
+
+    this.renderedHeightIdleCallbacks.add(callback);
   }
 
   private getInitialPosition(key: string, data: EntityCoordinates): Promise<Cesium.Cartesian3> {
@@ -234,7 +245,10 @@ export class EntityPositionManager {
   }
 
   private scheduleRemainingRenderedHeights(): void {
-    if (this.renderedHeightQueuedKeys.size === 0) return;
+    if (this.renderedHeightQueuedKeys.size === 0) {
+      this.notifyRenderedHeightIdleIfNeeded();
+      return;
+    }
 
     this.scheduleRenderedHeights(
       this.useGoogle3dTiles ? GOOGLE_RENDERED_SAMPLE_BATCH_DELAY_MS : 0,
@@ -262,10 +276,16 @@ export class EntityPositionManager {
   private flushRenderedHeightQueue(): void {
     this.renderedHeightSamplingScheduled = false;
     this.renderedHeightSamplingTimeout = undefined;
-    if (this.isHeightSamplingSuppressed()) return;
+    if (this.isHeightSamplingSuppressed()) {
+      this.notifyRenderedHeightIdleIfNeeded();
+      return;
+    }
 
     const keys = this.takeRenderedHeightBatch();
-    if (keys.length === 0) return;
+    if (keys.length === 0) {
+      this.notifyRenderedHeightIdleIfNeeded();
+      return;
+    }
 
     const batchHeightSamplingGeneration = this.heightSamplingGeneration;
     const viewRectangle = this.getHeightSamplingViewRectangle();
@@ -366,6 +386,18 @@ export class EntityPositionManager {
 
   private isHeightSamplingSuppressed(): boolean {
     return this.cameraMoving;
+  }
+
+  private isRenderedHeightRefreshActive(): boolean {
+    return this.renderedHeightSamplingScheduled || this.hasQueuedOrSamplingTerrainHeights();
+  }
+
+  private notifyRenderedHeightIdleIfNeeded(): void {
+    if (this.isRenderedHeightRefreshActive() || this.renderedHeightIdleCallbacks.size === 0) return;
+
+    const callbacks = Array.from(this.renderedHeightIdleCallbacks);
+    this.renderedHeightIdleCallbacks.clear();
+    callbacks.forEach(callback => callback());
   }
 
   private hasQueuedOrSamplingTerrainHeights(): boolean {

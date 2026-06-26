@@ -56,6 +56,7 @@ export class PortalLabelEntityManager {
   private hasDeferredVisibilityUpdate = false;
   private deferredVisibilityUpdateDepth = 0;
   private overlapRefreshGeneration = 0;
+  private hasPositionSettledVisibilityUpdate = false;
 
   constructor(
     private viewer: Cesium.Viewer,
@@ -109,7 +110,7 @@ export class PortalLabelEntityManager {
         const entity = await this.createLabelEntity(data, layout.wrappedText);
         const positionCallback: EntityPositionCallback = (_latE6, _lngE6, position) => {
           entity.position = new Cesium.ConstantPositionProperty(position);
-          this.queueAllVisibilityUpdates();
+          this.queueVisibilityUpdateAfterEntityPositionsSettle();
         };
         this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, positionCallback);
         const label: PortalLabel = {
@@ -282,6 +283,30 @@ export class PortalLabelEntityManager {
       return;
     }
     this.scheduleVisibilityUpdates();
+  }
+
+  private queueVisibilityUpdateAfterEntityPositionsSettle(): void {
+    this.overlapDirty = true;
+
+    if (this.deferredVisibilityUpdateDepth > 0) {
+      this.hasDeferredVisibilityUpdate = true;
+      return;
+    }
+
+    if (this.hasPositionSettledVisibilityUpdate) return;
+    this.hasPositionSettledVisibilityUpdate = true;
+
+    this.entityPositionManager.runAfterRenderedHeightRefresh(() => {
+      this.hasPositionSettledVisibilityUpdate = false;
+
+      if (this.deferredVisibilityUpdateDepth > 0) {
+        this.hasDeferredVisibilityUpdate = true;
+        return;
+      }
+
+      this.captureVisibilityCameraSnapshot();
+      this.scheduleVisibilityUpdates();
+    });
   }
 
   private async deferVisibilityUpdates(callback: () => Promise<void>): Promise<void> {
