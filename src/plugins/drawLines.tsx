@@ -96,7 +96,7 @@ class DrawLinesPlugin {
       this.interfaceManager.mountSidebarButton(this.importLinesButtonEl);
 
       this.linesDataSource = this.layerManager.getOrCreateDataSource(LINES_LAYER_NAME);
-      this.lineMarkersDataSource = this.layerManager.getOrCreateOverlay(LINE_MARKERS_LAYER_NAME);
+      this.lineMarkersDataSource = this.layerManager.getOrCreateOverlayLayer(LINE_MARKERS_LAYER_NAME);
       this.handler = new Cesium.ScreenSpaceEventHandler(this.viewer.scene.canvas);
       this.bindEvents();
 
@@ -114,8 +114,8 @@ class DrawLinesPlugin {
 
       this.removeLineMarkers();
 
-      this.layerManager.removeOverlay(LINE_MARKERS_LAYER_NAME);
-      this.layerManager.removeDataSource(LINES_LAYER_NAME);
+      this.layerManager.removeOverlayLayer(LINE_MARKERS_LAYER_NAME);
+      this.layerManager.removeDataSourceLayer(LINES_LAYER_NAME);
 
       if (this.importLinesButtonEl) this.interfaceManager.unmountSidebarButton(this.importLinesButtonEl);
       if (this.exportLinesButtonEl) this.interfaceManager.unmountSidebarButton(this.exportLinesButtonEl);

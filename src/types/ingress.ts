@@ -24,7 +24,7 @@ export interface PortalData {
   image?: string;
   title?: string;
   ornaments?: string[];
-  timestamp: number;
+  timestamp?: number;
   isPlaceholder?: boolean;
   mods?: (PortalMod | null)[];
   resonators?: (PortalResonator | null)[];
@@ -69,12 +69,14 @@ export interface LinkData {
 export interface FieldData {
   guid: string;
   team: Team;
-  points: {
-    guid: string;
-    latE6: number;
-    lngE6: number;
-  }[];
+  points: FieldPoint[];
   timestamp: number;
+}
+
+export interface FieldPoint {
+  guid: string;
+  latE6: number;
+  lngE6: number;
 }
 
 export interface Player {
@@ -100,7 +102,6 @@ export interface TileResponse {
     map: {
       [tileId: string]: {
         gameEntities?: RawEntity[];
-        deletedGameEntityGuids?: string[];
         error?: string;
       };
     };

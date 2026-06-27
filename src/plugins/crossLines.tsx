@@ -80,7 +80,7 @@ class CrossLinesPlugin {
       this.viewer?.dataSources.dataSourceRemoved.removeEventListener(this.dataSourceRemovedListener);
       this.trackedSources.forEach(source => this.untrackSource(source));
       this.trackedSources.clear();
-      this.layerManager.removeDataSource(CROSS_LINES_LAYER_NAME);
+      this.layerManager.removeDataSourceLayer(CROSS_LINES_LAYER_NAME);
       this.highlightSource = undefined;
       this.drawLinesSource = undefined;
       this.updateQueued = false;

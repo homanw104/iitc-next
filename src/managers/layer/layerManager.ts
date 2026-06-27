@@ -24,16 +24,17 @@ const LOG_TAG = "LayerManager";
 export class LayerManager {
   private static readonly DEFAULT_OVERLAY_Z_INDEX = 1000;
 
-  // Entities like links and portals use normal DataSources, named by layer visibility id.
+  // Links, portals, etc., use normal DataSource layers, named by layer visibility id.
   private dataSources: Map<string, Cesium.DataSource> = new Map();
 
-  // Entities like player activity markers use custom overlays, named by layer visibility id.
-  private overlays: Map<string, LayerOverlay> = new Map();
+  // Player activity markers, etc., use custom overlay layers, named by layer visibility id.
+  private overlayLayers: Map<string, LayerOverlay> = new Map();
 
   // Fine-grained layer visibility state, such as "portals-l8-enlightened".
-  private dataSourceAndOverlayVisibility: Map<string, boolean> = new Map();
+  private layerVisibility: Map<string, boolean> = new Map();
 
-  // Master filter visibility settings, such as "portals", shown in the layer chooser.
+  // Master filter visibility settings, such as "portals", that govern fine-grained layers.
+  // THIS IS THE SOURCE OF THE OPTIONS SHOWN IN THE LAYER PANE.
   private filterState: Map<string, boolean> = new Map();
 
   private pendingRenderFrame: number | null = null;
@@ -85,10 +86,10 @@ export class LayerManager {
     return source;
   }
 
-  public getOrCreateOverlay(name: string, zIndex?: number): Cesium.DataSource {
+  public getOrCreateOverlayLayer(name: string, zIndex?: number): Cesium.DataSource {
     this.registerPluginFilterIfNeeded(name);
 
-    let layer = this.overlays.get(name);
+    let layer = this.overlayLayers.get(name);
     if (!layer) {
       layer = new LayerOverlay(
         this.viewer,
@@ -96,7 +97,7 @@ export class LayerManager {
         this.getLayerVisibility(name),
         zIndex ?? LayerManager.DEFAULT_OVERLAY_Z_INDEX,
       );
-      this.overlays.set(name, layer);
+      this.overlayLayers.set(name, layer);
       this.refreshOverlays();
     } else if (zIndex !== undefined) {
       layer.setZIndex(zIndex);
@@ -148,7 +149,7 @@ export class LayerManager {
     layers.forEach(({ name, type }) => {
       const source = type === "dataSource" ?
         this.getOrCreateDataSource(name) :
-        this.getOrCreateOverlay(name);
+        this.getOrCreateOverlayLayer(name);
       collections.add(source.entities);
     });
 
@@ -156,14 +157,14 @@ export class LayerManager {
   }
 
   public setOverlayZIndex(name: string, zIndex: number): void {
-    const layer = this.overlays.get(name);
+    const layer = this.overlayLayers.get(name);
     if (!layer) return;
 
     layer.setZIndex(zIndex);
     this.refreshOverlays();
   }
 
-  public removeDataSource(name: string): void {
+  public removeDataSourceLayer(name: string): void {
     const source = this.dataSources.get(name);
     if (source) {
       this.viewer.dataSources.remove(source, true);
@@ -172,11 +173,11 @@ export class LayerManager {
     this.unregisterPluginFilterIfNeeded(name);
   }
 
-  public removeOverlay(name: string): void {
-    const layer = this.overlays.get(name);
+  public removeOverlayLayer(name: string): void {
+    const layer = this.overlayLayers.get(name);
     if (layer) {
       layer.destroy();
-      this.overlays.delete(name);
+      this.overlayLayers.delete(name);
     }
     this.unregisterPluginFilterIfNeeded(name);
   }
@@ -265,7 +266,7 @@ export class LayerManager {
     if (!this.filterState.has(name)) return;
 
     this.filterState.delete(name);
-    this.dataSourceAndOverlayVisibility.delete(name);
+    this.layerVisibility.delete(name);
     this.saveStorageState();
   }
 
@@ -279,24 +280,24 @@ export class LayerManager {
   }
 
   private setLayerVisibility(name: string, visible: boolean): void {
-    const previousVisible = this.dataSourceAndOverlayVisibility.get(name);
-    this.dataSourceAndOverlayVisibility.set(name, visible);
+    const previousVisible = this.layerVisibility.get(name);
+    this.layerVisibility.set(name, visible);
 
     const dataSource = this.dataSources.get(name);
     if (dataSource) dataSource.show = visible;
 
-    const overlay = this.overlays.get(name);
+    const overlay = this.overlayLayers.get(name);
     if (overlay) overlay.setVisible(visible);
 
     if (previousVisible !== visible) this.refreshScene();
   }
 
   private getLayerVisibility(name: string): boolean {
-    return this.dataSourceAndOverlayVisibility.get(name) !== false;
+    return this.layerVisibility.get(name) !== false;
   }
 
   private refreshOverlays(): void {
-    Array.from(this.overlays.values())
+    Array.from(this.overlayLayers.values())
       .sort((a, b) => a.zIndex - b.zIndex)
       .forEach(layer => layer.raiseToTop());
   }

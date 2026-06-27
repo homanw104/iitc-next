@@ -1,5 +1,10 @@
 /**
- * Runtime bridge for Cesium when it has been loaded. See loadCesiumScript.ts for details.
+ * Runtime bridge for the Vite alias from "cesium" to this file.
+ *
+ * loadCesiumScript() first injects Cesium's UMD bundle, which populates
+ * safeWindow.Cesium; this bridge then forwards existing "cesium" imports to it.
+ *
+ * Named exports stay explicit because ES module exports must be known at build time.
  */
 
 import { safeWindow } from "../../utils/window.ts";
@@ -49,6 +54,7 @@ export const HeightReference = Cesium.HeightReference;
 export const HorizontalOrigin = Cesium.HorizontalOrigin;
 export const Ion = Cesium.Ion;
 export const IonGeocodeProviderType = Cesium.IonGeocodeProviderType;
+export const ImageryLayer = Cesium.ImageryLayer;
 export const JulianDate = Cesium.JulianDate;
 export const KeyboardEventModifier = Cesium.KeyboardEventModifier;
 export const LabelStyle = Cesium.LabelStyle;

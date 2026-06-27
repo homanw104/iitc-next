@@ -165,7 +165,7 @@ export class PortalLabelEntityManager {
 
   private async createLabelEntity(data: PortalData, wrappedText: string): Promise<Cesium.Entity> {
     const layerId = getPortalLabelEntityLayerId(data);
-    const entities = this.layerManager.getOrCreateOverlay(layerId).entities;
+    const entities = this.layerManager.getOrCreateOverlayLayer(layerId).entities;
     const position = await this.entityPositionManager.getPosition(data);
     const entityReference: { entity?: Cesium.Entity } = {};
 
@@ -221,7 +221,7 @@ export class PortalLabelEntityManager {
   private removeLabelEntity(guid: string): void {
     const labelInfo = this.labels.get(guid);
     if (labelInfo) {
-      const entities = this.layerManager.getOrCreateOverlay(labelInfo.currentLayerId).entities;
+      const entities = this.layerManager.getOrCreateOverlayLayer(labelInfo.currentLayerId).entities;
 
       entities.remove(labelInfo.entity);
       this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(labelInfo.data, labelInfo.positionCallback);
@@ -258,8 +258,8 @@ export class PortalLabelEntityManager {
   private moveLabelToLayer(labelInfo: PortalLabel, newLayerId: string): void {
     if (labelInfo.currentLayerId === newLayerId) return;
 
-    this.layerManager.getOrCreateOverlay(labelInfo.currentLayerId).entities.remove(labelInfo.entity);
-    this.layerManager.getOrCreateOverlay(newLayerId).entities.add(labelInfo.entity);
+    this.layerManager.getOrCreateOverlayLayer(labelInfo.currentLayerId).entities.remove(labelInfo.entity);
+    this.layerManager.getOrCreateOverlayLayer(newLayerId).entities.add(labelInfo.entity);
     labelInfo.currentLayerId = newLayerId;
   }
 

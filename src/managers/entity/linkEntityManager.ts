@@ -17,7 +17,10 @@ interface Link {
 export class LinkEntityManager {
   private links: Map<string, Link> = new Map();
 
-  constructor(private layerManager: LayerManager, private portalManager: PortalEntityManager) {}
+  constructor(
+    private layerManager: LayerManager,
+    private portalManager: PortalEntityManager
+  ) {}
 
   public async addOrUpdateLinks(links: LinkData[]): Promise<void> {
     await this.addPlaceholderPortals(links);
@@ -186,7 +189,7 @@ function setNewestPlaceholder(placeholders: Map<string, PortalData>, placeholder
   }
 
   placeholder.links?.forEach((link) => addPortalLink(existing, link));
-  if (placeholder.timestamp > existing.timestamp) {
+  if (placeholder.timestamp && placeholder.timestamp > (existing.timestamp ?? 0)) {
     existing.team = placeholder.team;
     existing.latE6 = placeholder.latE6;
     existing.lngE6 = placeholder.lngE6;

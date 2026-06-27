@@ -1,5 +1,8 @@
 /**
- * Loads the Cesium global script outside Tampermonkey @require.
+ * Loads Cesium as a page script instead of a Tampermonkey @require.
+ *
+ * The Cesium UMD bundle populates safeWindow.Cesium when it executes; app.ts
+ * awaits that before importing modules that use the "cesium" alias bridge.
  */
 
 import { safeWindow } from "../utils/window";
@@ -13,6 +16,7 @@ type WindowWithCesium = Window & typeof globalThis & {
 
 export default function loadCesiumScript(appContext: AppContext): Promise<void> {
   const targetWindow = safeWindow as WindowWithCesium;
+
   if (targetWindow.Cesium) return Promise.resolve();
   if (appContext.cesiumLoadPromise) return appContext.cesiumLoadPromise;
 

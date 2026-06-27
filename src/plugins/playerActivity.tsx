@@ -100,8 +100,8 @@ class PlayerActivityPlugin {
       this.hoverHandler = new Cesium.ScreenSpaceEventHandler(this.viewer.scene.canvas);
       this.setUpTooltipElement();
       this.setUpHoverAction();
-      this.dataSourceEnl = this.layerManager.getOrCreateOverlay(PLAYER_ACTIVITY_ENL_LAYER_NAME);
-      this.dataSourceRes = this.layerManager.getOrCreateOverlay(PLAYER_ACTIVITY_RES_LAYER_NAME);
+      this.dataSourceEnl = this.layerManager.getOrCreateOverlayLayer(PLAYER_ACTIVITY_ENL_LAYER_NAME);
+      this.dataSourceRes = this.layerManager.getOrCreateOverlayLayer(PLAYER_ACTIVITY_RES_LAYER_NAME);
       this.pathDataSourceEnl = this.layerManager.getOrCreateDataSource(ACTIVITY_PATH_ENL_LAYER_NAME);
       this.pathDataSourceRes = this.layerManager.getOrCreateDataSource(ACTIVITY_PATH_RES_LAYER_NAME);
       this.configureDataSource(this.dataSourceEnl);
@@ -119,10 +119,10 @@ class PlayerActivityPlugin {
     try {
       this.unsetPlayerPositionSubscriptions();
       this.commManager.unsetOnReceiveMsgCallback(this.onReceiveCommMsgCallback);
-      this.layerManager.removeOverlay(PLAYER_ACTIVITY_ENL_LAYER_NAME);
-      this.layerManager.removeOverlay(PLAYER_ACTIVITY_RES_LAYER_NAME);
-      this.layerManager.removeDataSource(ACTIVITY_PATH_ENL_LAYER_NAME);
-      this.layerManager.removeDataSource(ACTIVITY_PATH_RES_LAYER_NAME);
+      this.layerManager.removeOverlayLayer(PLAYER_ACTIVITY_ENL_LAYER_NAME);
+      this.layerManager.removeOverlayLayer(PLAYER_ACTIVITY_RES_LAYER_NAME);
+      this.layerManager.removeDataSourceLayer(ACTIVITY_PATH_ENL_LAYER_NAME);
+      this.layerManager.removeDataSourceLayer(ACTIVITY_PATH_RES_LAYER_NAME);
       this.playerLocations.clear();
       this.playerPaths.clear();
       this.playerLocationsPendingCreation.clear();

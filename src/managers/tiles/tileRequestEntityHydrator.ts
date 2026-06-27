@@ -17,7 +17,6 @@ import type { TileRequestQueue } from "./tileRequestQueue";
 
 const LOG_TAG = "TileRequestEntityHydrator";
 const PORTAL_HYDRATION_BATCH_SIZE = 64;
-const DECORATION_HYDRATION_BATCH_SIZE = 64;
 const LINK_HYDRATION_BATCH_SIZE = 128;
 const FIELD_HYDRATION_BATCH_SIZE = 128;
 
@@ -82,8 +81,6 @@ export class TileEntityHydrator {
 
       queue.setTileStatus(tileKey, "loaded");
 
-      tileData.deletedGameEntityGuids?.forEach((guid) => this.removeEntity(guid));
-
       if (tileData.gameEntities) {
         entitiesFound += tileData.gameEntities.length;
         const { portals, links, fields } = parseTileEntities(tileData.gameEntities);
@@ -92,8 +89,7 @@ export class TileEntityHydrator {
           if (
             !existing ||
             existing.isPlaceholder ||
-            portal.timestamp > existing.timestamp ||
-            (!existing.resonators && portal.resonators)
+            portal.timestamp && portal.timestamp > (existing.timestamp ?? 0)
           ) {
             portalsToHydrate.set(portal.guid, portal);
           }
@@ -113,15 +109,13 @@ export class TileEntityHydrator {
       }
     }
 
-    attachLinksToPortals(portalsToHydrate, linksToHydrate);
-    attachFieldsToPortals(portalsToHydrate, fieldsToHydrate);
+    attachLinksToExistingPortals(portalsToHydrate, linksToHydrate);
+    attachFieldsToExistingPortals(portalsToHydrate, fieldsToHydrate);
 
     const portals = Array.from(portalsToHydrate.values());
-    await hydrateInBatches(portals, PORTAL_HYDRATION_BATCH_SIZE, (batch) =>
-      this.portalEntityManager.addOrUpdatePortals(batch)
-    );
-    await hydrateInBatches(portals, DECORATION_HYDRATION_BATCH_SIZE, async (batch) => {
+    await hydrateInBatches(portals, PORTAL_HYDRATION_BATCH_SIZE, async (batch) => {
       await Promise.all([
+        this.portalEntityManager.addOrUpdatePortals(batch),
         this.portalLabelEntityManager.addOrUpdateLabels(batch),
         this.portalOrnamentEntityManager.addOrUpdateOrnaments(batch),
         this.portalHistoryEntityManager.addOrUpdateHistoryHalos(batch),
@@ -138,47 +132,37 @@ export class TileEntityHydrator {
     logManager.debug(LOG_TAG, `Processed ${entitiesFound} entities`);
     this.viewer.scene.requestRender();
   }
-
-  private removeEntity(guid: string): void {
-    this.portalEntityManager.removePortal(guid);
-    this.portalLabelEntityManager.removeLabel(guid);
-    this.portalOrnamentEntityManager.removeOrnament(guid);
-    this.portalHistoryEntityManager.removeHistoryHalo(guid);
-    this.scoutHistoryEntityManager.removeScoutControlHalo(guid);
-    this.linkEntityManager.removeLink(guid);
-    this.fieldEntityManager.removeField(guid);
-  }
 }
 
-function attachLinksToPortals(
+function attachLinksToExistingPortals(
   portals: Map<string, PortalData>,
   links: Map<string, LinkData>,
 ): void {
   for (const link of links.values()) {
-    addPortalLink(portals.get(link.oGuid), link);
-    addPortalLink(portals.get(link.dGuid), link);
+    attachLinkToPortal(portals.get(link.oGuid), link);
+    attachLinkToPortal(portals.get(link.dGuid), link);
   }
 }
 
-function addPortalLink(portal: PortalData | undefined, link: LinkData): void {
+function attachLinkToPortal(portal: PortalData | undefined, link: LinkData): void {
   if (!portal) return;
   if (portal.links?.some((existingLink) => existingLink.guid === link.guid)) return;
 
   (portal.links ??= []).push(link);
 }
 
-function attachFieldsToPortals(
+function attachFieldsToExistingPortals(
   portals: Map<string, PortalData>,
   fields: Map<string, FieldData>,
 ): void {
   for (const field of fields.values()) {
     for (const point of field.points) {
-      addPortalField(portals.get(point.guid), field);
+      attachFieldToPortal(portals.get(point.guid), field);
     }
   }
 }
 
-function addPortalField(portal: PortalData | undefined, field: FieldData): void {
+function attachFieldToPortal(portal: PortalData | undefined, field: FieldData): void {
   if (!portal) return;
   if (portal.fields?.some((existingField) => existingField.guid === field.guid)) return;
 

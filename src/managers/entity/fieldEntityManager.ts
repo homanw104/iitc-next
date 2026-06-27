@@ -6,10 +6,11 @@ import * as Cesium from "cesium";
 import type { FieldData, PortalData } from "../../types/ingress";
 import { getTeamColor } from "../../utils/color";
 import type { LayerManager } from "../layer/layerManager";
+import { settingsManager } from "../system/settingsManager.ts";
 import type { PortalEntityManager } from "./portalEntityManager";
 
 const FIELD_Z_INDEX = 0;
-const FIELD_CLASSIFICATION_TYPE = Cesium.ClassificationType.BOTH;
+const FIELD_FILL_ALPHA = 0.2;
 
 interface Field {
   data: FieldData;
@@ -105,9 +106,9 @@ export class FieldEntityManager {
       id: `field-${data.guid}`,
       polygon: {
         hierarchy: createFieldHierarchy(points),
-        material: getTeamColor(data.team).withAlpha(0.2),
+        material: getTeamColor(data.team).withAlpha(FIELD_FILL_ALPHA),
         outline: false,
-        classificationType: FIELD_CLASSIFICATION_TYPE,
+        classificationType: getFieldClassificationType(),
         zIndex: FIELD_Z_INDEX,
       },
       properties: {
@@ -149,8 +150,8 @@ export class FieldEntityManager {
       entity.polygon.heightReference = undefined;
       entity.polygon.extrudedHeight = undefined;
       entity.polygon.extrudedHeightReference = undefined;
-      entity.polygon.material = new Cesium.ColorMaterialProperty(getTeamColor(data.team).withAlpha(0.2));
-      entity.polygon.classificationType = new Cesium.ConstantProperty(FIELD_CLASSIFICATION_TYPE);
+      entity.polygon.material = new Cesium.ColorMaterialProperty(getTeamColor(data.team).withAlpha(FIELD_FILL_ALPHA));
+      entity.polygon.classificationType = new Cesium.ConstantProperty(getFieldClassificationType());
       entity.polygon.zIndex = new Cesium.ConstantProperty(FIELD_Z_INDEX);
     }
   }
@@ -168,6 +169,12 @@ function createFieldHierarchy(points: number[]): Cesium.PolygonHierarchy {
   return new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray(points));
 }
 
+function getFieldClassificationType(): Cesium.ClassificationType {
+  return settingsManager.getUseGoogle3dTiles()
+    ? Cesium.ClassificationType.CESIUM_3D_TILE
+    : Cesium.ClassificationType.TERRAIN;
+}
+
 function getFieldLayerId(data: FieldData): string {
   const team = data.team.toLowerCase();
   return `fields-${team}`;
@@ -181,7 +188,7 @@ function setNewestPlaceholder(placeholders: Map<string, PortalData>, placeholder
   }
 
   placeholder.fields?.forEach((field) => addPortalField(existing, field));
-  if (placeholder.timestamp > existing.timestamp) {
+  if (placeholder.timestamp && placeholder.timestamp > (existing.timestamp ?? 0)) {
     existing.team = placeholder.team;
     existing.latE6 = placeholder.latE6;
     existing.lngE6 = placeholder.lngE6;

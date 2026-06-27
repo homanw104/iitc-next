@@ -61,10 +61,6 @@ export class PortalEntityManager {
     await this.addOrUpdatePortal(portalData);
   }
 
-  public hasPortal(guid: string): boolean {
-    return this.portals.has(guid) || this.portalsPendingCreation.has(guid);
-  }
-
   public async addOrUpdatePortals(portals: PortalData[]): Promise<void> {
     const layers = new Set<string>();
     portals.forEach((portal) => {
@@ -86,9 +82,8 @@ export class PortalEntityManager {
     if (existing) {
       if (data.isPlaceholder) return;
       if (
-        existing.data.isPlaceholder ||
-        data.timestamp > existing.data.timestamp ||
-        data.resonators
+        (existing.data.isPlaceholder && !data.isPlaceholder) ||
+        (data.timestamp && data.timestamp > (existing.data.timestamp ?? 0))
       ) {
         const oldLayerId = existing.currentLayerId;
         const newLayerId = getPortalLayerId(data);
@@ -171,10 +166,6 @@ export class PortalEntityManager {
 
   public getPortalEntity(guid: string): Cesium.Entity | undefined {
     return this.portals.get(guid)?.entity;
-  }
-
-  public removePortal(guid: string): void {
-    this.removePortalEntity(guid);
   }
 
   public removePortalsInView(viewRect: Cesium.Rectangle): void {
