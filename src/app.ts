@@ -9,6 +9,7 @@ import extractVersionString from "./procedures/extractVersionString";
 import getPageRoute from "./procedures/getPageRoute.ts";
 import getLoginStatus from "./procedures/getLoginStatus.ts";
 import setUpResponsivePage from "./procedures/setUpResponsivePage.ts";
+import disableVanillaLoadHandlers from "./procedures/disableVanillaLoadHandlers.ts";
 import disableStyleSheets from "./procedures/disableStyleSheets.ts";
 import enableStyleSheets from "./procedures/enableStyleSheets.ts";
 import patchCesiumModelPicking from "./procedures/patchCesiumModelPicking.ts";
@@ -68,6 +69,9 @@ const isFirstBoot = checkAndMarkBootStatus();
 const pageRoute = getPageRoute();
 
 if (isFirstBoot && pageRoute && pageRoute !== "/signinhandler") {
+  // Prevent original scripts from ingress intel from loading
+  disableVanillaLoadHandlers();
+
   // Set up a viewport meta tag for responsive design
   setUpResponsivePage();
 
@@ -77,14 +81,10 @@ if (isFirstBoot && pageRoute && pageRoute !== "/signinhandler") {
   // Set up splash screen at the very start
   loadSplashScreen(appContext);
 
-  // Disable vanilla JS
-  window.onload = function () {};
-  if (document.body) document.body.onload = function () {};
-
   // Initialize once the DOM content is loaded
-  if (document.readyState === "complete") {
-    init().then();
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => init().then(), { once: true });
   } else {
-    window.addEventListener("load", init);
+    init().then();
   }
 }
