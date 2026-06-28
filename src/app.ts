@@ -4,13 +4,14 @@
 
 import type { SplashScreenController } from "./controllers/SplashScreenController.tsx";
 import type { CoreManagers } from "./core/coreManagers.ts";
-import claimIITCNextBoot from "./procedures/claimIITCNextBoot.ts";
+import checkAndMarkBootStatus from "./procedures/checkAndMarkBootStatus.ts";
 import extractVersionString from "./procedures/extractVersionString";
 import getPageRoute from "./procedures/getPageRoute.ts";
 import getLoginStatus from "./procedures/getLoginStatus.ts";
 import setUpResponsivePage from "./procedures/setUpResponsivePage.ts";
 import disableStyleSheets from "./procedures/disableStyleSheets.ts";
 import enableStyleSheets from "./procedures/enableStyleSheets.ts";
+import patchCesiumModelPicking from "./procedures/patchCesiumModelPicking.ts";
 import loadLoginScreen from "./procedures/loadLoginScreen.ts";
 import loadSplashScreen from "./procedures/loadSplashScreen.ts";
 import loadCesiumScript from "./procedures/loadCesiumScript.ts";
@@ -55,12 +56,13 @@ const init = async () => {
   } else {
     enableStyleSheets(appContext);
     await loadCesiumScript(appContext);
+    patchCesiumModelPicking();
     await startIITCNextRuntime(appContext);
   }
 };
 
 // To know whether the script has booted
-const isFirstBoot = claimIITCNextBoot();
+const isFirstBoot = checkAndMarkBootStatus();
 
 // To know on which page we are
 const pageRoute = getPageRoute();

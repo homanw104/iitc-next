@@ -9,7 +9,7 @@ type WindowWithBootState = Window & typeof globalThis & {
   iitcNextBooted?: boolean;
 };
 
-export default function claimIITCNextBoot(): boolean {
+export default function checkAndMarkBootStatus(): boolean {
   const targetWindow = safeWindow as WindowWithBootState;
   if (targetWindow.iitcNextBooted) return false;
   targetWindow.iitcNextBooted = true;
