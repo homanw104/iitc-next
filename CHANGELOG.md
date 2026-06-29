@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.2.2
+
+* Improved label display and hide sequence
+* Fixed the portal detail pane not showing details
+* Other minor improvements
+
 ## 2.2.1
 
 * Improved the responsiveness of the splash screen
