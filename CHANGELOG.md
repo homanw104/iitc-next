@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.2.1
+
+* Improved the responsiveness of the splash screen
+* Fixed the splash screen not showing messages when using default settings
+* Other minor improvements
+
 ## 2.2.0
 
 * Added a splash screen for initial loading

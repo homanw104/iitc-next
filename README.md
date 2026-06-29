@@ -19,7 +19,7 @@ Note: You need to diable every IITC-CE userscript/plugin when using
 IITC-Next. IITC-Next is not a plugin of IITC-CE and it does not work with it.
 
 1. Download the userscript from [Releases](https://github.com/homanw104/iitc-next/releases).
-   The userscript is named like `iitc-next-v2.2.0.js`.
+   The userscript is named like `iitc-next-v2.2.1.js`.
 2. Install [Tampermonkey](https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo)
    in your browser, a userscript executor.
 3. Open Tampermonkey, inside the Dashboard, go to the Utility page.
