@@ -11,6 +11,7 @@ import { settingsManager } from "../system/settingsManager.ts";
 import { parsePortal } from "../tiles/tileRequestEntityParser";
 import type { EntityPositionManager, EntityPositionCallback } from "./entityPositionManager";
 import type { EntityTranslucencyManager } from "./entityTranslucencyManager";
+import { getPortalEntityLayerId } from "./portalEntityLayers";
 
 export const PORTAL_POINT_PIXEL_SIZE = 18;
 export const PORTAL_POINT_OUTLINE_WIDTH = 2;
@@ -66,7 +67,7 @@ export class PortalEntityManager {
     portals.forEach((portal) => {
       const existing = this.portals.get(portal.guid);
       if (existing) layers.add(existing.currentLayerId);
-      layers.add(getPortalLayerId(portal));
+      layers.add(getPortalEntityLayerId(portal));
     });
 
     await this.layerManager.withEntityCollectionEventsSuspended(
@@ -80,47 +81,10 @@ export class PortalEntityManager {
   public async addOrUpdatePortal(data: PortalData): Promise<void> {
     const existing = this.portals.get(data.guid);
     if (existing) {
-      if (data.isPlaceholder) return;
-      if (
-        (existing.data.isPlaceholder && !data.isPlaceholder) ||
-        (data.timestamp && data.timestamp >= (existing.data.timestamp ?? 0))
-      ) {
-        const oldLayerId = existing.currentLayerId;
-        const newLayerId = getPortalLayerId(data);
-        if (oldLayerId !== newLayerId) {
-          if (this.shouldPostponeLayerMove(existing, data.guid)) {
-            existing.pendingLayerId = newLayerId;
-          } else {
-            this.movePortalToLayer(existing, newLayerId);
-            existing.pendingLayerId = undefined;
-          }
-        } else {
-          existing.pendingLayerId = undefined;
-        }
-        await this.updatePortalEntity(existing.entity, existing.occlusionEntity, data);
-        this.updatePortalPositionSubscription(existing, data);
-        existing.data = data;
-      }
+      await this.updateExistingPortal(existing, data);
+      return;
     } else {
-      if (this.portalsPendingCreation.has(data.guid)) return;
-      this.portalsPendingCreation.add(data.guid);
-      try {
-        const { entity, occlusionEntity } = await this.createPortalEntity(data);
-        const positionCallback: EntityPositionCallback = (_latE6, _lngE6, position) => {
-          entity.position = new Cesium.ConstantPositionProperty(position);
-          occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
-        };
-        this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, positionCallback);
-        this.portals.set(data.guid, {
-          data,
-          entity,
-          occlusionEntity,
-          positionCallback,
-          currentLayerId: getPortalLayerId(data),
-        });
-      } finally {
-        this.portalsPendingCreation.delete(data.guid);
-      }
+      await this.createAndStorePortal(data);
     }
   }
 
@@ -172,11 +136,40 @@ export class PortalEntityManager {
     this.removePortalEntitiesInView(viewRect);
   }
 
+  private async updateExistingPortal(portal: Portal, data: PortalData): Promise<void> {
+    if (!shouldReplacePortalData(portal.data, data)) return;
+
+    this.syncPortalLayer(portal, data);
+    await this.updatePortalEntity(portal.entity, portal.occlusionEntity, data);
+    this.updatePortalPositionSubscription(portal, data);
+    portal.data = data;
+  }
+
+  private async createAndStorePortal(data: PortalData): Promise<void> {
+    if (this.portalsPendingCreation.has(data.guid)) return;
+
+    this.portalsPendingCreation.add(data.guid);
+    try {
+      const { entity, occlusionEntity } = await this.createPortalEntity(data);
+      const positionCallback = createPortalPositionCallback(entity, occlusionEntity);
+      this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, positionCallback);
+      this.portals.set(data.guid, {
+        data,
+        entity,
+        occlusionEntity,
+        positionCallback,
+        currentLayerId: getPortalEntityLayerId(data),
+      });
+    } finally {
+      this.portalsPendingCreation.delete(data.guid);
+    }
+  }
+
   private async createPortalEntity(data: PortalData): Promise<{
     entity: Cesium.Entity;
     occlusionEntity: Cesium.Entity
   }> {
-    const layerId = getPortalLayerId(data);
+    const layerId = getPortalEntityLayerId(data);
     const entities = this.layerManager.getOrCreateDataSource(layerId).entities;
     const position = await this.entityPositionManager.getPosition(data);
 
@@ -297,6 +290,22 @@ export class PortalEntityManager {
       this.layerMovePostponedPortalGuids.has(guid);
   }
 
+  private syncPortalLayer(portal: Portal, data: PortalData): void {
+    const newLayerId = getPortalEntityLayerId(data);
+    if (portal.currentLayerId === newLayerId) {
+      portal.pendingLayerId = undefined;
+      return;
+    }
+
+    if (this.shouldPostponeLayerMove(portal, data.guid)) {
+      portal.pendingLayerId = newLayerId;
+      return;
+    }
+
+    this.movePortalToLayer(portal, newLayerId);
+    portal.pendingLayerId = undefined;
+  }
+
   private movePortalToLayer(portalInfo: Portal, newLayerId: string): void {
     if (portalInfo.currentLayerId === newLayerId) return;
 
@@ -308,13 +317,21 @@ export class PortalEntityManager {
   }
 }
 
-function getPortalLayerId(data: PortalData): string {
-  const team = data.team.toLowerCase();
-  const level = data.level ?? 0;
-  if (data.isPlaceholder || level === 0) {
-    return `portals-placeholder-${team}`;
-  }
-  return `portals-l${level}-${team}`;
+function shouldReplacePortalData(current: PortalData, next: PortalData): boolean {
+  if (next.isPlaceholder) return false;
+
+  return current.isPlaceholder === true ||
+    (!!next.timestamp && next.timestamp >= (current.timestamp ?? 0));
+}
+
+function createPortalPositionCallback(
+  entity: Cesium.Entity,
+  occlusionEntity: Cesium.Entity,
+): EntityPositionCallback {
+  return (_latE6, _lngE6, position) => {
+    entity.position = new Cesium.ConstantPositionProperty(position);
+    occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
+  };
 }
 
 export function getPortalDisableDepthTestDistance(): number {

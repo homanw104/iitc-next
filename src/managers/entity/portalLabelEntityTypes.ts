@@ -1,5 +1,10 @@
 /**
- * Manage portal label entity types.
+ * Shared portal label entity state.
+ *
+ * PortalLabel combines the Cesium entity reference with cached text bounds,
+ * layer membership, and fade state. Bounds are approximate screen-space values
+ * used by overlap selection, while current/fade opacity fields are kept flat so
+ * the fade loop can update them without allocating per frame.
  */
 
 import type * as Cesium from "cesium";
@@ -14,22 +19,22 @@ export interface PortalLabel {
   screenBoxWidth: number;
   screenBoxHeight: number;
   linkCount: number;
-  opacity: number;
-  targetOpacity: number;
+  currentOpacity: number;
   fadeStartOpacity: number;
+  fadeTargetOpacity: number;
   fadeStartTime: number;
   firstShownAt: number | undefined;
   currentLayerId: string;
 }
 
-export interface PortalLabelEntityScreenBounds {
+export interface PortalLabelScreenBounds {
   left: number;
   top: number;
   right: number;
   bottom: number;
 }
 
-export interface PortalLabelEntityTextLayout {
+export interface PortalLabelTextLayout {
   wrappedText: string;
   screenBoxWidth: number;
   screenBoxHeight: number;

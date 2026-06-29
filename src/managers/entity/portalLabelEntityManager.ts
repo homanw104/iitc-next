@@ -14,15 +14,16 @@ import {
   PORTAL_LABEL_ENTITY_OUTLINE_WIDTH,
   PORTAL_LABEL_ENTITY_VISIBLE_OPACITY,
   createPortalLabelEntityPixelOffsetCallback,
-  getPortalLabelEntityLayerId,
+  getPortalLabelEntityFadeTargetOpacity,
   getPortalLabelEntityLinkCount,
   getPortalLabelEntityPosition,
   getPortalLabelEntityTextLayout,
-  setPortalLabelEntityColorCallbackProperties,
-  setPortalLabelEntityOpacity,
+  setPortalLabelEntityCurrentOpacity,
+  setPortalLabelEntityOpacityCallbackProperties,
 } from "./portalLabelEntityLayout";
+import { getPortalLabelEntityLayerId } from "./portalEntityLayers";
 import { getNonOverlappingPortalLabelEntityGuids } from "./portalLabelEntityOverlap";
-import type { PortalLabel } from "./portalLabelEntityTypes";
+import type { PortalLabel, PortalLabelTextLayout } from "./portalLabelEntityTypes";
 import {
   PORTAL_LABEL_ENTITY_VISIBILITY_BATCH_DELAY_MS,
   PORTAL_LABEL_ENTITY_VISIBILITY_BATCH_SIZE,
@@ -84,56 +85,17 @@ export class PortalLabelEntityManager {
   }
 
   public async addOrUpdateLabel(data: PortalData): Promise<void> {
-    if (!data.title) {
+    const title = data.title;
+    if (!title) {
       this.removeLabel(data.guid);
       return;
     }
 
     const existing = this.labels.get(data.guid);
     if (existing) {
-      const layout = getPortalLabelEntityTextLayout(data.title || "");
-      const newLayerId = getPortalLabelEntityLayerId(data);
-      this.moveLabelToLayer(existing, newLayerId);
-      await this.updateLabelEntity(existing.entity, data, layout.wrappedText);
-      this.updateLabelPositionSubscription(existing, data);
-      existing.wrappedText = layout.wrappedText;
-      existing.screenBoxWidth = layout.screenBoxWidth;
-      existing.screenBoxHeight = layout.screenBoxHeight;
-      existing.linkCount = getPortalLabelEntityLinkCount(data);
-      existing.data = data;
-      this.queueAllVisibilityUpdates();
+      await this.updateExistingLabel(existing, data, title);
     } else {
-      if (this.labelsPendingCreation.has(data.guid)) return;
-      this.labelsPendingCreation.add(data.guid);
-      try {
-        const layout = getPortalLabelEntityTextLayout(data.title || "");
-        const entity = await this.createLabelEntity(data, layout.wrappedText);
-        const positionCallback: EntityPositionCallback = (_latE6, _lngE6, position) => {
-          entity.position = new Cesium.ConstantPositionProperty(position);
-          this.queueVisibilityUpdateAfterEntityPositionsSettle();
-        };
-        this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, positionCallback);
-        const label: PortalLabel = {
-          data,
-          entity,
-          positionCallback,
-          wrappedText: layout.wrappedText,
-          screenBoxWidth: layout.screenBoxWidth,
-          screenBoxHeight: layout.screenBoxHeight,
-          linkCount: getPortalLabelEntityLinkCount(data),
-          opacity: PORTAL_LABEL_ENTITY_INITIAL_OPACITY,
-          targetOpacity: PORTAL_LABEL_ENTITY_INITIAL_OPACITY,
-          fadeStartOpacity: PORTAL_LABEL_ENTITY_INITIAL_OPACITY,
-          fadeStartTime: 0,
-          firstShownAt: undefined,
-          currentLayerId: getPortalLabelEntityLayerId(data),
-        };
-        setPortalLabelEntityColorCallbackProperties(label);
-        this.labels.set(data.guid, label);
-        this.queueVisibilityUpdate(data.guid, true);
-      } finally {
-        this.labelsPendingCreation.delete(data.guid);
-      }
+      await this.createAndStoreLabel(data, title);
     }
   }
 
@@ -161,6 +123,48 @@ export class PortalLabelEntityManager {
 
   public removeLabelsInView(viewRect: Cesium.Rectangle): void {
     this.removeLabelEntitiesInView(viewRect);
+  }
+
+  private async updateExistingLabel(label: PortalLabel, data: PortalData, title: string): Promise<void> {
+    const layout = getPortalLabelEntityTextLayout(title);
+    this.moveLabelToLayer(label, getPortalLabelEntityLayerId(data));
+    await this.updateLabelEntity(label.entity, data, layout.wrappedText);
+    this.updateLabelPositionSubscription(label, data);
+    this.updateLabelState(label, data, layout);
+    this.queueAllVisibilityUpdates();
+  }
+
+  private async createAndStoreLabel(data: PortalData, title: string): Promise<void> {
+    if (this.labelsPendingCreation.has(data.guid)) return;
+
+    this.labelsPendingCreation.add(data.guid);
+    try {
+      const layout = getPortalLabelEntityTextLayout(title);
+      const entity = await this.createLabelEntity(data, layout.wrappedText);
+      const positionCallback = this.createLabelPositionCallback(entity);
+      this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, positionCallback);
+
+      const label: PortalLabel = {
+        data,
+        entity,
+        positionCallback,
+        wrappedText: layout.wrappedText,
+        screenBoxWidth: layout.screenBoxWidth,
+        screenBoxHeight: layout.screenBoxHeight,
+        linkCount: getPortalLabelEntityLinkCount(data),
+        currentOpacity: PORTAL_LABEL_ENTITY_INITIAL_OPACITY,
+        fadeStartOpacity: PORTAL_LABEL_ENTITY_INITIAL_OPACITY,
+        fadeTargetOpacity: PORTAL_LABEL_ENTITY_INITIAL_OPACITY,
+        fadeStartTime: 0,
+        firstShownAt: undefined,
+        currentLayerId: getPortalLabelEntityLayerId(data),
+      };
+      setPortalLabelEntityOpacityCallbackProperties(label);
+      this.labels.set(data.guid, label);
+      this.queueVisibilityUpdate(data.guid, true);
+    } finally {
+      this.labelsPendingCreation.delete(data.guid);
+    }
   }
 
   private async createLabelEntity(data: PortalData, wrappedText: string): Promise<Cesium.Entity> {
@@ -197,6 +201,25 @@ export class PortalLabelEntityManager {
     entityReference.entity = entity;
 
     return entity;
+  }
+
+  private createLabelPositionCallback(entity: Cesium.Entity): EntityPositionCallback {
+    return (_latE6, _lngE6, position) => {
+      entity.position = new Cesium.ConstantPositionProperty(position);
+      this.queueVisibilityUpdateAfterEntityPositionsSettle();
+    };
+  }
+
+  private updateLabelState(
+    label: PortalLabel,
+    data: PortalData,
+    layout: PortalLabelTextLayout
+  ): void {
+    label.wrappedText = layout.wrappedText;
+    label.screenBoxWidth = layout.screenBoxWidth;
+    label.screenBoxHeight = layout.screenBoxHeight;
+    label.linkCount = getPortalLabelEntityLinkCount(data);
+    label.data = data;
   }
 
   private async updateLabelEntity(entity: Cesium.Entity, data: PortalData, wrappedText: string): Promise<void> {
@@ -397,14 +420,15 @@ export class PortalLabelEntityManager {
 
   private setLabelTargetVisibility(label: PortalLabel, visible: boolean): boolean {
     const targetOpacity = visible ? PORTAL_LABEL_ENTITY_VISIBLE_OPACITY : PORTAL_LABEL_ENTITY_HIDDEN_OPACITY;
-    if (label.targetOpacity === targetOpacity) return false;
+    if (getPortalLabelEntityFadeTargetOpacity(label) === targetOpacity) return false;
 
-    label.targetOpacity = targetOpacity;
-    label.fadeStartOpacity = label.opacity;
-    label.fadeStartTime = performance.now();
+    const startTime = performance.now();
+    label.fadeStartOpacity = label.currentOpacity;
+    label.fadeTargetOpacity = targetOpacity;
+    label.fadeStartTime = startTime;
     if (visible) {
       label.entity.show = true;
-      label.firstShownAt ??= label.fadeStartTime;
+      label.firstShownAt ??= startTime;
     }
 
     this.fadingLabelGuids.add(label.data.guid);
@@ -432,13 +456,13 @@ export class PortalLabelEntityManager {
       }
 
       const progress = Cesium.Math.clamp((timestamp - label.fadeStartTime) / LABEL_FADE_DURATION_MS, 0, 1);
-      const opacity = Cesium.Math.lerp(label.fadeStartOpacity, label.targetOpacity, smoothstep(progress));
-      if (setPortalLabelEntityOpacity(label, opacity)) changed = true;
+      const opacity = Cesium.Math.lerp(label.fadeStartOpacity, label.fadeTargetOpacity, smoothstep(progress));
+      if (setPortalLabelEntityCurrentOpacity(label, opacity)) changed = true;
 
       if (progress < 1) return;
 
-      setPortalLabelEntityOpacity(label, label.targetOpacity);
-      if (label.targetOpacity === PORTAL_LABEL_ENTITY_HIDDEN_OPACITY && label.entity.show) {
+      setPortalLabelEntityCurrentOpacity(label, label.fadeTargetOpacity);
+      if (label.fadeTargetOpacity === PORTAL_LABEL_ENTITY_HIDDEN_OPACITY && label.entity.show) {
         label.entity.show = false;
         changed = true;
       }

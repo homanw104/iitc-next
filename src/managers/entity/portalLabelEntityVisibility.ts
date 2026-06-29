@@ -1,5 +1,11 @@
 /**
- * Manages visibility of portal label entities.
+ * Checks whether a portal label anchor is visible from the camera.
+ *
+ * Labels render as overlays, so overlap acceptance still needs an occlusion
+ * check against the world. With globe terrain enabled, we ray-cast against the
+ * globe; without it, we fall back to rendered-depth picking. The checked point
+ * is nudged slightly above the portal anchor to avoid treating the portal's own
+ * surface as an occluder.
  */
 
 import * as Cesium from "cesium";
@@ -12,36 +18,45 @@ export const PORTAL_LABEL_ENTITY_VISIBILITY_DISTANCE_EPSILON_FACTOR = 0.02;
 export const PORTAL_LABEL_ENTITY_VISIBILITY_MAX_EPSILON_METERS = 300;
 
 const LOG_TAG = "PortalLabelEntityManager";
-const RAY_CAST_CALCULATION_HEIGHT_COMPENSATE = 5;
+const RAY_TARGET_HEIGHT_OFFSET_METERS = 5;
 
 const loggedVisibilityFailures = new Set<string>();
-const portalLabelEntityTerrainPickScratch = new Cesium.Cartesian3();
-const portalLabelEntityDepthPickScratch = new Cesium.Cartesian3();
-const portalLabelEntityRayTargetScratch = new Cesium.Cartesian3();
-const portalLabelEntityRayDirectionScratch = new Cesium.Cartesian3();
-const portalLabelEntityVisibilityRayScratch = new Cesium.Ray();
+const terrainPickScratch = new Cesium.Cartesian3();
+const renderedDepthPickScratch = new Cesium.Cartesian3();
+const rayTargetScratch = new Cesium.Cartesian3();
+const rayDirectionScratch = new Cesium.Cartesian3();
+const visibilityRayScratch = new Cesium.Ray();
 
 export function isPortalLabelEntityPositionVisible(
   viewer: Cesium.Viewer,
   labelPosition: Cesium.Cartesian3,
   windowPosition?: Cesium.Cartesian2,
 ): boolean {
-  const globe = viewer.scene.globe;
-  const rayTargetPosition = getRayTargetPosition(labelPosition);
+  const targetPosition = getVisibilityTargetPosition(labelPosition);
 
-  if (!globe.show) {
+  if (!viewer.scene.globe.show) {
     if (!windowPosition) {
-      warnVisibilityFailure("rendered-depth-position-unavailable", "Label visibility check failed because the label window position is unavailable.");
+      warnVisibilityFailure(
+        "rendered-depth-position-unavailable",
+        "Label visibility check failed because the label window position is unavailable.",
+      );
       return false;
     }
 
-    return isPortalLabelEntityPositionVisibleAgainstRenderedDepth(viewer, rayTargetPosition, windowPosition);
+    return isPositionVisibleAgainstRenderedDepth(viewer, targetPosition, windowPosition);
   }
 
-  const ray = getCameraToPositionRay(viewer.camera, rayTargetPosition);
+  return isPositionVisibleAgainstTerrain(viewer, targetPosition);
+}
+
+function isPositionVisibleAgainstTerrain(
+  viewer: Cesium.Viewer,
+  targetPosition: Cesium.Cartesian3,
+): boolean {
+  const ray = getCameraToPositionRay(viewer.camera, targetPosition);
   if (!ray) return false;
 
-  const terrainPosition = globe.pick(ray, viewer.scene, portalLabelEntityTerrainPickScratch);
+  const terrainPosition = viewer.scene.globe.pick(ray, viewer.scene, terrainPickScratch);
   if (!terrainPosition) {
     warnVisibilityFailure("terrain-pick-unavailable", "Label visibility check failed because terrain pick is unavailable.");
     return false;
@@ -50,7 +65,7 @@ export function isPortalLabelEntityPositionVisible(
   return isPickedPositionVisible(
     viewer.camera,
     terrainPosition,
-    rayTargetPosition,
+    targetPosition,
   );
 }
 
@@ -66,21 +81,24 @@ export function takePortalLabelEntityGuidBatch(queuedGuids: Set<string>, limit: 
   return batch;
 }
 
-function isPortalLabelEntityPositionVisibleAgainstRenderedDepth(
+function isPositionVisibleAgainstRenderedDepth(
   viewer: Cesium.Viewer,
-  labelPosition: Cesium.Cartesian3,
+  targetPosition: Cesium.Cartesian3,
   windowPosition: Cesium.Cartesian2,
 ): boolean {
   const depthPosition = pickRenderedDepthPosition(viewer.scene, windowPosition);
   if (!depthPosition) {
-    warnVisibilityFailure("rendered-depth-pick-unavailable", "Label visibility check failed because rendered depth pick is unavailable.");
+    warnVisibilityFailure(
+      "rendered-depth-pick-unavailable",
+      "Label visibility check failed because rendered depth pick is unavailable.",
+    );
     return false;
   }
 
   return isPickedPositionVisible(
     viewer.camera,
     depthPosition,
-    labelPosition,
+    targetPosition,
   );
 }
 
@@ -91,7 +109,7 @@ function pickRenderedDepthPosition(scene: Cesium.Scene, windowPosition: Cesium.C
   }
 
   try {
-    return scene.pickPosition(windowPosition, portalLabelEntityDepthPickScratch);
+    return scene.pickPosition(windowPosition, renderedDepthPickScratch);
   } catch (error) {
     warnVisibilityFailure("rendered-depth-pick-error", "Label visibility check failed while picking rendered depth.", error);
     return undefined;
@@ -101,44 +119,44 @@ function pickRenderedDepthPosition(scene: Cesium.Scene, windowPosition: Cesium.C
 function isPickedPositionVisible(
   camera: Cesium.Camera,
   pickedPosition: Cesium.Cartesian3,
-  originPosition: Cesium.Cartesian3,
+  targetPosition: Cesium.Cartesian3,
 ): boolean {
   const pickedDistance = Cesium.Cartesian3.distance(camera.positionWC, pickedPosition);
-  const originDistance = Cesium.Cartesian3.distance(camera.positionWC, originPosition);
-  const epsilonMeters = getVisibilityEpsilonMeters(originDistance);
-  return pickedDistance >= originDistance - epsilonMeters ||
-    Cesium.Cartesian3.distance(pickedPosition, originPosition) <= epsilonMeters;
+  const targetDistance = Cesium.Cartesian3.distance(camera.positionWC, targetPosition);
+  const epsilonMeters = getVisibilityEpsilonMeters(targetDistance);
+  return pickedDistance >= targetDistance - epsilonMeters ||
+    Cesium.Cartesian3.distance(pickedPosition, targetPosition) <= epsilonMeters;
 }
 
-function getVisibilityEpsilonMeters(originDistance: number): number {
+function getVisibilityEpsilonMeters(targetDistance: number): number {
   return Cesium.Math.clamp(
-    originDistance * PORTAL_LABEL_ENTITY_VISIBILITY_DISTANCE_EPSILON_FACTOR,
+    targetDistance * PORTAL_LABEL_ENTITY_VISIBILITY_DISTANCE_EPSILON_FACTOR,
     PORTAL_LABEL_ENTITY_VISIBILITY_EPSILON_METERS,
     PORTAL_LABEL_ENTITY_VISIBILITY_MAX_EPSILON_METERS,
   );
 }
 
 function getCameraToPositionRay(camera: Cesium.Camera, position: Cesium.Cartesian3): Cesium.Ray | undefined {
-  const direction = Cesium.Cartesian3.subtract(position, camera.positionWC, portalLabelEntityRayDirectionScratch);
+  const direction = Cesium.Cartesian3.subtract(position, camera.positionWC, rayDirectionScratch);
   if (Cesium.Cartesian3.equalsEpsilon(direction, Cesium.Cartesian3.ZERO, Cesium.Math.EPSILON14)) {
     warnVisibilityFailure("ray-direction-unavailable", "Label visibility check failed because the label position overlaps the camera.");
     return undefined;
   }
 
   Cesium.Cartesian3.normalize(direction, direction);
-  portalLabelEntityVisibilityRayScratch.origin = camera.positionWC;
-  portalLabelEntityVisibilityRayScratch.direction = direction;
-  return portalLabelEntityVisibilityRayScratch;
+  visibilityRayScratch.origin = camera.positionWC;
+  visibilityRayScratch.direction = direction;
+  return visibilityRayScratch;
 }
 
-function getRayTargetPosition(labelPosition: Cesium.Cartesian3): Cesium.Cartesian3 {
-  Cesium.Cartesian3.normalize(labelPosition, portalLabelEntityRayTargetScratch);
+function getVisibilityTargetPosition(labelPosition: Cesium.Cartesian3): Cesium.Cartesian3 {
+  Cesium.Cartesian3.normalize(labelPosition, rayTargetScratch);
   Cesium.Cartesian3.multiplyByScalar(
-    portalLabelEntityRayTargetScratch,
-    RAY_CAST_CALCULATION_HEIGHT_COMPENSATE,
-    portalLabelEntityRayTargetScratch,
+    rayTargetScratch,
+    RAY_TARGET_HEIGHT_OFFSET_METERS,
+    rayTargetScratch,
   );
-  return Cesium.Cartesian3.add(labelPosition, portalLabelEntityRayTargetScratch, portalLabelEntityRayTargetScratch);
+  return Cesium.Cartesian3.add(labelPosition, rayTargetScratch, rayTargetScratch);
 }
 
 function warnVisibilityFailure(reason: string, message: string, error?: unknown): void {
