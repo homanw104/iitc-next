@@ -59,8 +59,21 @@ function blockVanillaGlobal(name: "configureIFrame" | "initialize"): void {
 function blockVanillaScriptInsertion(): void {
   const targetWindow = safeWindow as WindowWithVanillaScriptState;
   const nodePrototype = targetWindow.Node.prototype;
+  const scriptPrototype = targetWindow.HTMLScriptElement.prototype;
   const appendChild = nodePrototype.appendChild;
   const insertBefore = nodePrototype.insertBefore;
+  const srcDescriptor = Object.getOwnPropertyDescriptor(scriptPrototype, "src");
+
+  if (srcDescriptor?.get && srcDescriptor.set) {
+    Object.defineProperty(scriptPrototype, "src", {
+      configurable: true,
+      get: srcDescriptor.get,
+      set(this: HTMLScriptElement, value: string) {
+        srcDescriptor.set!.call(this, value);
+        blockVanillaScript(this);
+      },
+    });
+  }
 
   nodePrototype.appendChild = function<T extends Node>(this: Node, node: T): T {
     blockVanillaNode(node);
@@ -141,5 +154,6 @@ function isGoogleMapsScript(url: URL): boolean {
 }
 
 function isArkScript(url: URL): boolean {
-  return url.hostname === "storage.googleapis.com" && url.pathname.startsWith("/spatialweb-ark/ark/");
+  return (url.hostname === "storage.googleapis.com" && url.pathname.startsWith("/spatialweb-ark/ark/"))
+    || (url.hostname === location.hostname && /^\/p-[a-f0-9]+\.system(?:\.entry)?\.js$/.test(url.pathname));
 }
