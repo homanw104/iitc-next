@@ -62,6 +62,7 @@ const SplashScreen = ({ logEntries, fadeOutMs, onInitTextRef, onLogGridRef }: {
             ref={(el: HTMLElement) => onLogGridRef?.(el) }
             style={{
               width: "100%",
+              minWidth: "0",
             }}
           >
             {logEntries.map(logEntry => {
