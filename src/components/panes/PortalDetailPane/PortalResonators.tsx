@@ -84,7 +84,7 @@ const PortalResonators = ({ data, teamColorHex }: { data: PortalData, teamColorH
               whiteSpace: "nowrap",
               color: r2 ? teamColorHex : "#555"
             }}>
-              {r2?.owner || "empty slot"}
+              {r2 === undefined ? "unknown" : r2 === null ? "empty slot" : r2.owner}
             </div>
           </Fragment>
         );
