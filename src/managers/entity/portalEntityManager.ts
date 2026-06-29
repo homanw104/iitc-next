@@ -203,9 +203,6 @@ export class PortalEntityManager {
         outlineColor: Cesium.Color.BLACK.withAlpha(PORTAL_OCCLUDED_ALPHA),
         outlineWidth: PORTAL_POINT_OUTLINE_WIDTH,
       },
-      properties: {
-        selectable: false,
-      },
     });
 
     return { entity, occlusionEntity };

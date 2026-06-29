@@ -111,9 +111,6 @@ export class FieldEntityManager {
         classificationType: getFieldClassificationType(),
         zIndex: FIELD_Z_INDEX,
       },
-      properties: {
-        selectable: false,
-      }
     });
   }
 

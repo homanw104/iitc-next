@@ -123,9 +123,6 @@ export class LinkEntityManager {
         clampToGround: true,
         zIndex: 10,
       },
-      properties: {
-        selectable: false,
-      }
     });
   }
 

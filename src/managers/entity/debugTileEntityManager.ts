@@ -89,9 +89,6 @@ export class DebugTileEntityManager {
         outlineWidth: 2,
         classificationType: DEBUG_TILE_CLASSIFICATION_TYPE,
       },
-      properties: {
-        selectable: false,
-      }
     });
   }
 

@@ -161,9 +161,6 @@ class CrossLinesPlugin {
           arcType: Cesium.ArcType.GEODESIC,
           clampToGround: true,
         },
-        properties: {
-          selectable: false,
-        },
       });
     });
 

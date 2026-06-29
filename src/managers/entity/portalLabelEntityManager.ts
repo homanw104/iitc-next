@@ -66,16 +66,11 @@ export class PortalLabelEntityManager {
 
   public async addOrUpdateLabel(data: PortalData): Promise<void> {
     const title = data.title;
-    if (!title) {
-      this.removeLabel(data.guid);
-      return;
-    }
-
     const existing = this.labels.get(data.guid);
     if (existing) {
-      await this.updateExistingLabel(existing, data, title);
+      await this.updateExistingLabel(existing, data, title ?? "");
     } else {
-      await this.createAndStoreLabel(data, title);
+      await this.createAndStoreLabel(data, title ?? "");
     }
   }
 
@@ -91,14 +86,10 @@ export class PortalLabelEntityManager {
       await this.layerManager.withEntityCollectionEventsSuspended(
         Array.from(layers, (name) => ({ name, type: "overlay" as const })),
         async () => {
-          await Promise.all(portals.map((portal) => this.addOrUpdateLabel(portal)));
+          await Promise.all(portals.map((portalData) => this.addOrUpdateLabel(portalData)));
         }
       );
     });
-  }
-
-  public removeLabel(guid: string): void {
-    this.removeLabelEntity(guid);
   }
 
   public removeLabelsInView(viewRect: Cesium.Rectangle): void {
@@ -173,9 +164,6 @@ export class PortalLabelEntityManager {
           this.viewer,
           (time) => entityReference.entity?.position?.getValue(time) ?? position,
         ),
-      },
-      properties: {
-        selectable: false,
       },
     });
     entityReference.entity = entity;
@@ -267,15 +255,14 @@ export class PortalLabelEntityManager {
   }
 
   private queueAllVisibilityUpdates(): void {
-    if (this.deferredVisibilityUpdateDepth > 0) {
-      this.overlapDirty = true;
-      this.hasDeferredVisibilityUpdate = true;
-      return;
-    }
-
     this.overlapDirty = true;
-    this.cameraMoveTracker.captureSnapshot();
-    this.scheduleVisibilityUpdates();
+
+    if (this.deferredVisibilityUpdateDepth > 0) {
+      this.hasDeferredVisibilityUpdate = true;
+    } else {
+      this.cameraMoveTracker.captureSnapshot();
+      this.scheduleVisibilityUpdates();
+    }
   }
 
   private queueVisibilityUpdate(guid: string, overlapDirty = false): void {
