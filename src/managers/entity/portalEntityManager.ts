@@ -83,7 +83,7 @@ export class PortalEntityManager {
       if (data.isPlaceholder) return;
       if (
         (existing.data.isPlaceholder && !data.isPlaceholder) ||
-        (data.timestamp && data.timestamp > (existing.data.timestamp ?? 0))
+        (data.timestamp && data.timestamp >= (existing.data.timestamp ?? 0))
       ) {
         const oldLayerId = existing.currentLayerId;
         const newLayerId = getPortalLayerId(data);
