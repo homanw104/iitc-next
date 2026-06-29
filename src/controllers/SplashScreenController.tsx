@@ -33,7 +33,6 @@ export class SplashScreenController {
   }
 
   private appendLogEntry(entry: LogEntry): void {
-    if (!logManager.getRecordedLogs().includes(entry)) return;
     if (!this.logGridEl) return;
 
     this.logGridEl.appendChild(SplashMessage({ logEntry: entry }));
