@@ -178,16 +178,20 @@ export class EntityPositionManager {
   private async getTerrainProviderPosition(data: EntityCoordinates): Promise<Cesium.Cartesian3> {
     const cartographic = Cesium.Cartographic.fromDegrees(data.lngE6 / 1e6, data.latE6 / 1e6);
     const height = this.viewer.scene.globe.getHeight(cartographic);
-    if (height !== undefined) return getTerrainPosition(cartographic.longitude, cartographic.latitude, height);
+    if (height) {
+      return getTerrainPosition(cartographic.longitude, cartographic.latitude, height);
+    }
 
     if (this.viewer.terrainProvider instanceof Cesium.EllipsoidTerrainProvider) {
       return getTerrainPosition(cartographic.longitude, cartographic.latitude, 0);
     }
 
     const [sampled] = await Cesium.sampleTerrain(this.viewer.terrainProvider, TERRAIN_SAMPLE_LEVEL, [cartographic]);
-    if (sampled.height === undefined) throw new Error("Terrain height is unavailable");
+    if (sampled.height) {
+      return getTerrainPosition(sampled.longitude, sampled.latitude, sampled.height);
+    }
 
-    return getTerrainPosition(sampled.longitude, sampled.latitude, sampled.height);
+    throw new Error("Terrain height is unavailable");
   }
 
   private refreshTerrainProviderPosition(positionState: EntityPositionState): void {
