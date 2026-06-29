@@ -55,8 +55,8 @@ const init = async () => {
     loadLoginScreen(appContext);
   } else {
     enableStyleSheets(appContext);
-    await loadCesiumScript(appContext);
     patchCesiumModelPicking();
+    await loadCesiumScript(appContext);
     await startIITCNextRuntime(appContext);
   }
 };
@@ -74,7 +74,7 @@ if (isFirstBoot && pageRoute && pageRoute !== "/signinhandler") {
   // Disable stylesheets that make the login page a desktop view
   disableStyleSheets(appContext);
 
-  // Set up splash screen at the very start
+  // Set up splash screen at the early stage
   loadSplashScreen(appContext);
 
   // Initialize once the DOM content is loaded
