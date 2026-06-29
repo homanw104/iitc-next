@@ -23,7 +23,12 @@ export const PORTAL_LABEL_ENTITY_VISIBLE_OPACITY = 1;
 export const PORTAL_LABEL_ENTITY_HIDDEN_OPACITY = 0;
 
 export function getPortalLabelEntityLayerId(data: PortalData): string {
-  return `portals-label-${data.team.toLowerCase()}`;
+  const team = data.team.toLowerCase();
+  const level = data.level ?? 0;
+  if (data.isPlaceholder || level === 0) {
+    return `portals-label-placeholder-${team}`;
+  }
+  return `portals-label-l${level}-${team}`;
 }
 
 export function getPortalLabelEntityLinkCount(data: PortalData): number {

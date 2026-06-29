@@ -270,8 +270,8 @@ export class PortalLabelEntityManager {
       return;
     }
 
-    this.captureVisibilityCameraSnapshot();
     this.overlapDirty = true;
+    this.captureVisibilityCameraSnapshot();
     this.scheduleVisibilityUpdates();
   }
 

@@ -68,15 +68,23 @@ export function applyLayerFilters(
 ): void {
   TEAMS.map(t => t.toLowerCase()).forEach(team => {
     const teamVisible = isEnabled(filterState, `team-${team}`);
+    const labelsVisible = teamVisible && isEnabled(filterState, "portals-label");
 
     PORTAL_LEVELS.forEach(level => {
       setLayerVisibility(
         `portals-l${level}-${team}`,
         teamVisible && isEnabled(filterState, `level-${level}`),
       );
+      setLayerVisibility(
+        `portals-label-l${level}-${team}`,
+        labelsVisible && isEnabled(filterState, `level-${level}`),
+      );
     });
 
-    setLayerVisibility(`portals-label-${team}`, teamVisible && isEnabled(filterState, "portals-label"));
+    setLayerVisibility(
+      `portals-label-placeholder-${team}`,
+      labelsVisible && isEnabled(filterState, "portals-placeholder"),
+    );
     setLayerVisibility(`portals-ornament-${team}`, teamVisible && isEnabled(filterState, "portals-ornament"));
     setLayerVisibility(`portals-placeholder-${team}`, teamVisible && isEnabled(filterState, "portals-placeholder"));
     setLayerVisibility(`links-${team}`, teamVisible && isEnabled(filterState, "links"));
@@ -126,9 +134,12 @@ function createBuiltInDataSourceAndOverlayNames(): string[] {
   TEAMS.forEach(t => {
     const team = t.toLowerCase();
 
-    PORTAL_LEVELS.forEach(l => names.push(`portals-l${l}-${team}`));
+    PORTAL_LEVELS.forEach(l => {
+      names.push(`portals-l${l}-${team}`);
+      names.push(`portals-label-l${l}-${team}`);
+    });
     names.push(`portals-placeholder-${team}`);
-    names.push(`portals-label-${team}`);
+    names.push(`portals-label-placeholder-${team}`);
     names.push(`portals-ornament-${team}`);
     names.push(`links-${team}`);
     names.push(`fields-${team}`);
