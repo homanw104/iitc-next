@@ -23,7 +23,6 @@ import { safeLocalStorage } from "./utils/storage";
 import { safeWindow } from "./utils/window";
 
 export interface AppContext {
-  initStarted: boolean;
   coreManagers: CoreManagers | undefined;
   cesiumLoadPromise: Promise<void> | undefined;
   splashScreenController: SplashScreenController | undefined;
@@ -31,7 +30,6 @@ export interface AppContext {
 }
 
 const appContext: AppContext = {
-  initStarted: false,
   coreManagers: undefined,
   cesiumLoadPromise: undefined,
   splashScreenController: undefined,
@@ -39,9 +37,6 @@ const appContext: AppContext = {
 };
 
 const init = async () => {
-  if (appContext.initStarted) return;
-  appContext.initStarted = true;
-
   await safeLocalStorage.initialize();
   safeLocalStorage.shadow();
   safeWindow.iitc = {};
