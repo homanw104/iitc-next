@@ -20,7 +20,7 @@ const DATA_SOURCE_LAYER_NAME = "history-visited-captured";
 const DATA_SOURCE_LAYER_NAME_REVERSE = "history-visited-captured-reverse";
 const HALO_POINT_PIXEL_SIZE = PORTAL_POINT_PIXEL_SIZE + PORTAL_POINT_OUTLINE_WIDTH;
 const HALO_POINT_OUTLINE_WIDTH = 4;
-const HALO_POINT_ALPHA = 0.95;
+const HALO_POINT_ALPHA = 1.0;
 const VISITED_COLOR = "#FFCE00";
 const CAPTURED_COLOR = "#FF6060";
 

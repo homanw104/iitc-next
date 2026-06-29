@@ -20,7 +20,7 @@ const DATA_SOURCE_LAYER_NAME = "history-scout-control";
 const DATA_SOURCE_LAYER_NAME_REVERSE = "history-scout-control-reverse";
 const HALO_POINT_PIXEL_SIZE = PORTAL_POINT_PIXEL_SIZE + PORTAL_POINT_OUTLINE_WIDTH;
 const HALO_POINT_OUTLINE_WIDTH = 4;
-const HALO_POINT_ALPHA = 0.95;
+const HALO_POINT_ALPHA = 1.0;
 const SCOUT_CONTROL_COLOR = "#FF9000";
 
 type ScoutHistoryState = "none" | "controlled";
