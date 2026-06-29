@@ -30,7 +30,8 @@ import {
   takePortalLabelEntityGuidBatch,
 } from "./portalLabelEntityVisibility";
 
-const LABEL_FADE_DURATION_MS = 200;
+const LABEL_FADE_IN_DURATION_MS = 200;
+const LABEL_FADE_OUT_DURATION_MS = 200;
 
 const LABEL_CAMERA_MOVE_VISIBILITY_UPDATE_INTERVAL_MS = 1000;
 const LABEL_CAMERA_MOVE_MIN_POSITION_METERS = 5;
@@ -50,6 +51,8 @@ export class PortalLabelEntityManager {
   private overlapDirty = true;
   private fadingLabelGuids: Set<string> = new Set();
   private fadeFrame: number | undefined;
+  private pendingOverlapRevealGuids: Set<string> | undefined;
+  private pendingOverlapRevealGeneration: number | undefined;
   private hasLastVisibilityCameraSnapshot = false;
   private lastVisibilityCameraPosition = new Cesium.Cartesian3();
   private lastVisibilityCameraDirection = new Cesium.Cartesian3();
@@ -375,6 +378,7 @@ export class PortalLabelEntityManager {
         return;
       }
 
+      if (this.shouldWaitForRejectedOverlapFade(guid, label)) return;
       if (this.setLabelTargetVisibility(label, true)) changed = true;
     });
 
@@ -385,37 +389,95 @@ export class PortalLabelEntityManager {
   private async refreshLabelOverlaps(time: Cesium.JulianDate): Promise<boolean> {
     const overlapRefreshGeneration = ++this.overlapRefreshGeneration;
     this.overlapDirty = false;
+    this.clearPendingOverlapReveal();
 
-    let changed = false;
-    this.overlapVisibleGuids = await getNonOverlappingPortalLabelEntityGuids(
+    const nextOverlapVisibleGuids = await getNonOverlappingPortalLabelEntityGuids(
       this.viewer,
       this.labels,
       time,
-      (guid) => {
-        if (overlapRefreshGeneration !== this.overlapRefreshGeneration) return;
-
-        const label = this.labels.get(guid);
-        if (!label) return;
-
-        this.visibilityQueuedGuids.delete(guid);
-        if (this.setLabelTargetVisibility(label, true)) {
-          changed = true;
-        }
-      },
       () => overlapRefreshGeneration === this.overlapRefreshGeneration,
     );
-    if (overlapRefreshGeneration !== this.overlapRefreshGeneration) return changed;
+    if (overlapRefreshGeneration !== this.overlapRefreshGeneration) return false;
+
+    this.overlapVisibleGuids = nextOverlapVisibleGuids;
+
+    const { changed, hasLabelsFadingOut } = this.hideRejectedOverlapLabels(nextOverlapVisibleGuids);
+    if (hasLabelsFadingOut) {
+      this.deferAcceptedOverlapLabelsUntilRejectedFade(nextOverlapVisibleGuids, overlapRefreshGeneration);
+      return changed;
+    }
+
+    return this.showAcceptedOverlapLabels(nextOverlapVisibleGuids) || changed;
+  }
+
+  private hideRejectedOverlapLabels(acceptedGuids: Set<string>): {
+    changed: boolean;
+    hasLabelsFadingOut: boolean
+  } {
+    let changed = false;
+    let hasLabelsFadingOut = false;
 
     this.labels.forEach((label, guid) => {
-      if (this.overlapVisibleGuids.has(guid)) {
-        this.visibilityQueuedGuids.delete(guid);
-        return;
-      }
+      if (acceptedGuids.has(guid)) return;
 
       this.visibilityQueuedGuids.delete(guid);
       if (this.setLabelTargetVisibility(label, false)) changed = true;
+      if (this.isLabelFadingOut(label)) hasLabelsFadingOut = true;
     });
+
+    return { changed, hasLabelsFadingOut };
+  }
+
+  private showAcceptedOverlapLabels(acceptedGuids: Set<string>): boolean {
+    let changed = false;
+
+    acceptedGuids.forEach((guid) => {
+      const label = this.labels.get(guid);
+      if (!label) return;
+
+      this.visibilityQueuedGuids.delete(guid);
+      if (this.setLabelTargetVisibility(label, true)) changed = true;
+    });
+
     return changed;
+  }
+
+  private deferAcceptedOverlapLabelsUntilRejectedFade(
+    acceptedGuids: Set<string>,
+    overlapRefreshGeneration: number,
+  ): void {
+    this.pendingOverlapRevealGuids = acceptedGuids;
+    this.pendingOverlapRevealGeneration = overlapRefreshGeneration;
+  }
+
+  private revealPendingAcceptedOverlapLabels(): boolean {
+    const acceptedGuids = this.pendingOverlapRevealGuids;
+    const overlapRefreshGeneration = this.pendingOverlapRevealGeneration;
+    this.clearPendingOverlapReveal();
+
+    if (!acceptedGuids) return false;
+    if (overlapRefreshGeneration !== this.overlapRefreshGeneration) {
+      this.queueAllVisibilityUpdates();
+      return false;
+    }
+
+    return this.showAcceptedOverlapLabels(acceptedGuids);
+  }
+
+  private clearPendingOverlapReveal(): void {
+    this.pendingOverlapRevealGuids = undefined;
+    this.pendingOverlapRevealGeneration = undefined;
+  }
+
+  private shouldWaitForRejectedOverlapFade(guid: string, label: PortalLabel): boolean {
+    return this.pendingOverlapRevealGuids?.has(guid) === true &&
+      getPortalLabelEntityFadeTargetOpacity(label) !== PORTAL_LABEL_ENTITY_VISIBLE_OPACITY;
+  }
+
+  private isLabelFadingOut(label: PortalLabel): boolean {
+    return label.entity.show &&
+      getPortalLabelEntityFadeTargetOpacity(label) === PORTAL_LABEL_ENTITY_HIDDEN_OPACITY &&
+      label.currentOpacity > PORTAL_LABEL_ENTITY_HIDDEN_OPACITY + Cesium.Math.EPSILON6;
   }
 
   private setLabelTargetVisibility(label: PortalLabel, visible: boolean): boolean {
@@ -455,7 +517,7 @@ export class PortalLabelEntityManager {
         return;
       }
 
-      const progress = Cesium.Math.clamp((timestamp - label.fadeStartTime) / LABEL_FADE_DURATION_MS, 0, 1);
+      const progress = Cesium.Math.clamp((timestamp - label.fadeStartTime) / getLabelFadeDurationMs(label), 0, 1);
       const opacity = Cesium.Math.lerp(label.fadeStartOpacity, label.fadeTargetOpacity, smoothstep(progress));
       if (setPortalLabelEntityCurrentOpacity(label, opacity)) changed = true;
 
@@ -469,8 +531,18 @@ export class PortalLabelEntityManager {
       this.fadingLabelGuids.delete(guid);
     });
 
+    if (!this.hasAnyLabelFadingOut() && this.revealPendingAcceptedOverlapLabels()) changed = true;
     if (changed) this.viewer.scene.requestRender();
     if (this.fadingLabelGuids.size > 0) this.scheduleLabelFade();
+  }
+
+  private hasAnyLabelFadingOut(): boolean {
+    for (const guid of this.fadingLabelGuids) {
+      const label = this.labels.get(guid);
+      if (label && this.isLabelFadingOut(label)) return true;
+    }
+
+    return false;
   }
 
   private hasCameraMovedEnoughForVisibility(): boolean {
@@ -505,4 +577,10 @@ export class PortalLabelEntityManager {
 
 function smoothstep(value: number): number {
   return value * value * (3 - 2 * value);
+}
+
+function getLabelFadeDurationMs(label: PortalLabel): number {
+  return getPortalLabelEntityFadeTargetOpacity(label) === PORTAL_LABEL_ENTITY_HIDDEN_OPACITY
+    ? LABEL_FADE_OUT_DURATION_MS
+    : LABEL_FADE_IN_DURATION_MS;
 }

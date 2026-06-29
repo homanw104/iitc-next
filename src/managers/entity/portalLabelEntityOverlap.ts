@@ -48,7 +48,6 @@ export async function getNonOverlappingPortalLabelEntityGuids(
   viewer: Cesium.Viewer,
   labels: Map<string, PortalLabel>,
   time: Cesium.JulianDate,
-  onAcceptedGuid?: (guid: string) => void,
   shouldContinue: () => boolean = () => true,
 ): Promise<Set<string>> {
   const candidates = collectPortalLabelOverlapCandidates(viewer, labels, time, shouldContinue);
@@ -56,7 +55,7 @@ export async function getNonOverlappingPortalLabelEntityGuids(
 
   candidates.sort(comparePortalLabelOverlapCandidates);
 
-  return acceptNonOverlappingPortalLabelGuids(viewer, candidates, onAcceptedGuid, shouldContinue);
+  return acceptNonOverlappingPortalLabelGuids(viewer, candidates, shouldContinue);
 }
 
 function collectPortalLabelOverlapCandidates(
@@ -107,7 +106,6 @@ function collectPortalLabelOverlapCandidates(
 async function acceptNonOverlappingPortalLabelGuids(
   viewer: Cesium.Viewer,
   candidates: PortalLabelOverlapCandidate[],
-  onAcceptedGuid: ((guid: string) => void) | undefined,
   shouldContinue: () => boolean,
 ): Promise<Set<string>> {
   const acceptedGuids = new Set<string>();
@@ -128,7 +126,6 @@ async function acceptNonOverlappingPortalLabelGuids(
 
     acceptedGuids.add(candidate.guid);
     addAcceptedCandidateToGrid(candidate, acceptedCandidateGrid);
-    onAcceptedGuid?.(candidate.guid);
     acceptedSinceLastFrame++;
 
     if (acceptedSinceLastFrame >= PORTAL_LABEL_ENTITY_OVERLAP_ACCEPTED_LABELS_PER_FRAME) {
