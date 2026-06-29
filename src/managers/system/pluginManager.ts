@@ -7,7 +7,7 @@ import { safeLocalStorage } from "../../utils/storage";
 import { logManager } from "./logManager";
 
 const LOG_TAG = "PluginManager";
-const ENABLED_PLUGINS_STORAGE_KEY = "iitc-enabled-plugins";
+const ENABLED_PLUGINS_STORAGE_KEY = "iitc-next-enabled-plugins";
 
 export class PluginManager {
   private plugins: Map<string, IITCPlugin> = new Map();

@@ -6,7 +6,7 @@ import { safeLocalStorage } from "../../utils/storage";
 import { logManager } from "./logManager";
 
 const LOG_TAG = "SettingsManager";
-const SETTINGS_STORAGE_KEY = "iitc-settings";
+const SETTINGS_STORAGE_KEY = "iitc-next-settings";
 
 export interface Settings {
   logging: {
