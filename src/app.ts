@@ -9,7 +9,6 @@ import extractVersionString from "./procedures/extractVersionString";
 import getPageRoute from "./procedures/getPageRoute.ts";
 import getLoginStatus from "./procedures/getLoginStatus.ts";
 import setUpResponsivePage from "./procedures/setUpResponsivePage.ts";
-import disableVanillaLoadHandlers from "./procedures/disableVanillaLoadHandlers.ts";
 import disableStyleSheets from "./procedures/disableStyleSheets.ts";
 import enableStyleSheets from "./procedures/enableStyleSheets.ts";
 import patchCesiumModelPicking from "./procedures/patchCesiumModelPicking.ts";
@@ -69,9 +68,6 @@ const isFirstBoot = checkAndMarkBootStatus();
 const pageRoute = getPageRoute();
 
 if (isFirstBoot && pageRoute && pageRoute !== "/signinhandler") {
-  // Prevent original scripts from ingress intel from loading
-  disableVanillaLoadHandlers();
-
   // Set up a viewport meta tag for responsive design
   setUpResponsivePage();
 

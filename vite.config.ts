@@ -32,7 +32,7 @@ export default defineConfig({
   },
   plugins: [
     monkey({
-      entry: "src/app.ts",
+      entry: "src/bootstrap.ts",
       userscript: {
         name: "iitc-next",
         author: "Homan",

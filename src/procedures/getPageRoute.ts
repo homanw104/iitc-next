@@ -4,7 +4,7 @@
 
 type PageRoute = "/signinhandler" | "/intel" | "/"
 
-const getPageRoute = (): PageRoute | undefined => {
+export default function getPageRoute(): PageRoute | undefined {
   if (window.location.hostname === "intel.ingress.com") {
     if (window.location.pathname === "/") return "/";
     if (window.location.pathname.startsWith("/intel")) return "/intel";
@@ -12,5 +12,3 @@ const getPageRoute = (): PageRoute | undefined => {
   }
   return undefined;
 };
-
-export default getPageRoute;

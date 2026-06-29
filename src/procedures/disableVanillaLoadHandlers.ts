@@ -17,7 +17,11 @@ type WindowWithVanillaScriptState = Window & typeof globalThis & {
 const blockedScriptType = "javascript/blocked";
 const noop = () => undefined;
 
-export default function disableVanillaLoadHandlers(): void {
+if (location.pathname !== "/signinhandler") {
+  disableVanillaLoadHandlers();
+}
+
+function disableVanillaLoadHandlers(): void {
   const targetWindow = safeWindow as WindowWithVanillaScriptState;
   if (targetWindow.iitcNextVanillaScriptBlockerInstalled) return;
 
