@@ -78,6 +78,7 @@ export const WebMercatorProjection = Cesium.WebMercatorProjection;
 export const WebMercatorTilingScheme = Cesium.WebMercatorTilingScheme;
 export const buildModuleUrl = Cesium.buildModuleUrl;
 export const createGooglePhotorealistic3DTileset = Cesium.createGooglePhotorealistic3DTileset;
+export const createWorldTerrainAsync = Cesium.createWorldTerrainAsync;
 export const defined = Cesium.defined;
 export const sampleTerrain = Cesium.sampleTerrain;
 export const sampleTerrainMostDetailed = Cesium.sampleTerrainMostDetailed;

@@ -198,7 +198,7 @@ export class PortalEntityManager {
         heightReference: Cesium.HeightReference.NONE,
         disableDepthTestDistance: PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
         scaleByDistance: createPortalNearFarScalar(),
-        translucencyByDistance: this.entityTranslucencyManager.getOccludedTranslucencyByDistance(),
+        translucencyByDistance: this.entityTranslucencyManager.getCallbackProperty(),
         color: getTeamColor(data.team).withAlpha(PORTAL_OCCLUDED_ALPHA),
         outlineColor: Cesium.Color.BLACK.withAlpha(PORTAL_OCCLUDED_ALPHA),
         outlineWidth: PORTAL_POINT_OUTLINE_WIDTH,
