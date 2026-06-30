@@ -156,14 +156,11 @@ export class PortalOrnamentEntityManager {
     }
   }
 
-  private updateOrnamentPositionSubscription(ornamentInfo: {
-    data: PortalData;
-    positionCallback: EntityPositionCallback;
-  }, data: PortalData): void {
-    if (ornamentInfo.data.latE6 === data.latE6 && ornamentInfo.data.lngE6 === data.lngE6) return;
+  private updateOrnamentPositionSubscription(ornament: PortalOrnament, data: PortalData): void {
+    if (ornament.data.latE6 === data.latE6 && ornament.data.lngE6 === data.lngE6) return;
 
-    this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(ornamentInfo.data, ornamentInfo.positionCallback);
-    this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, ornamentInfo.positionCallback);
+    this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(ornament.data, ornament.positionCallback);
+    this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, ornament.positionCallback);
   }
 
   private removeOrnamentEntity(guid: string): void {

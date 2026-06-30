@@ -182,14 +182,11 @@ export class ScoutHistoryEntityManager {
     scoutHistoryHalo.reverseOcclusionEntity = reverseOcclusionEntity;
   }
 
-  private updateScoutControlPositionSubscription(scoutControlHaloInfo: {
-    data: PortalData;
-    positionCallback: EntityPositionCallback;
-  }, data: PortalData): void {
-    if (scoutControlHaloInfo.data.latE6 === data.latE6 && scoutControlHaloInfo.data.lngE6 === data.lngE6) return;
+  private updateScoutControlPositionSubscription(scoutControlHalo: ScoutHistoryHalo, data: PortalData): void {
+    if (scoutControlHalo.data.latE6 === data.latE6 && scoutControlHalo.data.lngE6 === data.lngE6) return;
 
-    this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(scoutControlHaloInfo.data, scoutControlHaloInfo.positionCallback);
-    this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, scoutControlHaloInfo.positionCallback);
+    this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(scoutControlHalo.data, scoutControlHalo.positionCallback);
+    this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, scoutControlHalo.positionCallback);
   }
 
   private removeScoutControlHaloEntity(guid: string): void {

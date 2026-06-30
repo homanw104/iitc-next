@@ -199,14 +199,11 @@ export class PortalLabelEntityManager {
     }
   }
 
-  private updateLabelPositionSubscription(labelInfo: {
-    data: PortalData;
-    positionCallback: EntityPositionCallback;
-  }, data: PortalData): void {
-    if (labelInfo.data.latE6 === data.latE6 && labelInfo.data.lngE6 === data.lngE6) return;
+  private updateLabelPositionSubscription(label: PortalLabel, data: PortalData): void {
+    if (label.data.latE6 === data.latE6 && label.data.lngE6 === data.lngE6) return;
 
-    this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(labelInfo.data, labelInfo.positionCallback);
-    this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, labelInfo.positionCallback);
+    this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(label.data, label.positionCallback);
+    this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, label.positionCallback);
   }
 
   private removeLabelEntity(guid: string): void {

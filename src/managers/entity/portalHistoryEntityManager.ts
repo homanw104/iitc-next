@@ -189,14 +189,11 @@ export class PortalHistoryEntityManager {
     portalHistoryHalo.reverseOcclusionEntity = reverseOcclusionEntity;
   }
 
-  private updateHistoryHaloPositionSubscription(historyHaloInfo: {
-    data: PortalData;
-    positionCallback: EntityPositionCallback;
-  }, data: PortalData): void {
-    if (historyHaloInfo.data.latE6 === data.latE6 && historyHaloInfo.data.lngE6 === data.lngE6) return;
+  private updateHistoryHaloPositionSubscription(historyHalo: PortalHistoryHalo, data: PortalData): void {
+    if (historyHalo.data.latE6 === data.latE6 && historyHalo.data.lngE6 === data.lngE6) return;
 
-    this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(historyHaloInfo.data, historyHaloInfo.positionCallback);
-    this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, historyHaloInfo.positionCallback);
+    this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(historyHalo.data, historyHalo.positionCallback);
+    this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, historyHalo.positionCallback);
   }
 
   private removeHistoryHaloEntity(guid: string): void {

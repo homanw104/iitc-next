@@ -221,14 +221,11 @@ export class PortalEntityManager {
     }
   }
 
-  private updatePortalPositionSubscription(portalInfo: {
-    data: PortalData;
-    positionCallback: EntityPositionCallback;
-  }, data: PortalData): void {
-    if (portalInfo.data.latE6 === data.latE6 && portalInfo.data.lngE6 === data.lngE6) return;
+  private updatePortalPositionSubscription(portal: Portal, data: PortalData): void {
+    if (portal.data.latE6 === data.latE6 && portal.data.lngE6 === data.lngE6) return;
 
-    this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(portalInfo.data, portalInfo.positionCallback);
-    this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, portalInfo.positionCallback);
+    this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(portal.data, portal.positionCallback);
+    this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, portal.positionCallback);
   }
 
   private removePortalEntity(guid: string): void {
