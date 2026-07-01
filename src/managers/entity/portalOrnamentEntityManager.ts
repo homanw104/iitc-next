@@ -92,7 +92,7 @@ export class PortalOrnamentEntityManager {
     try {
       const { entity, occlusionEntity } = await this.createOrnamentEntity(data);
       const positionCallback = createOrnamentPositionCallback(entity, occlusionEntity);
-      this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, positionCallback);
+      this.entityPositionManager.setOnPositionChangedCallback(data, positionCallback);
       this.ornaments.set(data.guid, {
         data,
         entity,
@@ -159,8 +159,8 @@ export class PortalOrnamentEntityManager {
   private updateOrnamentPositionSubscription(ornament: PortalOrnament, data: PortalData): void {
     if (ornament.data.latE6 === data.latE6 && ornament.data.lngE6 === data.lngE6) return;
 
-    this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(ornament.data, ornament.positionCallback);
-    this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, ornament.positionCallback);
+    this.entityPositionManager.unsetOnPositionChangedCallback(ornament.data, ornament.positionCallback);
+    this.entityPositionManager.setOnPositionChangedCallback(data, ornament.positionCallback);
   }
 
   private removeOrnamentEntity(guid: string): void {
@@ -171,7 +171,7 @@ export class PortalOrnamentEntityManager {
       entities.remove(ornamentInfo.entity);
       entities.remove(ornamentInfo.occlusionEntity);
 
-      this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(ornamentInfo.data, ornamentInfo.positionCallback);
+      this.entityPositionManager.unsetOnPositionChangedCallback(ornamentInfo.data, ornamentInfo.positionCallback);
       this.ornaments.delete(guid);
     }
     this.ornamentsPendingCreation.delete(guid);

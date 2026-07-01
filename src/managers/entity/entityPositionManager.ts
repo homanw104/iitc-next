@@ -9,473 +9,259 @@ import { settingsManager } from "../system/settingsManager";
 
 const LOG_TAG = "EntityPositionManager";
 
-// Raise portals slightly above Google 3D Tiles.
+// Raise portals slightly above Google 3D Tiles
 const GOOGLE_GROUND_TERRAIN_COMPENSATION_METER = 1;
 
-// Fast terrain-network sample used before an entity is first shown.
-const TERRAIN_SAMPLE_LEVEL = 11;
-
-// Height sampling from currently rendered Google 3D Tiles.
-const GOOGLE_RENDERED_SAMPLE_BATCH_SIZE = 16;
-const GOOGLE_RENDERED_SAMPLE_BATCH_DELAY_MS = 10;
-
-type HeightSource = "terrain" | "rendered";
-
-const HEIGHT_SOURCE_RANK: Record<HeightSource, number> = {
-  terrain: 0,
-  rendered: 1,
-};
-
-const heightSamplingCartographicScratch = new Cesium.Cartographic();
+// Throttle the speed of sampling when using Google 3D Tiles
+const GOOGLE_TILES_SAMPLE_BATCH_SIZE = 16;
+const GOOGLE_TILES_SAMPLE_BATCH_DELAY_MS = 10;
 
 export type EntityPositionCallback = (latE6: number, lngE6: number, position: Cesium.Cartesian3) => void;
 
-export interface EntityCoordinates {
+interface EntityData {
   latE6: number;
   lngE6: number;
 }
 
-interface EntityPositionState extends EntityCoordinates {
-  position: Cesium.Cartesian3;
-  heightSource: HeightSource;
-  renderedHeightSampleGeneration: number;
+interface EntityPosition {
+  latE6: number;
+  lngE6: number;
+  position: Cesium.Cartesian3 | undefined;
+  positionPromise: Promise<Cesium.Cartesian3>;
+  positionPromiseResolver: (position: Cesium.Cartesian3) => void;
+  positionCallbacks: Set<EntityPositionCallback>;
 }
 
 export class EntityPositionManager {
   private readonly useGoogle3dTiles = settingsManager.getUseGoogle3dTiles();
-  private readonly positionStatesByKey = new Map<string, EntityPositionState>();
-  private readonly pendingPositionPromisesByKey = new Map<string, Promise<Cesium.Cartesian3>>();
-  private readonly refreshableHeightKeys = new Set<string>();
-  private readonly renderedHeightQueuedKeys = new Set<string>();
-  private readonly renderedHeightSamplingKeys = new Set<string>();
-  private readonly entityPositionCallbacks = new Map<string, Set<EntityPositionCallback>>();
-  private renderedHeightSamplingScheduled = false;
-  private renderedHeightSamplingTimeout: number | undefined;
-  private cameraMoving = false;
-  private heightSamplingViewRectangle: Cesium.Rectangle | undefined;
-  private heightSamplingViewRectangleDirty = true;
-  private heightSamplingGeneration = 0;
-  private lastTerrainRefreshGeneration = -1;
-  private queueStatusLoggingActive = false;
-  private renderedHeightIdleCallbacks = new Set<() => void>();
+  private readonly entityPositions = new Map<string, EntityPosition>();
+  private readonly entityPositionsSamplingQueue = new Set<string>();
+  private readonly entityPositionsNowSampling = new Set<string>();
+  private readonly samplingIdleCallbacks = new Set<() => void>();
+  private samplingScheduled = false;
+  private samplingScheduledTimeoutId: number | undefined;
 
   constructor(
     private readonly viewer: Cesium.Viewer,
     private readonly sceneEventManager: SceneEventManager,
   ) {
     viewer.camera.moveStart.addEventListener(() => {
-      this.cameraMoving = true;
-      this.heightSamplingViewRectangleDirty = true;
-      this.heightSamplingGeneration++;
-      this.clearRenderedHeightWork();
+      if (this.useGoogle3dTiles) {
+        this.clearSamplingWork();
+      }
     });
 
     viewer.camera.moveEnd.addEventListener(() => {
-      this.cameraMoving = false;
-      this.heightSamplingViewRectangleDirty = true;
-      this.queueVisibleRefreshableRenderedHeights();
-      this.notifyRenderedHeightIdleIfNeeded();
+      if (this.useGoogle3dTiles) {
+        this.startSamplingWork();
+      }
     });
   }
 
-  public async getPosition(data: EntityCoordinates): Promise<Cesium.Cartesian3> {
+  public async getPosition(data: EntityData): Promise<Cesium.Cartesian3> {
     await this.sceneEventManager.waitForInitSceneLoaded();
 
-    const entityPositionState = await this.getPositionState(data);
-    this.queueRenderedHeight(entityPositionState);
-    return entityPositionState.position;
+    if (this.useGoogle3dTiles) {
+      const entityPosition = this.registerEntityPosition(data);
+      return entityPosition.positionPromise;
+    } else {
+      return getTerrainPosition(this.viewer, data);
+    }
   }
 
-  private async getPositionState(data: EntityCoordinates): Promise<EntityPositionState> {
+  public setOnPositionChangedCallback(data: EntityData, callback: EntityPositionCallback): void {
     const key = getEntityPositionKey(data.latE6, data.lngE6);
-    const entityPositionState = this.positionStatesByKey.get(key);
-    if (entityPositionState) return entityPositionState;
-
-    const position = await this.getInitialPosition(key, data);
-    return this.positionStatesByKey.get(key) ?? this.createPositionState(data, position);
-  }
-
-  public setOnCoordinatePositionChangedCallback(data: EntityCoordinates, callback: EntityPositionCallback): void {
-    const key = getEntityPositionKey(data.latE6, data.lngE6);
-    const callbacks = this.entityPositionCallbacks.get(key) ?? new Set<EntityPositionCallback>();
-    callbacks.add(callback);
-    this.entityPositionCallbacks.set(key, callbacks);
-  }
-
-  public unsetOnCoordinatePositionChangedCallback(data: EntityCoordinates, callback: EntityPositionCallback): void {
-    const key = getEntityPositionKey(data.latE6, data.lngE6);
-    const callbacks = this.entityPositionCallbacks.get(key);
+    const callbacks = this.entityPositions.get(key)?.positionCallbacks;
     if (!callbacks) return;
-
-    callbacks.delete(callback);
-    if (callbacks.size === 0) this.entityPositionCallbacks.delete(key);
+    callbacks.add(callback);
   }
 
-  public refreshTerrainPositions(): boolean {
-    if (this.isHeightSamplingSuppressed()) return false;
-    if (this.hasQueuedOrSamplingTerrainHeights()) return false;
-    if (this.refreshableHeightKeys.size === 0) return true;
-    if (this.lastTerrainRefreshGeneration === this.heightSamplingGeneration) return false;
-
-    this.heightSamplingGeneration++;
-    this.lastTerrainRefreshGeneration = this.heightSamplingGeneration;
-    return this.queueVisibleRefreshableRenderedHeights();
-  }
-
-  public invalidateTerrainPositions(): boolean {
-    const canRefreshTerrainProviderPositions = !this.isHeightSamplingSuppressed();
-
-    this.heightSamplingGeneration++;
-    this.refreshableHeightKeys.clear();
-    this.clearRenderedHeightWork();
-
-    this.positionStatesByKey.forEach((positionState) => {
-      positionState.heightSource = "terrain";
-      positionState.renderedHeightSampleGeneration = -1;
-      this.refreshableHeightKeys.add(getEntityPositionKey(positionState.latE6, positionState.lngE6));
-      if (canRefreshTerrainProviderPositions) this.refreshTerrainProviderPosition(positionState);
-    });
-    return true;
-  }
-
-  public hasRefreshableTerrainPositions(): boolean {
-    return this.refreshableHeightKeys.size > 0;
-  }
-
-  public runAfterRenderedHeightRefresh(callback: () => void): void {
-    if (!this.isRenderedHeightRefreshActive()) {
-      callback();
-      return;
-    }
-
-    this.renderedHeightIdleCallbacks.add(callback);
-  }
-
-  private getInitialPosition(key: string, data: EntityCoordinates): Promise<Cesium.Cartesian3> {
-    const pendingPosition = this.pendingPositionPromisesByKey.get(key);
-    if (pendingPosition) return pendingPosition;
-
-    const position = this.getTerrainProviderPosition(data)
-      .finally(() => this.pendingPositionPromisesByKey.delete(key));
-    this.pendingPositionPromisesByKey.set(key, position);
-    return position;
-  }
-
-  private createPositionState(data: EntityCoordinates, position: Cesium.Cartesian3): EntityPositionState {
+  public unsetOnPositionChangedCallback(data: EntityData, callback: EntityPositionCallback): void {
     const key = getEntityPositionKey(data.latE6, data.lngE6);
-    const positionState: EntityPositionState = {
-      latE6: data.latE6,
-      lngE6: data.lngE6,
-      position,
-      heightSource: "terrain",
-      renderedHeightSampleGeneration: -1,
-    };
-    this.positionStatesByKey.set(key, positionState);
-    this.refreshableHeightKeys.add(key);
-    return positionState;
+    const callbacks = this.entityPositions.get(key)?.positionCallbacks;
+    if (!callbacks) return;
+    callbacks.delete(callback);
   }
 
-  private async getTerrainProviderPosition(data: EntityCoordinates): Promise<Cesium.Cartesian3> {
-    const cartographic = Cesium.Cartographic.fromDegrees(data.lngE6 / 1e6, data.latE6 / 1e6);
-    const height = this.viewer.scene.globe.getHeight(cartographic);
-    if (height) {
-      return getTerrainPosition(cartographic.longitude, cartographic.latitude, height);
+  public runAfterSamplingQueue(callback: () => void): void {
+    if (this.isSamplingQueueEmpty()) {
+      callback();
+    } else {
+      this.samplingIdleCallbacks.add(callback);
     }
-
-    if (this.viewer.terrainProvider instanceof Cesium.EllipsoidTerrainProvider) {
-      return getTerrainPosition(cartographic.longitude, cartographic.latitude, 0);
-    }
-
-    const [sampled] = await Cesium.sampleTerrain(this.viewer.terrainProvider, TERRAIN_SAMPLE_LEVEL, [cartographic]);
-    if (sampled.height) {
-      return getTerrainPosition(sampled.longitude, sampled.latitude, sampled.height);
-    }
-
-    throw new Error("Terrain height is unavailable");
   }
 
-  private refreshTerrainProviderPosition(positionState: EntityPositionState): void {
-    const batchHeightSamplingGeneration = this.heightSamplingGeneration;
-    this.getTerrainProviderPosition(positionState)
-      .then((position) => {
-        if (batchHeightSamplingGeneration !== this.heightSamplingGeneration || this.isHeightSamplingSuppressed()) return;
-
-        this.updatePositionState(positionState, position, "terrain");
-        this.queueRenderedHeight(positionState);
-      })
-      .catch(() => {
-        logManager.warn(LOG_TAG, "Terrain height failed");
+  private registerEntityPosition(data: EntityData): EntityPosition {
+    const key = getEntityPositionKey(data.latE6, data.lngE6);
+    const existing = this.entityPositions.get(key);
+    if (!existing) {
+      let positionPromiseResolver: EntityPosition["positionPromiseResolver"] = () => undefined;
+      const positionPromise = new Promise<Cesium.Cartesian3>((resolve) => {
+        positionPromiseResolver = resolve;
       });
+      const entityPosition = {
+        latE6: data.latE6,
+        lngE6: data.lngE6,
+        position: undefined,
+        positionPromise: positionPromise,
+        positionPromiseResolver: positionPromiseResolver,
+        positionCallbacks: new Set<EntityPositionCallback>(),
+      };
+      this.entityPositions.set(key, entityPosition);
+      this.entityPositionsSamplingQueue.add(key);
+      this.scheduleSamplingWork();
+      return entityPosition;
+    } else {
+      return existing;
+    }
   }
 
-  private queueVisibleRefreshableRenderedHeights(): boolean {
-    const viewRectangle = this.getHeightSamplingViewRectangle();
-    let queuedAny = false;
+  private scheduleSamplingWork(): void {
+    if (this.samplingScheduled) return;
+    if (this.entityPositionsSamplingQueue.size === 0) return;
 
-    this.refreshableHeightKeys.forEach((key) => {
-      const positionState = this.positionStatesByKey.get(key);
-      if (!positionState) {
-        this.refreshableHeightKeys.delete(key);
+    this.samplingScheduled = true;
+    this.samplingScheduledTimeoutId = window.setTimeout(() => {
+      this.samplingScheduled = false;
+      this.flushSamplingQueue();
+    }, GOOGLE_TILES_SAMPLE_BATCH_DELAY_MS);
+  }
+
+  private startSamplingWork(): void {
+    if (!this.isSamplingQueueEmpty()) return;
+
+    this.populateSamplingQueue();
+    this.flushSamplingQueue();
+  }
+
+  private populateSamplingQueue(): void {
+    this.entityPositions.forEach((entityPosition, key) => {
+      if (entityPosition.position === undefined) this.entityPositionsSamplingQueue.add(key);
+      else if (isEntityPositionInView(this.viewer, entityPosition)) this.entityPositionsSamplingQueue.add(key);
+    });
+  }
+
+  private flushSamplingQueue(): void {
+    const keys = takeSamplingBatch(this.entityPositionsSamplingQueue, GOOGLE_TILES_SAMPLE_BATCH_SIZE);
+    keys.forEach((key) => {
+      this.entityPositionsSamplingQueue.delete(key);
+      this.entityPositionsNowSampling.add(key);
+
+      const entityPosition = this.entityPositions.get(key);
+
+      if (!entityPosition) {
+        this.entityPositionsNowSampling.delete(key);
         return;
       }
 
-      if (this.queueRenderedHeight(positionState, viewRectangle)) queuedAny = true;
-    });
+      const height = getGoogleTilesPositionHeight(
+        this.viewer.scene,
+        Cesium.Cartographic.fromDegrees(
+          entityPosition.lngE6 / 1e6,
+          entityPosition.latE6 / 1e6,
+        ),
+      );
 
-    return queuedAny;
-  }
+      if (height === undefined) {
+        this.entityPositionsNowSampling.delete(key);
+        return;
+      }
 
-  private queueRenderedHeight(
-    positionState: EntityPositionState,
-    viewRectangle = this.getHeightSamplingViewRectangle(),
-  ): boolean {
-    if (positionState.renderedHeightSampleGeneration === this.heightSamplingGeneration) return false;
-    if (!this.isPositionInHeightSamplingView(positionState, viewRectangle)) return false;
+      const position = Cesium.Cartesian3.fromDegreesArrayHeights([
+        entityPosition.lngE6 / 1e6,
+        entityPosition.latE6 / 1e6,
+        height + GOOGLE_GROUND_TERRAIN_COMPENSATION_METER,
+      ])[0];
 
-    const key = getEntityPositionKey(positionState.latE6, positionState.lngE6);
-    if (this.renderedHeightQueuedKeys.has(key) || this.renderedHeightSamplingKeys.has(key)) return false;
-
-    this.renderedHeightQueuedKeys.add(key);
-    this.scheduleRenderedHeights();
-    return true;
-  }
-
-  private scheduleRenderedHeights(delayMs = 0): void {
-    if (this.renderedHeightSamplingScheduled) return;
-    if (this.isHeightSamplingSuppressed()) return;
-
-    this.renderedHeightSamplingScheduled = true;
-    this.renderedHeightSamplingTimeout = window.setTimeout(() => this.flushRenderedHeightQueue(), delayMs);
-  }
-
-  private scheduleRemainingRenderedHeights(): void {
-    if (this.renderedHeightQueuedKeys.size === 0) {
-      this.notifyRenderedHeightIdleIfNeeded();
-      return;
-    }
-
-    this.scheduleRenderedHeights(
-      this.useGoogle3dTiles ? GOOGLE_RENDERED_SAMPLE_BATCH_DELAY_MS : 0,
-    );
-  }
-
-  private takeRenderedHeightBatch(): string[] {
-    if (this.useGoogle3dTiles) {
-      return takeHeightKeyBatch(this.renderedHeightQueuedKeys, GOOGLE_RENDERED_SAMPLE_BATCH_SIZE);
-    }
-
-    const keys = Array.from(this.renderedHeightQueuedKeys);
-    this.renderedHeightQueuedKeys.clear();
-    return keys;
-  }
-
-  private clearRenderedHeightWork(): void {
-    if (this.renderedHeightSamplingTimeout !== undefined) window.clearTimeout(this.renderedHeightSamplingTimeout);
-    this.renderedHeightSamplingTimeout = undefined;
-    this.renderedHeightSamplingScheduled = false;
-    this.renderedHeightQueuedKeys.clear();
-    this.renderedHeightSamplingKeys.clear();
-  }
-
-  private flushRenderedHeightQueue(): void {
-    this.renderedHeightSamplingScheduled = false;
-    this.renderedHeightSamplingTimeout = undefined;
-    if (this.isHeightSamplingSuppressed()) {
-      this.notifyRenderedHeightIdleIfNeeded();
-      return;
-    }
-
-    const keys = this.takeRenderedHeightBatch();
-    if (keys.length === 0) {
-      this.notifyRenderedHeightIdleIfNeeded();
-      return;
-    }
-
-    const batchHeightSamplingGeneration = this.heightSamplingGeneration;
-    const viewRectangle = this.getHeightSamplingViewRectangle();
-    const positionStates = keys
-      .map((key) => this.positionStatesByKey.get(key))
-      .filter((positionState): positionState is EntityPositionState => {
-        return !!positionState &&
-          positionState.renderedHeightSampleGeneration !== batchHeightSamplingGeneration &&
-          this.isPositionInHeightSamplingView(positionState, viewRectangle);
+      entityPosition.position = position;
+      entityPosition.positionPromiseResolver(position);
+      entityPosition.positionCallbacks.forEach((callback) => {
+        callback(entityPosition.latE6, entityPosition.lngE6, position);
       });
 
-    if (positionStates.length === 0) {
-      this.scheduleRemainingRenderedHeights();
-      return;
-    }
-
-    positionStates.forEach((positionState) => {
-      positionState.renderedHeightSampleGeneration = batchHeightSamplingGeneration;
-      this.renderedHeightSamplingKeys.add(getEntityPositionKey(positionState.latE6, positionState.lngE6));
-    });
-    this.logQueueStatus(true);
-
-    const cartographics = positionStates.map((positionState) => {
-      return Cesium.Cartographic.fromDegrees(positionState.lngE6 / 1e6, positionState.latE6 / 1e6);
+      this.entityPositionsNowSampling.delete(key);
     });
 
-    if (this.useGoogle3dTiles) {
-      this.sampleGoogleRenderedHeights(positionStates, cartographics, batchHeightSamplingGeneration);
-    } else {
-      this.sampleTerrainRenderedHeights(positionStates, cartographics, batchHeightSamplingGeneration);
-    }
-
-    positionStates.forEach((positionState) => {
-      this.renderedHeightSamplingKeys.delete(getEntityPositionKey(positionState.latE6, positionState.lngE6));
-    });
-    this.scheduleRemainingRenderedHeights();
     this.logQueueStatus();
-  }
 
-  private sampleGoogleRenderedHeights(
-    positionStates: EntityPositionState[],
-    cartographics: Cesium.Cartographic[],
-    batchHeightSamplingGeneration: number,
-  ): void {
-    if (batchHeightSamplingGeneration !== this.heightSamplingGeneration || this.isHeightSamplingSuppressed()) return;
-
-    positionStates.forEach((positionState, index) => {
-      const cartographic = cartographics[index];
-      const height = sampleRenderedGoogleHeight(this.viewer.scene, cartographic);
-      if (height === undefined) return;
-
-      this.updatePositionState(
-        positionState,
-        getTerrainPosition(
-          cartographic.longitude,
-          cartographic.latitude,
-          height + GOOGLE_GROUND_TERRAIN_COMPENSATION_METER,
-        ),
-        "rendered",
-      );
-    });
-  }
-
-  private sampleTerrainRenderedHeights(
-    positionStates: EntityPositionState[],
-    cartographics: Cesium.Cartographic[],
-    batchHeightSamplingGeneration: number,
-  ): void {
-    if (batchHeightSamplingGeneration !== this.heightSamplingGeneration || this.isHeightSamplingSuppressed()) return;
-
-    positionStates.forEach((positionState, index) => {
-      const cartographic = cartographics[index];
-      const height = this.viewer.scene.globe.getHeight(cartographic) ?? 0;
-      this.updatePositionState(
-        positionState,
-        getTerrainPosition(cartographic.longitude, cartographic.latitude, height),
-        "rendered",
-      );
-    });
-  }
-
-  private updatePositionState(positionState: EntityPositionState, position: Cesium.Cartesian3, heightSource: HeightSource): void {
-    if (HEIGHT_SOURCE_RANK[heightSource] < HEIGHT_SOURCE_RANK[positionState.heightSource]) return;
-
-    positionState.heightSource = heightSource;
-    this.refreshableHeightKeys.add(getEntityPositionKey(positionState.latE6, positionState.lngE6));
-    this.applyPositionState(positionState, position);
-  }
-
-  private applyPositionState(positionState: EntityPositionState, position: Cesium.Cartesian3): void {
-    if (Cesium.Cartesian3.equals(positionState.position, position)) return;
-
-    positionState.position = position;
-    const key = getEntityPositionKey(positionState.latE6, positionState.lngE6);
-    this.entityPositionCallbacks.get(key)?.forEach(callback => callback(positionState.latE6, positionState.lngE6, position));
-    this.viewer.scene.requestRender();
-  }
-
-  private isHeightSamplingSuppressed(): boolean {
-    return this.cameraMoving;
-  }
-
-  private isRenderedHeightRefreshActive(): boolean {
-    return this.renderedHeightSamplingScheduled || this.hasQueuedOrSamplingTerrainHeights();
-  }
-
-  private notifyRenderedHeightIdleIfNeeded(): void {
-    if (this.isRenderedHeightRefreshActive() || this.renderedHeightIdleCallbacks.size === 0) return;
-
-    const callbacks = Array.from(this.renderedHeightIdleCallbacks);
-    this.renderedHeightIdleCallbacks.clear();
-    callbacks.forEach(callback => callback());
-  }
-
-  private hasQueuedOrSamplingTerrainHeights(): boolean {
-    return this.renderedHeightQueuedKeys.size > 0 || this.renderedHeightSamplingKeys.size > 0;
-  }
-
-  private getHeightSamplingViewRectangle(): Cesium.Rectangle | undefined {
-    if (this.heightSamplingViewRectangleDirty) {
-      this.heightSamplingViewRectangle = this.viewer.camera.computeViewRectangle(this.viewer.scene.globe.ellipsoid);
-      this.heightSamplingViewRectangleDirty = false;
+    if (this.isSamplingQueueEmpty()) {
+      this.clearSamplingWork();
+    } else {
+      this.flushRemainingSamplingQueue();
     }
-
-    return this.heightSamplingViewRectangle;
   }
 
-  private isPositionInHeightSamplingView(
-    positionState: EntityPositionState,
-    viewRectangle: Cesium.Rectangle | undefined,
-  ): boolean {
-    if (!viewRectangle) return true;
+  private flushRemainingSamplingQueue(): void {
+    if (this.samplingScheduled) return;
+    if (this.entityPositionsSamplingQueue.size === 0) return;
 
-    const cartographic = Cesium.Cartographic.fromDegrees(
-      positionState.lngE6 / 1e6,
-      positionState.latE6 / 1e6,
-      0,
-      heightSamplingCartographicScratch,
-    );
-    return Cesium.Rectangle.contains(viewRectangle, cartographic);
+    this.samplingScheduled = true;
+    this.samplingScheduledTimeoutId = window.setTimeout(() => {
+      this.samplingScheduled = false;
+      this.flushSamplingQueue();
+    }, GOOGLE_TILES_SAMPLE_BATCH_DELAY_MS);
   }
 
-  private logQueueStatus(isQueueStart = false): void {
-    if (isQueueStart) {
-      if (this.queueStatusLoggingActive) return;
-      this.queueStatusLoggingActive = true;
-    }
+  private clearSamplingWork(): void {
+    this.entityPositionsSamplingQueue.clear();
+    this.entityPositionsNowSampling.clear();
+    window.clearTimeout(this.samplingScheduledTimeoutId);
+    this.samplingScheduled = false;
+    this.samplingScheduledTimeoutId = undefined;
+    this.samplingIdleCallbacks.forEach((callback) => callback());
+    this.samplingIdleCallbacks.clear();
+  }
 
-    const renderedHeightCount = this.renderedHeightQueuedKeys.size + this.renderedHeightSamplingKeys.size;
+  private logQueueStatus(): void {
+    const samplingCount = this.entityPositionsSamplingQueue.size + this.entityPositionsNowSampling.size;
 
-    if (renderedHeightCount > 0) {
-      logManager.info(LOG_TAG, `Rendering ${renderedHeightCount} entity positions`);
+    if (samplingCount > 0) {
+      logManager.info(LOG_TAG, `Rendering ${samplingCount} entity positions`);
     } else {
       logManager.info(LOG_TAG, "Rendered all entity positions");
     }
-
-    if (!this.hasQueuedOrSamplingTerrainHeights()) this.queueStatusLoggingActive = false;
   }
-}
 
-function getTerrainPosition(longitude: number, latitude: number, height: number): Cesium.Cartesian3 {
-  return Cesium.Cartesian3.fromRadians(longitude, latitude, height);
+  private isSamplingQueueEmpty(): boolean {
+    return this.entityPositionsNowSampling.size + this.entityPositionsSamplingQueue.size === 0;
+  }
 }
 
 function getEntityPositionKey(latE6: number, lngE6: number): string {
   return `${latE6},${lngE6}`;
 }
 
-function takeHeightKeyBatch(
-  queuedHeightKeys: Set<string>,
-  limit: number,
-): string[] {
+function getTerrainPosition(viewer: Cesium.Viewer, data: EntityData): Cesium.Cartesian3 {
+  const height = viewer.scene.globe.getHeight(
+    Cesium.Cartographic.fromDegrees(data.lngE6 / 1e6, data.latE6 / 1e6)
+  );
+  return Cesium.Cartesian3.fromDegrees(data.lngE6 / 1e6, data.latE6 / 1e6, height);
+}
+
+function getGoogleTilesPositionHeight(scene: Cesium.Scene, cartographic: Cesium.Cartographic): number | undefined {
+  const sceneWithGetHeight = scene as Cesium.Scene & {
+    getHeight: (cartographic: Cesium.Cartographic, heightReference?: Cesium.HeightReference) => number | undefined;
+  };
+  return sceneWithGetHeight.getHeight(cartographic, Cesium.HeightReference.CLAMP_TO_3D_TILE);
+}
+
+function isEntityPositionInView(viewer: Cesium.Viewer, entityPosition: EntityPosition): boolean {
+  if (entityPosition.position === undefined) return true;
+
+  const viewRectangle = viewer.camera.computeViewRectangle();
+  if (!viewRectangle) return true;
+
+  return Cesium.Rectangle.contains(viewRectangle, Cesium.Cartographic.fromCartesian(entityPosition.position));
+}
+
+function takeSamplingBatch(samplingQueue: Set<string>, limit: number,): string[] {
   const batch: string[] = [];
 
-  for (const key of queuedHeightKeys) {
-    queuedHeightKeys.delete(key);
+  for (const key of samplingQueue) {
+    samplingQueue.delete(key);
     batch.push(key);
     if (batch.length >= limit) break;
   }
 
   return batch;
-}
-
-function sampleRenderedGoogleHeight(scene: Cesium.Scene, cartographic: Cesium.Cartographic): number | undefined {
-  const sceneWithGetHeight = scene as Cesium.Scene & {
-    getHeight: (cartographic: Cesium.Cartographic, heightReference?: Cesium.HeightReference) => number | undefined;
-  };
-  return sceneWithGetHeight.getHeight(cartographic, Cesium.HeightReference.CLAMP_TO_3D_TILE);
 }

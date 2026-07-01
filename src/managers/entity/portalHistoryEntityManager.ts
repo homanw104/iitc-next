@@ -69,7 +69,7 @@ export class PortalHistoryEntityManager {
             if (portalHistoryHalo.reverseOcclusionEntity) portalHistoryHalo.reverseOcclusionEntity.position = new Cesium.ConstantPositionProperty(position);
           },
         };
-        this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, portalHistoryHalo.positionCallback);
+        this.entityPositionManager.setOnPositionChangedCallback(data, portalHistoryHalo.positionCallback);
         this.historyHalos.set(data.guid, portalHistoryHalo);
       } finally {
         this.historyHalosPendingCreation.delete(data.guid);
@@ -192,15 +192,15 @@ export class PortalHistoryEntityManager {
   private updateHistoryHaloPositionSubscription(historyHalo: PortalHistoryHalo, data: PortalData): void {
     if (historyHalo.data.latE6 === data.latE6 && historyHalo.data.lngE6 === data.lngE6) return;
 
-    this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(historyHalo.data, historyHalo.positionCallback);
-    this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, historyHalo.positionCallback);
+    this.entityPositionManager.unsetOnPositionChangedCallback(historyHalo.data, historyHalo.positionCallback);
+    this.entityPositionManager.setOnPositionChangedCallback(data, historyHalo.positionCallback);
   }
 
   private removeHistoryHaloEntity(guid: string): void {
     const portalHistoryHalo = this.historyHalos.get(guid);
     if (portalHistoryHalo) {
       this.removeHistoryHaloEntityGroup(portalHistoryHalo);
-      this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(portalHistoryHalo.data, portalHistoryHalo.positionCallback);
+      this.entityPositionManager.unsetOnPositionChangedCallback(portalHistoryHalo.data, portalHistoryHalo.positionCallback);
       this.historyHalos.delete(guid);
     }
     this.historyHalosPendingCreation.delete(guid);

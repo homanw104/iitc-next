@@ -113,7 +113,7 @@ export class PortalLabelEntityManager {
       const layout = getPortalLabelEntityTextLayout(title);
       const entity = await this.createLabelEntity(data, layout.wrappedText);
       const positionCallback = this.createLabelPositionCallback(entity);
-      this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, positionCallback);
+      this.entityPositionManager.setOnPositionChangedCallback(data, positionCallback);
 
       const label: PortalLabel = {
         data,
@@ -202,8 +202,8 @@ export class PortalLabelEntityManager {
   private updateLabelPositionSubscription(label: PortalLabel, data: PortalData): void {
     if (label.data.latE6 === data.latE6 && label.data.lngE6 === data.lngE6) return;
 
-    this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(label.data, label.positionCallback);
-    this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, label.positionCallback);
+    this.entityPositionManager.unsetOnPositionChangedCallback(label.data, label.positionCallback);
+    this.entityPositionManager.setOnPositionChangedCallback(data, label.positionCallback);
   }
 
   private removeLabelEntity(guid: string): void {
@@ -212,7 +212,7 @@ export class PortalLabelEntityManager {
       const entities = this.layerManager.getOrCreateOverlayLayer(labelInfo.currentLayerId).entities;
 
       entities.remove(labelInfo.entity);
-      this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(labelInfo.data, labelInfo.positionCallback);
+      this.entityPositionManager.unsetOnPositionChangedCallback(labelInfo.data, labelInfo.positionCallback);
       this.labels.delete(guid);
       this.queueAllVisibilityUpdates();
     }
@@ -283,7 +283,7 @@ export class PortalLabelEntityManager {
     if (this.hasPositionSettledVisibilityUpdate) return;
     this.hasPositionSettledVisibilityUpdate = true;
 
-    this.entityPositionManager.runAfterRenderedHeightRefresh(() => {
+    this.entityPositionManager.runAfterSamplingQueue(() => {
       this.hasPositionSettledVisibilityUpdate = false;
 
       if (this.deferredVisibilityUpdateDepth > 0) {

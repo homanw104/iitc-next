@@ -152,7 +152,7 @@ export class PortalEntityManager {
     try {
       const { entity, occlusionEntity } = await this.createPortalEntity(data);
       const positionCallback = createPortalPositionCallback(entity, occlusionEntity);
-      this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, positionCallback);
+      this.entityPositionManager.setOnPositionChangedCallback(data, positionCallback);
       this.portals.set(data.guid, {
         data,
         entity,
@@ -224,8 +224,8 @@ export class PortalEntityManager {
   private updatePortalPositionSubscription(portal: Portal, data: PortalData): void {
     if (portal.data.latE6 === data.latE6 && portal.data.lngE6 === data.lngE6) return;
 
-    this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(portal.data, portal.positionCallback);
-    this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, portal.positionCallback);
+    this.entityPositionManager.unsetOnPositionChangedCallback(portal.data, portal.positionCallback);
+    this.entityPositionManager.setOnPositionChangedCallback(data, portal.positionCallback);
   }
 
   private removePortalEntity(guid: string): void {
@@ -237,7 +237,7 @@ export class PortalEntityManager {
       entities.remove(portalInfo.entity);
       entities.remove(portalInfo.occlusionEntity);
 
-      this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(portalInfo.data, portalInfo.positionCallback);
+      this.entityPositionManager.unsetOnPositionChangedCallback(portalInfo.data, portalInfo.positionCallback);
       this.portals.delete(guid);
     }
     this.portalsPendingCreation.delete(guid);

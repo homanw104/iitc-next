@@ -68,7 +68,7 @@ export class ScoutHistoryEntityManager {
             if (scoutHistoryHalo.reverseOcclusionEntity) scoutHistoryHalo.reverseOcclusionEntity.position = new Cesium.ConstantPositionProperty(position);
           },
         };
-        this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, scoutHistoryHalo.positionCallback);
+        this.entityPositionManager.setOnPositionChangedCallback(data, scoutHistoryHalo.positionCallback);
         this.scoutControlHalos.set(data.guid, scoutHistoryHalo);
       } finally {
         this.scoutControlHalosPendingCreation.delete(data.guid);
@@ -185,15 +185,15 @@ export class ScoutHistoryEntityManager {
   private updateScoutControlPositionSubscription(scoutControlHalo: ScoutHistoryHalo, data: PortalData): void {
     if (scoutControlHalo.data.latE6 === data.latE6 && scoutControlHalo.data.lngE6 === data.lngE6) return;
 
-    this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(scoutControlHalo.data, scoutControlHalo.positionCallback);
-    this.entityPositionManager.setOnCoordinatePositionChangedCallback(data, scoutControlHalo.positionCallback);
+    this.entityPositionManager.unsetOnPositionChangedCallback(scoutControlHalo.data, scoutControlHalo.positionCallback);
+    this.entityPositionManager.setOnPositionChangedCallback(data, scoutControlHalo.positionCallback);
   }
 
   private removeScoutControlHaloEntity(guid: string): void {
     const scoutControlHalo = this.scoutControlHalos.get(guid);
     if (scoutControlHalo) {
       this.removeScoutControlHaloEntityGroup(scoutControlHalo);
-      this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(scoutControlHalo.data, scoutControlHalo.positionCallback);
+      this.entityPositionManager.unsetOnPositionChangedCallback(scoutControlHalo.data, scoutControlHalo.positionCallback);
       this.scoutControlHalos.delete(guid);
     }
     this.scoutControlHalosPendingCreation.delete(guid);

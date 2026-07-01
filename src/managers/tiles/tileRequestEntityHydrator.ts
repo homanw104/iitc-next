@@ -144,13 +144,6 @@ function attachLinksToExistingPortals(
   }
 }
 
-function attachLinkToPortal(portal: PortalData | undefined, link: LinkData): void {
-  if (!portal) return;
-  if (portal.links?.some((existingLink) => existingLink.guid === link.guid)) return;
-
-  (portal.links ??= []).push(link);
-}
-
 function attachFieldsToExistingPortals(
   portals: Map<string, PortalData>,
   fields: Map<string, FieldData>,
@@ -160,6 +153,13 @@ function attachFieldsToExistingPortals(
       attachFieldToPortal(portals.get(point.guid), field);
     }
   }
+}
+
+function attachLinkToPortal(portal: PortalData | undefined, link: LinkData): void {
+  if (!portal) return;
+  if (portal.links?.some((existingLink) => existingLink.guid === link.guid)) return;
+
+  (portal.links ??= []).push(link);
 }
 
 function attachFieldToPortal(portal: PortalData | undefined, field: FieldData): void {

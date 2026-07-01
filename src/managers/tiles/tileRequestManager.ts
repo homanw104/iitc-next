@@ -28,7 +28,7 @@ export class TileRequestManager {
   private refreshIntervalId: number | null = null;
 
   constructor(
-    private readonly viewer: Cesium.Viewer,
+    viewer: Cesium.Viewer,
     portalEntityManager: PortalEntityManager,
     portalLabelEntityManager: PortalLabelEntityManager,
     portalOrnamentEntityManager: PortalOrnamentEntityManager,

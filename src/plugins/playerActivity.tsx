@@ -6,7 +6,7 @@
  */
 
 import * as Cesium from "cesium";
-import type { EntityCoordinates, EntityPositionCallback } from "../managers/entity/entityPositionManager";
+import type { EntityPositionCallback } from "../managers/entity/entityPositionManager";
 import type { IITCCore } from "../types/iitc";
 import type { Team } from "../types/ingress";
 import type { PlextMark } from "../types/api.ts";
@@ -33,7 +33,7 @@ interface Portal {
   lngE6: number;
 }
 
-interface PlayerActivity {
+interface PlayerActivityData {
   name: string;
   team: Team;
   timestamp: number;
@@ -43,9 +43,9 @@ interface PlayerActivity {
   lngE6: number;
 }
 
-interface PlayerPositionSubscription {
-  coordinates: EntityCoordinates;
-  callback: EntityPositionCallback;
+interface PlayerActivity {
+  data: PlayerActivityData;
+  positionCallback: EntityPositionCallback;
 }
 
 class PlayerActivityPlugin {
@@ -64,11 +64,11 @@ class PlayerActivityPlugin {
   private dataSourceRes: Cesium.CustomDataSource = new Cesium.CustomDataSource("player-activity-res");
   private pathDataSourceEnl: Cesium.CustomDataSource = new Cesium.CustomDataSource("activity-path-enl");
   private pathDataSourceRes: Cesium.CustomDataSource = new Cesium.CustomDataSource("activity-path-res");
+  private playerActivities: Map<string, PlayerActivity> = new Map();
   private playerLocations: Map<string, Cesium.Entity> = new Map();
-  private playerPaths: Map<string, Cesium.Entity> = new Map();
   private playerLocationsPendingCreation: Set<string> = new Set();
+  private playerPaths: Map<string, Cesium.Entity> = new Map();
   private playerPathsPendingCreation: Set<string> = new Set();
-  private playerPositionSubscriptions: Map<string, PlayerPositionSubscription> = new Map();
   private onReceiveCommMsgCallback: () => void = () => {};
 
   private tooltipEl: HTMLElement | null = null;
@@ -127,7 +127,7 @@ class PlayerActivityPlugin {
       this.playerPaths.clear();
       this.playerLocationsPendingCreation.clear();
       this.playerPathsPendingCreation.clear();
-      this.playerPositionSubscriptions.clear();
+      this.playerActivities.clear();
       this.unsetHoverAction();
       this.unsetTooltipElement();
     } catch (e) {
@@ -164,9 +164,9 @@ class PlayerActivityPlugin {
         const entity = pickedObject.id as Cesium.Entity | Cesium.Entity[];
         if (Array.isArray(entity) && entity[0].id.startsWith("player-activity")) {
           // Multiplayer activities
-          const allPlayersLastActivities: PlayerActivity[] = entity.map(e => {
-            const specificPlayerActivities: PlayerActivity[] = e.properties?.activities.getValue();
-            const activity = this.getLatestActivity(specificPlayerActivities);
+          const allPlayersLastActivitiesData: PlayerActivityData[] = entity.map(e => {
+            const specificPlayerActivitiesData: PlayerActivityData[] = e.properties?.activities.getValue();
+            const activity = this.getLatestActivity(specificPlayerActivitiesData);
             if (!activity) return null;
             return {
               name: activity.name,
@@ -177,9 +177,9 @@ class PlayerActivityPlugin {
               latE6: activity.latE6,
               lngE6: activity.lngE6,
             };
-          }).filter((activity): activity is PlayerActivity => !!activity);
-          if (allPlayersLastActivities.length === 0) return;
-          allPlayersLastActivities.sort((a, b) => b.timestamp - a.timestamp);
+          }).filter((activity): activity is PlayerActivityData => !!activity);
+          if (allPlayersLastActivitiesData.length === 0) return;
+          allPlayersLastActivitiesData.sort((a, b) => b.timestamp - a.timestamp);
           const table = (
             <table>
               <thead>
@@ -187,7 +187,7 @@ class PlayerActivityPlugin {
                   <th style={{ textAlign: "left" }}>{entity.length + " players"}</th>
                 </tr>
               </thead>
-              {allPlayersLastActivities.map(activity => {
+              {allPlayersLastActivitiesData.map(activity => {
                 return (
                   <tr style={{ fontSize: "12px" }}>
                     <td style={{ paddingRight: "8px" }}>{activity.name}</td>
@@ -197,22 +197,22 @@ class PlayerActivityPlugin {
               })}
             </table>
           ) as HTMLElement;
-          this.configureTooltipElement(table, allPlayersLastActivities, movement);
+          this.configureTooltipElement(table, allPlayersLastActivitiesData, movement);
         } else if (!Array.isArray(entity) && entity.id.startsWith("player-activity")) {
           // Single player activities
-          const activities: PlayerActivity[] = entity.properties?.activities.getValue();
-          const newestActivities = [...activities].sort((a, b) => b.timestamp - a.timestamp);
-          const latestActivity = newestActivities[0];
-          if (!latestActivity) return;
+          const activitiesData: PlayerActivityData[] = entity.properties?.activities.getValue();
+          const newestActivitiesData = [...activitiesData].sort((a, b) => b.timestamp - a.timestamp);
+          const latestActivityData = newestActivitiesData[0];
+          if (!latestActivityData) return;
           const table = (
             <table>
               <thead>
                 <tr>
-                  <th style={{ textAlign: "left" }}>{latestActivity.name}</th>
+                  <th style={{ textAlign: "left" }}>{latestActivityData.name}</th>
                 </tr>
               </thead>
               <tbody>
-                {newestActivities.slice(0, 6).map(activity => {
+                {newestActivitiesData.slice(0, 6).map(activity => {
                   return (
                     <tr style={{ fontSize: "12px" }}>
                       <td style={{ paddingRight: "8px" }}>{activity.portalName}</td>
@@ -224,7 +224,7 @@ class PlayerActivityPlugin {
             </table>
           ) as HTMLElement;
           if (!this.tooltipEl) return;
-          this.configureTooltipElement(table, newestActivities, movement);
+          this.configureTooltipElement(table, newestActivitiesData, movement);
         } else {
           // Hover out
           if (!this.tooltipEl) return;
@@ -254,9 +254,9 @@ class PlayerActivityPlugin {
     source.clustering.clusterBillboards = true;
     source.clustering.clusterEvent.addEventListener((clusteredEntities, cluster) => {
       const maxPlayers = 2;
-      const playerActivities: PlayerActivity[] = clusteredEntities.map(e => {
-        const specificPlayerActivities: PlayerActivity[] = e.properties?.activities.getValue();
-        const lastActivity = this.getLatestActivity(specificPlayerActivities);
+      const playerActivitiesData: PlayerActivityData[] = clusteredEntities.map(e => {
+        const specificPlayerActivitiesData: PlayerActivityData[] = e.properties?.activities.getValue();
+        const lastActivity = this.getLatestActivity(specificPlayerActivitiesData);
         if (!lastActivity) return null;
         return {
           name: lastActivity.name,
@@ -267,14 +267,14 @@ class PlayerActivityPlugin {
           latE6: lastActivity.latE6,
           lngE6: lastActivity.lngE6,
         };
-      }).filter((activity): activity is PlayerActivity => !!activity);
-      if (playerActivities.length === 0) return;
-      playerActivities.sort((a, b) => b.timestamp - a.timestamp);
+      }).filter((activityData): activityData is PlayerActivityData => !!activityData);
+      if (playerActivitiesData.length === 0) return;
+      playerActivitiesData.sort((a, b) => b.timestamp - a.timestamp);
 
-      const visiblePlayerNames = playerActivities.slice(0, maxPlayers).map(p => p.name).join("\n");
-      const remainingPlayers = playerActivities.length - maxPlayers;
+      const visiblePlayerNames = playerActivitiesData.slice(0, maxPlayers).map(p => p.name).join("\n");
+      const remainingPlayers = playerActivitiesData.length - maxPlayers;
       const displayText = remainingPlayers === 1
-        ? `${visiblePlayerNames}\n${playerActivities[maxPlayers].name}`
+        ? `${visiblePlayerNames}\n${playerActivitiesData[maxPlayers].name}`
         : remainingPlayers > 1
           ? `${visiblePlayerNames}\n(${remainingPlayers} more)`
           : visiblePlayerNames;
@@ -282,9 +282,9 @@ class PlayerActivityPlugin {
       cluster.label.text = displayText;
       cluster.label.font = "16px coda_regular, arial, helvetica, sans-serif";
       cluster.label.verticalOrigin = Cesium.VerticalOrigin.CENTER;
-      cluster.label.horizontalOrigin = playerActivities[0].team === "ENLIGHTENED" ? Cesium.HorizontalOrigin.LEFT : Cesium.HorizontalOrigin.RIGHT;
-      cluster.label.pixelOffset = playerActivities[0].team === "ENLIGHTENED" ? new Cesium.Cartesian2(25, 0) : new Cesium.Cartesian2(-25, 0);
-      cluster.label.fillColor = getTeamColor(playerActivities[0].team);
+      cluster.label.horizontalOrigin = playerActivitiesData[0].team === "ENLIGHTENED" ? Cesium.HorizontalOrigin.LEFT : Cesium.HorizontalOrigin.RIGHT;
+      cluster.label.pixelOffset = playerActivitiesData[0].team === "ENLIGHTENED" ? new Cesium.Cartesian2(25, 0) : new Cesium.Cartesian2(-25, 0);
+      cluster.label.fillColor = getTeamColor(playerActivitiesData[0].team);
       cluster.label.outlineColor = Cesium.Color.BLACK;
       cluster.label.outlineWidth = 6;
       cluster.label.style = Cesium.LabelStyle.FILL_AND_OUTLINE;
@@ -295,12 +295,12 @@ class PlayerActivityPlugin {
     });
   }
 
-  private configureTooltipElement(table: HTMLElement, activities: PlayerActivity[], movement: Cesium.ScreenSpaceEventHandler.MotionEvent ): void {
+  private configureTooltipElement(table: HTMLElement, activitiesData: PlayerActivityData[], movement: Cesium.ScreenSpaceEventHandler.MotionEvent ): void {
     if (!this.tooltipEl) return;
     this.tooltipEl.innerHTML = "";
     this.tooltipEl.appendChild(table);
     this.tooltipEl.style.display = "block";
-    this.tooltipEl.style.borderColor = getTeamColor(activities[0].team).toCssColorString();
+    this.tooltipEl.style.borderColor = getTeamColor(activitiesData[0].team).toCssColorString();
     const container = this.interfaceManager.getContainer();
     if (container && container.clientWidth - movement.endPosition.x - this.tooltipEl.clientWidth < 30) {
       this.tooltipEl.style.left = "";
@@ -319,7 +319,7 @@ class PlayerActivityPlugin {
   }
 
   private updatePlayerActivity(): void {
-    const playerActivities: Map<string, PlayerActivity[]> = new Map();
+    const playerActivitiesData: Map<string, PlayerActivityData[]> = new Map();
 
     this.commManager.getMessages("all", false)?.forEach((msg) => {
       let player: Player | null = null;
@@ -358,8 +358,8 @@ class PlayerActivityPlugin {
           lngE6: portal.lngE6,
         };
 
-        const activities = playerActivities.get(player.name) || [];
-        if (activities.length === 0) playerActivities.set(player.name, activities);
+        const activities = playerActivitiesData.get(player.name) || [];
+        if (activities.length === 0) playerActivitiesData.set(player.name, activities);
 
         const existing = activities.find(a => a.timestamp === activity.timestamp);
         const existingIndex = activities.findIndex((a) => a.timestamp === existing?.timestamp);
@@ -380,57 +380,53 @@ class PlayerActivityPlugin {
           activities.push(activity);
           activities.sort((a, b) => a.timestamp - b.timestamp);
         }
-        playerActivities.set(player.name, activities);
+        playerActivitiesData.set(player.name, activities);
       }
     });
 
-    this.renderPlayerLocations(playerActivities);
-    this.renderPlayerPaths(playerActivities);
+    this.renderPlayerLocations(playerActivitiesData);
+    this.renderPlayerPaths(playerActivitiesData);
     this.viewer.scene.requestRender();
   }
 
-  private getLatestActivity(activities: PlayerActivity[] | undefined): PlayerActivity | undefined {
-    return activities?.reduce<PlayerActivity | undefined>((latest, activity) => {
+  private getLatestActivity(activitiesData: PlayerActivityData[] | undefined): PlayerActivityData | undefined {
+    return activitiesData?.reduce<PlayerActivityData | undefined>((latest, activity) => {
       if (!latest || activity.timestamp > latest.timestamp) return activity;
       return latest;
     }, undefined);
   }
 
-  private setPlayerPositionSubscription(playerName: string, coordinates: EntityCoordinates, entity: Cesium.Entity): void {
-    const existing = this.playerPositionSubscriptions.get(playerName);
-    if (existing?.coordinates.latE6 === coordinates.latE6 && existing?.coordinates.lngE6 === coordinates.lngE6) return;
-    if (existing) this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(existing.coordinates, existing.callback);
+  private setPlayerPositionSubscription(activityData: PlayerActivityData, entity: Cesium.Entity): void {
+    const existing = this.playerActivities.get(activityData.name);
+    if (existing?.data.latE6 === activityData.latE6 && existing?.data.lngE6 === activityData.lngE6) return;
+    if (existing) this.entityPositionManager.unsetOnPositionChangedCallback(existing.data, existing.positionCallback);
 
     const callback: EntityPositionCallback = (_latE6, _lngE6, position) => {
       entity.position = new Cesium.ConstantPositionProperty(position);
       this.viewer.scene.requestRender();
     };
-    const subscriptionCoordinates = {
-      latE6: coordinates.latE6,
-      lngE6: coordinates.lngE6,
-    };
-    this.entityPositionManager.setOnCoordinatePositionChangedCallback(subscriptionCoordinates, callback);
-    this.playerPositionSubscriptions.set(playerName, {
-      coordinates: subscriptionCoordinates,
-      callback,
+    this.entityPositionManager.setOnPositionChangedCallback(activityData, callback);
+    this.playerActivities.set(activityData.name, {
+      data: activityData,
+      positionCallback: callback,
     });
   }
 
   private unsetPlayerPositionSubscriptions(): void {
-    this.playerPositionSubscriptions.forEach(({ coordinates, callback }) => {
-      this.entityPositionManager.unsetOnCoordinatePositionChangedCallback(coordinates, callback);
+    this.playerActivities.forEach(({ data, positionCallback }) => {
+      this.entityPositionManager.unsetOnPositionChangedCallback(data, positionCallback);
     });
   }
 
-  private renderPlayerLocations(playerActivities: Map<string, PlayerActivity[]>): void {
-    playerActivities.forEach((activities, playerName) => {
+  private renderPlayerLocations(playerActivitiesData: Map<string, PlayerActivityData[]>): void {
+    playerActivitiesData.forEach((activities, playerName) => {
       const lastActivity = this.getLatestActivity(activities);
       if (!lastActivity) return;
       this.renderPlayerLocation(playerName, activities, lastActivity).then();
     });
   }
 
-  private async renderPlayerLocation(playerName: string, activities: PlayerActivity[], lastActivity: PlayerActivity): Promise<void> {
+  private async renderPlayerLocation(playerName: string, activitiesData: PlayerActivityData[], lastActivity: PlayerActivityData): Promise<void> {
     if (this.playerLocationsPendingCreation.has(playerName)) return;
     this.playerLocationsPendingCreation.add(playerName);
 
@@ -444,10 +440,10 @@ class PlayerActivityPlugin {
       else return;
 
       let entity = this.playerLocations.get(playerName);
-      if (!entity) entity = this.createPlayerLocationEntity(source, lastPosition, lastActivity, activities, playerName);
-      else this.updatePlayerLocationEntity(entity, lastPosition, lastActivity, activities);
+      if (!entity) entity = this.createPlayerLocationEntity(source, lastPosition, lastActivity, activitiesData, playerName);
+      else this.updatePlayerLocationEntity(entity, lastPosition, lastActivity, activitiesData);
 
-      this.setPlayerPositionSubscription(playerName, lastActivity, entity);
+      this.setPlayerPositionSubscription(lastActivity, entity);
       this.playerLocations.set(playerName, entity);
     } finally {
       this.playerLocationsPendingCreation.delete(playerName);
@@ -457,8 +453,8 @@ class PlayerActivityPlugin {
   private createPlayerLocationEntity(
     source: Cesium.DataSource,
     lastPosition: Cesium.Cartesian3,
-    lastActivity: PlayerActivity,
-    activities: PlayerActivity[],
+    lastActivityData: PlayerActivityData,
+    activitiesData: PlayerActivityData[],
     playerName: string,
   ): Cesium.Entity {
     return source.entities.add({
@@ -468,9 +464,9 @@ class PlayerActivityPlugin {
         text: playerName,
         font: "16px coda_regular, arial, helvetica, sans-serif",
         verticalOrigin: Cesium.VerticalOrigin.CENTER,
-        horizontalOrigin: lastActivity.team === "ENLIGHTENED" ? Cesium.HorizontalOrigin.LEFT : Cesium.HorizontalOrigin.RIGHT,
-        pixelOffset: lastActivity.team === "ENLIGHTENED" ? new Cesium.Cartesian2(25, 0) : new Cesium.Cartesian2(-25, 0),
-        fillColor: getTeamColor(lastActivity.team),
+        horizontalOrigin: lastActivityData.team === "ENLIGHTENED" ? Cesium.HorizontalOrigin.LEFT : Cesium.HorizontalOrigin.RIGHT,
+        pixelOffset: lastActivityData.team === "ENLIGHTENED" ? new Cesium.Cartesian2(25, 0) : new Cesium.Cartesian2(-25, 0),
+        fillColor: getTeamColor(lastActivityData.team),
         outlineColor: Cesium.Color.BLACK,
         outlineWidth: 6,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
@@ -483,7 +479,7 @@ class PlayerActivityPlugin {
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
       properties: {
-        activities: activities as PlayerActivity[]
+        activities: activitiesData as PlayerActivityData[]
       },
     });
   }
@@ -491,37 +487,37 @@ class PlayerActivityPlugin {
   private updatePlayerLocationEntity(
     entity: Cesium.Entity,
     lastPosition: Cesium.Cartesian3,
-    lastActivity: PlayerActivity,
-    activities: PlayerActivity[],
+    lastActivityData: PlayerActivityData,
+    activitiesData: PlayerActivityData[],
   ): void {
     entity.position = new Cesium.ConstantPositionProperty(lastPosition);
 
     // For rare ocations where agents might change their faction
     if (entity.label) {
-      entity.label.horizontalOrigin = lastActivity.team === "ENLIGHTENED" ?
+      entity.label.horizontalOrigin = lastActivityData.team === "ENLIGHTENED" ?
         new Cesium.ConstantProperty(Cesium.HorizontalOrigin.LEFT) :
         new Cesium.ConstantProperty(Cesium.HorizontalOrigin.RIGHT);
-      entity.label.pixelOffset = lastActivity.team === "ENLIGHTENED" ?
+      entity.label.pixelOffset = lastActivityData.team === "ENLIGHTENED" ?
         new Cesium.ConstantProperty(new Cesium.Cartesian2(25, 0)) :
         new Cesium.ConstantProperty(new Cesium.Cartesian2(-25, 0));
-      entity.label.fillColor = new Cesium.ConstantProperty(getTeamColor(lastActivity.team));
+      entity.label.fillColor = new Cesium.ConstantProperty(getTeamColor(lastActivityData.team));
     }
 
     // Update the properties for tooltips
     if (entity.properties) {
-      entity.properties?.activities.setValue(activities as PlayerActivity[]);
+      entity.properties?.activities.setValue(activitiesData as PlayerActivityData[]);
     }
   }
 
-  private renderPlayerPaths(playerActivities: Map<string, PlayerActivity[]>): void {
-    playerActivities.forEach((activities, playerName) => {
+  private renderPlayerPaths(playerActivitiesData: Map<string, PlayerActivityData[]>): void {
+    playerActivitiesData.forEach((activities, playerName) => {
       const lastActivity = this.getLatestActivity(activities);
       if (!lastActivity) return;
       this.renderPlayerPath(playerName, activities, lastActivity).then();
     });
   }
 
-  private async renderPlayerPath(playerName: string, activities: PlayerActivity[], lastActivity: PlayerActivity): Promise<void> {
+  private async renderPlayerPath(playerName: string, activities: PlayerActivityData[], lastActivity: PlayerActivityData): Promise<void> {
     if (this.playerPathsPendingCreation.has(playerName)) return;
     this.playerPathsPendingCreation.add(playerName);
 
