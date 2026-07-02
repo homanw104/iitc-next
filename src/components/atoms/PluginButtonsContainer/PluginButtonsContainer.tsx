@@ -21,7 +21,6 @@ const PluginButtonsContainer = () => {
         overflowX: "hidden",
         flexShrink: 0,
         minHeight: 0,
-        zIndex: "10010",
       }}
     />
   ) as HTMLElement;

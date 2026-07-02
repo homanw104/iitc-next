@@ -10,7 +10,6 @@ const CommButton = ({ commDetailPaneController }: {
         position: "absolute",
         bottom: "var(--iitc-bottom-control-padding, 5px)",
         right: "calc(var(--iitc-right-control-padding, 5px) + 38px)",
-        zIndex: "10000",
         display: "flex",
         flexDirection: "column",
       }}

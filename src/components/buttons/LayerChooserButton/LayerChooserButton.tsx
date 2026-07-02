@@ -10,7 +10,6 @@ const LayerChooserButton = ({ layerChooserPaneController }: {
         position: "absolute",
         bottom: "var(--iitc-bottom-control-padding, 5px)",
         right: "var(--iitc-right-control-padding, 5px)",
-        zIndex: "10000",
         display: "flex",
         flexDirection: "column-reverse",
         alignItems: "flex-end",

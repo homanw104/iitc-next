@@ -22,7 +22,6 @@ const PortalDetailBar = ({ portalDetailPaneController, data, msg }: {
         paddingLeft: "12px",
         paddingRight: "12px",
         fontSize: "14px",
-        zIndex: "10000",
         backgroundColor: "rgb(48, 51, 54)",
         color: "white",
         fontFamily: "sans-serif",

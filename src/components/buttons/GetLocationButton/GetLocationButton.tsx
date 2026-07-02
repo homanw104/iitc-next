@@ -34,7 +34,6 @@ const GetLocationButton = ({ viewer }: {
         position: "absolute",
         bottom: "calc(var(--iitc-bottom-control-padding, 5px) + 65px)",
         right: "calc(var(--iitc-right-control-padding, 5px) + 29px)",
-        zIndex: "10000",
         display: "flex",
       }}
     >
