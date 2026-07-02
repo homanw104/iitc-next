@@ -5,7 +5,7 @@
 import * as Cesium from "cesium";
 import type { PortalData } from "../../types/ingress";
 import type { LayerManager } from "../layer/layerManager";
-import type { EntityPositionCallback, EntityPositionManager } from "./entityPositionManager";
+import type { EntityPosition, EntityPositionCallback, EntityPositionManager } from "./entityPositionManager";
 import type { EntityTranslucencyManager } from "./entityTranslucencyManager";
 import {
   PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
@@ -44,6 +44,18 @@ export class ScoutHistoryEntityManager {
     private entityTranslucencyManager: EntityTranslucencyManager
   ) {}
 
+  public async addOrUpdateScoutControlHalos(portals: PortalData[]): Promise<void> {
+    await this.layerManager.withEntityCollectionEventsSuspended(
+      [
+        { name: DATA_SOURCE_LAYER_NAME, type: "dataSource" },
+        { name: DATA_SOURCE_LAYER_NAME_REVERSE, type: "dataSource" },
+      ],
+      async () => {
+        await Promise.all(portals.map((portal) => this.addOrUpdateScoutControlHalo(portal)));
+      }
+    );
+  }
+
   public async addOrUpdateScoutControlHalo(data: PortalData): Promise<void> {
     const existing = this.scoutControlHalos.get(data.guid);
     if (existing) {
@@ -61,11 +73,23 @@ export class ScoutHistoryEntityManager {
           occlusionEntity,
           reverseEntity,
           reverseOcclusionEntity,
-          positionCallback: (_latE6, _lngE6, position) => {
-            if (scoutHistoryHalo.entity) scoutHistoryHalo.entity.position = new Cesium.ConstantPositionProperty(position);
-            if (scoutHistoryHalo.occlusionEntity) scoutHistoryHalo.occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
-            if (scoutHistoryHalo.reverseEntity) scoutHistoryHalo.reverseEntity.position = new Cesium.ConstantPositionProperty(position);
-            if (scoutHistoryHalo.reverseOcclusionEntity) scoutHistoryHalo.reverseOcclusionEntity.position = new Cesium.ConstantPositionProperty(position);
+          positionCallback: (entityPosition: EntityPosition) => {
+            if (scoutHistoryHalo.entity) {
+              scoutHistoryHalo.entity.position = new Cesium.ConstantPositionProperty(entityPosition.position);
+              scoutHistoryHalo.entity.show = !entityPosition.isFallbackPosition;
+            }
+            if (scoutHistoryHalo.occlusionEntity) {
+              scoutHistoryHalo.occlusionEntity.position = new Cesium.ConstantPositionProperty(entityPosition.position);
+              scoutHistoryHalo.occlusionEntity.show = !entityPosition.isFallbackPosition;
+            }
+            if (scoutHistoryHalo.reverseEntity) {
+              scoutHistoryHalo.reverseEntity.position = new Cesium.ConstantPositionProperty(entityPosition.position);
+              scoutHistoryHalo.reverseEntity.show = !entityPosition.isFallbackPosition;
+            }
+            if (scoutHistoryHalo.reverseOcclusionEntity) {
+              scoutHistoryHalo.reverseOcclusionEntity.position = new Cesium.ConstantPositionProperty(entityPosition.position);
+              scoutHistoryHalo.reverseOcclusionEntity.show = !entityPosition.isFallbackPosition;
+            }
           },
         };
         this.entityPositionManager.setOnPositionChangedCallback(data, scoutHistoryHalo.positionCallback);
@@ -74,18 +98,6 @@ export class ScoutHistoryEntityManager {
         this.scoutControlHalosPendingCreation.delete(data.guid);
       }
     }
-  }
-
-  public async addOrUpdateScoutControlHalos(portals: PortalData[]): Promise<void> {
-    await this.layerManager.withEntityCollectionEventsSuspended(
-      [
-        { name: DATA_SOURCE_LAYER_NAME, type: "dataSource" },
-        { name: DATA_SOURCE_LAYER_NAME_REVERSE, type: "dataSource" },
-      ],
-      async () => {
-        await Promise.all(portals.map((portal) => this.addOrUpdateScoutControlHalo(portal)));
-      }
-    );
   }
 
   public removeScoutControlHalo(guid: string): void {
@@ -105,7 +117,7 @@ export class ScoutHistoryEntityManager {
     const entities = this.layerManager.getOrCreateDataSource(DATA_SOURCE_LAYER_NAME).entities;
     const reverseEntities = this.layerManager.getOrCreateDataSource(DATA_SOURCE_LAYER_NAME_REVERSE).entities;
     const scoutHistoryState = getScoutHistoryState(data);
-    const position = await this.entityPositionManager.getPosition(data);
+    const entityPosition = await this.entityPositionManager.getEntityPosition(data);
 
     let entity: Cesium.Entity | undefined = undefined;
     let occlusionEntity: Cesium.Entity | undefined = undefined;
@@ -115,7 +127,8 @@ export class ScoutHistoryEntityManager {
     if (scoutHistoryState === "controlled") {
       entity = entities.add({
         id: `scout-halo-${data.guid}`,
-        position: position,
+        position: entityPosition.position,
+        show: !entityPosition.isFallbackPosition,
         point: {
           pixelSize: HALO_POINT_PIXEL_SIZE,
           color: Cesium.Color.TRANSPARENT,
@@ -128,7 +141,8 @@ export class ScoutHistoryEntityManager {
       });
       occlusionEntity = entities.add({
         id: `scout-halo-occluded-${data.guid}`,
-        position: position,
+        position: entityPosition.position,
+        show: !entityPosition.isFallbackPosition,
         point: {
           pixelSize: HALO_POINT_PIXEL_SIZE,
           color: Cesium.Color.TRANSPARENT,
@@ -143,7 +157,8 @@ export class ScoutHistoryEntityManager {
     } else {
       reverseEntity = reverseEntities.add({
         id: `scout-halo-reverse-${data.guid}`,
-        position: position,
+        position: entityPosition.position,
+        show: !entityPosition.isFallbackPosition,
         point: {
           pixelSize: HALO_POINT_PIXEL_SIZE,
           color: Cesium.Color.TRANSPARENT,
@@ -156,7 +171,8 @@ export class ScoutHistoryEntityManager {
       });
       reverseOcclusionEntity = reverseEntities.add({
         id: `scout-halo-reverse-occluded-${data.guid}`,
-        position: position,
+        position: entityPosition.position,
+        show: !entityPosition.isFallbackPosition,
         point: {
           pixelSize: HALO_POINT_PIXEL_SIZE,
           color: Cesium.Color.TRANSPARENT,

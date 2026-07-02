@@ -6,6 +6,7 @@ import * as Cesium from "cesium";
 import { logManager } from "../system/logManager";
 import type { SceneEventManager } from "../system/sceneEventManager";
 import { settingsManager } from "../system/settingsManager";
+import { Cartesian3 } from "cesium";
 
 const LOG_TAG = "EntityPositionManager";
 
@@ -16,30 +17,31 @@ const GOOGLE_GROUND_TERRAIN_COMPENSATION_METER = 1;
 const GOOGLE_TILES_SAMPLE_BATCH_SIZE = 16;
 const GOOGLE_TILES_SAMPLE_BATCH_DELAY_MS = 10;
 
-export type EntityPositionCallback = (latE6: number, lngE6: number, position: Cesium.Cartesian3) => void;
-
 interface EntityData {
   latE6: number;
   lngE6: number;
 }
 
-interface EntityPosition {
+export interface EntityPosition {
   latE6: number;
   lngE6: number;
-  position: Cesium.Cartesian3 | undefined;
+  position: Cesium.Cartesian3;
   positionPromise: Promise<Cesium.Cartesian3>;
   positionPromiseResolver: (position: Cesium.Cartesian3) => void;
   positionCallbacks: Set<EntityPositionCallback>;
+  isFallbackPosition: boolean;
 }
+
+export type EntityPositionCallback = (entityPosition: EntityPosition) => void;
 
 export class EntityPositionManager {
   private readonly useGoogle3dTiles = settingsManager.getUseGoogle3dTiles();
-  private readonly entityPositions = new Map<string, EntityPosition>();
-  private readonly entityPositionsSamplingQueue = new Set<string>();
-  private readonly entityPositionsNowSampling = new Set<string>();
-  private readonly samplingIdleCallbacks = new Set<() => void>();
-  private samplingScheduled = false;
-  private samplingScheduledTimeoutId: number | undefined;
+  private readonly googleEntityPositions = new Map<string, EntityPosition>();
+  private readonly googleEntityPositionsSamplingQueue = new Set<string>();
+  private readonly googleEntityPositionsNowSampling = new Set<string>();
+  private readonly googleSamplingIdleCallbacks = new Set<() => void>();
+  private googleSamplingScheduled = false;
+  private googleSamplingScheduledTimeoutId: number | undefined;
 
   constructor(
     private readonly viewer: Cesium.Viewer,
@@ -58,27 +60,26 @@ export class EntityPositionManager {
     });
   }
 
-  public async getPosition(data: EntityData): Promise<Cesium.Cartesian3> {
+  public async getEntityPosition(data: EntityData): Promise<EntityPosition> {
     await this.sceneEventManager.waitForInitSceneLoaded();
 
     if (this.useGoogle3dTiles) {
-      const entityPosition = this.registerEntityPosition(data);
-      return entityPosition.positionPromise;
+      return this.registerGoogleEntityPosition(data);
     } else {
-      return getTerrainPosition(this.viewer, data);
+      return this.getTerrainEntityPosition(data);
     }
   }
 
   public setOnPositionChangedCallback(data: EntityData, callback: EntityPositionCallback): void {
     const key = getEntityPositionKey(data.latE6, data.lngE6);
-    const callbacks = this.entityPositions.get(key)?.positionCallbacks;
+    const callbacks = this.googleEntityPositions.get(key)?.positionCallbacks;
     if (!callbacks) return;
     callbacks.add(callback);
   }
 
   public unsetOnPositionChangedCallback(data: EntityData, callback: EntityPositionCallback): void {
     const key = getEntityPositionKey(data.latE6, data.lngE6);
-    const callbacks = this.entityPositions.get(key)?.positionCallbacks;
+    const callbacks = this.googleEntityPositions.get(key)?.positionCallbacks;
     if (!callbacks) return;
     callbacks.delete(callback);
   }
@@ -87,28 +88,29 @@ export class EntityPositionManager {
     if (this.isSamplingQueueEmpty()) {
       callback();
     } else {
-      this.samplingIdleCallbacks.add(callback);
+      this.googleSamplingIdleCallbacks.add(callback);
     }
   }
 
-  private registerEntityPosition(data: EntityData): EntityPosition {
+  private registerGoogleEntityPosition(data: EntityData): EntityPosition {
     const key = getEntityPositionKey(data.latE6, data.lngE6);
-    const existing = this.entityPositions.get(key);
+    const existing = this.googleEntityPositions.get(key);
     if (!existing) {
       let positionPromiseResolver: EntityPosition["positionPromiseResolver"] = () => undefined;
       const positionPromise = new Promise<Cesium.Cartesian3>((resolve) => {
         positionPromiseResolver = resolve;
       });
-      const entityPosition = {
+      const entityPosition: EntityPosition = {
         latE6: data.latE6,
         lngE6: data.lngE6,
-        position: undefined,
+        position: getFallbackPosition(data),
         positionPromise: positionPromise,
         positionPromiseResolver: positionPromiseResolver,
         positionCallbacks: new Set<EntityPositionCallback>(),
+        isFallbackPosition: true,
       };
-      this.entityPositions.set(key, entityPosition);
-      this.entityPositionsSamplingQueue.add(key);
+      this.googleEntityPositions.set(key, entityPosition);
+      this.googleEntityPositionsSamplingQueue.add(key);
       this.scheduleSamplingWork();
       return entityPosition;
     } else {
@@ -116,13 +118,26 @@ export class EntityPositionManager {
     }
   }
 
-  private scheduleSamplingWork(): void {
-    if (this.samplingScheduled) return;
-    if (this.entityPositionsSamplingQueue.size === 0) return;
+  private getTerrainEntityPosition(data: EntityData): EntityPosition {
+    const position = getTerrainPosition(this.viewer, data);
+    return {
+      latE6: data.latE6,
+      lngE6: data.lngE6,
+      position: position,
+      positionPromise: Promise.resolve(position),
+      positionPromiseResolver: () => {},
+      positionCallbacks: new Set<EntityPositionCallback>(),
+      isFallbackPosition: false,
+    };
+  }
 
-    this.samplingScheduled = true;
-    this.samplingScheduledTimeoutId = window.setTimeout(() => {
-      this.samplingScheduled = false;
+  private scheduleSamplingWork(): void {
+    if (this.googleSamplingScheduled) return;
+    if (this.googleEntityPositionsSamplingQueue.size === 0) return;
+
+    this.googleSamplingScheduled = true;
+    this.googleSamplingScheduledTimeoutId = window.setTimeout(() => {
+      this.googleSamplingScheduled = false;
       this.flushSamplingQueue();
     }, GOOGLE_TILES_SAMPLE_BATCH_DELAY_MS);
   }
@@ -135,26 +150,25 @@ export class EntityPositionManager {
   }
 
   private populateSamplingQueue(): void {
-    this.entityPositions.forEach((entityPosition, key) => {
-      if (entityPosition.position === undefined) this.entityPositionsSamplingQueue.add(key);
-      else if (isEntityPositionInView(this.viewer, entityPosition)) this.entityPositionsSamplingQueue.add(key);
+    this.googleEntityPositions.forEach((entityPosition, key) => {
+      if (isEntityPositionInView(this.viewer, entityPosition)) this.googleEntityPositionsSamplingQueue.add(key);
     });
   }
 
   private flushSamplingQueue(): void {
-    const keys = takeSamplingBatch(this.entityPositionsSamplingQueue, GOOGLE_TILES_SAMPLE_BATCH_SIZE);
+    const keys = takeSamplingBatch(this.googleEntityPositionsSamplingQueue, GOOGLE_TILES_SAMPLE_BATCH_SIZE);
     keys.forEach((key) => {
-      this.entityPositionsSamplingQueue.delete(key);
-      this.entityPositionsNowSampling.add(key);
+      this.googleEntityPositionsSamplingQueue.delete(key);
+      this.googleEntityPositionsNowSampling.add(key);
 
-      const entityPosition = this.entityPositions.get(key);
+      const entityPosition = this.googleEntityPositions.get(key);
 
       if (!entityPosition) {
-        this.entityPositionsNowSampling.delete(key);
+        this.googleEntityPositionsNowSampling.delete(key);
         return;
       }
 
-      const height = getGoogleTilesPositionHeight(
+      const height = getGooglePositionHeight(
         this.viewer.scene,
         Cesium.Cartographic.fromDegrees(
           entityPosition.lngE6 / 1e6,
@@ -162,24 +176,27 @@ export class EntityPositionManager {
         ),
       );
 
-      if (height === undefined) {
-        this.entityPositionsNowSampling.delete(key);
-        return;
+      let position: Cartesian3;
+      let isFallbackPosition: boolean;
+      if (height === undefined && !entityPosition.isFallbackPosition) {
+        // Use last position if it's sampled before but failed to sample this time
+        position = entityPosition.position;
+        isFallbackPosition = false;
+      } else {
+        position = Cesium.Cartesian3.fromDegreesArrayHeights([
+          entityPosition.lngE6 / 1e6,
+          entityPosition.latE6 / 1e6,
+          (height ?? 0) + GOOGLE_GROUND_TERRAIN_COMPENSATION_METER,
+        ])[0];
+        isFallbackPosition = height === undefined;
       }
 
-      const position = Cesium.Cartesian3.fromDegreesArrayHeights([
-        entityPosition.lngE6 / 1e6,
-        entityPosition.latE6 / 1e6,
-        height + GOOGLE_GROUND_TERRAIN_COMPENSATION_METER,
-      ])[0];
-
+      entityPosition.isFallbackPosition = isFallbackPosition;
       entityPosition.position = position;
       entityPosition.positionPromiseResolver(position);
-      entityPosition.positionCallbacks.forEach((callback) => {
-        callback(entityPosition.latE6, entityPosition.lngE6, position);
-      });
+      entityPosition.positionCallbacks.forEach((callback) => callback(entityPosition));
 
-      this.entityPositionsNowSampling.delete(key);
+      this.googleEntityPositionsNowSampling.delete(key);
     });
 
     this.logQueueStatus();
@@ -192,28 +209,28 @@ export class EntityPositionManager {
   }
 
   private flushRemainingSamplingQueue(): void {
-    if (this.samplingScheduled) return;
-    if (this.entityPositionsSamplingQueue.size === 0) return;
+    if (this.googleSamplingScheduled) return;
+    if (this.googleEntityPositionsSamplingQueue.size === 0) return;
 
-    this.samplingScheduled = true;
-    this.samplingScheduledTimeoutId = window.setTimeout(() => {
-      this.samplingScheduled = false;
+    this.googleSamplingScheduled = true;
+    this.googleSamplingScheduledTimeoutId = window.setTimeout(() => {
+      this.googleSamplingScheduled = false;
       this.flushSamplingQueue();
     }, GOOGLE_TILES_SAMPLE_BATCH_DELAY_MS);
   }
 
   private clearSamplingWork(): void {
-    this.entityPositionsSamplingQueue.clear();
-    this.entityPositionsNowSampling.clear();
-    window.clearTimeout(this.samplingScheduledTimeoutId);
-    this.samplingScheduled = false;
-    this.samplingScheduledTimeoutId = undefined;
-    this.samplingIdleCallbacks.forEach((callback) => callback());
-    this.samplingIdleCallbacks.clear();
+    this.googleEntityPositionsSamplingQueue.clear();
+    this.googleEntityPositionsNowSampling.clear();
+    window.clearTimeout(this.googleSamplingScheduledTimeoutId);
+    this.googleSamplingScheduled = false;
+    this.googleSamplingScheduledTimeoutId = undefined;
+    this.googleSamplingIdleCallbacks.forEach((callback) => callback());
+    this.googleSamplingIdleCallbacks.clear();
   }
 
   private logQueueStatus(): void {
-    const samplingCount = this.entityPositionsSamplingQueue.size + this.entityPositionsNowSampling.size;
+    const samplingCount = this.googleEntityPositionsSamplingQueue.size + this.googleEntityPositionsNowSampling.size;
 
     if (samplingCount > 0) {
       logManager.info(LOG_TAG, `Rendering ${samplingCount} entity positions`);
@@ -223,7 +240,7 @@ export class EntityPositionManager {
   }
 
   private isSamplingQueueEmpty(): boolean {
-    return this.entityPositionsNowSampling.size + this.entityPositionsSamplingQueue.size === 0;
+    return this.googleEntityPositionsNowSampling.size + this.googleEntityPositionsSamplingQueue.size === 0;
   }
 }
 
@@ -235,10 +252,22 @@ function getTerrainPosition(viewer: Cesium.Viewer, data: EntityData): Cesium.Car
   const height = viewer.scene.globe.getHeight(
     Cesium.Cartographic.fromDegrees(data.lngE6 / 1e6, data.latE6 / 1e6)
   );
-  return Cesium.Cartesian3.fromDegrees(data.lngE6 / 1e6, data.latE6 / 1e6, height);
+  return Cesium.Cartesian3.fromDegrees(
+    data.lngE6 / 1e6,
+    data.latE6 / 1e6,
+    height,
+  );
 }
 
-function getGoogleTilesPositionHeight(scene: Cesium.Scene, cartographic: Cesium.Cartographic): number | undefined {
+function getFallbackPosition(data: EntityData): Cesium.Cartesian3 {
+  return Cesium.Cartesian3.fromDegrees(
+    data.lngE6 / 1e6,
+    data.latE6 / 1e6,
+    GOOGLE_GROUND_TERRAIN_COMPENSATION_METER,
+  );
+}
+
+function getGooglePositionHeight(scene: Cesium.Scene, cartographic: Cesium.Cartographic): number | undefined {
   const sceneWithGetHeight = scene as Cesium.Scene & {
     getHeight: (cartographic: Cesium.Cartographic, heightReference?: Cesium.HeightReference) => number | undefined;
   };
@@ -246,8 +275,6 @@ function getGoogleTilesPositionHeight(scene: Cesium.Scene, cartographic: Cesium.
 }
 
 function isEntityPositionInView(viewer: Cesium.Viewer, entityPosition: EntityPosition): boolean {
-  if (entityPosition.position === undefined) return true;
-
   const viewRectangle = viewer.camera.computeViewRectangle();
   if (!viewRectangle) return true;
 

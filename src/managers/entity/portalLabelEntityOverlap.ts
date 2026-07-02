@@ -12,7 +12,6 @@ import * as Cesium from "cesium";
 import {
   PORTAL_LABEL_ENTITY_VISIBLE_OPACITY,
   getPortalLabelEntityFadeTargetOpacity,
-  getPortalLabelEntityPosition,
   getPortalLabelEntityPixelOffsetY,
 } from "./portalLabelEntityLayout";
 import type { PortalLabel, PortalLabelScreenBounds } from "./portalLabelEntityTypes";
@@ -69,8 +68,9 @@ function collectPortalLabelOverlapCandidates(
 
   for (const [guid, label] of labels) {
     if (!shouldContinue()) return undefined;
+    if (label.isFallbackPosition) continue;
 
-    const labelPosition = getPortalLabelEntityPosition(label, time);
+    const labelPosition = label.entity.position?.getValue(time);
     if (!labelPosition) continue;
     if (!isLabelPositionInViewRectangle(viewer, labelPosition, viewRectangle)) continue;
 

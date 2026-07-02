@@ -27,7 +27,7 @@ export const PORTAL_LABEL_ENTITY_INITIAL_OPACITY = 0;
 export const PORTAL_LABEL_ENTITY_VISIBLE_OPACITY = 1;
 export const PORTAL_LABEL_ENTITY_HIDDEN_OPACITY = 0;
 
-export function getPortalLabelEntityLinkCount(data: PortalData): number {
+export function getPortalLabelLinkCount(data: PortalData): number {
   if (!data.links) return 0;
   return new Set(data.links.map((link) => link.guid)).size;
 }
@@ -41,15 +41,6 @@ export function getPortalLabelEntityTextLayout(text: string): PortalLabelTextLay
     screenBoxWidth: maxLineLength * PORTAL_LABEL_ENTITY_AVERAGE_CHARACTER_WIDTH_PX + PORTAL_LABEL_ENTITY_OUTLINE_WIDTH * 2,
     screenBoxHeight: lines.length * PORTAL_LABEL_ENTITY_LINE_HEIGHT_PX + PORTAL_LABEL_ENTITY_OUTLINE_WIDTH * 2,
   };
-}
-
-export function setPortalLabelEntityOpacityCallbackProperties(label: PortalLabel): void {
-  if (!label.entity.label) return;
-
-  label.entity.label.fillColor = new Cesium.CallbackProperty((_time, result) =>
-    Cesium.Color.WHITE.withAlpha(label.currentOpacity, result), false);
-  label.entity.label.outlineColor = new Cesium.CallbackProperty((_time, result) =>
-    Cesium.Color.BLACK.withAlpha(label.currentOpacity, result), false);
 }
 
 export function setPortalLabelEntityCurrentOpacity(label: PortalLabel, opacity: number): boolean {
@@ -87,11 +78,4 @@ export function getPortalLabelEntityPixelOffsetY(distance: number): number {
   const scale = getPortalNearFarScale(distance);
 
   return -(PORTAL_POINT_PIXEL_SIZE * scale / 2 + PORTAL_LABEL_ENTITY_POINT_GAP_PX);
-}
-
-export function getPortalLabelEntityPosition(
-  label: PortalLabel,
-  time: Cesium.JulianDate,
-): Cesium.Cartesian3 | undefined {
-  return label.entity.position?.getValue(time);
 }

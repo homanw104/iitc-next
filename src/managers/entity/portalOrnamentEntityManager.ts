@@ -5,7 +5,7 @@
 import * as Cesium from "cesium";
 import type { PortalData } from "../../types/ingress";
 import type { LayerManager } from "../layer/layerManager";
-import type { EntityPositionCallback, EntityPositionManager } from "./entityPositionManager";
+import type { EntityPosition, EntityPositionCallback, EntityPositionManager } from "./entityPositionManager";
 import type { EntityTranslucencyManager } from "./entityTranslucencyManager";
 import {
   PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
@@ -40,20 +40,6 @@ export class PortalOrnamentEntityManager {
     private entityTranslucencyManager: EntityTranslucencyManager
   ) {}
 
-  public async addOrUpdateOrnament(data: PortalData): Promise<void> {
-    if (!data.ornaments?.length) {
-      this.removeOrnament(data.guid);
-      return;
-    }
-
-    const existing = this.ornaments.get(data.guid);
-    if (existing) {
-      await this.updateExistingOrnament(existing, data);
-    } else {
-      await this.createAndStoreOrnament(data);
-    }
-  }
-
   public async addOrUpdateOrnaments(portals: PortalData[]): Promise<void> {
     const layers = new Set<string>();
     portals.forEach((portal) => {
@@ -68,6 +54,20 @@ export class PortalOrnamentEntityManager {
         await Promise.all(portals.map((portal) => this.addOrUpdateOrnament(portal)));
       }
     );
+  }
+
+  public async addOrUpdateOrnament(data: PortalData): Promise<void> {
+    if (!data.ornaments?.length) {
+      this.removeOrnament(data.guid);
+      return;
+    }
+
+    const existing = this.ornaments.get(data.guid);
+    if (existing) {
+      await this.updateExistingOrnament(existing, data);
+    } else {
+      await this.createAndStoreOrnament(data);
+    }
   }
 
   public removeOrnament(guid: string): void {
@@ -111,11 +111,12 @@ export class PortalOrnamentEntityManager {
   }> {
     const layerId = getPortalOrnamentEntityLayerId(data);
     const entities = this.layerManager.getOrCreateDataSource(layerId).entities;
-    const position = await this.entityPositionManager.getPosition(data);
+    const entityPosition = await this.entityPositionManager.getEntityPosition(data);
 
     const entity = entities.add({
       id: `ornament-${data.guid}`,
-      position: position,
+      position: entityPosition.position,
+      show: !entityPosition.isFallbackPosition,
       billboard: {
         image: getOrnamentImage(data),
         heightReference: Cesium.HeightReference.NONE,
@@ -128,7 +129,8 @@ export class PortalOrnamentEntityManager {
 
     const occlusionEntity = entities.add({
       id: `ornament-occluded-${data.guid}`,
-      position: position,
+      position: entityPosition.position,
+      show: !entityPosition.isFallbackPosition,
       billboard: {
         image: getOrnamentImage(data),
         color: Cesium.Color.WHITE.withAlpha(PORTAL_OCCLUDED_ALPHA),
@@ -144,10 +146,12 @@ export class PortalOrnamentEntityManager {
   }
 
   private async updateOrnamentEntity(entity: Cesium.Entity, occlusionEntity: Cesium.Entity, data: PortalData): Promise<void> {
-    const position = await this.entityPositionManager.getPosition(data);
+    const entityPosition = await this.entityPositionManager.getEntityPosition(data);
 
-    entity.position = new Cesium.ConstantPositionProperty(position);
-    occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
+    entity.position = new Cesium.ConstantPositionProperty(entityPosition.position);
+    occlusionEntity.position = new Cesium.ConstantPositionProperty(entityPosition.position);
+    entity.show = !entityPosition.isFallbackPosition;
+    occlusionEntity.show = !entityPosition.isFallbackPosition;
     if (entity.billboard) {
       entity.billboard.image = new Cesium.ConstantProperty(getOrnamentImage(data));
     }
@@ -213,9 +217,11 @@ function createOrnamentPositionCallback(
   entity: Cesium.Entity,
   occlusionEntity: Cesium.Entity,
 ): EntityPositionCallback {
-  return (_latE6, _lngE6, position) => {
-    entity.position = new Cesium.ConstantPositionProperty(position);
-    occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
+  return (entityPosition: EntityPosition) => {
+    entity.position = new Cesium.ConstantPositionProperty(entityPosition.position);
+    occlusionEntity.position = new Cesium.ConstantPositionProperty(entityPosition.position);
+    entity.show = !entityPosition.isFallbackPosition;
+    occlusionEntity.show = !entityPosition.isFallbackPosition;
   };
 }
 

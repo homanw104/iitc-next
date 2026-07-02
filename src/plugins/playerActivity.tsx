@@ -6,7 +6,7 @@
  */
 
 import * as Cesium from "cesium";
-import type { EntityPositionCallback } from "../managers/entity/entityPositionManager";
+import type { EntityPosition, EntityPositionCallback } from "../managers/entity/entityPositionManager";
 import type { IITCCore } from "../types/iitc";
 import type { Team } from "../types/ingress";
 import type { PlextMark } from "../types/api.ts";
@@ -401,8 +401,9 @@ class PlayerActivityPlugin {
     if (existing?.data.latE6 === activityData.latE6 && existing?.data.lngE6 === activityData.lngE6) return;
     if (existing) this.entityPositionManager.unsetOnPositionChangedCallback(existing.data, existing.positionCallback);
 
-    const callback: EntityPositionCallback = (_latE6, _lngE6, position) => {
-      entity.position = new Cesium.ConstantPositionProperty(position);
+    const callback: EntityPositionCallback = (entityPosition) => {
+      entity.position = new Cesium.ConstantPositionProperty(entityPosition.position);
+      entity.show = !entityPosition.isFallbackPosition;
       this.viewer.scene.requestRender();
     };
     this.entityPositionManager.setOnPositionChangedCallback(activityData, callback);
@@ -431,7 +432,7 @@ class PlayerActivityPlugin {
     this.playerLocationsPendingCreation.add(playerName);
 
     try {
-      const lastPosition = await this.entityPositionManager.getPosition(lastActivity);
+      const lastEntityPosition = await this.entityPositionManager.getEntityPosition(lastActivity);
       if (!this.playerLocationsPendingCreation.has(playerName)) return;
 
       let source: Cesium.DataSource;
@@ -440,8 +441,8 @@ class PlayerActivityPlugin {
       else return;
 
       let entity = this.playerLocations.get(playerName);
-      if (!entity) entity = this.createPlayerLocationEntity(source, lastPosition, lastActivity, activitiesData, playerName);
-      else this.updatePlayerLocationEntity(entity, lastPosition, lastActivity, activitiesData);
+      if (!entity) entity = this.createPlayerLocationEntity(source, lastEntityPosition, lastActivity, activitiesData, playerName);
+      else this.updatePlayerLocationEntity(entity, lastEntityPosition, lastActivity, activitiesData);
 
       this.setPlayerPositionSubscription(lastActivity, entity);
       this.playerLocations.set(playerName, entity);
@@ -452,14 +453,15 @@ class PlayerActivityPlugin {
 
   private createPlayerLocationEntity(
     source: Cesium.DataSource,
-    lastPosition: Cesium.Cartesian3,
+    lastEntityPosition: EntityPosition,
     lastActivityData: PlayerActivityData,
     activitiesData: PlayerActivityData[],
     playerName: string,
   ): Cesium.Entity {
     return source.entities.add({
       id: `player-activity-${playerName}`,
-      position: lastPosition,
+      position: lastEntityPosition.position,
+      show: !lastEntityPosition.isFallbackPosition,
       label: {
         text: playerName,
         font: "16px coda_regular, arial, helvetica, sans-serif",
@@ -486,11 +488,12 @@ class PlayerActivityPlugin {
 
   private updatePlayerLocationEntity(
     entity: Cesium.Entity,
-    lastPosition: Cesium.Cartesian3,
+    lastEntityPosition: EntityPosition,
     lastActivityData: PlayerActivityData,
     activitiesData: PlayerActivityData[],
   ): void {
-    entity.position = new Cesium.ConstantPositionProperty(lastPosition);
+    entity.position = new Cesium.ConstantPositionProperty(lastEntityPosition.position);
+    entity.show = !lastEntityPosition.isFallbackPosition;
 
     // For rare ocations where agents might change their faction
     if (entity.label) {

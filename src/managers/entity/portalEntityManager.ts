@@ -9,7 +9,7 @@ import { getTeamColor } from "../../utils/color";
 import type { LayerManager } from "../layer/layerManager";
 import { settingsManager } from "../system/settingsManager.ts";
 import { parsePortal } from "../tiles/tileRequestEntityParser";
-import type { EntityPositionManager, EntityPositionCallback } from "./entityPositionManager";
+import type { EntityPositionManager, EntityPositionCallback, EntityPosition } from "./entityPositionManager";
 import type { EntityTranslucencyManager } from "./entityTranslucencyManager";
 import { getPortalEntityLayerId } from "./portalEntityLayers";
 
@@ -171,11 +171,12 @@ export class PortalEntityManager {
   }> {
     const layerId = getPortalEntityLayerId(data);
     const entities = this.layerManager.getOrCreateDataSource(layerId).entities;
-    const position = await this.entityPositionManager.getPosition(data);
+    const entityPosition = await this.entityPositionManager.getEntityPosition(data);
 
     const entity = entities.add({
       id: `portal-${data.guid}`,
-      position: position,
+      position: entityPosition.position,
+      show: !entityPosition.isFallbackPosition,
       point: {
         pixelSize: PORTAL_POINT_PIXEL_SIZE,
         heightReference: Cesium.HeightReference.NONE,
@@ -192,7 +193,8 @@ export class PortalEntityManager {
 
     const occlusionEntity = entities.add({
       id: `portal-${data.guid}-occluded`,
-      position: position,
+      position: entityPosition.position,
+      show: !entityPosition.isFallbackPosition,
       point: {
         pixelSize: PORTAL_POINT_PIXEL_SIZE,
         heightReference: Cesium.HeightReference.NONE,
@@ -209,9 +211,11 @@ export class PortalEntityManager {
   }
 
   private async updatePortalEntity(entity: Cesium.Entity, occlusionEntity: Cesium.Entity, data: PortalData): Promise<void> {
-    const position = await this.entityPositionManager.getPosition(data);
-    entity.position = new Cesium.ConstantPositionProperty(position);
-    occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
+    const entityPosition = await this.entityPositionManager.getEntityPosition(data);
+    entity.position = new Cesium.ConstantPositionProperty(entityPosition.position);
+    occlusionEntity.position = new Cesium.ConstantPositionProperty(entityPosition.position);
+    entity.show = !entityPosition.isFallbackPosition;
+    occlusionEntity.show = !entityPosition.isFallbackPosition;
 
     if (entity.point) {
       entity.point.color = new Cesium.ConstantProperty(getTeamColor(data.team));
@@ -322,9 +326,11 @@ function createPortalPositionCallback(
   entity: Cesium.Entity,
   occlusionEntity: Cesium.Entity,
 ): EntityPositionCallback {
-  return (_latE6, _lngE6, position) => {
-    entity.position = new Cesium.ConstantPositionProperty(position);
-    occlusionEntity.position = new Cesium.ConstantPositionProperty(position);
+  return (entityPosition: EntityPosition) => {
+    entity.position = new Cesium.ConstantPositionProperty(entityPosition.position);
+    occlusionEntity.position = new Cesium.ConstantPositionProperty(entityPosition.position);
+    entity.show = !entityPosition.isFallbackPosition;
+    occlusionEntity.show = !entityPosition.isFallbackPosition;
   };
 }
 

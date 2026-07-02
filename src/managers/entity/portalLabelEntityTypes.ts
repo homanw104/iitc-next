@@ -18,12 +18,13 @@ export interface PortalLabel {
   wrappedText: string;
   screenBoxWidth: number;
   screenBoxHeight: number;
-  linkCount: number;
+  isFallbackPosition: boolean;
   currentOpacity: number;
   fadeStartOpacity: number;
   fadeTargetOpacity: number;
   fadeStartTime: number;
   firstShownAt: number | undefined;
+  linkCount: number;
   currentLayerId: string;
 }
 
