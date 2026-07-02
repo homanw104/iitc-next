@@ -6,6 +6,7 @@ import type { AppContext } from "../app.ts";
 import { configureCameraControls } from "../cesium/setup/configureCameraControls.ts";
 import { createCesiumContainer } from "../cesium/setup/createCesiumContainer";
 import { initCesiumViewer } from "../cesium/setup/initCesiumViewer";
+import { moveCreditElement } from "../cesium/setup/moveCreditElement.ts";
 import { restoreLastView } from "../cesium/setup/restoreLastView.ts";
 import { setUpEntityPositionRefresh } from "../cesium/setup/setUpEntityPositionRefresh.ts";
 import { setUpInteractionHandlers } from "../cesium/setup/setUpInteractionHandlers.ts";
@@ -22,8 +23,9 @@ export default function loadCesiumViewer(appContext: AppContext): void {
   document.body = document.createElement("body");
 
   const container = createCesiumContainer();
-  const viewer = initCesiumViewer(container.id);
+  const viewer = initCesiumViewer(container);
 
+  moveCreditElement(container);
   restoreLastView(viewer);
 
   const managers = createCoreManagers(viewer, container);

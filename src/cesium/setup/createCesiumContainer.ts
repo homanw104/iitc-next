@@ -32,14 +32,19 @@ export function createCesiumContainer(): HTMLDivElement {
   });
   document.body.appendChild(container);
 
-  const style = document.createElement("style");
-  style.textContent = `
+  let cesiumStyle = container.querySelector<HTMLStyleElement>("#iitc-next-cesium-style");
+  if (!cesiumStyle) {
+    cesiumStyle = document.createElement("style");
+    cesiumStyle.id = "iitc-next-cesium-style";
+    container.appendChild(cesiumStyle);
+  }
+
+  cesiumStyle.textContent = `
     #cesium-container .cesium-viewer-toolbar {
       top: var(--iitc-top-control-padding, 5px);
       right: var(--iitc-right-control-padding, 5px);
     }
   `;
-  container.appendChild(style);
 
   return container;
 }

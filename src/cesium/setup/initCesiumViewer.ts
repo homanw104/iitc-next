@@ -121,7 +121,7 @@ const GOOGLE_3D_TILES_RENDER_SETTINGS: Record<Google3dTilesRenderQuality, Google
   },
 };
 
-export function initCesiumViewer(container: string): Cesium.Viewer {
+export function initCesiumViewer(container: HTMLElement): Cesium.Viewer {
   const useGoogle3dTiles = settingsManager.getUseGoogle3dTiles();
   const gaodeSatelliteViewModel = new Cesium.ProviderViewModel({
     name: "Gaode Satellite",
@@ -155,7 +155,7 @@ export function initCesiumViewer(container: string): Cesium.Viewer {
     }
   });
 
-  const viewer = new Cesium.Viewer(container, {
+  const viewer = new Cesium.Viewer(container.id, {
     animation: false,
     timeline: false,
     homeButton: false,
@@ -222,12 +222,6 @@ export function initCesiumViewer(container: string): Cesium.Viewer {
     const renderSettings = GOOGLE_3D_TILES_RENDER_SETTINGS[settingsManager.getGoogle3dTilesRenderQuality()];
     applyGoogle3dTilesRenderSettings(viewer, renderSettings);
     addGoogle3dTiles(viewer, renderSettings).then();
-  }
-
-  // Remove the credits widget
-  const credits = document.querySelector(".cesium-widget-credits") as HTMLElement;
-  if (credits) {
-    credits.style.display = "none";
   }
 
   return viewer;
