@@ -76,7 +76,6 @@ export function handlePortalSelection({
       window.setTimeout(() => {
         if (freshData) return;
         if (selectionState.lastPortalEntity === portalEntity && !isPortalDisplaySuppressed(gestureState)) {
-          console.log("show stale data");
           viewer.selectedEntity = portalEntity;
           interfaceState.lastPortalData = staleData;
           interfaceState.portalDetailBar?.remove();
