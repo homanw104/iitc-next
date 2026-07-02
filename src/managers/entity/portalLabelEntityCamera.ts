@@ -3,7 +3,7 @@
  *
  * Label overlap and occlusion checks are expensive on dense views, so the
  * manager only refreshes while the camera is moving after enough time and
- * camera motion have accumulated. This helper owns the camera snapshots and
+ * camera motion has accumulated. This helper owns the camera snapshots and
  * threshold math; the manager only receives callbacks when overlap state should
  * be invalidated or refreshed.
  */

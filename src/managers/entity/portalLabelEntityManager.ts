@@ -278,7 +278,7 @@ export class PortalLabelEntityManager {
     if (this.hasPositionSettledVisibilityUpdate) return;
     this.hasPositionSettledVisibilityUpdate = true;
 
-    this.entityPositionManager.runAfterSamplingQueue(() => {
+    this.entityPositionManager.runAfterSamplingWork(() => {
       this.hasPositionSettledVisibilityUpdate = false;
 
       if (this.deferredVisibilityUpdateDepth > 0) {

@@ -13,6 +13,7 @@ import { mountCoreControllersAndUI } from "../core/coreControllers.ts";
 import { createCoreManagers, exposeCoreManagers } from "../core/coreManagers";
 import { logManager } from "../managers/system/logManager";
 import { safeWindow } from "../utils/window";
+import { setUpEntityPositionRefresh } from "../cesium/setup/setUpEntityPositionRefresh.ts";
 
 const LOG_TAG = "LoadCesiumViewer";
 
@@ -26,6 +27,7 @@ export default function loadCesiumViewer(appContext: AppContext): void {
   restoreLastView(viewer);
 
   const managers = createCoreManagers(viewer, container);
+  const entityPositionManager = managers.entityPositionManager;
   const portalEntityManager = managers.portalEntityManager;
   const portalLabelEntityManager = managers.portalLabelEntityManager;
   const portalOrnamentEntityManager = managers.portalOrnamentEntityManager;
@@ -40,6 +42,7 @@ export default function loadCesiumViewer(appContext: AppContext): void {
   const { portalDetailPaneController, state } = mountCoreControllersAndUI(viewer, container, managers);
 
   configureCameraControls(viewer);
+  setUpEntityPositionRefresh(viewer, entityPositionManager);
   setUpInteractionHandlers(viewer, container, portalDetailPaneController, portalEntityManager, portalLabelEntityManager, portalOrnamentEntityManager, portalHistoryEntityManager, scoutHistoryEntityManager, state);
   setUpTileUpdateWhenMove(viewer, tileRequestManager);
 

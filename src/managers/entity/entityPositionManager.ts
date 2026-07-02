@@ -50,13 +50,38 @@ export class EntityPositionManager {
     });
 
     viewer.camera.moveEnd.addEventListener(() => {
-      this.startSamplingWork();
+      this.newSamplingWork();
     });
   }
 
   public async getEntityPosition(data: EntityData): Promise<EntityPosition> {
     await this.sceneEventManager.waitForInitSceneLoaded();
     return this.registerEntityPosition(data);
+  }
+
+  public clearSamplingWork(): void {
+    this.entityPositionsSamplingQueue.clear();
+    this.entityPositionsNowSampling.clear();
+    window.clearTimeout(this.samplingScheduledTimeoutId);
+    this.samplingScheduled = false;
+    this.samplingScheduledTimeoutId = undefined;
+    this.samplingIdleCallbacks.forEach((callback) => callback());
+    this.samplingIdleCallbacks.clear();
+  }
+
+  public newSamplingWork(): void {
+    if (!this.isSamplingQueueEmpty()) return;
+
+    this.populateSamplingQueue();
+    this.scheduleSamplingWork();
+  }
+
+  public runAfterSamplingWork(callback: () => void): void {
+    if (this.isSamplingQueueEmpty()) {
+      callback();
+    } else {
+      this.samplingIdleCallbacks.add(callback);
+    }
   }
 
   public setOnPositionChangedCallback(data: EntityData, callback: EntityPositionCallback): void {
@@ -71,14 +96,6 @@ export class EntityPositionManager {
     const callbacks = this.entityPositions.get(key)?.positionCallbacks;
     if (!callbacks) return;
     callbacks.delete(callback);
-  }
-
-  public runAfterSamplingQueue(callback: () => void): void {
-    if (this.isSamplingQueueEmpty()) {
-      callback();
-    } else {
-      this.samplingIdleCallbacks.add(callback);
-    }
   }
 
   private registerEntityPosition(data: EntityData): EntityPosition {
@@ -101,6 +118,12 @@ export class EntityPositionManager {
     }
   }
 
+  private populateSamplingQueue(): void {
+    this.entityPositions.forEach((entityPosition, key) => {
+      if (isEntityPositionInView(this.viewer, entityPosition)) this.entityPositionsSamplingQueue.add(key);
+    });
+  }
+
   private scheduleSamplingWork(): void {
     if (this.samplingScheduled) return;
     if (this.entityPositionsSamplingQueue.size === 0) return;
@@ -110,19 +133,6 @@ export class EntityPositionManager {
       this.samplingScheduled = false;
       this.flushSamplingQueue();
     }, SAMPLING_BATCH_DELAY_MS);
-  }
-
-  private startSamplingWork(): void {
-    if (!this.isSamplingQueueEmpty()) return;
-
-    this.populateSamplingQueue();
-    this.flushSamplingQueue();
-  }
-
-  private populateSamplingQueue(): void {
-    this.entityPositions.forEach((entityPosition, key) => {
-      if (isEntityPositionInView(this.viewer, entityPosition)) this.entityPositionsSamplingQueue.add(key);
-    });
   }
 
   private flushSamplingQueue(): void {
@@ -182,7 +192,11 @@ export class EntityPositionManager {
     this.logQueueStatus();
 
     if (this.isSamplingQueueEmpty()) {
-      this.clearSamplingWork();
+      window.clearTimeout(this.samplingScheduledTimeoutId);
+      this.samplingScheduled = false;
+      this.samplingScheduledTimeoutId = undefined;
+      this.samplingIdleCallbacks.forEach((callback) => callback());
+      this.samplingIdleCallbacks.clear();
     } else {
       this.flushRemainingSamplingQueue();
     }
@@ -197,16 +211,6 @@ export class EntityPositionManager {
       this.samplingScheduled = false;
       this.flushSamplingQueue();
     }, SAMPLING_BATCH_DELAY_MS);
-  }
-
-  private clearSamplingWork(): void {
-    this.entityPositionsSamplingQueue.clear();
-    this.entityPositionsNowSampling.clear();
-    window.clearTimeout(this.samplingScheduledTimeoutId);
-    this.samplingScheduled = false;
-    this.samplingScheduledTimeoutId = undefined;
-    this.samplingIdleCallbacks.forEach((callback) => callback());
-    this.samplingIdleCallbacks.clear();
   }
 
   private logQueueStatus(): void {
