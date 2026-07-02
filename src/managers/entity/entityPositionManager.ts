@@ -13,6 +13,9 @@ const LOG_TAG = "EntityPositionManager";
 // Raise portals slightly above Google 3D Tiles
 const GOOGLE_GROUND_TERRAIN_COMPENSATION_METER = 1;
 
+// Horizon will be visible when camera pitch is above this threshold since the FOV is 60 degrees
+const CAMERA_PITCH_THRESHOLD_DEGREES = -30;
+
 interface EntityData {
   latE6: number;
   lngE6: number;
@@ -252,6 +255,11 @@ function getGoogleHeight(scene: Cesium.Scene, cartographic: Cesium.Cartographic)
 }
 
 function isEntityPositionInView(viewer: Cesium.Viewer, entityPosition: EntityPosition): boolean {
+  // Count all entities as in view if the horizon is visible
+  const cameraPith = Cesium.Math.toDegrees(viewer.camera.pitch);
+  if (cameraPith > CAMERA_PITCH_THRESHOLD_DEGREES) return true;
+
+  // Count all entities as in view if the view rectangle is not defined
   const viewRectangle = viewer.camera.computeViewRectangle();
   if (!viewRectangle) return true;
 
