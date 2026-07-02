@@ -13,10 +13,6 @@ const LOG_TAG = "EntityPositionManager";
 // Raise portals slightly above Google 3D Tiles
 const GOOGLE_GROUND_TERRAIN_COMPENSATION_METER = 1;
 
-// Throttle the speed of sampling when using Google 3D Tiles
-const SAMPLING_BATCH_SIZE = 16;
-const SAMPLING_BATCH_DELAY_MS = 10;
-
 interface EntityData {
   latE6: number;
   lngE6: number;
@@ -132,11 +128,11 @@ export class EntityPositionManager {
     this.samplingScheduledTimeoutId = window.setTimeout(() => {
       this.samplingScheduled = false;
       this.flushSamplingQueue();
-    }, SAMPLING_BATCH_DELAY_MS);
+    }, getSamplingBatchDelayMs());
   }
 
   private flushSamplingQueue(): void {
-    const keys = takeSamplingBatch(this.entityPositionsSamplingQueue, SAMPLING_BATCH_SIZE);
+    const keys = takeSamplingBatch(this.entityPositionsSamplingQueue, getSamplingBatchSize());
     keys.forEach((key) => {
       this.entityPositionsSamplingQueue.delete(key);
       this.entityPositionsNowSampling.add(key);
@@ -210,7 +206,7 @@ export class EntityPositionManager {
     this.samplingScheduledTimeoutId = window.setTimeout(() => {
       this.samplingScheduled = false;
       this.flushSamplingQueue();
-    }, SAMPLING_BATCH_DELAY_MS);
+    }, getSamplingBatchDelayMs());
   }
 
   private logQueueStatus(): void {
@@ -226,6 +222,14 @@ export class EntityPositionManager {
   private isSamplingQueueEmpty(): boolean {
     return this.entityPositionsNowSampling.size + this.entityPositionsSamplingQueue.size === 0;
   }
+}
+
+function getSamplingBatchSize(): number {
+  return settingsManager.getUseGoogle3dTiles() ? 16 : 128;
+}
+
+function getSamplingBatchDelayMs(): number {
+  return settingsManager.getUseGoogle3dTiles() ? 10 : 2;
 }
 
 function getEntityPositionKey(latE6: number, lngE6: number): string {
