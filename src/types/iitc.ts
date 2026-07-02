@@ -20,7 +20,7 @@ import type { LayerManager } from "../managers/layer/layerManager";
 import type { InterfaceManager } from "../managers/system/interfaceManager";
 import type { LogManager } from "../managers/system/logManager";
 import type { PluginManager } from "../managers/system/pluginManager";
-import type { SceneEventManager } from "../managers/system/sceneEventManager";
+import type { LoadingProgressManager } from "../managers/system/loadingProgressManager.ts";
 import type { SettingsManager } from "../managers/system/settingsManager";
 import type { TileRequestManager } from "../managers/tiles/tileRequestManager.ts";
 
@@ -38,7 +38,7 @@ export interface IITCCore {
   settingsManager?: SettingsManager;
   pluginManager?: PluginManager;
   layerManager?: LayerManager;
-  sceneEventManager?: SceneEventManager;
+  loadingProgressManager?: LoadingProgressManager;
   entityPositionManager?: EntityPositionManager;
   entityTranslucencyManager?: EntityTranslucencyManager;
   playerInfoManager?: PlayerInfoManager;

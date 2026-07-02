@@ -6,30 +6,38 @@ import * as Cesium from "cesium";
 import { logManager } from "./logManager";
 import { settingsManager } from "./settingsManager";
 
-const LOG_TAG = "SceneEventManager";
+const LOG_TAG = "LoadingProgressManager";
 const GLOBE_TILES_QUALITY_SETTLE_MS = 750;
 const GLOBE_TILES_QUALITY_STABLE_FRAMES = 3;
 const GOOGLE_3D_TILES_QUALITY_SETTLE_MS = 750;
 const GOOGLE_3D_TILES_QUALITY_STABLE_FRAMES = 3;
 
-export class SceneEventManager {
+export class LoadingProgressManager {
   private readonly useGoogle3dTiles = settingsManager.getUseGoogle3dTiles();
   private readonly initSceneLoadedPromise: Promise<void>;
   private initSceneLoaded = false;
   private watchedGoogleTilesets = new WeakSet<Cesium.Cesium3DTileset>();
   private maxGlobeTilesLoadingCountObserved = 1;
-  private lastGlobeTilesProgress = -1;
   private maxGoogleTilesLoadingCountObserved = 1;
+  private lastGlobeTilesProgress = -1;
   private lastGoogleTilesProgress = -1;
 
-  constructor(private readonly viewer: Cesium.Viewer) {
+  constructor(
+    private readonly viewer: Cesium.Viewer
+  ) {
     this.initSceneLoadedPromise = this.createInitSceneLoadedPromise();
-
     if (this.useGoogle3dTiles) this.watchGoogleTilesets();
   }
 
   public waitForInitSceneLoaded(): Promise<void> {
     return this.initSceneLoadedPromise;
+  }
+
+  public waitForGlobeTilesLoaded(): Promise<void> {
+    return new Promise((resolve) => {
+      const waitForQuality = this.waitForGlobeTilesQuality(resolve, false);
+      waitForQuality();
+    });
   }
 
   private createInitSceneLoadedPromise(): Promise<void> {
@@ -135,7 +143,7 @@ export class SceneEventManager {
     });
   }
 
-  private waitForGlobeTilesQuality(resolve: () => void): (() => void) & { cancel: () => void } {
+  private waitForGlobeTilesQuality(resolve: () => void, stopWhenInitSceneLoaded = true): (() => void) & { cancel: () => void } {
     let isWaiting = false;
     let settleStartTime = 0;
     let stableFrames = 0;
@@ -154,14 +162,14 @@ export class SceneEventManager {
     };
 
     const requestSettlingRender = () => {
-      if (!isWaiting || this.initSceneLoaded) return;
+      if (!isWaiting || (stopWhenInitSceneLoaded && this.initSceneLoaded)) return;
 
       this.viewer.scene.requestRender();
       renderTimer = setTimeout(requestSettlingRender, 100);
     };
 
     const checkSettled = () => {
-      if (this.initSceneLoaded) {
+      if (stopWhenInitSceneLoaded && this.initSceneLoaded) {
         cancel();
         return;
       }
@@ -183,7 +191,7 @@ export class SceneEventManager {
     };
 
     const waitForQuality = () => {
-      if (isWaiting || this.initSceneLoaded) return;
+      if (isWaiting || (stopWhenInitSceneLoaded && this.initSceneLoaded)) return;
 
       isWaiting = true;
       removePostRenderListener = this.viewer.scene.postRender.addEventListener(checkSettled);

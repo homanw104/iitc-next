@@ -4,7 +4,7 @@
 
 import * as Cesium from "cesium";
 import { logManager } from "../system/logManager";
-import type { SceneEventManager } from "../system/sceneEventManager";
+import type { LoadingProgressManager } from "../system/loadingProgressManager.ts";
 import { settingsManager } from "../system/settingsManager";
 import { Cartesian3 } from "cesium";
 
@@ -42,7 +42,7 @@ export class EntityPositionManager {
 
   constructor(
     private readonly viewer: Cesium.Viewer,
-    private readonly sceneEventManager: SceneEventManager,
+    private readonly sceneEventManager: LoadingProgressManager,
   ) {
     viewer.camera.moveStart.addEventListener(() => {
       this.clearSamplingWork();
@@ -56,6 +56,12 @@ export class EntityPositionManager {
   public async getEntityPosition(data: EntityData): Promise<EntityPosition> {
     await this.sceneEventManager.waitForInitSceneLoaded();
     return this.registerEntityPosition(data);
+  }
+
+  public invalidateEntityPositions(): void {
+    this.entityPositions.forEach((entityPosition) => {
+      entityPosition.isFallbackPosition = true;
+    });
   }
 
   public clearSamplingWork(): void {

@@ -9,7 +9,7 @@ const LOG_TAG = "ScheduleUnloadSplashScreen";
 
 export default function scheduleUnloadSplashScreen(appContext: AppContext): void {
   if (appContext.coreManagers) {
-    appContext.coreManagers.sceneEventManager.waitForInitSceneLoaded()
+    appContext.coreManagers.loadingProgressManager.waitForInitSceneLoaded()
       .then(() => {
         if (appContext.splashScreenController) {
           appContext.splashScreenController.deinit();

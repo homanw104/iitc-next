@@ -18,13 +18,13 @@ import { RedeemManager } from "../managers/game/redeemManager";
 import { ScoreManager } from "../managers/game/scoreManager";
 import { LayerManager } from "../managers/layer/layerManager";
 import { InterfaceManager } from "../managers/system/interfaceManager";
-import { SceneEventManager } from "../managers/system/sceneEventManager";
+import { LoadingProgressManager } from "../managers/system/loadingProgressManager.ts";
 import { TileRequestManager } from "../managers/tiles/tileRequestManager.ts";
 import type { IITCCore } from "../types/iitc";
 
 export interface CoreManagers {
   layerManager: LayerManager;
-  sceneEventManager: SceneEventManager;
+  loadingProgressManager: LoadingProgressManager;
   entityPositionManager: EntityPositionManager;
   entityTranslucencyManager: EntityTranslucencyManager;
   portalEntityManager: PortalEntityManager;
@@ -44,8 +44,8 @@ export interface CoreManagers {
 
 export function createCoreManagers(viewer: Cesium.Viewer, container: HTMLElement): CoreManagers {
   const layerManager = new LayerManager(viewer);
-  const sceneEventManager = new SceneEventManager(viewer);
-  const entityPositionManager = new EntityPositionManager(viewer, sceneEventManager);
+  const loadingProgressManager = new LoadingProgressManager(viewer);
+  const entityPositionManager = new EntityPositionManager(viewer, loadingProgressManager);
   const entityTranslucencyManager = new EntityTranslucencyManager(viewer);
   const portalEntityManager = new PortalEntityManager(viewer, layerManager, entityPositionManager, entityTranslucencyManager);
   const portalLabelEntityManager = new PortalLabelEntityManager(viewer, layerManager, entityPositionManager);
@@ -65,7 +65,7 @@ export function createCoreManagers(viewer: Cesium.Viewer, container: HTMLElement
 
   return {
     layerManager,
-    sceneEventManager,
+    loadingProgressManager: loadingProgressManager,
     entityPositionManager,
     entityTranslucencyManager,
     portalEntityManager,
@@ -87,7 +87,7 @@ export function createCoreManagers(viewer: Cesium.Viewer, container: HTMLElement
 export function exposeCoreManagers(iitc: IITCCore, viewer: Cesium.Viewer, managers: CoreManagers): void {
   iitc.viewer = viewer;
   iitc.layerManager = managers.layerManager;
-  iitc.sceneEventManager = managers.sceneEventManager;
+  iitc.loadingProgressManager = managers.loadingProgressManager;
   iitc.entityPositionManager = managers.entityPositionManager;
   iitc.entityTranslucencyManager = managers.entityTranslucencyManager;
   iitc.portalEntityManager = managers.portalEntityManager;

@@ -7,13 +7,13 @@ import { configureCameraControls } from "../cesium/setup/configureCameraControls
 import { createCesiumContainer } from "../cesium/setup/createCesiumContainer";
 import { initCesiumViewer } from "../cesium/setup/initCesiumViewer";
 import { restoreLastView } from "../cesium/setup/restoreLastView.ts";
+import { setUpEntityPositionRefresh } from "../cesium/setup/setUpEntityPositionRefresh.ts";
 import { setUpInteractionHandlers } from "../cesium/setup/setUpInteractionHandlers.ts";
 import { setUpTileUpdateWhenMove } from "../cesium/setup/setUpTileUpdateWhenMove.ts";
 import { mountCoreControllersAndUI } from "../core/coreControllers.ts";
 import { createCoreManagers, exposeCoreManagers } from "../core/coreManagers";
 import { logManager } from "../managers/system/logManager";
 import { safeWindow } from "../utils/window";
-import { setUpEntityPositionRefresh } from "../cesium/setup/setUpEntityPositionRefresh.ts";
 
 const LOG_TAG = "LoadCesiumViewer";
 
@@ -34,6 +34,7 @@ export default function loadCesiumViewer(appContext: AppContext): void {
   const portalHistoryEntityManager = managers.portalHistoryEntityManager;
   const scoutHistoryEntityManager = managers.scoutHistoryEntityManager;
   const tileRequestManager = managers.tileRequestManager;
+  const loadingProgressManager = managers.loadingProgressManager;
 
   // Expose managers to the global iitc object
   if (safeWindow) exposeCoreManagers(safeWindow.iitc, viewer, managers);
@@ -42,7 +43,7 @@ export default function loadCesiumViewer(appContext: AppContext): void {
   const { portalDetailPaneController, state } = mountCoreControllersAndUI(viewer, container, managers);
 
   configureCameraControls(viewer);
-  setUpEntityPositionRefresh(viewer, entityPositionManager);
+  setUpEntityPositionRefresh(viewer, entityPositionManager, loadingProgressManager);
   setUpInteractionHandlers(viewer, container, portalDetailPaneController, portalEntityManager, portalLabelEntityManager, portalOrnamentEntityManager, portalHistoryEntityManager, scoutHistoryEntityManager, state);
   setUpTileUpdateWhenMove(viewer, tileRequestManager);
 
