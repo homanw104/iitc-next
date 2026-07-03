@@ -3,20 +3,20 @@
  */
 
 import type * as Cesium from "cesium";
-import CommButton from "../components/buttons/CommButton/CommButton.tsx";
-import GetLocationButton from "../components/buttons/GetLocationButton/GetLocationButton";
-import LayerChooserButton from "../components/buttons/LayerChooserButton/LayerChooserButton";
-import PortalDetailBar from "../components/buttons/PortalDetailBar/PortalDetailBar";
-import ProfileButton from "../components/buttons/ProfileButton/ProfileButton.tsx";
-import SoftRefreshButton from "../components/buttons/SoftRefreshButton/SoftRefreshButton";
-import { CommPaneController } from "../controllers/CommPaneController.tsx";
-import { LayerChooserPaneController } from "../controllers/LayerChooserPaneController.tsx";
-import { PortalDetailPaneController } from "../controllers/PortalDetailPaneController.tsx";
-import { ProfilePaneController } from "../controllers/ProfilePaneController.tsx";
-import { SoftRefreshButtonController } from "../controllers/SoftRefreshButtonController.tsx";
-import { logManager } from "../managers/system/logManager";
-import type { PortalData } from "../types/ingress";
-import type { CoreManagers } from "./coreManagers";
+import CommButton from "../../components/buttons/CommButton/CommButton.tsx";
+import GetLocationButton from "../../components/buttons/GetLocationButton/GetLocationButton.tsx";
+import LayerChooserButton from "../../components/buttons/LayerChooserButton/LayerChooserButton.tsx";
+import PortalDetailBar from "../../components/buttons/PortalDetailBar/PortalDetailBar.tsx";
+import ProfileButton from "../../components/buttons/ProfileButton/ProfileButton.tsx";
+import SoftRefreshButton from "../../components/buttons/SoftRefreshButton/SoftRefreshButton.tsx";
+import { CommPaneController } from "../../controllers/CommPaneController.tsx";
+import { LayerChooserPaneController } from "../../controllers/LayerChooserPaneController.tsx";
+import { PortalDetailPaneController } from "../../controllers/PortalDetailPaneController.tsx";
+import { ProfilePaneController } from "../../controllers/ProfilePaneController.tsx";
+import { SoftRefreshButtonController } from "../../controllers/SoftRefreshButtonController.tsx";
+import { logManager } from "../../managers/system/logManager.ts";
+import type { PortalData } from "../../types/ingress.ts";
+import type { CoreManagers } from "./createCoreManagers.ts";
 
 export interface PortalDetailState {
   lastLogMsg: string;

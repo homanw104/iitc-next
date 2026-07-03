@@ -6,7 +6,6 @@ import "cesium/Build/Cesium/Widgets/widgets.css";
 import * as Cesium from "cesium";
 import { logManager } from "../../managers/system/logManager";
 import { settingsManager, type Google3dTilesRenderQuality } from "../../managers/system/settingsManager";
-import { createBaseLayerViewModels } from "../layer/createBaseLayers.ts";
 
 const DEFAULT_BASE_LAYER_NAME = "Google Satellite";
 
@@ -123,15 +122,11 @@ const GOOGLE_3D_TILES_RENDER_SETTINGS: Record<Google3dTilesRenderQuality, Google
   },
 };
 
-export function initCesiumViewer(container: HTMLElement): Cesium.Viewer {
+export function createCesiumViewer(container: HTMLElement, imageryProviderViewModels: Cesium.ProviderViewModel[] | undefined): Cesium.Viewer {
   const useGoogle3dTiles = settingsManager.getUseGoogle3dTiles();
-  let imageryProviderViewModels: Cesium.ProviderViewModel[] | undefined;
-  let selectedImageryProviderViewModel: Cesium.ProviderViewModel | undefined;
-
-  if (!useGoogle3dTiles) {
-    imageryProviderViewModels = createBaseLayerViewModels();
-    selectedImageryProviderViewModel = imageryProviderViewModels.find((viewModel) => viewModel.name === DEFAULT_BASE_LAYER_NAME);
-  }
+  const selectedImageryProviderViewModel = imageryProviderViewModels?.find(
+    (viewModel) => viewModel.name === DEFAULT_BASE_LAYER_NAME
+  );
 
   const viewer = new Cesium.Viewer(container.id, {
     animation: false,

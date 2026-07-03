@@ -5,7 +5,7 @@
 import { ScreenSpaceEventType } from "cesium";
 import * as Cesium from "cesium";
 import type { PortalDetailPaneController } from "../../controllers/PortalDetailPaneController.tsx";
-import type { PortalDetailState } from "../../core/coreControllers.ts";
+import type { PortalDetailState } from "./mountCoreControllersAndUI.ts";
 import type { PortalEntityManager } from "../../managers/entity/portalEntityManager.ts";
 import type { PortalHistoryEntityManager } from "../../managers/entity/portalHistoryEntityManager.ts";
 import type { PortalLabelEntityManager } from "../../managers/entity/portalLabelEntityManager.ts";

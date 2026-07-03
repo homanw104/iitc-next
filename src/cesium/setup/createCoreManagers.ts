@@ -3,24 +3,23 @@
  */
 
 import type * as Cesium from "cesium";
-import { CommManager } from "../managers/comm/commManager";
-import { DebugTileEntityManager } from "../managers/entity/debugTileEntityManager";
-import { EntityPositionManager } from "../managers/entity/entityPositionManager";
-import { EntityTranslucencyManager } from "../managers/entity/entityTranslucencyManager";
-import { FieldEntityManager } from "../managers/entity/fieldEntityManager";
-import { LinkEntityManager } from "../managers/entity/linkEntityManager";
-import { PortalEntityManager } from "../managers/entity/portalEntityManager";
-import { PortalHistoryEntityManager } from "../managers/entity/portalHistoryEntityManager";
-import { PortalLabelEntityManager } from "../managers/entity/portalLabelEntityManager";
-import { PortalOrnamentEntityManager } from "../managers/entity/portalOrnamentEntityManager.ts";
-import { ScoutHistoryEntityManager } from "../managers/entity/scoutHistoryEntityManager";
-import { RedeemManager } from "../managers/game/redeemManager";
-import { ScoreManager } from "../managers/game/scoreManager";
-import { LayerManager } from "../managers/layer/layerManager";
-import { InterfaceManager } from "../managers/system/interfaceManager";
-import { LoadingProgressManager } from "../managers/system/loadingProgressManager.ts";
-import { TileRequestManager } from "../managers/tiles/tileRequestManager.ts";
-import type { IITCCore } from "../types/iitc";
+import { CommManager } from "../../managers/comm/commManager.ts";
+import { DebugTileEntityManager } from "../../managers/entity/debugTileEntityManager.ts";
+import { EntityPositionManager } from "../../managers/entity/entityPositionManager.ts";
+import { EntityTranslucencyManager } from "../../managers/entity/entityTranslucencyManager.ts";
+import { FieldEntityManager } from "../../managers/entity/fieldEntityManager.ts";
+import { LinkEntityManager } from "../../managers/entity/linkEntityManager.ts";
+import { PortalEntityManager } from "../../managers/entity/portalEntityManager.ts";
+import { PortalHistoryEntityManager } from "../../managers/entity/portalHistoryEntityManager.ts";
+import { PortalLabelEntityManager } from "../../managers/entity/portalLabelEntityManager.ts";
+import { PortalOrnamentEntityManager } from "../../managers/entity/portalOrnamentEntityManager.ts";
+import { ScoutHistoryEntityManager } from "../../managers/entity/scoutHistoryEntityManager.ts";
+import { RedeemManager } from "../../managers/game/redeemManager.ts";
+import { ScoreManager } from "../../managers/game/scoreManager.ts";
+import { LayerManager } from "../../managers/layer/layerManager.ts";
+import { InterfaceManager } from "../../managers/system/interfaceManager.ts";
+import { LoadingProgressManager } from "../../managers/system/loadingProgressManager.ts";
+import { TileRequestManager } from "../../managers/tiles/tileRequestManager.ts";
 
 export interface CoreManagers {
   layerManager: LayerManager;
@@ -61,8 +60,6 @@ export function createCoreManagers(viewer: Cesium.Viewer, container: HTMLElement
   const redeemManager = new RedeemManager();
   const interfaceManager = new InterfaceManager(container);
 
-  tileRequestManager.onTileStatusChange((key, status) => debugTileEntityManager.updateTile(key, status));
-
   return {
     layerManager,
     loadingProgressManager: loadingProgressManager,
@@ -82,24 +79,4 @@ export function createCoreManagers(viewer: Cesium.Viewer, container: HTMLElement
     redeemManager,
     interfaceManager,
   };
-}
-
-export function exposeCoreManagers(iitc: IITCCore, viewer: Cesium.Viewer, managers: CoreManagers): void {
-  iitc.viewer = viewer;
-  iitc.layerManager = managers.layerManager;
-  iitc.loadingProgressManager = managers.loadingProgressManager;
-  iitc.entityPositionManager = managers.entityPositionManager;
-  iitc.entityTranslucencyManager = managers.entityTranslucencyManager;
-  iitc.portalEntityManager = managers.portalEntityManager;
-  iitc.portalLabelEntityManager = managers.portalLabelEntityManager;
-  iitc.portalOrnamentEntityManager = managers.portalOrnamentEntityManager;
-  iitc.portalHistoryEntityManager = managers.portalHistoryEntityManager;
-  iitc.scoutHistoryEntityManager = managers.scoutHistoryEntityManager;
-  iitc.linkEntityManager = managers.linkEntityManager;
-  iitc.fieldEntityManager = managers.fieldEntityManager;
-  iitc.tileRequestManager = managers.tileRequestManager;
-  iitc.commManager = managers.commManager;
-  iitc.scoreManager = managers.scoreManager;
-  iitc.redeemManager = managers.redeemManager;
-  iitc.interfaceManager = managers.interfaceManager;
 }

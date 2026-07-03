@@ -1,6 +1,6 @@
 import type { Viewer } from "cesium";
 import CommPane from "../components/panes/CommPane/CommPane.tsx";
-import type { PortalDetailState } from "../core/coreControllers";
+import type { PortalDetailState } from "../cesium/setup/mountCoreControllersAndUI.ts";
 import type { CommManager } from "../managers/comm/commManager";
 import type { PortalEntityManager } from "../managers/entity/portalEntityManager";
 import type { PortalHistoryEntityManager } from "../managers/entity/portalHistoryEntityManager";

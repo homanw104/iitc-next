@@ -5,7 +5,7 @@
 import * as Cesium from "cesium";
 import PortalDetailBar from "../../../components/buttons/PortalDetailBar/PortalDetailBar";
 import type { PortalDetailPaneController } from "../../../controllers/PortalDetailPaneController.tsx";
-import type { PortalDetailState } from "../../../core/coreControllers.ts";
+import type { PortalDetailState } from "../../setup/mountCoreControllersAndUI.ts";
 import type { PortalEntityManager } from "../../../managers/entity/portalEntityManager";
 import type { PortalHistoryEntityManager } from "../../../managers/entity/portalHistoryEntityManager";
 import type { PortalLabelEntityManager } from "../../../managers/entity/portalLabelEntityManager.ts";

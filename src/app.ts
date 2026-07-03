@@ -3,7 +3,7 @@
  */
 
 import type { SplashScreenController } from "./controllers/SplashScreenController.tsx";
-import type { CoreManagers } from "./core/coreManagers.ts";
+import type { CoreManagers } from "./cesium/setup/createCoreManagers.ts";
 import checkAndMarkBootStatus from "./procedures/checkAndMarkBootStatus.ts";
 import getPageRoute from "./procedures/getPageRoute.ts";
 import getLoginStatus from "./procedures/getLoginStatus.ts";
