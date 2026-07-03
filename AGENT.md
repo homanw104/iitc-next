@@ -1,4 +1,4 @@
-# AGENTS.md
+# AGENT.md
 
 ## Project Purpose
 
@@ -13,15 +13,22 @@ Key findings for agents:
 
 * This is a Vite userscript injected into Ingress Intel, with Capacitor Android
   and iOS shells that inject the built userscript into native WebViews.
+* `src/bootstrap.ts` installs the vanilla Intel blocker first, then dynamically
+  imports `src/app.ts`.
 * `src/app.ts` is a procedural boot sequence. `src/procedures/` owns one-time
   startup wiring; avoid hiding startup side effects in constructors.
-* `src/core/coreManagers.ts` constructs the runtime manager graph and exposes it
-  through `window.iitc`, which is the plugin integration surface. Some managers
-  like logManager are exposed directly in the corresponding procedures.
+* `src/cesium/setup/` owns Cesium-specific runtime construction: viewer
+  creation, base-layer view models, core manager construction, manager exposure,
+  built-in UI mounting, camera/interaction hooks, and tile refresh wiring.
+* `src/cesium/setup/createCoreManagers.ts` constructs the runtime manager graph,
+  and `src/cesium/setup/exposeCoreManagers.ts` publishes it through
+  `window.iitc`, which is the plugin integration surface. Some app-wide
+  singletons, such as `logManager` and `apiRequestManager`, are exposed directly
+  in their setup procedures.
 * TSX is not React here. `src/utils/dom.ts` is a custom JSX factory that returns
   real DOM nodes.
 * `src/managers/` is the domain/runtime layer, grouped into `tiles/`,
-  `entities/`, `layers/`, `comm/`, `game/`, and `system/`.
+  `entity/`, `layer/`, `comm/`, `game/`, and `system/`.
 * `LayerManager` and some Cesium interaction code use Cesium private/internal
   structures. Changes there need real rendering verification.
 * Plugins must clean up data sources, overlays, event handlers, timers, and DOM
