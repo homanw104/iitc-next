@@ -6,7 +6,9 @@ import "cesium/Build/Cesium/Widgets/widgets.css";
 import * as Cesium from "cesium";
 import { logManager } from "../../managers/system/logManager";
 import { settingsManager, type Google3dTilesRenderQuality } from "../../managers/system/settingsManager";
-import { AmapMercatorTilingScheme } from "../../utils/map";
+import { createBaseLayerViewModels } from "../layer/createBaseLayers.ts";
+
+const DEFAULT_BASE_LAYER_NAME = "Google Satellite";
 
 // Tell Cesium where to find its assets (Images, Workers, etc.).
 // Since we use the CDN for the main library, we should also use it for assets.
@@ -123,37 +125,13 @@ const GOOGLE_3D_TILES_RENDER_SETTINGS: Record<Google3dTilesRenderQuality, Google
 
 export function initCesiumViewer(container: HTMLElement): Cesium.Viewer {
   const useGoogle3dTiles = settingsManager.getUseGoogle3dTiles();
-  const gaodeSatelliteViewModel = new Cesium.ProviderViewModel({
-    name: "Gaode Satellite",
-    iconUrl: Cesium.buildModuleUrl("Widgets/Images/ImageryProviders/bingAerial.png"),
-    tooltip: "Gaode Satellite Imagery",
-    category: "Gaode",
-    creationFunction: function() {
-      return new Cesium.UrlTemplateImageryProvider({
-        url: "https://wprd01.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=6&x={x}&y={y}&z={z}",
-        tilingScheme: new AmapMercatorTilingScheme({}),
-        minimumLevel: 1,
-        maximumLevel: 20,
-        credit: new Cesium.Credit("Gaode", true)
-      });
-    }
-  });
+  let imageryProviderViewModels: Cesium.ProviderViewModel[] | undefined;
+  let selectedImageryProviderViewModel: Cesium.ProviderViewModel | undefined;
 
-  const gaodeRoadViewModel = new Cesium.ProviderViewModel({
-    name: "Gaode Road",
-    iconUrl: Cesium.buildModuleUrl("Widgets/Images/ImageryProviders/bingRoads.png"),
-    tooltip: "Gaode Road Map",
-    category: "Gaode",
-    creationFunction: function() {
-      return new Cesium.UrlTemplateImageryProvider({
-        url: "https://wprd01.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}",
-        tilingScheme: new AmapMercatorTilingScheme({}),
-        minimumLevel: 1,
-        maximumLevel: 20,
-        credit: new Cesium.Credit("Gaode", true)
-      });
-    }
-  });
+  if (!useGoogle3dTiles) {
+    imageryProviderViewModels = createBaseLayerViewModels();
+    selectedImageryProviderViewModel = imageryProviderViewModels.find((viewModel) => viewModel.name === DEFAULT_BASE_LAYER_NAME);
+  }
 
   const viewer = new Cesium.Viewer(container.id, {
     animation: false,
@@ -165,26 +143,11 @@ export function initCesiumViewer(container: HTMLElement): Cesium.Viewer {
     baseLayerPicker: !useGoogle3dTiles,
     sceneModePicker: false,
     geocoder: useGoogle3dTiles ? Cesium.IonGeocodeProviderType.GOOGLE : undefined,
+    imageryProviderViewModels,
+    selectedImageryProviderViewModel,
     requestRenderMode: true,
     maximumRenderTimeChange: Infinity,
   });
-
-  // Remove unused imagery layer options
-  if (!useGoogle3dTiles) {
-    const models = viewer.baseLayerPicker.viewModel.imageryProviderViewModels;
-    viewer.baseLayerPicker.viewModel.imageryProviderViewModels = models.filter((model) => {
-      return model.name !== "Sentinel-2" &&
-        model.name !== "Blue Marble" &&
-        model.name !== "Earth at night" &&
-        model.name !== "Azure Maps Aerial" &&
-        model.name !== "Azure Maps Roads" &&
-        model.name !== "Esri World Ocean" &&
-        !model.name.startsWith("Stadia");
-    });
-
-    // Add Gaode imagery options to the base layer picker
-    viewer.baseLayerPicker.viewModel.imageryProviderViewModels.unshift(gaodeSatelliteViewModel, gaodeRoadViewModel);
-  }
 
   // Constraint the tilt angle
   const controller = viewer.scene.screenSpaceCameraController;
@@ -227,6 +190,17 @@ export function initCesiumViewer(container: HTMLElement): Cesium.Viewer {
   return viewer;
 }
 
+function applyGoogle3dTilesRenderSettings(viewer: Cesium.Viewer, renderSettings: Google3dTilesRenderSettings): void {
+  viewer.scene.highDynamicRange = false;
+  viewer.scene.msaaSamples = renderSettings.msaaSamples;
+  viewer.resolutionScale = renderSettings.resolutionScale;
+  viewer.scene.postProcessStages.fxaa.enabled = renderSettings.fxaaEnabled;
+  viewer.scene.globe.showGroundAtmosphere = false;
+  viewer.scene.fog.enabled = true;
+  viewer.scene.fog.density = 0.001;
+  viewer.scene.screenSpaceCameraController.enableCollisionDetection = true;
+}
+
 async function addGoogle3dTiles(viewer: Cesium.Viewer, renderSettings: Google3dTilesRenderSettings): Promise<void> {
   try {
     const tileset = await Cesium.createGooglePhotorealistic3DTileset({
@@ -259,19 +233,8 @@ async function addGoogle3dTiles(viewer: Cesium.Viewer, renderSettings: Google3dT
     viewer.scene.requestRender();
     logManager.debug(LOG_TAG, "Google 3D Tiles enabled");
   } catch (error) {
-    logManager.error(LOG_TAG, "Failed to load Google 3D Tiles", error);
     viewer.scene.globe.show = true;
     viewer.scene.requestRender();
+    logManager.error(LOG_TAG, "Failed to load Google 3D Tiles", error);
   }
-}
-
-function applyGoogle3dTilesRenderSettings(viewer: Cesium.Viewer, renderSettings: Google3dTilesRenderSettings): void {
-  viewer.scene.highDynamicRange = false;
-  viewer.scene.msaaSamples = renderSettings.msaaSamples;
-  viewer.resolutionScale = renderSettings.resolutionScale;
-  viewer.scene.postProcessStages.fxaa.enabled = renderSettings.fxaaEnabled;
-  viewer.scene.globe.showGroundAtmosphere = false;
-  viewer.scene.fog.enabled = true;
-  viewer.scene.fog.density = 0.001;
-  viewer.scene.screenSpaceCameraController.enableCollisionDetection = true;
 }

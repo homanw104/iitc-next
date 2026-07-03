@@ -26,11 +26,11 @@ export interface PortalDetailState {
 
 export interface CoreControllers {
   portalDetailPaneController: PortalDetailPaneController;
-  state: PortalDetailState;
+  portalDetailState: PortalDetailState;
 }
 
 export function mountCoreControllersAndUI(viewer: Cesium.Viewer, container: HTMLElement, managers: CoreManagers): CoreControllers {
-  const state: PortalDetailState = {
+  const portalDetailState: PortalDetailState = {
     lastLogMsg: "Loading...",
     lastPortalData: null,
     portalDetailBar: null,
@@ -51,10 +51,10 @@ export function mountCoreControllersAndUI(viewer: Cesium.Viewer, container: HTML
     managers.portalHistoryEntityManager,
     managers.scoutHistoryEntityManager,
     portalDetailPaneController,
-    state,
+    portalDetailState,
   );
 
-  state.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailPaneController: portalDetailPaneController }));
+  portalDetailState.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailPaneController: portalDetailPaneController }));
   container.appendChild(GetLocationButton({ viewer }));
   container.appendChild(SoftRefreshButton({ softRefreshButtonController: softRefreshButtonController }));
   container.appendChild(CommButton({ commDetailPaneController: commDetailPaneController }));
@@ -62,11 +62,11 @@ export function mountCoreControllersAndUI(viewer: Cesium.Viewer, container: HTML
   container.appendChild(ProfileButton({ gameDetailPaneController: gameDetailPaneController }));
 
   logManager.subscribe((entry) => {
-    state.lastLogMsg = entry.args.join(" ");
-    if (state.portalDetailBar && !state.lastPortalData) {
-      portalDetailPaneController.updateDetailBarText(undefined, state.lastLogMsg);
+    portalDetailState.lastLogMsg = entry.args.join(" ");
+    if (portalDetailState.portalDetailBar && !portalDetailState.lastPortalData) {
+      portalDetailPaneController.updateDetailBarText(undefined, portalDetailState.lastLogMsg);
     }
   });
 
-  return { portalDetailPaneController: portalDetailPaneController, state };
+  return { portalDetailPaneController: portalDetailPaneController, portalDetailState: portalDetailState };
 }

@@ -41,6 +41,7 @@ export default defineConfig({
         namespace: "https://github.com/homanw104/iitc-next",
         match: ["https://intel.ingress.com/*"],
         exclude: ["https://intel.ingress.com/signinhandler*"],
+        connect: ["maps.googleapis.com", "*.googleapis.com", "*.google.com", "tm.amap.com"],
         "run-at": "document-start",
       },
       build: {

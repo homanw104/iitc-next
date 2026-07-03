@@ -112,21 +112,20 @@ function prepareVanillaNode(node: Node): InsertionDecision {
 }
 
 function prepareVanillaScripts(root: ParentNode): void {
-  root
-    .querySelectorAll<HTMLScriptElement>("script[src]")
-    .forEach(prepareVanillaScript);
+  root.querySelectorAll<HTMLScriptElement>("script[src]").forEach(prepareVanillaScript);
 }
 
 function prepareVanillaScript(script: HTMLScriptElement): InsertionDecision {
   if (isDashboardScript(script.src)) {
     script.type = blockedScriptType;
+    return "insert";
   } else if (isArkScript(script.src)) {
     script.type = blockedScriptType;
     script.removeAttribute("src");
     return "skip";
+  } else {
+    return "insert";
   }
-
-  return "insert";
 }
 
 function isDashboardScript(src: string): boolean {

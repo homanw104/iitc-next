@@ -42,11 +42,11 @@ export default function loadCesiumViewer(appContext: AppContext): void {
   if (safeWindow) exposeCoreManagers(safeWindow.iitc, viewer, managers);
 
   // Mount core UI and get portal details UI and portal data in state
-  const { portalDetailPaneController, state } = mountCoreControllersAndUI(viewer, container, managers);
+  const { portalDetailPaneController, portalDetailState } = mountCoreControllersAndUI(viewer, container, managers);
 
   configureCameraControls(viewer);
   setUpEntityPositionRefresh(viewer, entityPositionManager, loadingProgressManager);
-  setUpInteractionHandlers(viewer, container, portalDetailPaneController, portalEntityManager, portalLabelEntityManager, portalOrnamentEntityManager, portalHistoryEntityManager, scoutHistoryEntityManager, state);
+  setUpInteractionHandlers(viewer, container, portalDetailPaneController, portalEntityManager, portalLabelEntityManager, portalOrnamentEntityManager, portalHistoryEntityManager, scoutHistoryEntityManager, portalDetailState);
   setUpTileUpdateWhenMove(viewer, tileRequestManager);
 
   appContext.coreManagers = managers;

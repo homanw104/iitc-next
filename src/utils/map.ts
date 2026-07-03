@@ -42,6 +42,7 @@ export class AmapMercatorTilingScheme extends Cesium.WebMercatorTilingScheme {
       }
       return cartesian;
     };
+
     internalTilingScheme._projection.unproject = function(cartesian: Cesium.Cartesian3, result?: Cesium.Cartographic): Cesium.Cartographic {
       const cartographic = projection.unproject(cartesian);
       const wgs84 = gcj02ToWgs84(

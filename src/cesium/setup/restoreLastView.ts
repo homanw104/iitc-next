@@ -14,11 +14,17 @@ export function restoreLastView(viewer: Cesium.Viewer): void {
   const useGoogle3dTiles = settingsManager.getUseGoogle3dTiles();
   if (!useGoogle3dTiles) {
     const modelName = localStorage.getItem(BASE_LAYER_STORAGE_KEY);
-    const viewModel = viewer.baseLayerPicker.viewModel.imageryProviderViewModels.find(m => m.name === modelName);
-    if (viewModel) viewer.baseLayerPicker.viewModel.selectedImagery = viewModel;
+    const viewModel = viewer.baseLayerPicker.viewModel.imageryProviderViewModels.find((viewModel) => viewModel.name === modelName);
+    if (viewModel) {
+      viewer.baseLayerPicker.viewModel.selectedImagery = viewModel;
+    } else {
+      localStorage.removeItem(BASE_LAYER_STORAGE_KEY);
+    }
+
     document.querySelectorAll(".cesium-baseLayerPicker-item").forEach((item) => {
       item.addEventListener("click", () => {
-        localStorage.setItem(BASE_LAYER_STORAGE_KEY, viewer.baseLayerPicker.viewModel.selectedImagery.name);
+        const selectedImagery = viewer.baseLayerPicker.viewModel.selectedImagery;
+        if (selectedImagery) localStorage.setItem(BASE_LAYER_STORAGE_KEY, selectedImagery.name);
       });
     });
   }
