@@ -30,7 +30,6 @@ export default function loadCesiumViewer(appContext: AppContext): void {
   const viewer = createCesiumViewer(container, viewModels);
 
   moveCreditElement(container);
-  restoreLastView(viewer);
 
   const managers = createCoreManagers(viewer, container);
   const entityPositionManager = managers.entityPositionManager;
@@ -49,6 +48,7 @@ export default function loadCesiumViewer(appContext: AppContext): void {
   // Mount core UI and get portal details UI and portal data in state
   const { portalDetailPaneController, portalDetailState } = mountCoreControllersAndUI(viewer, container, managers);
 
+  restoreLastView(viewer, loadingProgressManager);
   configureCameraControls(viewer);
   setupDebugTilesRefresh(tileRequestManager, debugTileEntityManager);
   setUpEntityPositionRefresh(viewer, entityPositionManager, loadingProgressManager);

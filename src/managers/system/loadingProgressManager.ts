@@ -12,6 +12,8 @@ const GLOBE_TILES_QUALITY_STABLE_FRAMES = 3;
 const GOOGLE_3D_TILES_QUALITY_SETTLE_MS = 750;
 const GOOGLE_3D_TILES_QUALITY_STABLE_FRAMES = 3;
 
+type QualityWaiter = (() => void) & { cancel: () => void };
+
 export class LoadingProgressManager {
   private readonly useGoogle3dTiles = settingsManager.getUseGoogle3dTiles();
   private readonly initSceneLoadedPromise: Promise<void>;
@@ -72,7 +74,9 @@ export class LoadingProgressManager {
         if (tileset.tilesLoaded) waitForQuality();
       };
 
+      const shouldWaitForGoogleTiles = () => this.useGoogle3dTiles && !this.viewer.scene.globe.show;
       const waitForTerrainTiles = () => {
+        if (shouldWaitForGoogleTiles()) return;
         if (this.viewer.scene.globe.tilesLoaded) waitForGlobeTilesQuality();
       };
 
@@ -84,7 +88,7 @@ export class LoadingProgressManager {
       const removeTerrainProviderChangedListener = this.viewer.scene.globe.terrainProviderChanged.addEventListener(waitForTerrainTiles);
       const removeTileLoadProgressListener = this.viewer.scene.globe.tileLoadProgressEvent.addEventListener(trackGlobeTilesProgress);
       const removePostRenderListener = this.viewer.scene.postRender.addEventListener(() => {
-        if (this.useGoogle3dTiles) {
+        if (shouldWaitForGoogleTiles()) {
           waitForGoogleTiles();
         } else {
           waitForTerrainTiles();
@@ -100,10 +104,10 @@ export class LoadingProgressManager {
         removePostRenderListener
       );
 
-      if (this.useGoogle3dTiles) {
+      if (shouldWaitForGoogleTiles()) {
         waitForGoogleTiles();
       } else {
-        this.logGlobeTilesProgress(0);
+        if (!this.useGoogle3dTiles) this.logGlobeTilesProgress(0);
         waitForTerrainTiles();
       }
       this.viewer.scene.requestRender();
@@ -143,7 +147,32 @@ export class LoadingProgressManager {
     });
   }
 
-  private waitForGlobeTilesQuality(resolve: () => void, stopWhenInitSceneLoaded = true): (() => void) & { cancel: () => void } {
+  private waitForGlobeTilesQuality(resolve: () => void, stopWhenInitSceneLoaded = true): QualityWaiter {
+    return this.waitForTilesQuality(
+      () => this.viewer.scene.globe.tilesLoaded,
+      GLOBE_TILES_QUALITY_SETTLE_MS,
+      GLOBE_TILES_QUALITY_STABLE_FRAMES,
+      resolve,
+      stopWhenInitSceneLoaded,
+    );
+  }
+
+  private waitForGoogleTilesQuality(tileset: Cesium.Cesium3DTileset, resolve: () => void): QualityWaiter {
+    return this.waitForTilesQuality(
+      () => tileset.tilesLoaded,
+      GOOGLE_3D_TILES_QUALITY_SETTLE_MS,
+      GOOGLE_3D_TILES_QUALITY_STABLE_FRAMES,
+      resolve,
+    );
+  }
+
+  private waitForTilesQuality(
+    isLoaded: () => boolean,
+    settleMs: number,
+    stableFramesRequired: number,
+    resolve: () => void,
+    stopWhenInitSceneLoaded = true,
+  ): QualityWaiter {
     let isWaiting = false;
     let settleStartTime = 0;
     let stableFrames = 0;
@@ -174,7 +203,7 @@ export class LoadingProgressManager {
         return;
       }
 
-      if (!this.viewer.scene.globe.tilesLoaded) {
+      if (!isLoaded()) {
         settleStartTime = 0;
         stableFrames = 0;
         return;
@@ -183,8 +212,8 @@ export class LoadingProgressManager {
       if (settleStartTime === 0) settleStartTime = performance.now();
       stableFrames += 1;
 
-      if (performance.now() - settleStartTime < GLOBE_TILES_QUALITY_SETTLE_MS) return;
-      if (stableFrames < GLOBE_TILES_QUALITY_STABLE_FRAMES) return;
+      if (performance.now() - settleStartTime < settleMs) return;
+      if (stableFrames < stableFramesRequired) return;
 
       cancel();
       resolve();
@@ -192,66 +221,6 @@ export class LoadingProgressManager {
 
     const waitForQuality = () => {
       if (isWaiting || (stopWhenInitSceneLoaded && this.initSceneLoaded)) return;
-
-      isWaiting = true;
-      removePostRenderListener = this.viewer.scene.postRender.addEventListener(checkSettled);
-      requestSettlingRender();
-      checkSettled();
-    };
-
-    waitForQuality.cancel = cancel;
-    return waitForQuality;
-  }
-
-  private waitForGoogleTilesQuality(tileset: Cesium.Cesium3DTileset, resolve: () => void): (() => void) & { cancel: () => void } {
-    let isWaiting = false;
-    let settleStartTime = 0;
-    let stableFrames = 0;
-    let removePostRenderListener: (() => void) | undefined;
-    let renderTimer: ReturnType<typeof setTimeout> | undefined;
-
-    const cancel = () => {
-      if (removePostRenderListener) {
-        removePostRenderListener();
-        removePostRenderListener = undefined;
-      }
-      if (renderTimer) {
-        clearTimeout(renderTimer);
-        renderTimer = undefined;
-      }
-    };
-
-    const requestSettlingRender = () => {
-      if (!isWaiting || this.initSceneLoaded) return;
-
-      this.viewer.scene.requestRender();
-      renderTimer = setTimeout(requestSettlingRender, 100);
-    };
-
-    const checkSettled = () => {
-      if (this.initSceneLoaded) {
-        cancel();
-        return;
-      }
-
-      if (!tileset.tilesLoaded) {
-        settleStartTime = 0;
-        stableFrames = 0;
-        return;
-      }
-
-      if (settleStartTime === 0) settleStartTime = performance.now();
-      stableFrames += 1;
-
-      if (performance.now() - settleStartTime < GOOGLE_3D_TILES_QUALITY_SETTLE_MS) return;
-      if (stableFrames < GOOGLE_3D_TILES_QUALITY_STABLE_FRAMES) return;
-
-      cancel();
-      resolve();
-    };
-
-    const waitForQuality = () => {
-      if (isWaiting || this.initSceneLoaded) return;
 
       isWaiting = true;
       removePostRenderListener = this.viewer.scene.postRender.addEventListener(checkSettled);

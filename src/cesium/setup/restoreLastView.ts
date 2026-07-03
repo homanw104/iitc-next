@@ -3,6 +3,7 @@
  */
 
 import * as Cesium from "cesium";
+import type { LoadingProgressManager } from "../../managers/system/loadingProgressManager.ts";
 import { settingsManager } from "../../managers/system/settingsManager.ts";
 import { HEIGHT_AT_ZOOM_ZERO } from "../../managers/tiles/tileRequestMath";
 import { getMapPosition } from "../../utils/browser";
@@ -10,7 +11,10 @@ import { getMapPosition } from "../../utils/browser";
 const BASE_LAYER_STORAGE_KEY = "iitc-next-base-layer";
 const MINIMUM_RESTORED_CAMERA_GROUND_CLEARANCE_METERS = 200;
 
-export function restoreLastView(viewer: Cesium.Viewer): void {
+export function restoreLastView(
+  viewer: Cesium.Viewer,
+  loadingProgressManager: LoadingProgressManager,
+): void {
   const useGoogle3dTiles = settingsManager.getUseGoogle3dTiles();
   if (!useGoogle3dTiles) {
     const modelName = localStorage.getItem(BASE_LAYER_STORAGE_KEY);
@@ -38,23 +42,29 @@ export function restoreLastView(viewer: Cesium.Viewer): void {
     viewer.camera.setView({
       destination: Cesium.Cartesian3.fromDegrees(position.lng, position.lat, height),
     });
-    keepRestoredCameraAboveTerrain(viewer, position.lng, position.lat, height, useGoogle3dTiles).then();
+    void keepRestoredCameraAboveTerrain(
+      viewer,
+      loadingProgressManager,
+      Cesium.Cartographic.fromDegrees(position.lng, position.lat, height),
+      useGoogle3dTiles,
+    );
   }
 }
 
 async function keepRestoredCameraAboveTerrain(
   viewer: Cesium.Viewer,
-  restoredLng: number,
-  restoredLat: number,
-  restoredHeight: number,
+  loadingProgressManager: LoadingProgressManager,
+  restoredPosition: Cesium.Cartographic,
   useGoogle3dTiles: boolean,
 ): Promise<void> {
-  const restoredPosition = Cesium.Cartographic.fromDegrees(restoredLng, restoredLat, restoredHeight);
-  const surfaceHeight = await getInitialSurfaceHeight(viewer, restoredPosition, useGoogle3dTiles);
-  if (surfaceHeight === undefined || hasCameraMoved(viewer.camera, restoredPosition)) return;
+  const surfaceHeight = await getInitialSurfaceHeight(viewer, loadingProgressManager, restoredPosition, useGoogle3dTiles);
+  if (
+    surfaceHeight === undefined ||
+    hasCameraMoved(viewer.camera, restoredPosition)
+  ) return;
 
   const minimumHeight = surfaceHeight + MINIMUM_RESTORED_CAMERA_GROUND_CLEARANCE_METERS;
-  if (restoredHeight >= surfaceHeight + MINIMUM_RESTORED_CAMERA_GROUND_CLEARANCE_METERS) return;
+  if (restoredPosition.height >= minimumHeight) return;
 
   viewer.camera.setView({
     destination: Cesium.Cartesian3.fromRadians(
@@ -68,21 +78,25 @@ async function keepRestoredCameraAboveTerrain(
 
 async function getInitialSurfaceHeight(
   viewer: Cesium.Viewer,
+  loadingProgressManager: LoadingProgressManager,
   position: Cesium.Cartographic,
   useGoogle3dTiles: boolean,
 ): Promise<number | undefined> {
-  await waitForInitialTerrain(viewer, useGoogle3dTiles);
+  await loadingProgressManager.waitForInitSceneLoaded();
   const positionToSample = new Cesium.Cartographic(position.longitude, position.latitude);
+
+  if (useGoogle3dTiles) {
+    return getRenderedGoogleTilesHeight(viewer.scene, positionToSample) ?? getRenderedSurfaceHeight(viewer.scene, positionToSample);
+  }
 
   if (viewer.terrainProvider instanceof Cesium.EllipsoidTerrainProvider) {
     return 0;
   }
 
   try {
-    const [sampled] = useGoogle3dTiles
-      ? await viewer.scene.sampleHeightMostDetailed([positionToSample])
-      : await Cesium.sampleTerrainMostDetailed(viewer.terrainProvider, [positionToSample]);
-    if (sampled?.height !== undefined) return sampled.height;
+    const [sampled] = await Cesium.sampleTerrainMostDetailed(viewer.terrainProvider, [positionToSample]);
+    const sampledHeight = getFiniteHeight(sampled?.height);
+    if (sampledHeight !== undefined) return sampledHeight;
   } catch {
     return getRenderedSurfaceHeight(viewer.scene, position);
   }
@@ -90,38 +104,28 @@ async function getInitialSurfaceHeight(
   return getRenderedSurfaceHeight(viewer.scene, position);
 }
 
-function waitForInitialTerrain(viewer: Cesium.Viewer, useGoogle3dTiles: boolean): Promise<void> {
-  if (isInitialTerrainReady(viewer, useGoogle3dTiles)) return Promise.resolve();
-
-  return new Promise((resolve) => {
-    const removePostRenderListener = viewer.scene.postRender.addEventListener(() => {
-      if (!isInitialTerrainReady(viewer, useGoogle3dTiles)) return;
-      removePostRenderListener();
-      resolve();
-    });
-    viewer.scene.requestRender();
-  });
-}
-
-function isInitialTerrainReady(viewer: Cesium.Viewer, useGoogle3dTiles: boolean): boolean {
-  if (useGoogle3dTiles) {
-    return viewer.scene.globe.show || getScene3dTileset(viewer.scene)?.tilesLoaded === true;
-  } else {
-    return viewer.scene.globe.tilesLoaded;
-  }
-}
-
 function getRenderedSurfaceHeight(scene: Cesium.Scene, position: Cesium.Cartographic): number | undefined {
   if (scene.sampleHeightSupported) {
     try {
-      const height = scene.sampleHeight(position);
+      const height = getFiniteHeight(scene.sampleHeight(position));
       if (height !== undefined) return height;
     } catch {
-      return scene.globe.getHeight(position);
+      return getFiniteHeight(scene.globe.getHeight(position));
     }
   }
 
-  return scene.globe.getHeight(position);
+  return getFiniteHeight(scene.globe.getHeight(position));
+}
+
+function getRenderedGoogleTilesHeight(scene: Cesium.Scene, position: Cesium.Cartographic): number | undefined {
+  const sceneWithGetHeight = scene as Cesium.Scene & {
+    getHeight: (cartographic: Cesium.Cartographic, heightReference?: Cesium.HeightReference) => number | undefined;
+  };
+  return getFiniteHeight(sceneWithGetHeight.getHeight(position, Cesium.HeightReference.CLAMP_TO_3D_TILE));
+}
+
+function getFiniteHeight(height: number | undefined): number | undefined {
+  return height !== undefined && Number.isFinite(height) ? height : undefined;
 }
 
 function hasCameraMoved(camera: Cesium.Camera, restoredPosition: Cesium.Cartographic): boolean {
@@ -130,13 +134,4 @@ function hasCameraMoved(camera: Cesium.Camera, restoredPosition: Cesium.Cartogra
   const hasLatMoved = !Cesium.Math.equalsEpsilon(currentPosition.latitude, restoredPosition.latitude, Cesium.Math.EPSILON10);
   const hasHeightMoved = Math.abs(currentPosition.height - restoredPosition.height) > 1;
   return hasLngMoved || hasLatMoved || hasHeightMoved;
-}
-
-function getScene3dTileset(scene: Cesium.Scene): Cesium.Cesium3DTileset | undefined {
-  for (let i = 0; i < scene.primitives.length; i++) {
-    const primitive = scene.primitives.get(i);
-    if (primitive instanceof Cesium.Cesium3DTileset) return primitive;
-  }
-
-  return undefined;
 }
