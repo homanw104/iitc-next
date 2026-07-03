@@ -154,6 +154,7 @@ export function createCesiumViewer(container: HTMLElement, imageryProviderViewMo
     navigationHelpButton: false,
     fullscreenButton: false,
     infoBox: false,
+    baseLayer: false,
     baseLayerPicker: !useGoogle3dTiles,
     sceneModePicker: false,
     geocoder: useGoogle3dTiles ? Cesium.IonGeocodeProviderType.GOOGLE : undefined,
@@ -200,7 +201,6 @@ export function createCesiumViewer(container: HTMLElement, imageryProviderViewMo
 }
 
 function applyCesiumRenderSettings(viewer: Cesium.Viewer, renderSettings: CesiumRenderSettings): void {
-  // Loading higher resolution globe tiles sooner may bypass broken intermediate KTX2 levels on mobile.
   viewer.scene.globe.maximumScreenSpaceError = renderSettings.globeMaximumScreenSpaceError;
   viewer.scene.msaaSamples = renderSettings.msaaSamples;
   viewer.resolutionScale = renderSettings.resolutionScale;
