@@ -3,9 +3,9 @@
  */
 
 import * as Cesium from "cesium";
-import { intelApiClient } from "../../utils/api.ts";
 import type { Channel } from "../../types/ingress";
 import type { CommResponseItem, GetPlextsPayload } from "../../types/api.ts";
+import { apiRequestManager } from "../system/apiRequestManager.ts";
 import { logManager } from "../system/logManager";
 
 const LOG_TAG = "CommManager";
@@ -178,7 +178,7 @@ export class CommManager {
         tab: channel
       };
 
-      const response = await intelApiClient.sendPlext(payload);
+      const response = await apiRequestManager.sendPlext(payload);
       if (response && response.error) {
         logManager.error(LOG_TAG, `Failed to send message to ${channel} channel`, response.error);
       }
@@ -235,7 +235,7 @@ export class CommManager {
 
       if (plextContinuationGuid) payload.plexContinuationGuid = plextContinuationGuid;
 
-      const data = await intelApiClient.getPlexts(payload);
+      const data = await apiRequestManager.getPlexts(payload);
 
       if (data && data.result) {
         data.result.forEach(item => {

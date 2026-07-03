@@ -8,7 +8,8 @@ The main boot flow starts in `src/app.ts`:
 
 * Initialize safe storage and the `window.iitc` integration object.
 * Set up global singleton managers for logs, settings, and player info.
-* Extract the Ingress API version used by `/r/...` requests.
+* Set up the API request manager, including the Ingress API version used by
+  `/r/...` requests.
 * If the user is logged in, create the Cesium viewer, core managers, UI
   controllers, plugins, and splash-screen lifecycle.
 
@@ -33,8 +34,8 @@ application wiring there instead of hiding it in constructors.
   plugin layer registration, and persisted layer state.
 * `comm/` wraps Ingress comm API state and requests.
 * `game/` wraps player info, scoreboard data, and passcode redemption.
-* `system/` contains app-wide managers for logs, settings, plugins, scene
-  readiness, and plugin-facing interface mounting.
+* `system/` contains app-wide managers for API requests, logs, settings,
+  plugins, scene readiness, and plugin-facing interface mounting.
 
 `src/cesium/` is Cesium-specific infrastructure. `setup/` creates the viewer,
 restores the last map position, configures camera controls, refreshes entity

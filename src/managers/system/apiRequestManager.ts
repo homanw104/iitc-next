@@ -1,8 +1,8 @@
 /**
- * Typed client for Intel API requests and response normalization.
+ * Handles Intel API version setup, requests, and response normalization.
  */
 
-import type { TileResponse } from "../types/ingress.ts";
+import type { TileResponse } from "../../types/ingress.ts";
 import type {
   GameScoreResponse,
   GetPlextsPayload,
@@ -14,9 +14,14 @@ import type {
   RedeemResponse,
   SendPlextPayload,
   SendPlextResponse,
-} from "../types/api.ts";
-import { apiRequest } from "./network.ts";
+} from "../../types/api.ts";
+import { getCookie } from "../../utils/browser.ts";
+import { safeLocalStorage } from "../../utils/storage.ts";
+import { logManager } from "./logManager";
 
+const LOG_TAG = "ApiRequestManager";
+const VERSION_STORAGE_KEY = "iitc-next-api-version";
+const VERSION_PATTERN = /gen_dashboard_([a-f0-9]{40})\.js/;
 const DEFAULT_MAX_RETRIES = 3;
 
 interface RequestOptions {
@@ -25,7 +30,41 @@ interface RequestOptions {
 
 type ResponseValidator<T> = (response: unknown) => T;
 
-export class Api {
+export class ApiRequestManager {
+  private apiVersion: string | undefined;
+
+  public initialize(): void {
+    const version = this.extractVersionFromScript();
+    if (version) {
+      this.setApiVersion(version);
+      this.storeVersion(version);
+      logManager.debug(LOG_TAG, `Extracted version string ${version}`);
+      return;
+    }
+
+    const storedVersion = this.getStoredVersion();
+    if (storedVersion) {
+      this.setApiVersion(storedVersion);
+      logManager.debug(LOG_TAG, `Using stored version string ${storedVersion}`);
+      return;
+    }
+
+    if (this.getApiVersion()) {
+      logManager.debug(LOG_TAG, "Using previously extracted version string");
+      return;
+    }
+
+    logManager.warn(LOG_TAG, "Could not extract version: Requests may fail");
+  }
+
+  public setApiVersion(version: string): void {
+    this.apiVersion = version;
+  }
+
+  public getApiVersion(): string | undefined {
+    return this.apiVersion;
+  }
+
   public getGameScore(): Promise<GameScoreResponse> {
     return this.request("getGameScore", {}, validateGameScoreResponse);
   }
@@ -65,7 +104,7 @@ export class Api {
 
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
-        return validate(await apiRequest(action, payload));
+        return validate(await this.apiRequest(action, payload));
       } catch (error) {
         lastError = error;
         if (attempt === retries) break;
@@ -74,9 +113,59 @@ export class Api {
 
     throw lastError;
   }
+
+  private async apiRequest<Action extends IntelApiAction>(
+    action: Action,
+    data: IntelApiPayloads[Action],
+  ): Promise<unknown> {
+    const csrfToken = getCookie("csrftoken");
+
+    if (!this.apiVersion) {
+      logManager.warn(LOG_TAG, "API version not set, requests might fail.");
+    }
+
+    const response = await fetch(`/r/${action}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "X-CSRFToken": csrfToken || "",
+      },
+      body: JSON.stringify({
+        ...data,
+        v: this.apiVersion,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  }
+
+  private extractVersionFromScript(): string | undefined {
+    const script = document.querySelector<HTMLScriptElement>("script[src^=\"/jsc/gen_dashboard_\"]");
+    if (!script) return undefined;
+
+    const match = VERSION_PATTERN.exec(script.getAttribute("src") || "");
+    return match?.[1];
+  }
+
+  private getStoredVersion(): string | undefined {
+    const version = safeLocalStorage.getItem(VERSION_STORAGE_KEY);
+    if (version && /^[a-f0-9]{40}$/.test(version)) {
+      return version;
+    }
+
+    return undefined;
+  }
+
+  private storeVersion(version: string): void {
+    safeLocalStorage.setItem(VERSION_STORAGE_KEY, version);
+  }
 }
 
-export const intelApiClient = new Api();
+export const apiRequestManager = new ApiRequestManager();
 
 function validateGameScoreResponse(response: unknown): GameScoreResponse {
   const normalized = normalizeRecord(response, "getGameScore");

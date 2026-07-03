@@ -3,10 +3,10 @@
  */
 
 import * as Cesium from "cesium";
-import { intelApiClient } from "../../utils/api.ts";
 import type { FieldData, LinkData, PortalData } from "../../types/ingress";
 import { getTeamColor } from "../../utils/color";
 import type { LayerManager } from "../layer/layerManager";
+import { apiRequestManager } from "../system/apiRequestManager.ts";
 import { settingsManager } from "../system/settingsManager.ts";
 import { parsePortal } from "../tiles/tileRequestEntityParser";
 import type { EntityPositionManager, EntityPositionCallback, EntityPosition } from "./entityPositionManager";
@@ -57,7 +57,7 @@ export class PortalEntityManager {
   }
 
   public async requestPortalDetails(guid: string): Promise<void> {
-    const data = await intelApiClient.getPortalDetails(guid);
+    const data = await apiRequestManager.getPortalDetails(guid);
     const portalData = parsePortal([guid, data.result[13] as number, data.result]);
     await this.addOrUpdatePortal(portalData);
   }

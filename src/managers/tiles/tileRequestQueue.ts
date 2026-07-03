@@ -2,8 +2,8 @@
  * Queue and concurrency control for Intel tile requests.
  */
 
-import { intelApiClient } from "../../utils/api.ts";
 import type { TileResponse } from "../../types/ingress";
+import { apiRequestManager } from "../system/apiRequestManager.ts";
 import { logManager } from "../system/logManager";
 
 const LOG_TAG = "TileRequestQueue";
@@ -155,7 +155,7 @@ export class TileRequestQueue {
     );
 
     try {
-      const response = await intelApiClient.getEntities(batch.tileKeys);
+      const response = await apiRequestManager.getEntities(batch.tileKeys);
       logManager.debug(LOG_TAG, `Received response for ${batch.tileKeys.length} tile${batch.tileKeys.length === 1 ? "" : "s"}`);
       await this.handleResponse(response, batch.tileKeys, batch.refreshExisting);
     } catch (error) {

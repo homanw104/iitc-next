@@ -5,7 +5,6 @@
 import type { SplashScreenController } from "./controllers/SplashScreenController.tsx";
 import type { CoreManagers } from "./core/coreManagers.ts";
 import checkAndMarkBootStatus from "./procedures/checkAndMarkBootStatus.ts";
-import extractVersionString from "./procedures/extractVersionString";
 import getPageRoute from "./procedures/getPageRoute.ts";
 import getLoginStatus from "./procedures/getLoginStatus.ts";
 import setUpResponsivePage from "./procedures/setUpResponsivePage.ts";
@@ -16,6 +15,7 @@ import loadLoginScreen from "./procedures/loadLoginScreen.ts";
 import loadSplashScreen from "./procedures/loadSplashScreen.ts";
 import loadCesiumScript from "./procedures/loadCesiumScript.ts";
 import setUpLogManager from "./procedures/setUpLogManager";
+import setupApiRequestManager from "./procedures/setupApiRequestManager.ts";
 import setUpPlayerInfoManager from "./procedures/setUpPlayerInfoManager.ts";
 import setUpSettingsManager from "./procedures/setUpSettingsManager.ts";
 import startIITCNextRuntime from "./procedures/startIITCNextRuntime.ts";
@@ -42,7 +42,7 @@ const init = async () => {
   safeWindow.iitc = {};
 
   setUpLogManager();
-  extractVersionString();
+  setupApiRequestManager();
   setUpSettingsManager();
   setUpPlayerInfoManager();
 

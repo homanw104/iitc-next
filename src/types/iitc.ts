@@ -17,6 +17,7 @@ import type { PlayerInfoManager } from "../managers/game/playerInfoManager.ts";
 import type { RedeemManager } from "../managers/game/redeemManager";
 import type { ScoreManager } from "../managers/game/scoreManager";
 import type { LayerManager } from "../managers/layer/layerManager";
+import type { ApiRequestManager } from "../managers/system/apiRequestManager.ts";
 import type { InterfaceManager } from "../managers/system/interfaceManager";
 import type { LogManager } from "../managers/system/logManager";
 import type { PluginManager } from "../managers/system/pluginManager";
@@ -35,6 +36,7 @@ export interface IITCPlugin {
 export interface IITCCore {
   viewer?: Cesium.Viewer;
   logManager?: LogManager;
+  apiRequestManager?: ApiRequestManager;
   settingsManager?: SettingsManager;
   pluginManager?: PluginManager;
   layerManager?: LayerManager;

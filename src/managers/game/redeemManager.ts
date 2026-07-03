@@ -2,7 +2,7 @@
  * Handle redeem requests.
  */
 
-import { intelApiClient } from "../../utils/api.ts";
+import { apiRequestManager } from "../system/apiRequestManager.ts";
 import { logManager } from "../system/logManager";
 
 const LOG_TAG = "RedeemManager";
@@ -13,7 +13,7 @@ export class RedeemManager {
     if (!trimmedPasscode) return "Passcode is required.";
 
     try {
-      const response = await intelApiClient.redeemReward(trimmedPasscode);
+      const response = await apiRequestManager.redeemReward(trimmedPasscode);
       if (response.error) {
         return String(response.error);
       } else {
