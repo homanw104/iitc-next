@@ -8,13 +8,16 @@ import {
   type GoogleMapsJsStyle,
   type GoogleMapsJsTileImageryProviderOptions,
 } from "../imagery/googleMapsJsTileImageryProvider.ts";
+import googleHybridIconUrl from "../../images/imageryProviders/GoogleHybrid.png";
+import googleIngressMapIconUrl from "../../images/imageryProviders/GoogleIngressMap.png";
+import googleRoadsIconUrl from "../../images/imageryProviders/GoogleRoads.png";
+import googleRoadsTrafficIconUrl from "../../images/imageryProviders/GoogleRoadsTraffic.png";
+import googleRoadsTransitIconUrl from "../../images/imageryProviders/GoogleRoadsTransit.png";
+import googleSatelliteIconUrl from "../../images/imageryProviders/GoogleSatellite.png";
+import googleTerrainIconUrl from "../../images/imageryProviders/GoogleTerrain.png";
 
 type ProviderCreationFunction = Cesium.ProviderViewModel.CreationFunction;
 
-const GOOGLE_ROADMAP_ICON_URL = Cesium.buildModuleUrl("Widgets/Images/ImageryProviders/googleRoadmap.png");
-const GOOGLE_SATELLITE_ICON_URL = Cesium.buildModuleUrl("Widgets/Images/ImageryProviders/googleSatellite.png");
-const GOOGLE_HYBRID_ICON_URL = Cesium.buildModuleUrl("Widgets/Images/ImageryProviders/googleSatelliteLabels.png");
-const GOOGLE_TERRAIN_ICON_URL = Cesium.buildModuleUrl("Widgets/Images/ImageryProviders/googleContour.png");
 const GOOGLE_MAPS_CREDIT = new Cesium.Credit("<span translate=\"no\">Google Maps</span>", true);
 
 const GOOGLE_INGRESS_MAP_STYLES: GoogleMapsJsStyle[] = [
@@ -55,25 +58,25 @@ const GOOGLE_INGRESS_MAP_STYLES: GoogleMapsJsStyle[] = [
 
 export function createGoogleBaseLayerViewModels(): Cesium.ProviderViewModel[] {
   return [
-    createGoogleViewModel("Google Ingress Map", "Google roadmap styled like the stock Ingress Intel map", GOOGLE_ROADMAP_ICON_URL, () => {
+    createGoogleViewModel("Google Ingress Map", "Google roadmap styled like the stock Ingress Intel map", googleIngressMapIconUrl, () => {
       return createGoogleProvider({ mapType: "roadmap", styles: GOOGLE_INGRESS_MAP_STYLES });
     }),
-    createGoogleViewModel("Google Roads", "Google roadmap", GOOGLE_ROADMAP_ICON_URL, () => {
+    createGoogleViewModel("Google Roads", "Google roadmap", googleRoadsIconUrl, () => {
       return createGoogleProvider({ mapType: "roadmap" });
     }),
-    createGoogleViewModel("Google Roads Traffic", "Google roadmap with traffic overlay", GOOGLE_ROADMAP_ICON_URL, () => {
+    createGoogleViewModel("Google Roads Traffic", "Google roadmap with traffic overlay", googleRoadsTrafficIconUrl, () => {
       return createGoogleProvider({ mapType: "roadmap", overlayLayer: "TrafficLayer" });
     }),
-    createGoogleViewModel("Google Roads Transit", "Google roadmap with transit overlay", GOOGLE_ROADMAP_ICON_URL, () => {
+    createGoogleViewModel("Google Roads Transit", "Google roadmap with transit overlay", googleRoadsTransitIconUrl, () => {
       return createGoogleProvider({ mapType: "roadmap", overlayLayer: "TransitLayer" });
     }),
-    createGoogleViewModel("Google Satellite", "Google satellite imagery", GOOGLE_SATELLITE_ICON_URL, () => {
+    createGoogleViewModel("Google Satellite", "Google satellite imagery", googleSatelliteIconUrl, () => {
       return createGoogleProvider({ mapType: "satellite" });
     }),
-    createGoogleViewModel("Google Hybrid", "Google satellite imagery with roadmap overlay", GOOGLE_HYBRID_ICON_URL, () => {
+    createGoogleViewModel("Google Hybrid", "Google satellite imagery with roadmap overlay", googleHybridIconUrl, () => {
       return createGoogleProvider({ mapType: "hybrid" });
     }),
-    createGoogleViewModel("Google Terrain", "Google terrain map", GOOGLE_TERRAIN_ICON_URL, () => {
+    createGoogleViewModel("Google Terrain", "Google terrain map", googleTerrainIconUrl, () => {
       return createGoogleProvider({ mapType: "terrain" });
     }),
   ];

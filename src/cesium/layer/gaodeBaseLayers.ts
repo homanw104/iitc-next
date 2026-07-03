@@ -5,26 +5,27 @@
 import * as Cesium from "cesium";
 import { GaodeTrafficImageryProvider } from "../imagery/gaodeTrafficImageryProvider.ts";
 import { AmapMercatorTilingScheme } from "../../utils/map.ts";
+import gaodeHybridIconUrl from "../../images/imageryProviders/GaodeHybrid.png";
+import gaodeRoadsIconUrl from "../../images/imageryProviders/GaodeRoads.png";
+import gaodeRoadsTrafficIconUrl from "../../images/imageryProviders/GaodeRoadsTraffic.png";
+import gaodeSatelliteIconUrl from "../../images/imageryProviders/GaodeSatellite.png";
 
 type ProviderCreationFunction = Cesium.ProviderViewModel.CreationFunction;
 
-const GAODE_SATELLITE_ICON_URL = Cesium.buildModuleUrl("Widgets/Images/ImageryProviders/bingAerial.png");
-const GAODE_ROAD_ICON_URL = Cesium.buildModuleUrl("Widgets/Images/ImageryProviders/bingRoads.png");
-const GAODE_HYBRID_ICON_URL = Cesium.buildModuleUrl("Widgets/Images/ImageryProviders/bingAerialLabels.png");
 const AUTONAVI_CREDIT = new Cesium.Credit("<a href=\"https://www.amap.com/\" target=\"_blank\" rel=\"noopener noreferrer\">&copy; 高德地图 AutoNavi</a>", true);
 
 export function createGaodeBaseLayerViewModels(): Cesium.ProviderViewModel[] {
   return [
-    createGaodeViewModel("Gaode Satellite", "Gaode satellite imagery", GAODE_SATELLITE_ICON_URL, () => {
+    createGaodeViewModel("Gaode Satellite", "Gaode satellite imagery", gaodeSatelliteIconUrl, () => {
       return createGaodeProvider(6, false);
     }),
-    createGaodeViewModel("Gaode Roads", "Gaode road map", GAODE_ROAD_ICON_URL, () => {
+    createGaodeViewModel("Gaode Roads", "Gaode road map", gaodeRoadsIconUrl, () => {
       return createGaodeProvider(7, false);
     }),
-    createGaodeViewModel("Gaode Roads Traffic", "Gaode road map with traffic overlay", GAODE_ROAD_ICON_URL, () => {
+    createGaodeViewModel("Gaode Roads Traffic", "Gaode road map with traffic overlay", gaodeRoadsTrafficIconUrl, () => {
       return [createGaodeProvider(7, false), createGaodeTrafficImageryProvider()];
     }),
-    createGaodeViewModel("Gaode Hybrid", "Gaode satellite imagery with road overlay", GAODE_HYBRID_ICON_URL, () => {
+    createGaodeViewModel("Gaode Hybrid", "Gaode satellite imagery with road overlay", gaodeHybridIconUrl, () => {
       return [createGaodeProvider(6, false), createGaodeProvider(8, true)];
     }),
   ];

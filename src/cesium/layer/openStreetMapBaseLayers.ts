@@ -3,15 +3,16 @@
  */
 
 import * as Cesium from "cesium";
+import cyclOSMIconUrl from "../../images/imageryProviders/CyclOSM.png";
+import openStreetMapIconUrl from "../../images/imageryProviders/OpenStreetMap.png";
 
 const OSM_ATTRIBUTION = "Map data &copy; <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> contributors";
-const OPEN_STREET_MAP_ICON_URL = Cesium.buildModuleUrl("Widgets/Images/ImageryProviders/openStreetMap.png");
 
 export function createOpenStreetMapBaseLayerViewModels(): Cesium.ProviderViewModel[] {
   return [
     new Cesium.ProviderViewModel({
       name: "OpenStreetMap",
-      iconUrl: OPEN_STREET_MAP_ICON_URL,
+      iconUrl: openStreetMapIconUrl,
       tooltip: "Native OpenStreetMap tiles",
       category: "OpenStreetMap",
       creationFunction: () => {
@@ -24,7 +25,7 @@ export function createOpenStreetMapBaseLayerViewModels(): Cesium.ProviderViewMod
     }),
     new Cesium.ProviderViewModel({
       name: "CyclOSM",
-      iconUrl: OPEN_STREET_MAP_ICON_URL,
+      iconUrl: cyclOSMIconUrl,
       tooltip: "CyclOSM map style",
       category: "OpenStreetMap",
       creationFunction: () => {

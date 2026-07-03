@@ -3,18 +3,18 @@
  */
 
 import * as Cesium from "cesium";
+import cartoDBDarkMatterIconUrl from "../../images/imageryProviders/CartoDBDarkMatter.png";
+import cartoDBPositronIconUrl from "../../images/imageryProviders/CartoDBPositron.png";
 
 const CARTO_ATTRIBUTION =
   "Map data &copy; <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> contributors, " +
   "&copy; <a href=\"https://carto.com/attributions\">CARTO</a>";
-const CARTO_DARK_ICON_URL = Cesium.buildModuleUrl("Widgets/Images/ImageryProviders/stadiaAlidadeSmoothDark.png");
-const CARTO_LIGHT_ICON_URL = Cesium.buildModuleUrl("Widgets/Images/ImageryProviders/stadiaAlidadeSmooth.png");
 
 export function createCartoBaseLayerViewModels(): Cesium.ProviderViewModel[] {
   return [
     new Cesium.ProviderViewModel({
       name: "CartoDB Dark Matter",
-      iconUrl: CARTO_DARK_ICON_URL,
+      iconUrl: cartoDBDarkMatterIconUrl,
       tooltip: "Dark CARTO basemap",
       category: "Carto",
       creationFunction: () => {
@@ -28,7 +28,7 @@ export function createCartoBaseLayerViewModels(): Cesium.ProviderViewModel[] {
     }),
     new Cesium.ProviderViewModel({
       name: "CartoDB Positron",
-      iconUrl: CARTO_LIGHT_ICON_URL,
+      iconUrl: cartoDBPositronIconUrl,
       tooltip: "Light CARTO basemap",
       category: "Carto",
       creationFunction: () => {
