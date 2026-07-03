@@ -5,7 +5,7 @@
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import * as Cesium from "cesium";
 import { logManager } from "../../managers/system/logManager";
-import { settingsManager, type Google3dTilesRenderQuality } from "../../managers/system/settingsManager";
+import { settingsManager, type CesiumRenderQuality } from "../../managers/system/settingsManager";
 
 const DEFAULT_BASE_LAYER_NAME = "Google Satellite";
 
@@ -16,6 +16,13 @@ window.CESIUM_BASE_URL = __CESIUM_BASE_URL__;
 
 // Default access token restricted to https://intel.ingress.com
 Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJkZGViN2YzNC1hYzgyLTQ2ZTQtYTEyMS0wZGYwOTY2ZWJiMzEiLCJpZCI6NDM1NTgyLCJzdWIiOiJob21hbncxMDQiLCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoiSUlUQyBOZXh0IiwiaWF0IjoxNzc5NTY3OTg4fQ.YBXp3trSarnjwb9R2G5sU57DC0VbI0iCJrZv7TyuZFk";
+
+type CesiumRenderSettings = {
+  globeMaximumScreenSpaceError: number;
+  resolutionScale: number;
+  msaaSamples: number;
+  fxaaEnabled: boolean;
+};
 
 type Google3dTilesRenderSettings = {
   maximumScreenSpaceError: number;
@@ -32,9 +39,6 @@ type Google3dTilesRenderSettings = {
   skipLevels: number;
   immediatelyLoadDesiredLevelOfDetail: boolean;
   loadSiblings: boolean;
-  resolutionScale: number;
-  msaaSamples: number;
-  fxaaEnabled: boolean;
 };
 
 const DARKEN_GOOGLE_3D_TILES_STYLE = new Cesium.Cesium3DTileStyle({
@@ -43,7 +47,34 @@ const DARKEN_GOOGLE_3D_TILES_STYLE = new Cesium.Cesium3DTileStyle({
 
 const LOG_TAG = "InitCesiumViewer";
 
-const GOOGLE_3D_TILES_RENDER_SETTINGS: Record<Google3dTilesRenderQuality, Google3dTilesRenderSettings> = {
+const CESIUM_RENDER_SETTINGS: Record<CesiumRenderQuality, CesiumRenderSettings> = {
+  performance: {
+    globeMaximumScreenSpaceError: 3,
+    resolutionScale: 0.75,
+    msaaSamples: 1,
+    fxaaEnabled: false,
+  },
+  balanced: {
+    globeMaximumScreenSpaceError: 1.5,
+    resolutionScale: 1,
+    msaaSamples: 1,
+    fxaaEnabled: true,
+  },
+  high: {
+    globeMaximumScreenSpaceError: 1,
+    resolutionScale: 1.5,
+    msaaSamples: 4,
+    fxaaEnabled: false,
+  },
+  ultra: {
+    globeMaximumScreenSpaceError: 0.75,
+    resolutionScale: 2.0,
+    msaaSamples: 4,
+    fxaaEnabled: false,
+  },
+};
+
+const GOOGLE_3D_TILES_RENDER_SETTINGS: Record<CesiumRenderQuality, Google3dTilesRenderSettings> = {
   performance: {
     maximumScreenSpaceError: 32,
     cacheBytes: 256 * 1024 * 1024,
@@ -59,9 +90,6 @@ const GOOGLE_3D_TILES_RENDER_SETTINGS: Record<Google3dTilesRenderQuality, Google
     skipLevels: 0,
     immediatelyLoadDesiredLevelOfDetail: false,
     loadSiblings: false,
-    resolutionScale: 0.75,
-    msaaSamples: 1,
-    fxaaEnabled: false,
   },
   balanced: {
     maximumScreenSpaceError: 24,
@@ -78,9 +106,6 @@ const GOOGLE_3D_TILES_RENDER_SETTINGS: Record<Google3dTilesRenderQuality, Google
     skipLevels: 0,
     immediatelyLoadDesiredLevelOfDetail: false,
     loadSiblings: false,
-    resolutionScale: 1,
-    msaaSamples: 1,
-    fxaaEnabled: true,
   },
   high: {
     maximumScreenSpaceError: 12,
@@ -97,9 +122,6 @@ const GOOGLE_3D_TILES_RENDER_SETTINGS: Record<Google3dTilesRenderQuality, Google
     skipLevels: 0,
     immediatelyLoadDesiredLevelOfDetail: false,
     loadSiblings: false,
-    resolutionScale: 1.5,
-    msaaSamples: 4,
-    fxaaEnabled: false,
   },
   ultra: {
     maximumScreenSpaceError: 8,
@@ -116,9 +138,6 @@ const GOOGLE_3D_TILES_RENDER_SETTINGS: Record<Google3dTilesRenderQuality, Google
     skipLevels: 0,
     immediatelyLoadDesiredLevelOfDetail: true,
     loadSiblings: true,
-    resolutionScale: 2.0,
-    msaaSamples: 4,
-    fxaaEnabled: false,
   },
 };
 
@@ -162,34 +181,34 @@ export function createCesiumViewer(container: HTMLElement, imageryProviderViewMo
     },
   ];
 
-  // Force Cesium to load higher resolution tiles sooner,
-  // which may bypass broken intermediate KTX2 levels on mobile
-  viewer.scene.globe.maximumScreenSpaceError = 1.5;
-
   // Other options for the camera and scene to improve visual quality and performance
   viewer.scene.logarithmicDepthBuffer = true;
   viewer.scene.globe.showGroundAtmosphere = true;
   viewer.scene.globe.baseColor = Cesium.Color.BLACK;
   viewer.scene.globe.show = !useGoogle3dTiles;
   viewer.scene.highDynamicRange = true;
-  viewer.scene.msaaSamples = 4;
-  viewer.resolutionScale = 1.5;
-  viewer.scene.postProcessStages.fxaa.enabled = false;  // No need if msaa is enabled. Turn off to improve performance
+
+  const renderQuality = settingsManager.getCesiumRenderQuality();
+  applyCesiumRenderSettings(viewer, CESIUM_RENDER_SETTINGS[renderQuality]);
 
   if (useGoogle3dTiles) {
-    const renderSettings = GOOGLE_3D_TILES_RENDER_SETTINGS[settingsManager.getGoogle3dTilesRenderQuality()];
-    applyGoogle3dTilesRenderSettings(viewer, renderSettings);
-    addGoogle3dTiles(viewer, renderSettings).then();
+    applyGoogle3dTilesSceneSettings(viewer);
+    addGoogle3dTiles(viewer, GOOGLE_3D_TILES_RENDER_SETTINGS[renderQuality]).then();
   }
 
   return viewer;
 }
 
-function applyGoogle3dTilesRenderSettings(viewer: Cesium.Viewer, renderSettings: Google3dTilesRenderSettings): void {
-  viewer.scene.highDynamicRange = false;
+function applyCesiumRenderSettings(viewer: Cesium.Viewer, renderSettings: CesiumRenderSettings): void {
+  // Loading higher resolution globe tiles sooner may bypass broken intermediate KTX2 levels on mobile.
+  viewer.scene.globe.maximumScreenSpaceError = renderSettings.globeMaximumScreenSpaceError;
   viewer.scene.msaaSamples = renderSettings.msaaSamples;
   viewer.resolutionScale = renderSettings.resolutionScale;
   viewer.scene.postProcessStages.fxaa.enabled = renderSettings.fxaaEnabled;
+}
+
+function applyGoogle3dTilesSceneSettings(viewer: Cesium.Viewer): void {
+  viewer.scene.highDynamicRange = false;
   viewer.scene.globe.showGroundAtmosphere = false;
   viewer.scene.fog.enabled = true;
   viewer.scene.fog.density = 0.001;

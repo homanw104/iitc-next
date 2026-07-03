@@ -12,31 +12,33 @@ export interface Settings {
   logging: {
     recordLogs: boolean;
   };
+  cesium: {
+    renderQuality: CesiumRenderQuality;
+  };
   googleTiles: {
     useGoogle3dTiles: boolean;
     darkenGoogle3dTiles: boolean;
-    google3dTilesRenderQuality: Google3dTilesRenderQuality;
   };
   refresh: {
     intervalMs: RefreshIntervalMs;
   };
 }
 
-type LegacySettings = Partial<Settings> & {
-  map?: Partial<Settings["googleTiles"]>;
-};
+type StoredSettings = Partial<Settings>;
 
 export type RefreshIntervalMs = null | 10000 | 30000 | 60000 | 300000 | 600000 | 1800000;
-export type Google3dTilesRenderQuality = "performance" | "balanced" | "high" | "ultra";
+export type CesiumRenderQuality = "performance" | "balanced" | "high" | "ultra";
 
 const DEFAULT_SETTINGS: Settings = {
   logging: {
     recordLogs: false,
   },
+  cesium: {
+    renderQuality: "balanced",
+  },
   googleTiles: {
     useGoogle3dTiles: false,
     darkenGoogle3dTiles: false,
-    google3dTilesRenderQuality: "balanced",
   },
   refresh: {
     intervalMs: null,
@@ -65,21 +67,21 @@ export class SettingsManager {
     this.saveState();
   }
 
+  public getCesiumRenderQuality(): CesiumRenderQuality {
+    return this.settings.cesium.renderQuality;
+  }
+
+  public setCesiumRenderQuality(renderQuality: CesiumRenderQuality): void {
+    this.settings.cesium.renderQuality = renderQuality;
+    this.saveState();
+  }
+
   public getUseGoogle3dTiles(): boolean {
     return this.settings.googleTiles.useGoogle3dTiles;
   }
 
   public setUseGoogle3dTiles(useGoogle3dTiles: boolean): void {
     this.settings.googleTiles.useGoogle3dTiles = useGoogle3dTiles;
-    this.saveState();
-  }
-
-  public getGoogle3dTilesRenderQuality(): Google3dTilesRenderQuality {
-    return this.settings.googleTiles.google3dTilesRenderQuality;
-  }
-
-  public setGoogle3dTilesRenderQuality(renderQuality: Google3dTilesRenderQuality): void {
-    this.settings.googleTiles.google3dTilesRenderQuality = renderQuality;
     this.saveState();
   }
 
@@ -106,16 +108,17 @@ export class SettingsManager {
     if (!stored) return;
 
     try {
-      const parsed = JSON.parse(stored) as LegacySettings;
-      const googleTiles = parsed.googleTiles ?? parsed.map;
+      const parsed = JSON.parse(stored) as StoredSettings;
       this.settings = {
         logging: {
           recordLogs: parsed.logging?.recordLogs ?? DEFAULT_SETTINGS.logging.recordLogs,
         },
+        cesium: {
+          renderQuality: this.normalizeCesiumRenderQuality(parsed.cesium?.renderQuality),
+        },
         googleTiles: {
-          useGoogle3dTiles: googleTiles?.useGoogle3dTiles ?? DEFAULT_SETTINGS.googleTiles.useGoogle3dTiles,
-          google3dTilesRenderQuality: this.normalizeGoogle3dTilesRenderQuality(googleTiles?.google3dTilesRenderQuality),
-          darkenGoogle3dTiles: googleTiles?.darkenGoogle3dTiles ?? DEFAULT_SETTINGS.googleTiles.darkenGoogle3dTiles,
+          useGoogle3dTiles: parsed.googleTiles?.useGoogle3dTiles ?? DEFAULT_SETTINGS.googleTiles.useGoogle3dTiles,
+          darkenGoogle3dTiles: parsed.googleTiles?.darkenGoogle3dTiles ?? DEFAULT_SETTINGS.googleTiles.darkenGoogle3dTiles,
         },
         refresh: {
           intervalMs: this.normalizeRefreshIntervalMs(parsed.refresh?.intervalMs),
@@ -147,11 +150,11 @@ export class SettingsManager {
       : DEFAULT_SETTINGS.refresh.intervalMs;
   }
 
-  private normalizeGoogle3dTilesRenderQuality(renderQuality: unknown): Google3dTilesRenderQuality {
-    const allowedQualities: Google3dTilesRenderQuality[] = ["performance", "balanced", "high", "ultra"];
-    return allowedQualities.includes(renderQuality as Google3dTilesRenderQuality)
-      ? renderQuality as Google3dTilesRenderQuality
-      : DEFAULT_SETTINGS.googleTiles.google3dTilesRenderQuality;
+  private normalizeCesiumRenderQuality(renderQuality: unknown): CesiumRenderQuality {
+    const allowedQualities: CesiumRenderQuality[] = ["performance", "balanced", "high", "ultra"];
+    return allowedQualities.includes(renderQuality as CesiumRenderQuality)
+      ? renderQuality as CesiumRenderQuality
+      : DEFAULT_SETTINGS.cesium.renderQuality;
   }
 }
 

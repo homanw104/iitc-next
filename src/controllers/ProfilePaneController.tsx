@@ -4,6 +4,7 @@ import LoggingSettingsPane from "../components/panes/LoggingSettingsPane/Logging
 import PluginSettingsPane from "../components/panes/PluginSettingsPane/PluginSettingsPane.tsx";
 import ProfilePane from "../components/panes/ProfilePane/ProfilePane.tsx";
 import RedeemResultPane from "../components/panes/RedeemResultPane/RedeemResultPane";
+import RenderQualitySettingsPane from "../components/panes/RenderQualitySettingsPane/RenderQualitySettingsPane.tsx";
 import RefreshIntervalSettingsPane from "../components/panes/RefreshIntervalSettingsPane/RefreshIntervalSettingsPane.tsx";
 import SettingsPane from "../components/panes/SettingsPane/SettingsPane.tsx";
 import type { RedeemManager } from "../managers/game/redeemManager";
@@ -85,10 +86,18 @@ export class ProfilePaneController {
     this.showPane(container, () => SettingsPane({
       onBack: () => this.showGameDetailPane(container),
       onClose: () => this.closeActivePane(),
+      onShowRenderQualityDetail: () => this.showRenderQualityDetailPane(container),
       onShowGoogleTilesDetail: () => this.showGoogleTilesDetailPane(container),
       onShowRefreshIntervalDetail: () => this.showRefreshIntervalDetailPane(container),
       onShowLoggingDetail: () => this.showLoggingDetailPane(container),
       onShowPluginDetail: () => this.showPluginDetailPane(container),
+    }));
+  }
+
+  private showRenderQualityDetailPane(container: HTMLElement) {
+    this.showPane(container, () => RenderQualitySettingsPane({
+      onBack: () => this.showSettingsDetailPane(container),
+      onClose: () => this.closeActivePane(),
     }));
   }
 

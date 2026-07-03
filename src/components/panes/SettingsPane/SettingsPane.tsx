@@ -6,6 +6,7 @@ import SettingsItem from "./SettingsItem.tsx";
 const SettingsPane = ({
   onBack,
   onClose,
+  onShowRenderQualityDetail,
   onShowGoogleTilesDetail,
   onShowRefreshIntervalDetail,
   onShowLoggingDetail,
@@ -13,6 +14,7 @@ const SettingsPane = ({
 }: {
   onBack: () => void,
   onClose: () => void,
+  onShowRenderQualityDetail: () => void,
   onShowGoogleTilesDetail: () => void,
   onShowRefreshIntervalDetail: () => void,
   onShowLoggingDetail: () => void,
@@ -53,8 +55,13 @@ const SettingsPane = ({
 
       <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
         <SettingsItem
+          title="Render Quality"
+          description="Control overall Cesium visual quality."
+          onClick={() => onShowRenderQualityDetail()}
+        />
+        <SettingsItem
           title="Google 3D Tiles"
-          description="Configure Google terrain and render quality."
+          description="Configure Google photorealistic terrain."
           onClick={() => onShowGoogleTilesDetail()}
         />
         <SettingsItem
