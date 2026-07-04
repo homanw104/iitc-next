@@ -15,15 +15,13 @@ import type { InteractionGestureState } from "../state/interactionGestureState";
 import { PortalData } from "../../../types/ingress.ts";
 
 export interface PortalSelectionState {
-  isPortalDetailLoading: boolean;
-  hasCancelledDisplayPortalDetail: boolean;
-  lastPortalEntity?: Cesium.Entity;
+  activeRequestId: number;
 }
 
-export type PortalSelectionGestureState = Pick<
-  InteractionGestureState,
-  "hasJustDoubleTapped" | "isDuringTheTap" | "hasJustPinched" | "isPinching" | "hasJustMoved"
->;
+interface PortalSelectionRequest {
+  id: number;
+  cancellationVersion: number;
+}
 
 interface HandlePortalSelectionOptions {
   viewer: Cesium.Viewer;
@@ -36,7 +34,7 @@ interface HandlePortalSelectionOptions {
   scoutHistoryEntityManager: ScoutHistoryEntityManager;
   interfaceState: PortalDetailState;
   selectionState: PortalSelectionState;
-  gestureState: PortalSelectionGestureState;
+  gestureState: InteractionGestureState;
   doubleTapThreshold: number;
   position: Cesium.Cartesian2;
 }
@@ -56,14 +54,50 @@ export function handlePortalSelection({
   doubleTapThreshold,
   position,
 }: HandlePortalSelectionOptions): void {
+  if (isPortalSelectionGestureBlocked(gestureState)) return;
+
+  const request: PortalSelectionRequest = {
+    id: ++selectionState.activeRequestId,
+    cancellationVersion: gestureState.portalSelectionCancellationVersion,
+  };
+
+  const displayPortalDetail = (portalEntity: Cesium.Entity, data: PortalData) => {
+    viewer.selectedEntity = portalEntity;
+    interfaceState.lastPortalData = data;
+    interfaceState.portalDetailBar?.remove();
+    interfaceState.portalDetailBar = container.appendChild(
+      PortalDetailBar({ portalDetailPaneController, data }),
+    );
+    portalDetailPaneController.updateDetailPane(data);
+  };
+
+  const updatePortalDecorations = (data: PortalData) => {
+    portalLabelEntityManager.addOrUpdateLabel(data).then();
+    portalOrnamentEntityManager.addOrUpdateOrnament(data).then();
+    portalHistoryEntityManager.addOrUpdateHistoryHalo(data).then();
+    scoutHistoryEntityManager.addOrUpdateScoutControlHalo(data).then();
+  };
+
+  const displayNoPortalDetail = () => {
+    viewer.selectedEntity = undefined;
+    interfaceState.lastPortalData = null;
+    interfaceState.portalDetailBar?.remove();
+    interfaceState.portalDetailBar = container.appendChild(
+      PortalDetailBar({ portalDetailPaneController, msg: interfaceState.lastLogMsg }),
+    );
+    portalDetailPaneController.removeDetailPane();
+  };
+
   const displayPortalDetailAfter = performance.now() + doubleTapThreshold;
+  scheduleLongPressCancellation(
+    selectionState,
+    gestureState,
+    request,
+    doubleTapThreshold,
+  );
+
   const pickedObjects = viewer.scene.drillPick(position);
   const portalEntity = getPickedPortalEntity(pickedObjects);
-
-  if (selectionState.isPortalDetailLoading && selectionState.lastPortalEntity !== portalEntity) {
-    selectionState.hasCancelledDisplayPortalDetail = true;
-  }
-  selectionState.lastPortalEntity = portalEntity;
 
   if (portalEntity) {
     const portalGuid = portalEntity.id.substring(7);
@@ -75,48 +109,29 @@ export function handlePortalSelection({
     if (staleData) {
       window.setTimeout(() => {
         if (freshData) return;
-        if (selectionState.lastPortalEntity === portalEntity && !isPortalDisplaySuppressed(gestureState)) {
-          viewer.selectedEntity = portalEntity;
-          interfaceState.lastPortalData = staleData;
-          interfaceState.portalDetailBar?.remove();
-          interfaceState.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailPaneController: portalDetailPaneController, data: staleData }));
-          portalDetailPaneController.updateDetailPane(staleData);
+        if (shouldDisplayPortalSelection(selectionState, gestureState, request)) {
+          displayPortalDetail(portalEntity, staleData);
         }
         portalEntityManager.releasePostponedLayerMove(portalGuid);
       }, doubleTapThreshold);
     }
 
-    selectionState.isPortalDetailLoading = true;
-
     portalEntityManager.requestPortalDetails(portalGuid).then(() => {
       window.setTimeout(() => {
-        if (selectionState.lastPortalEntity === portalEntity && !isPortalDisplaySuppressed(gestureState)) {
+        if (shouldDisplayPortalSelection(selectionState, gestureState, request)) {
           freshData = portalEntityManager.getPortalData(portalGuid);
           if (freshData) {
-            viewer.selectedEntity = portalEntity;
-            interfaceState.lastPortalData = freshData;
-            interfaceState.portalDetailBar?.remove();
-            interfaceState.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailPaneController: portalDetailPaneController, data: freshData }));
-            portalDetailPaneController.updateDetailPane(freshData);
-            portalLabelEntityManager.addOrUpdateLabel(freshData).then();
-            portalOrnamentEntityManager.addOrUpdateOrnament(freshData).then();
-            portalHistoryEntityManager.addOrUpdateHistoryHalo(freshData).then();
-            scoutHistoryEntityManager.addOrUpdateScoutControlHalo(freshData).then();
+            displayPortalDetail(portalEntity, freshData);
+            updatePortalDecorations(freshData);
           }
         }
         portalEntityManager.releasePostponedLayerMove(portalGuid);
       }, Math.max(0, displayPortalDetailAfter - performance.now()));
-    }).finally(() => {
-      selectionState.isPortalDetailLoading = false;
     });
   } else {
     window.setTimeout(() => {
-      if (!isPortalDisplaySuppressed(gestureState)) {
-        viewer.selectedEntity = undefined;
-        interfaceState.lastPortalData = null;
-        interfaceState.portalDetailBar?.remove();
-        interfaceState.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailPaneController: portalDetailPaneController, msg: interfaceState.lastLogMsg }));
-        portalDetailPaneController.removeDetailPane();
+      if (shouldDisplayPortalSelection(selectionState, gestureState, request)) {
+        displayNoPortalDetail();
       }
     }, doubleTapThreshold);
   }
@@ -141,9 +156,48 @@ function isPortalEntity(entity: unknown): entity is Cesium.Entity {
   );
 }
 
-function isPortalDisplaySuppressed(gestureState: PortalSelectionGestureState): boolean {
+function scheduleLongPressCancellation(
+  selectionState: PortalSelectionState,
+  gestureState: InteractionGestureState,
+  request: PortalSelectionRequest,
+  doubleTapThreshold: number,
+): void {
+  window.setTimeout(() => {
+    if (
+      isPortalSelectionRequestCurrent(selectionState, gestureState, request) &&
+      gestureState.isDuringTheTap
+    ) {
+      gestureState.portalSelectionCancellationVersion += 1;
+    }
+  }, doubleTapThreshold);
+}
+
+function shouldDisplayPortalSelection(
+  selectionState: PortalSelectionState,
+  gestureState: InteractionGestureState,
+  request: PortalSelectionRequest,
+): boolean {
+  if (!isPortalSelectionRequestCurrent(selectionState, gestureState, request)) return false;
+
+  if (gestureState.isDuringTheTap) {
+    gestureState.portalSelectionCancellationVersion += 1;
+    return false;
+  }
+
+  return !isPortalSelectionGestureBlocked(gestureState);
+}
+
+function isPortalSelectionRequestCurrent(
+  selectionState: PortalSelectionState,
+  gestureState: InteractionGestureState,
+  request: PortalSelectionRequest,
+): boolean {
+  return selectionState.activeRequestId === request.id &&
+    gestureState.portalSelectionCancellationVersion === request.cancellationVersion;
+}
+
+function isPortalSelectionGestureBlocked(gestureState: InteractionGestureState): boolean {
   return gestureState.hasJustDoubleTapped ||
-    gestureState.isDuringTheTap ||
     gestureState.hasJustPinched ||
     gestureState.isPinching ||
     gestureState.hasJustMoved;

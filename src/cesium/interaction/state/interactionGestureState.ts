@@ -9,6 +9,7 @@ export interface InteractionGestureState {
   hasJustDoubleTapped: boolean;
   isPinching: boolean;
   hasJustPinched: boolean;
+  portalSelectionCancellationVersion: number;
   momentumRequestId: number | null;
 }
 
@@ -20,6 +21,7 @@ export function createInteractionGestureState(): InteractionGestureState {
     hasJustDoubleTapped: false,
     isPinching: false,
     hasJustPinched: false,
+    portalSelectionCancellationVersion: 0,
     momentumRequestId: null,
   };
 }

@@ -116,6 +116,7 @@ export function createPinchGestureHandlers(
 
   const handlePinchStart = () => {
     gestureState.isPinching = true;
+    gestureState.portalSelectionCancellationVersion += 1;
     pinchMode = "pending";
     pinchZoomVelocity = 0;
     hasLastPinchCenter = false;

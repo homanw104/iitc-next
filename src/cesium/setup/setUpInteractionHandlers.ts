@@ -35,8 +35,7 @@ export function setUpInteractionHandlers(
   const gestureState = createInteractionGestureState();
 
   const portalSelectionState: PortalSelectionState = {
-    isPortalDetailLoading: false,
-    hasCancelledDisplayPortalDetail: false,
+    activeRequestId: 0,
   };
   const touchZoomHandlers = createTouchZoomHandlers(viewer, controller, gestureState, DOUBLE_TAP_THRESHOLD);
   const pinchGestureHandlers = createPinchGestureHandlers(viewer, handler, controller, gestureState, DOUBLE_TAP_THRESHOLD);

@@ -79,6 +79,7 @@ export function createTouchZoomHandlers(
   let hasActiveSingleTouchGesture = false;
   let isDuringTheSecondTap = false;
   let hasMovedDuringTheSecondTap = false;
+  let hasCancelledPortalSelectionForDrag = false;
   let isSingleTouchPanning = false;
   let isMouseLeftDown = false;
   let hasActiveMouseGesture = false;
@@ -97,6 +98,7 @@ export function createTouchZoomHandlers(
     resetPanVelocity();
     totalMovementLength = 0;
     hasMovedDuringTheSecondTap = false;
+    hasCancelledPortalSelectionForDrag = false;
     gestureState.isDuringTheTap = true;
     gestureSurfacePicker.reset();
 
@@ -116,6 +118,7 @@ export function createTouchZoomHandlers(
       isDuringTheSecondTap = true;
       gestureState.pendingSingleTapTime = null;
       gestureState.hasJustDoubleTapped = true;
+      gestureState.portalSelectionCancellationVersion += 1;
       controller.enableInputs = false;
 
       if (revertHasJustDoubleTappedTimeoutId) {
@@ -280,7 +283,13 @@ export function createTouchZoomHandlers(
 
     totalMovementLength += movement;
 
-    if (totalMovementLength > DRAG_THRESHOLD_PIXELS) gestureState.hasJustMoved = true;
+    if (totalMovementLength > DRAG_THRESHOLD_PIXELS) {
+      gestureState.hasJustMoved = true;
+      if (!hasCancelledPortalSelectionForDrag) {
+        gestureState.portalSelectionCancellationVersion += 1;
+        hasCancelledPortalSelectionForDrag = true;
+      }
+    }
     if (revertHasJustMovedTimeoutId) {
       window.clearTimeout(revertHasJustMovedTimeoutId);
       revertHasJustMovedTimeoutId = null;
