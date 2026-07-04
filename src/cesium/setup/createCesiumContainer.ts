@@ -41,8 +41,29 @@ export function createCesiumContainer(): HTMLDivElement {
 
   cesiumStyle.textContent = `
     #cesium-container .cesium-viewer-toolbar {
-      top: var(--iitc-top-control-padding, 5px);
-      right: var(--iitc-right-control-padding, 5px);
+      top: calc(var(--iitc-system-top-inset, 0px) + 5px);
+      right: calc(var(--iitc-system-right-inset, 0px) + 5px);
+    }
+
+    #cesium-container .cesium-baseLayerPicker-dropDown {
+      max-height: calc(100vh - var(--iitc-system-top-inset, 0px) - var(--iitc-system-bottom-inset, 0px) - 106px) !important;
+      z-index: 10010;
+    }
+    
+    #cesium-container .cesium-credit-lightbox-mobile {
+      padding-top: var(--iitc-system-top-inset, 0px);
+      padding-right: var(--iitc-system-right-inset, 0px);
+      padding-bottom: var(--iitc-system-bottom-inset, 0px);
+      padding-left: var(--iitc-system-left-inset, 0px);
+      position: absolute;
+      inset: 0px;
+      height: auto !important;
+      width: auto !important;
+    }
+    
+    #cesium-container .cesium-credit-lightbox-mobile .cesium-credit-lightbox-close {
+      top: calc(var(--iitc-system-top-inset, 0px) + 6px) !important;
+      right: calc(var(--iitc-system-right-inset, 0px) + 11px) !important;
     }
   `;
 
