@@ -15,7 +15,7 @@ import loadLoginScreen from "./procedures/loadLoginScreen.ts";
 import loadSplashScreen from "./procedures/loadSplashScreen.ts";
 import loadCesiumScript from "./procedures/loadCesiumScript.ts";
 import setUpLogManager from "./procedures/setUpLogManager";
-import setupApiRequestManager from "./procedures/setupApiRequestManager.ts";
+import setUpApiRequestManager from "./procedures/setUpApiRequestManager.ts";
 import setUpPlayerInfoManager from "./procedures/setUpPlayerInfoManager.ts";
 import setUpSettingsManager from "./procedures/setUpSettingsManager.ts";
 import startIITCNextRuntime from "./procedures/startIITCNextRuntime.ts";
@@ -42,7 +42,7 @@ const init = async () => {
   safeWindow.iitc = {};
 
   setUpLogManager();
-  setupApiRequestManager();
+  setUpApiRequestManager();
   setUpSettingsManager();
   setUpPlayerInfoManager();
 

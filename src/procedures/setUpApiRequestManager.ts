@@ -5,7 +5,7 @@
 import { apiRequestManager } from "../managers/system/apiRequestManager.ts";
 import { safeWindow } from "../utils/window.ts";
 
-export default function setupApiRequestManager(): void {
+export default function setUpApiRequestManager(): void {
   apiRequestManager.initialize();
   if (safeWindow) safeWindow.iitc.apiRequestManager = apiRequestManager;
 }
