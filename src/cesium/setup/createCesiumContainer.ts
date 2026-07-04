@@ -3,6 +3,7 @@
  */
 
 export function createCesiumContainer(): HTMLDivElement {
+  // Create a fixed full-screen container for the Cesium viewer
   const container = document.createElement("div");
   container.id = "cesium-container";
   Object.assign(container.style, {
@@ -16,6 +17,7 @@ export function createCesiumContainer(): HTMLDivElement {
   });
   document.body.appendChild(container);
 
+  // Create a <style> element if it doesn't exist
   let cesiumStyle = container.querySelector<HTMLStyleElement>("#iitc-next-cesium-style");
   if (!cesiumStyle) {
     cesiumStyle = document.createElement("style");
@@ -23,6 +25,7 @@ export function createCesiumContainer(): HTMLDivElement {
     container.appendChild(cesiumStyle);
   }
 
+  // Set the CSS rules for the Cesium viewer
   cesiumStyle.textContent = `
     #cesium-container .cesium-viewer-toolbar {
       top: calc(var(--iitc-system-top-inset, 0px) + 5px);

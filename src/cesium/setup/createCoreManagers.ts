@@ -62,7 +62,7 @@ export function createCoreManagers(viewer: Cesium.Viewer, container: HTMLElement
 
   return {
     layerManager,
-    loadingProgressManager: loadingProgressManager,
+    loadingProgressManager,
     entityPositionManager,
     entityTranslucencyManager,
     portalEntityManager,

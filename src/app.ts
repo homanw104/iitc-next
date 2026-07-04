@@ -26,14 +26,14 @@ export interface AppContext {
   coreManagers: CoreManagers | undefined;
   cesiumLoadPromise: Promise<void> | undefined;
   splashScreenController: SplashScreenController | undefined;
-  styleSheets: NodeListOf<HTMLLinkElement> | undefined;
+  styleSheetCache: NodeListOf<HTMLLinkElement> | undefined;
 }
 
 const appContext: AppContext = {
   coreManagers: undefined,
   cesiumLoadPromise: undefined,
   splashScreenController: undefined,
-  styleSheets: undefined,
+  styleSheetCache: undefined,
 };
 
 const init = async () => {

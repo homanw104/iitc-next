@@ -1,11 +1,12 @@
 /**
- * Move the credit element to leave space for the bottom control bar.
+ * Moves the Cesium credit widget to a custom position within the Cesium viewer.
  */
 
-export function moveCreditElement(container: HTMLElement): void {
-  const cesiumViewer = container.querySelector(".cesium-viewer") as HTMLElement;
+export function moveCreditWidget(container: HTMLElement): void {
+  const cesiumViewer = container.querySelector<HTMLElement>(".cesium-viewer");
+  if (!cesiumViewer) throw new Error("Cesium viewer element was not created");
 
-  let customWrapper = cesiumViewer.querySelector(".cesium-viewer-bottom-custom-wrapper") as HTMLElement;
+  let customWrapper = cesiumViewer.querySelector<HTMLElement>(".cesium-viewer-bottom-custom-wrapper");
   if (!customWrapper) {
     customWrapper = document.createElement("div");
     customWrapper.classList.add("cesium-viewer-bottom-custom-wrapper");
@@ -18,7 +19,7 @@ export function moveCreditElement(container: HTMLElement): void {
     cesiumViewer.appendChild(customWrapper);
   }
 
-  const cesiumBottomBar = cesiumViewer.querySelector(".cesium-viewer-bottom") as HTMLElement;
+  const cesiumBottomBar = cesiumViewer.querySelector<HTMLElement>(".cesium-viewer-bottom");
   if (cesiumBottomBar) {
     cesiumBottomBar.remove();
     customWrapper.appendChild(cesiumBottomBar);

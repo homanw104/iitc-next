@@ -7,6 +7,6 @@
 import { TileRequestManager } from "../../managers/tiles/tileRequestManager.ts";
 import { DebugTileEntityManager } from "../../managers/entity/debugTileEntityManager.ts";
 
-export function setupDebugTilesRefresh(tileRequestManager: TileRequestManager, debugTileEntityManager: DebugTileEntityManager) {
+export function setUpDebugTilesRefresh(tileRequestManager: TileRequestManager, debugTileEntityManager: DebugTileEntityManager) {
   tileRequestManager.onTileStatusChange((key, status) => debugTileEntityManager.updateTile(key, status));
 }

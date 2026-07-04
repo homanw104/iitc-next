@@ -5,6 +5,6 @@
 import { AppContext } from "../app.ts";
 
 export default function disableStyleSheets(appContext: AppContext) {
-  appContext.styleSheets = document.querySelectorAll<HTMLLinkElement>("head link[rel~='stylesheet']");
-  appContext.styleSheets.forEach(sheet => sheet.remove());
+  appContext.styleSheetCache = document.querySelectorAll<HTMLLinkElement>("head link[rel~='stylesheet']");
+  appContext.styleSheetCache.forEach(sheet => sheet.remove());
 }
