@@ -11,11 +11,11 @@ import type { PortalHistoryEntityManager } from "../../managers/entity/portalHis
 import type { PortalLabelEntityManager } from "../../managers/entity/portalLabelEntityManager.ts";
 import type { PortalOrnamentEntityManager } from "../../managers/entity/portalOrnamentEntityManager.ts";
 import type { ScoutHistoryEntityManager } from "../../managers/entity/scoutHistoryEntityManager.ts";
-import { createPinchGestureHandlers } from "../interaction/gestures/pinchGestureHandlers.ts";
-import { createTouchZoomHandlers } from "../interaction/gestures/touchZoomHandlers.ts";
-import { handlePortalSelection } from "../interaction/portals/portalSelection.ts";
-import type { PortalSelectionState } from "../interaction/portals/portalSelection.ts";
 import { createInteractionGestureState } from "../interaction/state/interactionGestureState.ts";
+import { createPinchGestureHandlers } from "../interaction/gesture/pinchGestureHandlers.ts";
+import { createTouchZoomHandlers } from "../interaction/gesture/touchZoomHandlers.ts";
+import { handlePortalSelection } from "../interaction/selection/portalSelection.ts";
+import type { PortalSelectionState } from "../interaction/selection/portalSelection.ts";
 
 const DOUBLE_TAP_THRESHOLD = 300; // ms
 
