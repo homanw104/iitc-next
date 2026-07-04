@@ -37,6 +37,11 @@ const TOUCH_EVENT_OPTIONS: AddEventListenerOptions = { passive: true };
 const MOUSE_DOWN_EVENT_OPTIONS: AddEventListenerOptions = { capture: true, passive: true };
 const MOUSE_UP_EVENT_OPTIONS: AddEventListenerOptions = { passive: true };
 
+type ZoomSurfacePick = {
+  position: Cesium.Cartesian3;
+  hasSurfaceHeight: boolean;
+};
+
 interface TouchZoomHandlers {
   handleTouchStart: (event: Cesium.ScreenSpaceEventHandler.PositionedEvent) => void;
   handleDrag: (event: Cesium.ScreenSpaceEventHandler.MotionEvent) => void;
@@ -59,6 +64,10 @@ export function createTouchZoomHandlers(
   const panVelocity = new Cesium.Cartesian2();
   const panMomentumPosition = new Cesium.Cartesian2();
   const panMomentumEndPosition = new Cesium.Cartesian2();
+  const zoomRenderedPosition = new Cesium.Cartesian3();
+  const zoomTerrainPosition = new Cesium.Cartesian3();
+  const zoomEllipsoidPosition = new Cesium.Cartesian3();
+  const zoomPickRay = new Cesium.Ray();
 
   let lastMoveTime = 0;
   let zoomVelocity = 0;
@@ -421,29 +430,65 @@ export function createTouchZoomHandlers(
   };
 
   const zoomInAroundTap = (position: Cesium.Cartesian2) => {
-    const camera = viewer.camera;
-    const height = camera.positionCartographic.height;
-    const targetHeight = height * 0.5;
-    const destination = viewer.camera.pickEllipsoid(position, viewer.scene.globe.ellipsoid);
-    if (!destination) {
+    const surfacePick = pickZoomSurfacePosition(position);
+    if (!surfacePick) {
       controller.enableInputs = true;
       return;
     }
 
-    const cartographic = Cesium.Cartographic.fromCartesian(destination);
-    const surfaceHeight = viewer.scene.sampleHeightSupported
-      ? viewer.scene.sampleHeight(cartographic)
-      : undefined;
-    cartographic.height = surfaceHeight === undefined
-      ? targetHeight
-      : Math.max(targetHeight, surfaceHeight + MINIMUM_3D_TILE_CAMERA_CLEARANCE_METERS);
-    camera.flyTo({
+    const cartographic = Cesium.Cartographic.fromCartesian(surfacePick.position);
+    const surfaceHeight = getZoomSurfaceHeight(cartographic, surfacePick.hasSurfaceHeight);
+    const cameraHeight = viewer.camera.positionCartographic.height;
+    const targetHeight = surfaceHeight + (cameraHeight - surfaceHeight) * 0.5;
+    cartographic.height = Math.max(targetHeight, surfaceHeight + MINIMUM_3D_TILE_CAMERA_CLEARANCE_METERS);
+    viewer.camera.flyTo({
       destination: Cesium.Cartographic.toCartesian(cartographic),
       duration: 0.5,
       complete: () => {
         controller.enableInputs = true;
       },
     });
+  };
+
+  const pickZoomSurfacePosition = (position: Cesium.Cartesian2): ZoomSurfacePick | undefined => {
+    const renderedPosition = pickRenderedSurfacePosition(position);
+    if (renderedPosition) return { position: renderedPosition, hasSurfaceHeight: true };
+
+    const ray = viewer.camera.getPickRay(position, zoomPickRay);
+    const terrainPosition = ray && viewer.scene.globe.show
+      ? viewer.scene.globe.pick(ray, viewer.scene, zoomTerrainPosition)
+      : undefined;
+    if (terrainPosition) return { position: terrainPosition, hasSurfaceHeight: true };
+
+    const ellipsoidPosition = viewer.camera.pickEllipsoid(
+      position,
+      viewer.scene.globe.ellipsoid,
+      zoomEllipsoidPosition,
+    );
+    if (ellipsoidPosition) return { position: ellipsoidPosition, hasSurfaceHeight: false };
+
+    return undefined;
+  };
+
+  const pickRenderedSurfacePosition = (position: Cesium.Cartesian2) => {
+    if (!viewer.scene.pickPositionSupported) return undefined;
+
+    try {
+      return viewer.scene.pickPosition(position, zoomRenderedPosition);
+    } catch {
+      return undefined;
+    }
+  };
+
+  const getZoomSurfaceHeight = (
+    cartographic: Cesium.Cartographic,
+    hasSurfaceHeight: boolean,
+  ) => {
+    if (hasSurfaceHeight) return cartographic.height;
+
+    return viewer.scene.sampleHeightSupported
+      ? viewer.scene.sampleHeight(cartographic) ?? cartographic.height
+      : cartographic.height;
   };
 
   const resetTouchTracking = () => {
