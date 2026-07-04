@@ -7,9 +7,9 @@ const PluginButtonsContainer = () => {
       no-scroll-bar={true}
       style={{
         position: "absolute",
-        left: "var(--iitc-left-control-padding, 5px)",
-        top: "calc(var(--iitc-top-control-padding, 5px) + 38px)",
-        bottom: "calc(var(--iitc-bottom-control-padding, 5px) + 38px)",
+        left: "calc(var(--iitc-system-left-inset, 0px) + 5px)",
+        top: "calc(var(--iitc-system-top-inset, 0px) + 43px)",
+        bottom: "calc(var(--iitc-system-bottom-inset, 0px) + 43px)",
         paddingTop: "38px",
         width: "38px",
         display: "flex",

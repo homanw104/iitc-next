@@ -8,8 +8,8 @@ const CommButton = ({ commDetailPaneController }: {
     <div
       style={{
         position: "absolute",
-        bottom: "var(--iitc-bottom-control-padding, 5px)",
-        right: "calc(var(--iitc-right-control-padding, 5px) + 38px)",
+        bottom: "calc(var(--iitc-system-bottom-inset, 0px) + 5px)",
+        right: "calc(var(--iitc-system-right-inset, 0px) + 43px)",
         display: "flex",
         flexDirection: "column",
       }}

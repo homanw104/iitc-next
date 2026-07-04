@@ -32,10 +32,10 @@ const SplashScreen = ({ logEntries, fadeOutMs, onInitTextRef, onLogGridRef }: {
         id="iitc-next-startup-splash-container"
         style={{
           position: "absolute",
-          left: "calc(var(--iitc-left-control-padding, 0px) + 20px)",
-          right: "calc(var(--iitc-right-control-padding, 0px) + 20px)",
-          top: "calc(var(--iitc-top-control-padding, 0px) + 65px)",
-          bottom: "calc(var(--iitc-bottom-control-padding, 0px) + 65px)",
+          left: "calc(var(--iitc-system-left-inset, 0px) + 25px)",
+          right: "calc(var(--iitc-system-right-inset, 0px) + 25px)",
+          top: "calc(var(--iitc-system-top-inset, 0px) + 70px)",
+          bottom: "calc(var(--iitc-system-bottom-inset, 0px) + 70px)",
           border: "1px solid #499399",
           padding: "40px",
           display: "grid",

@@ -26,7 +26,7 @@ class ScriptInjector {
             splash.style.cssText = 'position:fixed;inset:0;padding:0;z-index:2147483647;background:#0b0c0c;font-family:coda_regular,arial,helvetica,sans-serif;font-size:12px;line-height:1.55;letter-spacing:0;pointer-events:auto;';
             var container = document.createElement('div');
             container.id = 'iitc-next-startup-splash-container';
-            container.style.cssText = 'position:absolute;left:calc(var(--iitc-left-control-padding,0px) + 20px);right:calc(var(--iitc-right-control-padding,0px) + 20px);top:calc(var(--iitc-top-control-padding,0px) + 65px);bottom:calc(var(--iitc-bottom-control-padding,0px) + 65px);border:1px solid #499399;padding:40px;display:grid;grid-template-rows:auto auto minmax(0,1fr);overflow:hidden;';
+            container.style.cssText = 'position:absolute;left:calc(var(--iitc-system-left-inset,0px) + 25px);right:calc(var(--iitc-system-right-inset,0px) + 25px);top:calc(var(--iitc-system-top-inset,0px) + 70px);bottom:calc(var(--iitc-system-bottom-inset,0px) + 70px);border:1px solid #499399;padding:40px;display:grid;grid-template-rows:auto auto minmax(0,1fr);overflow:hidden;';
             var title = document.createElement('div');
             title.textContent = 'IITC Next';
             title.style.cssText = 'margin-bottom:40px;flex-shrink:0;font-size:48px;font-weight:700;font-family:Open Sans,sans-serif;white-space:nowrap;color:#eeff77;';

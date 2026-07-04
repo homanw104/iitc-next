@@ -8,8 +8,8 @@ const ProfileButton = ({ gameDetailPaneController }: {
     <div
       style={{
         position: "absolute",
-        top: "var(--iitc-top-control-padding, 5px)",
-        left: "var(--iitc-left-control-padding, 5px)",
+        top: "calc(var(--iitc-system-top-inset, 0px) + 5px)",
+        left: "calc(var(--iitc-system-left-inset, 0px) + 5px)",
         display: "flex",
         flexDirection: "column",
         alignItems: "flex",

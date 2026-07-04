@@ -8,8 +8,8 @@ const LayerChooserButton = ({ layerChooserPaneController }: {
     <div
       style={{
         position: "absolute",
-        bottom: "var(--iitc-bottom-control-padding, 5px)",
-        right: "var(--iitc-right-control-padding, 5px)",
+        bottom: "calc(var(--iitc-system-bottom-inset, 0px) + 5px)",
+        right: "calc(var(--iitc-system-right-inset, 0px) + 5px)",
         display: "flex",
         flexDirection: "column-reverse",
         alignItems: "flex-end",

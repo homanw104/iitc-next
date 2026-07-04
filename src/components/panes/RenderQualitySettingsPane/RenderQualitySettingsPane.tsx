@@ -56,8 +56,8 @@ const RenderQualitySettingsPane = ({ onBack, onClose }: {
     <div
       style={{
         position: "absolute",
-        left: "var(--iitc-left-control-padding, 5px)",
-        top: "calc(var(--iitc-top-control-padding, 5px) + 38px)",
+        left: "calc(var(--iitc-system-left-inset, 0px) + 5px)",
+        top: "calc(var(--iitc-system-top-inset, 0px) + 43px)",
         margin: "2px 3px",
         border: "1px solid #555",
         borderRadius: "4.2px",
@@ -65,7 +65,7 @@ const RenderQualitySettingsPane = ({ onBack, onClose }: {
         width: "400px",
 
         // 100% - 2 * right - 2 * margin - 2 * boarder - 2 * padding
-        maxWidth: "calc(100% - var(--iitc-left-control-padding, 5px) - var(--iitc-right-control-padding, 5px) - 32px)",
+        maxWidth: "calc(100% - var(--iitc-system-left-inset, 0px) - var(--iitc-system-right-inset, 0px) - 42px)",
         // 100% - 2 * right - 2 * margin - 2 * boarder - 2 * padding - 2 * button - 2 * margin compensate
         maxHeight: "calc(100% - var(--iitc-system-top-inset, 0px) - var(--iitc-system-bottom-inset, 0px) - 116px)",
 

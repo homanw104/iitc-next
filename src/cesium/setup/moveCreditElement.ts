@@ -11,9 +11,9 @@ export function moveCreditElement(container: HTMLElement): void {
     customWrapper.classList.add("cesium-viewer-bottom-custom-wrapper");
     Object.assign(customWrapper.style, {
       position: "absolute",
-      left: "var(--iitc-left-control-padding, 5px)",
-      bottom: "calc(var(--iitc-bottom-control-padding, 5px) + 38px)",
-      width: "calc(100% - var(--iitc-left-control-padding, 5px) - var(--iitc-right-control-padding, 5px) - 114px)",
+      left: "calc(var(--iitc-system-left-inset, 0px) + 5px)",
+      bottom: "calc(var(--iitc-system-bottom-inset, 0px) + 43px)",
+      width: "calc(100% - var(--iitc-system-left-inset, 0px) - var(--iitc-system-right-inset, 0px) - 124px)",
     });
     cesiumViewer.appendChild(customWrapper);
   }
