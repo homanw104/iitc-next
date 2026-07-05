@@ -24,7 +24,6 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const packageJsonPath = join(root, "package.json");
 const packageLockPath = join(root, "package-lock.json");
 const xcodeProjectPath = join(root, "ios/App/App.xcodeproj/project.pbxproj");
-const readmePath = join(root, "README.md");
 const iosScriptInjectorPath = join(root, "ios/App/App/ScriptInjector.swift");
 const androidScriptInjectorPath = join(root, "android/app/src/main/java/world/homans/iitcnext/ScriptInjector.java");
 
@@ -47,11 +46,6 @@ const xcodeProject = readFileSync(xcodeProjectPath, "utf8")
   .replace(/MARKETING_VERSION = [^;]+;/g, `MARKETING_VERSION = ${appVersion};`)
   .replace(/CURRENT_PROJECT_VERSION = [^;]+;/g, `CURRENT_PROJECT_VERSION = ${appVersionCode};`);
 writeFileSync(xcodeProjectPath, xcodeProject);
-
-// Update app version references in documentation
-const readme = readFileSync(readmePath, "utf8")
-  .replace(/iitc-next-v[^`]+\.js/g, `iitc-next-v${appVersion}.js`);
-writeFileSync(readmePath, readme);
 
 // Get the Cesium version from package.json
 const cesiumVersion = packageJson.dependencies.cesium.replace(/^[~^]/, "");

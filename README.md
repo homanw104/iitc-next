@@ -15,23 +15,26 @@ This project is a Total Conversion for Ingress Intel that adds a 3D globe view u
 
 ### For browsers
 
-Note: You need to diable every IITC-CE userscript/plugin when using
-IITC-Next. IITC-Next is not a plugin of IITC-CE and it does not work with it.
+1. Install a userscript manager like [Tampermonkey](https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo)
+   in your browser.
+2. Download and install the script from [GitHub Releases](https://github.com/homanw104/iitc-next/releases)
+   or click [here](https://github.com/homanw104/iitc-next/releases/latest/download/iitc-next.user.js)
+   to download and install the latest version directly.
+3. Goto <https://intel.ingress.com/>
+4. Enjoy.
 
-1. Download the userscript from [Releases](https://github.com/homanw104/iitc-next/releases).
-   The userscript is named like `iitc-next-v2.3.0.js`.
-2. Install [Tampermonkey](https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo)
-   in your browser, a userscript executor.
-3. Open Tampermonkey, inside the Dashboard, go to the Utility page.
-4. Choose "Import from file" and select the downloaded userscript.
-5. Install the userscript in Tampermonkey.
-6. Open <https://intel.ingress.com/>
-7. Enjoy.
+Note: You need to disable the IITC Button extension and disable
+all IITC-CE related scripts in your userscript manager to avoid
+conflicts. IITC Next is NOT a plugin of IITC-CE.
 
 ### For Android
 
-Download the apk from [Releases](https://github.com/homanw104/iitc-next/releases),
-or request for closed test access on Google Play by joining the [Telegram group](https://t.me/iitc_next_closed_test).
+Download the app from [Google Play](https://play.google.com/store/apps/details?id=world.homans.iitcnext)
+or from [GitHub Releases](https://github.com/homanw104/iitc-next/releases).
+
+Note: If you decide to switch between Google Play and
+GitHub Release, you need to uninstall the existing version first
+as they use different signature keys. 
 
 ## Development
 
