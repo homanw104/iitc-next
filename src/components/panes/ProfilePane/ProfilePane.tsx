@@ -1,5 +1,5 @@
 import { playerInfoManager } from "../../../managers/game/playerInfoManager.ts";
-import type { RedeemManager } from "../../../managers/game/redeemManager.ts";
+import type { RedeemManager, RedeemResult } from "../../../managers/game/redeemManager.ts";
 import type { ScoreManager } from "../../../managers/game/scoreManager.ts";
 import { h } from "../../../utils/dom.ts";
 import CloseButton from "../../atoms/CloseButton/CloseButton.tsx";
@@ -13,14 +13,14 @@ const ProfilePane = ({
   scoreManager,
   redeemManager,
   onClose,
-  onRedeemSuccess,
+  onShowRedeemResult,
   onShowSettingsDetail,
   onShowAboutDetail,
 }: {
   scoreManager: ScoreManager,
   redeemManager: RedeemManager,
   onClose: () => void,
-  onRedeemSuccess: (result: string) => void,
+  onShowRedeemResult: (result: RedeemResult) => void,
   onShowSettingsDetail: () => void,
   onShowAboutDetail: () => void,
 }) => {
@@ -58,7 +58,7 @@ const ProfilePane = ({
       </div>
       <PlayerStatus player={player} />
       <GameScore scoreManager={scoreManager} />
-      <GameRedeem redeemManager={redeemManager} onRedeemSuccess={onRedeemSuccess} />
+      <GameRedeem redeemManager={redeemManager} onShowRedeemResult={onShowRedeemResult} />
       <ProfilePaneButtonBar onShowSettingsDetail={onShowSettingsDetail} onShowAboutDetail={onShowAboutDetail} />
     </div>
   ) as HTMLElement;

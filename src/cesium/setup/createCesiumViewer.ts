@@ -7,7 +7,7 @@ import * as Cesium from "cesium";
 import { logManager } from "../../managers/system/logManager";
 import { settingsManager, type CesiumRenderQuality } from "../../managers/system/settingsManager";
 
-const DEFAULT_BASE_LAYER_NAME = "Google Satellite";
+const DEFAULT_BASE_LAYER_NAME = "OpenStreetMap";
 
 // Tell Cesium where to find its assets (Images, Workers, etc.).
 // Since we use the CDN for the main library, we should also use it for assets.

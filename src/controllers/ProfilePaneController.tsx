@@ -7,7 +7,7 @@ import RedeemResultPane from "../components/panes/RedeemResultPane/RedeemResultP
 import RenderQualitySettingsPane from "../components/panes/RenderQualitySettingsPane/RenderQualitySettingsPane.tsx";
 import RefreshIntervalSettingsPane from "../components/panes/RefreshIntervalSettingsPane/RefreshIntervalSettingsPane.tsx";
 import SettingsPane from "../components/panes/SettingsPane/SettingsPane.tsx";
-import type { RedeemManager } from "../managers/game/redeemManager";
+import type { RedeemManager, RedeemResult } from "../managers/game/redeemManager";
 import type { ScoreManager } from "../managers/game/scoreManager";
 import type { TileRequestManager } from "../managers/tiles/tileRequestManager.ts";
 
@@ -58,7 +58,7 @@ export class ProfilePaneController {
       scoreManager: this.scoreManager,
       redeemManager: this.redeemManager,
       onClose: () => this.closeActivePane(),
-      onRedeemSuccess: (msg) => this.showRedeemResultPane(container, msg),
+      onShowRedeemResult: (result) => this.showRedeemResultPane(container, result),
       onShowSettingsDetail: () => this.showSettingsDetailPane(container),
       onShowAboutDetail: () => this.showAboutDetailPane(container),
     });
@@ -130,8 +130,8 @@ export class ProfilePaneController {
     }));
   }
 
-  private showRedeemResultPane(container: HTMLElement, msg: string) {
+  private showRedeemResultPane(container: HTMLElement, result: RedeemResult) {
     this.closeRedeemResultPane();
-    this.redeemResultPane = container.appendChild(RedeemResultPane({ msg, onClose: () => this.closeRedeemResultPane() }));
+    this.redeemResultPane = container.appendChild(RedeemResultPane({ result, onClose: () => this.closeRedeemResultPane() }));
   }
 }

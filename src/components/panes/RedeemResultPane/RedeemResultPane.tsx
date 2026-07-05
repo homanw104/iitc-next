@@ -1,17 +1,22 @@
+import type { RedeemResult } from "../../../managers/game/redeemManager.ts";
 import { h } from "../../../utils/dom.ts";
+import RedeemResultMessage from "./RedeemResultMessage.tsx";
+import CloseButton from "../../atoms/CloseButton/CloseButton.tsx";
 
-const RedeemResultPane = ({ msg, onClose }: {
-  msg: string,
+const RedeemResultPane = ({ result, onClose }: {
+  result: RedeemResult,
   onClose: () => void,
 }): HTMLElement => {
+  const items = formatRedeemItems(result);
+  const message = getRedeemMessage(result, items);
+
   return (
     <div style={{
       position: "absolute",
-      top: "var(--iitc-system-top-inset, 0px)",
-      left: "var(--iitc-system-left-inset, 0px)",
-      bottom: "var(--iitc-system-bottom-inset, 0px)",
-      right: "var(--iitc-system-right-inset, 0px)",
-      margin: "auto",
+      top: "calc(var(--iitc-system-top-inset, 0px) + 41px)",
+      left: "calc(var(--iitc-system-left-inset, 0px) + 5px)",
+      bottom: "calc(var(--iitc-system-bottom-inset, 0px) + 41px)",
+      right: "calc(var(--iitc-system-right-inset, 0px) + 5px)",
       display: "flex",
       flexDirection: "column",
       alignItems: "center",
@@ -20,37 +25,70 @@ const RedeemResultPane = ({ msg, onClose }: {
     }}>
       <div style={{
         position: "relative",
-        width: "250px",
-        height: "100px",
-        padding: "12px",
-        maxWidth: "calc(100% - 32px)",
-        maxHeight: "calc(100% - 32px)",
-        backgroundColor: "rgba(42, 42, 42, 0.9)",
+        margin: "2px 3px",
         border: "1px solid #555",
         borderRadius: "4.2px",
+        padding: "12px",
+        width: "400px",
+        maxWidth: "calc(100% - 32px)",
+        maxHeight: "calc(100% - 30px)",
+        backgroundColor: "rgba(42, 42, 42, 0.9)",
         color: "white",
+        display: "flex",
+        flexDirection: "column",
+        gap: "10px",
+        overflowY: "auto",
       }}>
-        <div style={{ marginRight: "42px" }}>
-          {msg}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2px", gap: "8px" }}>
+          <RedeemResultMessage message={message} />
+          <CloseButton onClose={onClose} />
         </div>
-        <div
-          onClick={() => onClose()}
-          style={{
-            position: "absolute",
-            top: "12px",
-            right: "12px",
-            width: "24px",
-            height: "24px",
-            cursor: "pointer",
-          }}
-        >
-          <svg class="cesium-svgPath-svg" viewBox="0 -960 960 960" width="30" height="30" fill="currentColor">
-            <path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z" />
-          </svg>
-        </div>
+        {items.length > 0 && (
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+            gap: "4px 10px",
+          }}>
+            {items.map((item) => (
+              <div style={{ minWidth: 0, overflowWrap: "anywhere" }}>
+                {item}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   ) as HTMLElement;
 };
+
+function getRedeemMessage(result: RedeemResult, items: string[]): string {
+  if (!result.ok) return result.message;
+  return items.length === 0 ? "Passcode redeemed successfully!" : "Passcode confirmed. Acquired items:";
+}
+
+function formatRedeemItems(result: RedeemResult): string[] {
+  if (!result.ok) return [];
+
+  const rewards = result.response.rewards;
+  if (!rewards) return [];
+
+  const items: string[] = [];
+
+  rewards.other?.forEach((item) => {
+    if (item) items.push(item);
+  });
+
+  if (rewards.xm) items.push(`${rewards.xm} XM`);
+  if (rewards.ap) items.push(`${rewards.ap} AP`);
+
+  rewards.inventory?.forEach((type) => {
+    type.awards.forEach((award) => {
+      const level = award.level > 0 ? `L${award.level} ` : "";
+      items.push(`${level}${type.name} (${award.count})`);
+    });
+  });
+
+  return items;
+}
 
 export default RedeemResultPane;

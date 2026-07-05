@@ -1,10 +1,17 @@
-import type { RedeemManager } from "../../../managers/game/redeemManager.ts";
+import type { RedeemManager, RedeemResult } from "../../../managers/game/redeemManager.ts";
 import { h, Fragment } from "../../../utils/dom.ts";
 
-const GameRedeem = ({ redeemManager, onRedeemSuccess }: {
+const GameRedeem = ({ redeemManager, onShowRedeemResult }: {
   redeemManager: RedeemManager,
-  onRedeemSuccess: (message: string) => void,
+  onShowRedeemResult: (result: RedeemResult) => void,
 }) => {
+  const redeem = () => {
+    const input = document.getElementById("redeem-input") as HTMLInputElement;
+    if (input.value) {
+      redeemManager.requestRedeem(input.value).then((result) => onShowRedeemResult(result));
+    }
+  };
+
   return (
     <>
       <div style={{ marginTop: "20px" }}>Redeem Code</div>
@@ -23,10 +30,7 @@ const GameRedeem = ({ redeemManager, onRedeemSuccess }: {
           }}
           onKeypress={(e: KeyboardEvent) => {
             if (e.key === "Enter") {
-              const input = document.getElementById("redeem-input") as HTMLInputElement;
-              if (input.value) {
-                redeemManager.requestRedeem(input.value).then((msg) => onRedeemSuccess(msg));
-              }
+              redeem();
             }
           }}
         />
@@ -42,10 +46,7 @@ const GameRedeem = ({ redeemManager, onRedeemSuccess }: {
             cursor: "pointer",
           }}
           onClick={() => {
-            const input = document.getElementById("redeem-input") as HTMLInputElement;
-            if (input.value) {
-              redeemManager.requestRedeem(input.value).then((msg) => onRedeemSuccess(msg));
-            }
+            redeem();
           }}
         >
           Redeem

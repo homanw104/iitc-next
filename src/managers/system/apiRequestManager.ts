@@ -70,7 +70,7 @@ export class ApiRequestManager {
   }
 
   public redeemReward(passcode: string): Promise<RedeemResponse> {
-    return this.request("redeemReward", { passcode }, validateErrorResponse);
+    return this.request("redeemReward", { passcode }, validateRedeemResponse);
   }
 
   public sendPlext(payload: SendPlextPayload): Promise<SendPlextResponse> {
@@ -174,6 +174,19 @@ function validateGameScoreResponse(response: unknown): GameScoreResponse {
   }
 
   return normalized as unknown as GameScoreResponse;
+}
+
+function validateRedeemResponse(response: unknown): RedeemResponse {
+  const normalized = normalizeRecord(response, "redeemReward");
+  if (normalized.error !== undefined) {
+    return normalized as unknown as RedeemResponse;
+  }
+
+  if (!isRecord(normalized.rewards)) {
+    throw new Error("Invalid redeemReward response: missing rewards object");
+  }
+
+  return normalized as unknown as RedeemResponse;
 }
 
 function validateGetPlextsResponse(response: unknown): GetPlextsResponse {

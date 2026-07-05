@@ -12,8 +12,40 @@ export interface GameScoreResponse extends IntelResponseWithError {
   result?: string[];
 }
 
+export interface RedeemInventoryAward {
+  level: number;
+  count: number;
+}
+
+export interface RedeemInventoryReward {
+  name: string;
+  awards: RedeemInventoryAward[];
+}
+
+export interface RedeemRewards {
+  ap?: string;
+  xm?: string;
+  other?: string[];
+  inventory?: RedeemInventoryReward[];
+}
+
+export interface RedeemPlayerData {
+  ap: string;
+  energy: number;
+  team: Team;
+  available_invites: number;
+  verified_level: number;
+  xm_capacity: string;
+  min_ap_for_current_level: string | number;
+  min_ap_for_next_level: string | number;
+  guid: string;
+  recursion_count?: string;
+  nickname: string;
+}
+
 export interface RedeemResponse extends IntelResponseWithError {
-  result?: string;
+  rewards?: RedeemRewards;
+  playerData?: RedeemPlayerData;
 }
 
 export type SendPlextResponse = IntelResponseWithError;

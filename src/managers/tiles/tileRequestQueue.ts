@@ -29,7 +29,9 @@ export class TileRequestQueue {
   private queueProcessingScheduled = false;
   private scheduledRefreshExisting = false;
 
-  constructor(private readonly handleResponse: TileResponseHandler) {}
+  constructor(
+    private readonly handleResponse: TileResponseHandler,
+  ) {}
 
   public addTiles(tileKeys: string[], refreshExisting: boolean = false): void {
     logManager.debug(LOG_TAG, `Adding ${tileKeys.length} tiles to queue`);
