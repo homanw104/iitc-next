@@ -1,8 +1,6 @@
 package world.homans.iitcnext;
 
-import android.Manifest;
 import android.annotation.SuppressLint;
-import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.view.View;
@@ -11,9 +9,8 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import androidx.annotation.NonNull;
 import androidx.core.graphics.Insets;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
 import androidx.core.splashscreen.SplashScreen;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
@@ -23,8 +20,8 @@ import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
     private final ScriptInjector scriptInjector = new ScriptInjector();
-    private static final int PERMISSION_REQUEST_CODE = 1234;
     private static final String INTEL_URL = "https://intel.ingress.com/intel";
+    private IITCNativeInterface nativeInterface;
     private Insets systemBarInsets = Insets.NONE;
 
     @Override
@@ -41,7 +38,6 @@ public class MainActivity extends BridgeActivity {
             WebView.setWebContentsDebuggingEnabled(true);
         }
         scriptInjector.loadUserScript(this);
-        checkAndRequestPermissions();
     }
 
     private void configureEdgeToEdge() {
@@ -62,20 +58,22 @@ public class MainActivity extends BridgeActivity {
         insetsController.setAppearanceLightNavigationBars(false);
     }
 
-    private void checkAndRequestPermissions() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED ||
-            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            
-            ActivityCompat.requestPermissions(this,
-                new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION},
-                PERMISSION_REQUEST_CODE);
-        }
-    }
-
     @Override
     public void onResume() {
         super.onResume();
         scriptInjector.loadUserScript(this);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(
+        int requestCode,
+        @NonNull String[] permissions,
+        @NonNull int[] grantResults
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (nativeInterface != null) {
+            nativeInterface.onRequestPermissionsResult(requestCode);
+        }
     }
 
     public ScriptInjector getScriptInjector() {
@@ -119,7 +117,8 @@ public class MainActivity extends BridgeActivity {
         IITCWebViewSettings.configureNianticCookies(webView);
         IITCWebViewSettings.configureAuthIdentity(this, settings);
 
-        webView.addJavascriptInterface(new IITCNativeInterface(webView), "IITC_Native");
+        nativeInterface = new IITCNativeInterface(webView, this);
+        webView.addJavascriptInterface(nativeInterface, "IITC_Native");
     }
 
     private void configureSystemInsetBridge(WebView webView) {

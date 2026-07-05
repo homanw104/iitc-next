@@ -4,6 +4,21 @@ import { logManager } from "../../../managers/system/logManager.ts";
 import { h } from "../../../utils/dom.ts";
 
 const LOG_TAG = "GetLocationButton";
+const PRECISE_LOCATION_CAMERA_HEIGHT = 1800;
+const APPROXIMATE_LOCATION_ACCURACY_THRESHOLD = 1000;
+const APPROXIMATE_LOCATION_CAMERA_HEIGHT_MULTIPLIER = 4;
+const MAX_APPROXIMATE_LOCATION_CAMERA_HEIGHT = 40000;
+
+const getCameraHeightForAccuracy = (accuracy: number): number => {
+  if (!Number.isFinite(accuracy) || accuracy <= 0) {
+    return PRECISE_LOCATION_CAMERA_HEIGHT;
+  }
+
+  return Math.min(
+    Math.max(PRECISE_LOCATION_CAMERA_HEIGHT, accuracy * APPROXIMATE_LOCATION_CAMERA_HEIGHT_MULTIPLIER),
+    MAX_APPROXIMATE_LOCATION_CAMERA_HEIGHT
+  );
+};
 
 const GetLocationButton = ({ viewer }: {
   viewer: Cesium.Viewer,
@@ -12,8 +27,11 @@ const GetLocationButton = ({ viewer }: {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          const { latitude, longitude } = position.coords;
-          const height = 1800;
+          const { latitude, longitude, accuracy } = position.coords;
+          const height = getCameraHeightForAccuracy(accuracy);
+          if (accuracy >= APPROXIMATE_LOCATION_ACCURACY_THRESHOLD) {
+            logManager.info(LOG_TAG, "Using approximate location");
+          }
           viewer.camera.flyTo({
             destination: Cartesian3.fromDegrees(longitude, latitude, height),
             duration: 2.4,

@@ -146,6 +146,13 @@ public class ScriptInjector {
             "      window.onAndroidLocation = function(lat, lng, acc) { " +
             "        success({ coords: { latitude: lat, longitude: lng, accuracy: acc }, timestamp: Date.now() }); " +
             "      }; " +
+            "      window.onAndroidLocationError = function(code, message) { " +
+            "        if (typeof error === 'function') { " +
+            "          error({ code: code, message: message }); " +
+            "        } else { " +
+            "          console.warn('IITC-Next: location unavailable:', message); " +
+            "        } " +
+            "      }; " +
             "      window.IITC_Native.getCurrentPosition(); " +
             "    }; " +
             "  } " +
