@@ -49,6 +49,7 @@ dependencies {
     implementation libs.androidx.coordinatorlayout
     implementation libs.androidx.splashscreen.dep
     implementation libs.androidx.browser.dep
+    implementation libs.androidx.webkit
     implementation project(':capacitor-android')
     testImplementation libs.junit
     androidTestImplementation libs.androidx.junit

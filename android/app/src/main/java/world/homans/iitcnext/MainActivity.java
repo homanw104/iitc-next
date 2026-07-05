@@ -2,7 +2,6 @@ package world.homans.iitcnext;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
-import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.os.Bundle;
@@ -25,6 +24,7 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
     private final ScriptInjector scriptInjector = new ScriptInjector();
     private static final int PERMISSION_REQUEST_CODE = 1234;
+    private static final String INTEL_URL = "https://intel.ingress.com/intel";
     private Insets systemBarInsets = Insets.NONE;
 
     @Override
@@ -82,9 +82,12 @@ public class MainActivity extends BridgeActivity {
         return scriptInjector;
     }
 
-    public static String getCleanedUserAgent(Context context) {
-        String defaultUA = WebSettings.getDefaultUserAgent(context);
-        return defaultUA.replaceAll("Version/\\d+\\.\\d+\\s?", "").replaceAll(";\\s?wv", "");
+    public void openIntelMap() {
+        openMainWebViewUrl(INTEL_URL);
+    }
+
+    public void openMainWebViewUrl(String url) {
+        getBridge().getWebView().post(() -> getBridge().getWebView().loadUrl(url));
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -113,18 +116,8 @@ public class MainActivity extends BridgeActivity {
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         settings.setGeolocationEnabled(true);
 
-        android.webkit.CookieManager cookieManager = android.webkit.CookieManager.getInstance();
-        cookieManager.setAcceptThirdPartyCookies(webView, true);
-
-        // Set _ncc cookie to disable Niantic's cookie consent banner
-        try {
-            cookieManager.setAcceptCookie(true);
-            cookieManager.setCookie("https://signin.nianticspatial.com", "_ncc=0; Path=/; Domain=.nianticspatial.com");
-        } catch (Exception e) {
-            android.util.Log.w("MainActivity", "Could not set _ncc cookie: " + e.getMessage());
-        }
-
-        settings.setUserAgentString(getCleanedUserAgent(this));
+        IITCWebViewSettings.configureNianticCookies(webView);
+        IITCWebViewSettings.configureAuthIdentity(this, settings);
 
         webView.addJavascriptInterface(new IITCNativeInterface(webView), "IITC_Native");
     }

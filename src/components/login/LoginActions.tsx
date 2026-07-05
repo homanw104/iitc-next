@@ -1,7 +1,7 @@
 import { h } from "../../utils/dom.ts";
 import LoginButton from "./LoginButton.tsx";
 
-const SIGN_IN_URL = "https://signin.nianticspatial.com/signin?continue=https://intel.ingress.com/signinhandler&service=ingress-intel";
+const SIGN_IN_URL = "https://signin.nianticspatial.com/signin?continue=https%3A%2F%2Fintel.ingress.com%2Fsigninhandler&service=ingress-intel";
 const LEARN_MORE_URL = "https://support.ingress.com/hc";
 
 const LoginActions = (): HTMLElement => {

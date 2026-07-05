@@ -3,10 +3,16 @@ package world.homans.iitcnext;
 import android.annotation.SuppressLint;
 import android.app.Dialog;
 import android.content.Intent;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Message;
-import android.util.Log;
+import android.util.DisplayMetrics;
+import android.view.Gravity;
 import android.view.ViewGroup;
+import android.view.Window;
+import android.view.WindowManager;
 import android.webkit.CookieManager;
 import android.webkit.GeolocationPermissions;
 import android.webkit.WebChromeClient;
@@ -14,36 +20,37 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.FrameLayout;
 import androidx.browser.customtabs.CustomTabsIntent;
 import com.getcapacitor.Bridge;
 import com.getcapacitor.BridgeWebChromeClient;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 public class IITCPopupHandler extends BridgeWebChromeClient {
+    private static final float POPUP_WIDTH_RATIO = 0.94f;
+    private static final float POPUP_HEIGHT_RATIO = 0.86f;
+    private static final float POPUP_DIM_AMOUNT = 0.42f;
+    private static final float POPUP_CORNER_RADIUS_DP = 18f;
+
     private final MainActivity activity;
-    private Dialog popupDialog;
+    private final Map<WebView, Dialog> popupDialogs = new HashMap<>();
 
     public IITCPopupHandler(Bridge bridge, MainActivity activity) {
         super(bridge);
         this.activity = activity;
     }
 
-    private boolean isAllowedAuthHost(Uri uri) {
-        String host = uri.getHost();
-        if (host == null) return false;
-
-        String normalizedHost = host.toLowerCase();
-        return normalizedHost.equals("intel.ingress.com")
-            || normalizedHost.endsWith(".google.com")
-            || normalizedHost.equals("google.com")
-            || normalizedHost.endsWith(".googleusercontent.com")
-            || normalizedHost.equals("googleusercontent.com")
-            || normalizedHost.equals("signin.nianticspatial.com")
-            || normalizedHost.endsWith(".nianticspatial.com");
-    }
-
-    private boolean isIntelReturnUrl(String url) {
+    private void completeIntelReturn(String url) {
+        CookieManager.getInstance().flush();
+        dismissAllPopups();
         Uri uri = Uri.parse(url);
-        return "intel.ingress.com".equalsIgnoreCase(uri.getHost());
+        if (IITCAuthUrlHelper.isIntelSignInHandler(uri)) {
+            activity.openIntelMap();
+        } else {
+            activity.openMainWebViewUrl(url);
+        }
     }
 
     @Override
@@ -54,68 +61,131 @@ public class IITCPopupHandler extends BridgeWebChromeClient {
     @SuppressLint("SetJavaScriptEnabled")
     @Override
     public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, Message resultMsg) {
-        final WebView newWebView = new WebView(activity);
-        configurePopupWebView(newWebView);
+        if (!isUserGesture) return false;
 
-        if (popupDialog != null && popupDialog.isShowing()) {
-            popupDialog.dismiss();
-        }
+        final WebView newWebView = createPopupWebView();
+        showPopupDialog(newWebView);
+        WebView.WebViewTransport transport = (WebView.WebViewTransport) resultMsg.obj;
+        transport.setWebView(newWebView);
+        resultMsg.sendToTarget();
+        return true;
+    }
 
-        popupDialog = new Dialog(activity, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
-        popupDialog.setContentView(newWebView);
-        ViewGroup.LayoutParams params = newWebView.getLayoutParams();
-        params.width = ViewGroup.LayoutParams.MATCH_PARENT;
-        params.height = ViewGroup.LayoutParams.MATCH_PARENT;
-        newWebView.setLayoutParams(params);
-        popupDialog.show();
+    private WebView createPopupWebView() {
+        WebView popupWebView = new WebView(activity);
+        configurePopupWebView(popupWebView);
+        popupWebView.setWebViewClient(createPopupWebViewClient());
+        popupWebView.setWebChromeClient(createPopupChromeClient());
+        return popupWebView;
+    }
 
-        newWebView.setWebViewClient(new WebViewClient() {
+    private WebViewClient createPopupWebViewClient() {
+        return new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
-                if (IngressLinkHandler.openInApp(activity, uri)) {
-                    dismissPopup();
-                    return true;
-                }
-
-                if (isAllowedAuthHost(uri)) {
+                if (!request.isForMainFrame()) {
                     return false;
                 }
 
-                try {
-                    CustomTabsIntent.Builder builder = new CustomTabsIntent.Builder();
-                    CustomTabsIntent customTabsIntent = builder.build();
-                    customTabsIntent.launchUrl(activity, uri);
-                    return true;
-                } catch (Exception e) {
-                    Intent intent = new Intent(Intent.ACTION_VIEW, uri);
-                    activity.startActivity(intent);
+                String googleRedirect = IITCAuthUrlHelper.getGoogleRedirectTarget(uri);
+                if (googleRedirect != null) {
+                    return loadGoogleRedirect(view, googleRedirect);
+                }
+
+                if (IngressLinkHandler.openInApp(activity, uri)) {
+                    dismissPopup(view);
                     return true;
                 }
+
+                if (IITCAuthUrlHelper.isIntelHost(uri) && "GET".equalsIgnoreCase(request.getMethod())) {
+                    completeIntelReturn(uri.toString());
+                    return true;
+                }
+
+                if (IITCAuthUrlHelper.isAllowedAuthHost(uri)) {
+                    return false;
+                }
+
+                openExternal(uri);
+                return true;
             }
 
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
-                if (isIntelReturnUrl(url)) {
-                    CookieManager.getInstance().flush();
-                    activity.getBridge().getWebView().loadUrl(url);
-                    dismissPopup();
+                Uri uri = Uri.parse(url);
+                if (IITCAuthUrlHelper.isIntelHost(uri)) {
+                    completeIntelReturn(url);
                 }
             }
-        });
+        };
+    }
 
-        newWebView.setWebChromeClient(new WebChromeClient() {
+    private WebChromeClient createPopupChromeClient() {
+        return new WebChromeClient() {
+            @Override
+            public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, Message resultMsg) {
+                if (!isUserGesture) return false;
+
+                WebView nestedWebView = createPopupWebView();
+                showPopupDialog(nestedWebView);
+                WebView.WebViewTransport transport = (WebView.WebViewTransport) resultMsg.obj;
+                transport.setWebView(nestedWebView);
+                resultMsg.sendToTarget();
+                return true;
+            }
+
             @Override
             public void onCloseWindow(WebView window) {
-                dismissPopup();
+                dismissPopup(window);
             }
+        };
+    }
+
+    private void showPopupDialog(WebView webView) {
+        Dialog dialog = new Dialog(activity);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setContentView(createPopupContainer(webView));
+        dialog.setCanceledOnTouchOutside(true);
+        dialog.setOnDismissListener(dismissedDialog -> {
+            popupDialogs.remove(webView);
+            webView.destroy();
         });
 
-        WebView.WebViewTransport transport = (WebView.WebViewTransport) resultMsg.obj;
-        transport.setWebView(newWebView);
-        resultMsg.sendToTarget();
-        return true;
+        popupDialogs.put(webView, dialog);
+        dialog.show();
+
+        Window window = dialog.getWindow();
+        if (window == null) return;
+
+        DisplayMetrics metrics = activity.getResources().getDisplayMetrics();
+        int width = Math.round(metrics.widthPixels * POPUP_WIDTH_RATIO);
+        int height = Math.round(metrics.heightPixels * POPUP_HEIGHT_RATIO);
+        window.setLayout(width, height);
+        window.setGravity(Gravity.CENTER);
+        window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        WindowManager.LayoutParams attributes = window.getAttributes();
+        attributes.dimAmount = POPUP_DIM_AMOUNT;
+        window.setAttributes(attributes);
+        window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+    }
+
+    private FrameLayout createPopupContainer(WebView webView) {
+        FrameLayout container = new FrameLayout(activity);
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(Color.WHITE);
+        background.setCornerRadius(dpToPx(POPUP_CORNER_RADIUS_DP));
+        container.setBackground(background);
+        container.setClipToOutline(true);
+
+        webView.setBackgroundColor(Color.WHITE);
+        webView.setLayoutParams(new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT
+        ));
+        container.addView(webView);
+        return container;
     }
 
     private void configurePopupWebView(WebView webView) {
@@ -127,24 +197,47 @@ public class IITCPopupHandler extends BridgeWebChromeClient {
         settings.setDatabaseEnabled(true);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
 
-        String cleanedUA = MainActivity.getCleanedUserAgent(activity);
-        settings.setUserAgentString(cleanedUA);
+        IITCWebViewSettings.configureAuthIdentity(activity, settings);
+        IITCWebViewSettings.configureNianticCookies(webView);
+    }
 
-        // Set _ncc cookie to disable Niantic's cookie consent banner
+    private int dpToPx(float dp) {
+        return Math.round(dp * activity.getResources().getDisplayMetrics().density);
+    }
+
+    private boolean loadGoogleRedirect(WebView view, String url) {
+        Uri uri = Uri.parse(url);
+        if (IITCAuthUrlHelper.isAllowedAuthHost(uri)) {
+            view.loadUrl(url);
+        } else {
+            openExternal(uri);
+        }
+        return true;
+    }
+
+    private void openExternal(Uri uri) {
         try {
-            CookieManager cookieManager = CookieManager.getInstance();
-            cookieManager.setAcceptCookie(true);
-            cookieManager.setAcceptThirdPartyCookies(webView, true);
-            cookieManager.setCookie("https://signin.nianticspatial.com", "_ncc=0; Path=/; Domain=.nianticspatial.com");
+            CustomTabsIntent.Builder builder = new CustomTabsIntent.Builder();
+            CustomTabsIntent customTabsIntent = builder.build();
+            customTabsIntent.launchUrl(activity, uri);
         } catch (Exception e) {
-            Log.w("IITCPopupHandler", "Could not set _ncc cookie: " + e.getMessage());
+            Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+            activity.startActivity(intent);
         }
     }
 
-    private void dismissPopup() {
-        if (popupDialog != null && popupDialog.isShowing()) {
-            popupDialog.dismiss();
-            popupDialog = null;
+    private void dismissPopup(WebView webView) {
+        Dialog dialog = popupDialogs.get(webView);
+        if (dialog != null && dialog.isShowing()) {
+            dialog.dismiss();
+        }
+    }
+
+    private void dismissAllPopups() {
+        for (Dialog dialog : new ArrayList<>(popupDialogs.values())) {
+            if (dialog.isShowing()) {
+                dialog.dismiss();
+            }
         }
     }
 }
