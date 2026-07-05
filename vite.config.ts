@@ -34,11 +34,13 @@ export default defineConfig({
     monkey({
       entry: "src/bootstrap.ts",
       userscript: {
-        name: "iitc-next",
+        name: "IITC Next: Your next Ingress Intel Total Conversion script",
         author: "Homan",
         version: packageJson.version,
         description: "IITC Next",
+        icon: "https://iitcnext.homans.world/favicon.ico",
         namespace: "https://github.com/homanw104/iitc-next",
+        downloadURL: "https://github.com/homanw104/iitc-next/releases/latest/download/iitc-next.user.js",
         match: ["https://intel.ingress.com/*"],
         exclude: ["https://intel.ingress.com/signinhandler*"],
         connect: ["maps.googleapis.com", "*.googleapis.com", "*.google.com", "tm.amap.com"],
