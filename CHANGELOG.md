@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.3.0
+
+* Added new map tiles options
+* Added map provider credits on screen
+* Added a brand-new set of map provider icons
+* Improved imagery selection pane display on mobile devices
+* Improved navigation experience on complicated terrains
+* Improved redeem functionality by displaying a formatted result
+* Improved position permission management on Android
+* Fixed double tap gestures selecting a portal when the user is trying to zoom in
+* Fixed portals displaying at a fallback position when using terrain tiles
+* Fixed occasional camera height bumps when restoring the last view when initiating
+* Fixed the error that would happen when the user logs in
+* Other minor improvements
+
 ## 2.2.2
 
 * Improved label display and hide sequence
