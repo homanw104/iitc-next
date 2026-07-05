@@ -3,7 +3,7 @@
  */
 
 import * as Cesium from "cesium";
-import type { PortalData } from "../../types/ingress";
+import type { PortalData } from "../../types/iitc/portal.ts";
 import type { LayerManager } from "../layer/layerManager";
 import type { EntityPosition, EntityPositionCallback, EntityPositionManager } from "./entityPositionManager";
 import {

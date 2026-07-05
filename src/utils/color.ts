@@ -3,7 +3,7 @@
  */
 
 import * as Cesium from "cesium";
-import type { Team } from "../types/ingress";
+import type { Team } from "../types/common/common.ts";
 
 export function getTeamColor(team: Team): Cesium.Color {
   switch (team) {

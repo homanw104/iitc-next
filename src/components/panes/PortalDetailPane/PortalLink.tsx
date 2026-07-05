@@ -1,4 +1,4 @@
-import type { PortalData } from "../../../types/ingress.ts";
+import type { PortalData } from "../../../types/iitc/portal.ts";
 import { h } from "../../../utils/dom.ts";
 
 const PortalLink = ({ data, onCopy }: {

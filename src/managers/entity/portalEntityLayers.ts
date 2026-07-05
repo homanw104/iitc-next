@@ -2,7 +2,7 @@
  * Portal entity layer id helpers.
  */
 
-import type { PortalData } from "../../types/ingress";
+import type { PortalData } from "../../types/iitc/portal.ts";
 
 export function getPortalEntityLayerId(data: PortalData): string {
   const team = data.team.toLowerCase();

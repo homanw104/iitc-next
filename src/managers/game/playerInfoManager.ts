@@ -2,7 +2,7 @@
  * Functions to manage player info.
  */
 
-import type { Player } from "../../types/ingress.ts";
+import type { Player } from "../../types/iitc/player.ts";
 import { logManager } from "../system/logManager.ts";
 
 const LOG_TAG = "PlayerInfoManager";

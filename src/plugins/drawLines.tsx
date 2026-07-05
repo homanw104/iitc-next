@@ -4,9 +4,9 @@
  * This plugin enables you to draw lines on the map.
  */
 
-import "../types/iitc.ts";
+import "../types/iitc/iitc.ts";
 import * as Cesium from "cesium";
-import type { IITCCore } from "../types/iitc";
+import type { IITCCore } from "../types/iitc/iitc.ts";
 import { h } from "../utils/dom.ts";
 import { safeLocalStorage } from "../utils/storage.ts";
 import { safeWindow } from "../utils/window";

@@ -3,7 +3,8 @@
  */
 
 import * as Cesium from "cesium";
-import type { LinkData, PortalData } from "../../types/ingress";
+import type { LinkData } from "../../types/iitc/link.ts";
+import type { PortalData } from "../../types/iitc/portal.ts";
 import { getTeamColor } from "../../utils/color";
 import type { LayerManager } from "../layer/layerManager";
 import type { PortalEntityManager } from "./portalEntityManager";

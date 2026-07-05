@@ -2,9 +2,9 @@
  * Queue and concurrency control for Intel tile requests.
  */
 
-import type { TileResponse } from "../../types/ingress";
 import { apiRequestManager } from "../system/apiRequestManager.ts";
 import { logManager } from "../system/logManager";
+import type { TileResponse } from "../../types/api/getEntities.ts";
 
 const LOG_TAG = "TileRequestQueue";
 const MAX_REQUESTS: number = 5;

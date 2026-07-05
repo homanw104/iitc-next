@@ -2,7 +2,7 @@
  * Handle redeem requests.
  */
 
-import type { RedeemPlayerData, RedeemResponse } from "../../types/api.ts";
+import type { RedeemPlayerData, RedeemResponse } from "../../types/api/redeemReward.ts";
 import { apiRequestManager } from "../system/apiRequestManager.ts";
 import { playerInfoManager } from "./playerInfoManager.ts";
 import { logManager } from "../system/logManager";

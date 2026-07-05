@@ -7,9 +7,9 @@
 
 import * as Cesium from "cesium";
 import type { EntityPosition, EntityPositionCallback } from "../managers/entity/entityPositionManager";
-import type { IITCCore } from "../types/iitc";
-import type { Team } from "../types/ingress";
-import type { PlextMark } from "../types/api.ts";
+import type { IITCCore } from "../types/iitc/iitc.ts";
+import type { Team } from "../types/common/common.ts";
+import type { PlextMark } from "../types/api/getPlexts.ts";
 import { getTeamColor } from "../utils/color";
 import { h } from "../utils/dom.ts";
 import { safeWindow } from "../utils/window";

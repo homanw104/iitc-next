@@ -3,7 +3,10 @@
  */
 
 import type * as Cesium from "cesium";
-import type { FieldData, LinkData, PortalData, TileResponse } from "../../types/ingress";
+import type { FieldData } from "../../types/iitc/field.ts";
+import type { LinkData } from "../../types/iitc/link.ts";
+import type { PortalData } from "../../types/iitc/portal.ts";
+import type { TileResponse } from "../../types/api/getEntities.ts";
 import type { FieldEntityManager } from "../entity/fieldEntityManager";
 import type { LinkEntityManager } from "../entity/linkEntityManager";
 import type { PortalEntityManager } from "../entity/portalEntityManager";

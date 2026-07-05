@@ -1,4 +1,4 @@
-import type { PortalData } from "../../../types/ingress.ts";
+import type { PortalData } from "../../../types/iitc/portal.ts";
 import { getTeamColor } from "../../../utils/color.ts";
 import { h } from "../../../utils/dom.ts";
 import PortalHistory from "./PortalHistory.tsx";

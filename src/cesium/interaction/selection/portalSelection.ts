@@ -12,7 +12,7 @@ import type { PortalLabelEntityManager } from "../../../managers/entity/portalLa
 import type { PortalOrnamentEntityManager } from "../../../managers/entity/portalOrnamentEntityManager.ts";
 import type { ScoutHistoryEntityManager } from "../../../managers/entity/scoutHistoryEntityManager";
 import type { InteractionGestureState } from "../state/interactionGestureState";
-import { PortalData } from "../../../types/ingress.ts";
+import type { PortalData } from "../../../types/iitc/portal.ts";
 
 export interface PortalSelectionState {
   activeRequestId: number;

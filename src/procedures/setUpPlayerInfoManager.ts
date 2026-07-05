@@ -4,7 +4,7 @@
 
 import { playerInfoManager } from "../managers/game/playerInfoManager.ts";
 import { logManager } from "../managers/system/logManager";
-import type { Team } from "../types/ingress";
+import type { Team } from "../types/common/common.ts";
 import { safeWindow } from "../utils/window.ts";
 
 const LOG_TAG = "SetUpPlayerInfoManager";

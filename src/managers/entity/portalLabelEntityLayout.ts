@@ -8,7 +8,7 @@
  */
 
 import * as Cesium from "cesium";
-import type { PortalData } from "../../types/ingress";
+import type { PortalData } from "../../types/iitc/portal.ts";
 import { wrapLabelText } from "../../utils/text.ts";
 import { getPortalNearFarScale, PORTAL_POINT_PIXEL_SIZE } from "./portalEntityManager.ts";
 import type { PortalLabel, PortalLabelTextLayout } from "./portalLabelEntityTypes";

@@ -3,7 +3,6 @@
  */
 
 import type * as Cesium from "cesium";
-import type { TileResponse } from "../../types/ingress";
 import type { FieldEntityManager } from "../entity/fieldEntityManager";
 import type { LinkEntityManager } from "../entity/linkEntityManager";
 import type { PortalEntityManager } from "../entity/portalEntityManager";
@@ -16,6 +15,7 @@ import { settingsManager, type RefreshIntervalMs } from "../system/settingsManag
 import { TileEntityHydrator } from "./tileRequestEntityHydrator";
 import { TileRequestQueue, type TileStatusCallback } from "./tileRequestQueue";
 import { ViewTileCalculator } from "./tileRequestViewCalculator";
+import type { TileResponse } from "../../types/api/getEntities.ts";
 
 const LOG_TAG = "TileRequestManager";
 

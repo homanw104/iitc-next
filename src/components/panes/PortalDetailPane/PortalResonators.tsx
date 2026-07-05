@@ -1,5 +1,5 @@
-import { RESO_LEVEL_ENERGY } from "../../../types/ingress.ts";
-import type { PortalData} from "../../../types/ingress.ts";
+import { RESO_LEVEL_ENERGY } from "../../../types/common/common.ts";
+import type { PortalData } from "../../../types/iitc/portal.ts";
 import { h, Fragment } from "../../../utils/dom.ts";
 
 const PortalResonators = ({ data, teamColorHex }: { data: PortalData, teamColorHex: string }) => (

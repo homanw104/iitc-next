@@ -3,7 +3,7 @@
  */
 
 import * as Cesium from "cesium";
-import { IITCCore } from "../../types/iitc.ts";
+import { IITCCore } from "../../types/iitc/iitc.ts";
 import { CoreManagers } from "./createCoreManagers.ts";
 
 export function exposeCoreManagers(iitc: IITCCore, viewer: Cesium.Viewer, managers: CoreManagers): void {

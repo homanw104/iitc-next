@@ -2,8 +2,17 @@
  * Converts raw Intel tile entities into typed map entities.
  */
 
-import type { FieldData, LinkData, PortalData, PortalLevel, PortalMod, PortalResonator, RawEntity } from "../../types/ingress";
-import type { ParsedEntities } from "../../types/map";
+import type { RawEntity } from "../../types/api/getEntities.ts";
+import type { PortalLevel } from "../../types/common/common.ts";
+import type { FieldData } from "../../types/iitc/field.ts";
+import type { LinkData } from "../../types/iitc/link.ts";
+import type { PortalData, PortalMod, PortalResonator } from "../../types/iitc/portal.ts";
+
+interface ParsedEntities {
+  portals: PortalData[];
+  links: LinkData[];
+  fields: FieldData[];
+}
 
 export function parseTileEntities(entities: RawEntity[]): ParsedEntities {
   const portals: PortalData[] = [];
@@ -94,7 +103,7 @@ export function parsePortal(ent: RawEntity): PortalData {
   return portal;
 }
 
-export function parseLink(ent: RawEntity): LinkData {
+function parseLink(ent: RawEntity): LinkData {
   const [guid, timestamp, data] = ent;
   const teamCode = data[1] as string;
   return {
@@ -112,7 +121,7 @@ export function parseLink(ent: RawEntity): LinkData {
   };
 }
 
-export function parseField(ent: RawEntity): FieldData {
+function parseField(ent: RawEntity): FieldData {
   const [guid, timestamp, data] = ent;
   const teamCode = data[1] as string;
   const team = teamCode === "E" ? "ENLIGHTENED" :

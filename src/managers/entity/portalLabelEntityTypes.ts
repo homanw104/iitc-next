@@ -8,7 +8,7 @@
  */
 
 import type * as Cesium from "cesium";
-import type { PortalData } from "../../types/ingress";
+import type { PortalData } from "../../types/iitc/portal.ts";
 import type { EntityPositionCallback } from "./entityPositionManager";
 
 export interface PortalLabel {

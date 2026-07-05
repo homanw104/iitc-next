@@ -5,8 +5,8 @@
  * safeWindow is provided for access to the IITC Next core components.
  */
 
-import "../types/iitc.ts";
-import type { IITCCore } from "../types/iitc";
+import "../types/iitc/iitc.ts";
+import type { IITCCore } from "../types/iitc/iitc.ts";
 import { safeWindow } from "../utils/window";
 
 const LOG_TAG = "SamplePlugin";

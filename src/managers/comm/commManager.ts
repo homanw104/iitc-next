@@ -3,8 +3,8 @@
  */
 
 import * as Cesium from "cesium";
-import type { Channel } from "../../types/ingress";
-import type { CommResponseItem, GetPlextsPayload } from "../../types/api.ts";
+import type { Channel } from "../../types/common/common.ts";
+import type { CommResponseItem, GetPlextsPayload } from "../../types/api/getPlexts.ts";
 import { apiRequestManager } from "../system/apiRequestManager.ts";
 import { logManager } from "../system/logManager";
 

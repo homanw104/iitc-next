@@ -2,7 +2,7 @@
  * Manages the lifecycle and state of IITC plugins.
  */
 
-import type { IITCPlugin } from "../../types/iitc";
+import type { IITCPlugin } from "../../types/iitc/iitc.ts";
 import { safeLocalStorage } from "../../utils/storage";
 import { logManager } from "./logManager";
 

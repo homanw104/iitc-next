@@ -1,0 +1,61 @@
+import type * as Cesium from "cesium";
+import type { CommManager } from "../../managers/comm/commManager.ts";
+import type { EntityPositionManager } from "../../managers/entity/entityPositionManager.ts";
+import type { EntityTranslucencyManager } from "../../managers/entity/entityTranslucencyManager.ts";
+import type { FieldEntityManager } from "../../managers/entity/fieldEntityManager.ts";
+import type { LinkEntityManager } from "../../managers/entity/linkEntityManager.ts";
+import type { PortalEntityManager } from "../../managers/entity/portalEntityManager.ts";
+import type { PortalHistoryEntityManager } from "../../managers/entity/portalHistoryEntityManager.ts";
+import type { PortalLabelEntityManager } from "../../managers/entity/portalLabelEntityManager.ts";
+import type { PortalOrnamentEntityManager } from "../../managers/entity/portalOrnamentEntityManager.ts";
+import type { ScoutHistoryEntityManager } from "../../managers/entity/scoutHistoryEntityManager.ts";
+import type { PlayerInfoManager } from "../../managers/game/playerInfoManager.ts";
+import type { RedeemManager } from "../../managers/game/redeemManager.ts";
+import type { ScoreManager } from "../../managers/game/scoreManager.ts";
+import type { LayerManager } from "../../managers/layer/layerManager.ts";
+import type { ApiRequestManager } from "../../managers/system/apiRequestManager.ts";
+import type { InterfaceManager } from "../../managers/system/interfaceManager.ts";
+import type { LogManager } from "../../managers/system/logManager.ts";
+import type { PluginManager } from "../../managers/system/pluginManager.ts";
+import type { LoadingProgressManager } from "../../managers/system/loadingProgressManager.ts";
+import type { SettingsManager } from "../../managers/system/settingsManager.ts";
+import type { TileRequestManager } from "../../managers/tiles/tileRequestManager.ts";
+
+export interface IITCPlugin {
+  id: string;
+  name: string;
+  description: string;
+  init: () => void;
+  deinit?: () => void;
+}
+
+export interface IITCCore {
+  viewer?: Cesium.Viewer;
+  logManager?: LogManager;
+  apiRequestManager?: ApiRequestManager;
+  settingsManager?: SettingsManager;
+  pluginManager?: PluginManager;
+  layerManager?: LayerManager;
+  loadingProgressManager?: LoadingProgressManager;
+  entityPositionManager?: EntityPositionManager;
+  entityTranslucencyManager?: EntityTranslucencyManager;
+  playerInfoManager?: PlayerInfoManager;
+  portalEntityManager?: PortalEntityManager;
+  linkEntityManager?: LinkEntityManager;
+  fieldEntityManager?: FieldEntityManager;
+  portalLabelEntityManager?: PortalLabelEntityManager;
+  portalOrnamentEntityManager?: PortalOrnamentEntityManager;
+  portalHistoryEntityManager?: PortalHistoryEntityManager;
+  scoutHistoryEntityManager?: ScoutHistoryEntityManager;
+  tileRequestManager?: TileRequestManager;
+  scoreManager?: ScoreManager;
+  redeemManager?: RedeemManager;
+  commManager?: CommManager;
+  interfaceManager?: InterfaceManager;
+}
+
+declare global {
+  interface Window {
+    iitc: IITCCore;
+  }
+}

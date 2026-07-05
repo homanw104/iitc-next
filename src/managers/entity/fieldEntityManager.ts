@@ -3,7 +3,8 @@
  */
 
 import * as Cesium from "cesium";
-import type { FieldData, PortalData } from "../../types/ingress";
+import type { FieldData } from "../../types/iitc/field.ts";
+import type { PortalData } from "../../types/iitc/portal.ts";
 import { getTeamColor } from "../../utils/color";
 import type { LayerManager } from "../layer/layerManager";
 import { settingsManager } from "../system/settingsManager.ts";

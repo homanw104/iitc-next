@@ -15,7 +15,7 @@ import { PortalDetailPaneController } from "../../controllers/PortalDetailPaneCo
 import { ProfilePaneController } from "../../controllers/ProfilePaneController.tsx";
 import { SoftRefreshButtonController } from "../../controllers/SoftRefreshButtonController.tsx";
 import { logManager } from "../../managers/system/logManager.ts";
-import type { PortalData } from "../../types/ingress.ts";
+import type { PortalData } from "../../types/iitc/portal.ts";
 import type { CoreManagers } from "./createCoreManagers.ts";
 
 export interface PortalDetailState {

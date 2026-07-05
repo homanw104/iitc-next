@@ -2,19 +2,17 @@
  * Handles Intel API version setup, requests, and response normalization.
  */
 
-import type { TileResponse } from "../../types/ingress.ts";
 import type {
-  GameScoreResponse,
-  GetPlextsPayload,
-  GetPlextsResponse,
   IntelApiAction,
   IntelApiPayloads,
   IntelApiResponses,
-  PortalDetailsResponse,
-  RedeemResponse,
-  SendPlextPayload,
-  SendPlextResponse,
-} from "../../types/api.ts";
+} from "../../types/api/api.ts";
+import type { TileResponse } from "../../types/api/getEntities.ts";
+import type { GameScoreResponse } from "../../types/api/getGameScore.ts";
+import type { GetPlextsPayload, GetPlextsResponse } from "../../types/api/getPlexts.ts";
+import type { PortalDetailsResponse } from "../../types/api/getPortalDetails.ts";
+import type { RedeemResponse } from "../../types/api/redeemReward.ts";
+import type { SendPlextPayload, SendPlextResponse } from "../../types/api/sendPlext.ts";
 import { getCookie } from "../../utils/browser.ts";
 import { safeLocalStorage } from "../../utils/storage.ts";
 import { logManager } from "./logManager";

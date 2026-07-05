@@ -8,8 +8,8 @@ import type { PortalLabelEntityManager } from "../../../managers/entity/portalLa
 import type { PortalOrnamentEntityManager } from "../../../managers/entity/portalOrnamentEntityManager.ts";
 import type { ScoutHistoryEntityManager } from "../../../managers/entity/scoutHistoryEntityManager.ts";
 import type { TileRequestManager } from "../../../managers/tiles/tileRequestManager.ts";
-import type { Channel } from "../../../types/ingress.ts";
-import type { CommResponseItem } from "../../../types/api.ts";
+import type { Channel } from "../../../types/common/common.ts";
+import type { CommResponseItem } from "../../../types/api/getPlexts.ts";
 import { getTeamColor } from "../../../utils/color.ts";
 import { h } from "../../../utils/dom.ts";
 import PortalDetailBar from "../../buttons/PortalDetailBar/PortalDetailBar.tsx";

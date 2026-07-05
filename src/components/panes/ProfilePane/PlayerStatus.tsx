@@ -1,4 +1,4 @@
-import type { Player } from "../../../types/ingress.ts";
+import type { Player } from "../../../types/iitc/player.ts";
 import { h } from "../../../utils/dom.ts";
 
 const PlayerStatus = ({ player }: {

@@ -9,7 +9,7 @@ import type { PortalOrnamentEntityManager } from "../managers/entity/portalOrnam
 import type { ScoutHistoryEntityManager } from "../managers/entity/scoutHistoryEntityManager";
 import { logManager } from "../managers/system/logManager";
 import type { TileRequestManager } from "../managers/tiles/tileRequestManager.ts";
-import type { Channel } from "../types/ingress";
+import type { Channel } from "../types/common/common.ts";
 import { h } from "../utils/dom";
 import type { PortalDetailPaneController } from "./PortalDetailPaneController.tsx";
 
