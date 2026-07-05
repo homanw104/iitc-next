@@ -2,8 +2,8 @@ import Foundation
 import Capacitor
 
 class ScriptInjector {
-    private var cesiumJs = "https://cdn.jsdelivr.net/npm/cesium@1.142.0/Build/Cesium/Cesium.js"
-    private var cesiumCss = "https://cdn.jsdelivr.net/npm/cesium@1.142.0/Build/Cesium/Widgets/widgets.css"
+    private var cesiumJs = "https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Cesium.js"
+    private var cesiumCss = "https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Widgets/widgets.css"
     private var systemJs = "https://cdn.jsdelivr.net/npm/systemjs@6.15.1/dist/system.min.js"
     private var systemNamedRegister = "https://cdn.jsdelivr.net/npm/systemjs@6.15.1/dist/extras/named-register.min.js"
     private var scriptVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
