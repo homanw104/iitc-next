@@ -1,14 +1,26 @@
-import type { RedeemManager, RedeemResult } from "../../../managers/game/redeemManager.ts";
+import { playerInfoManager } from "../../../managers/game/playerInfoManager.ts";
+import type { RedeemManager } from "../../../managers/game/redeemManager.ts";
+import type { RedeemPlayerData, RedeemResponse } from "../../../types/api/redeemReward.ts";
 import { h, Fragment } from "../../../utils/dom.ts";
 
 const GameRedeem = ({ redeemManager, onShowRedeemResult }: {
   redeemManager: RedeemManager,
-  onShowRedeemResult: (result: RedeemResult) => void,
+  onShowRedeemResult: (response: RedeemResponse) => void,
 }) => {
   const redeem = () => {
     const input = document.getElementById("redeem-input") as HTMLInputElement;
-    if (input.value) {
-      redeemManager.requestRedeem(input.value).then((result) => onShowRedeemResult(result));
+    const passcode = input.value.trim();
+
+    if (passcode) {
+      redeemManager.requestRedeem(passcode)
+        .then((response) => {
+          if (response.playerData) {
+            updatePlayerInfo(response.playerData);
+          }
+
+          onShowRedeemResult(response);
+        })
+        .catch((error: unknown) => onShowRedeemResult({ error }));
     }
   };
 
@@ -55,5 +67,19 @@ const GameRedeem = ({ redeemManager, onShowRedeemResult }: {
     </>
   );
 };
+
+function updatePlayerInfo(player: RedeemPlayerData): void {
+  playerInfoManager.setPlayerInfo({
+    ap: player.ap,
+    availableInvites: player.available_invites,
+    energy: player.energy,
+    minApForCurrentLevel: Number(player.min_ap_for_current_level),
+    minApForNextLevel: Number(player.min_ap_for_next_level),
+    nickname: player.nickname,
+    team: player.team,
+    verifiedLevel: player.verified_level,
+    xmCapacity: player.xm_capacity,
+  });
+}
 
 export default GameRedeem;

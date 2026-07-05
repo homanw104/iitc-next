@@ -127,7 +127,7 @@ const GoogleTilesSettingsPane = ({ onBack, onClose }: {
             display: "none",
             padding: "8px",
           }}
-          onClick={() => safeWindow?.location.reload()}
+          onClick={() => safeWindow.location.reload()}
         >
           Reload
         </a>

@@ -1,10 +1,10 @@
-import type { RedeemResult } from "../../../managers/game/redeemManager.ts";
+import type { RedeemResponse } from "../../../types/api/redeemReward.ts";
 import { h } from "../../../utils/dom.ts";
 import RedeemResultMessage from "./RedeemResultMessage.tsx";
 import CloseButton from "../../atoms/CloseButton/CloseButton.tsx";
 
 const RedeemResultPane = ({ result, onClose }: {
-  result: RedeemResult,
+  result: RedeemResponse,
   onClose: () => void,
 }): HTMLElement => {
   const items = formatRedeemItems(result);
@@ -61,15 +61,17 @@ const RedeemResultPane = ({ result, onClose }: {
   ) as HTMLElement;
 };
 
-function getRedeemMessage(result: RedeemResult, items: string[]): string {
-  if (!result.ok) return result.message;
+function getRedeemMessage(result: RedeemResponse, items: string[]): string {
+  if (result.error !== undefined) return stringifyError(result.error);
+  if (!result.rewards) return "An unexpected error occurred.";
+
   return items.length === 0 ? "Passcode redeemed successfully!" : "Passcode confirmed. Acquired items:";
 }
 
-function formatRedeemItems(result: RedeemResult): string[] {
-  if (!result.ok) return [];
+function formatRedeemItems(result: RedeemResponse): string[] {
+  if (result.error !== undefined) return [];
 
-  const rewards = result.response.rewards;
+  const rewards = result.rewards;
   if (!rewards) return [];
 
   const items: string[] = [];
@@ -89,6 +91,17 @@ function formatRedeemItems(result: RedeemResult): string[] {
   });
 
   return items;
+}
+
+function stringifyError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+
+  try {
+    return JSON.stringify(error) ?? String(error);
+  } catch {
+    return String(error);
+  }
 }
 
 export default RedeemResultPane;

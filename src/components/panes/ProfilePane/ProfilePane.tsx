@@ -1,6 +1,7 @@
 import { playerInfoManager } from "../../../managers/game/playerInfoManager.ts";
-import type { RedeemManager, RedeemResult } from "../../../managers/game/redeemManager.ts";
+import type { RedeemManager } from "../../../managers/game/redeemManager.ts";
 import type { ScoreManager } from "../../../managers/game/scoreManager.ts";
+import type { RedeemResponse } from "../../../types/api/redeemReward.ts";
 import { h } from "../../../utils/dom.ts";
 import CloseButton from "../../atoms/CloseButton/CloseButton.tsx";
 import GameRedeem from "./GameRedeem.tsx";
@@ -20,7 +21,7 @@ const ProfilePane = ({
   scoreManager: ScoreManager,
   redeemManager: RedeemManager,
   onClose: () => void,
-  onShowRedeemResult: (result: RedeemResult) => void,
+  onShowRedeemResult: (response: RedeemResponse) => void,
   onShowSettingsDetail: () => void,
   onShowAboutDetail: () => void,
 }) => {

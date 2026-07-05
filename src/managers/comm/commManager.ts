@@ -27,103 +27,6 @@ export class CommManager {
     this.viewer = viewer;
   }
 
-  private expandRangeToMinSpan(
-    min: number,
-    max: number,
-    minSpan: number,
-    range: { min: number; max: number }
-  ): {
-    min: number;
-    max: number;
-  } {
-    const fullSpan = range.max - range.min;
-    if (minSpan >= fullSpan) {
-      return range;
-    }
-
-    if (max - min >= minSpan) {
-      return {
-        min: Math.max(min, range.min),
-        max: Math.min(max, range.max),
-      };
-    }
-
-    // Expand around the current view center so tiny zoomed-in views still fetch a useful comm area.
-    const center = (min + max) / 2;
-    let expandedMin = center - minSpan / 2;
-    let expandedMax = center + minSpan / 2;
-
-    if (expandedMin < range.min) {
-      expandedMax += range.min - expandedMin;
-      expandedMin = range.min;
-    }
-    if (expandedMax > range.max) {
-      expandedMin -= expandedMax - range.max;
-      expandedMax = range.max;
-    }
-
-    return {
-      min: Math.max(expandedMin, range.min),
-      max: Math.min(expandedMax, range.max),
-    };
-  }
-
-  private getBounds(): {
-    minLatE6: number;
-    minLngE6: number;
-    maxLatE6: number;
-    maxLngE6: number;
-  } {
-    const viewRect = this.viewer.camera.computeViewRectangle();
-    if (viewRect) {
-      const south = Cesium.Math.toDegrees(viewRect.south);
-      const west = Cesium.Math.toDegrees(viewRect.west);
-      const north = Cesium.Math.toDegrees(viewRect.north);
-      const east = Cesium.Math.toDegrees(viewRect.east);
-      const center = Cesium.Rectangle.center(viewRect);
-      const centerLat = Cesium.Math.toDegrees(center.latitude);
-
-      // Use the smallest latitude degree length so the converted span is always at least 5 km.
-      const minLatSpan = MIN_COMM_BOUNDS_KM / MIN_KM_PER_DEGREE;
-      const latitude = this.expandRangeToMinSpan(
-        south,
-        north,
-        minLatSpan,
-        LATITUDE_DEGREES_RANGE
-      );
-
-      let longitude = LONGITUDE_DEGREES_RANGE;
-      if (east >= west) {
-        // Longitude degrees shrink by cos(latitude); near the poles, 5 km may require the full line.
-        const longitudeScale = Math.cos(Cesium.Math.toRadians(centerLat));
-        const minLngSpan = longitudeScale > 0
-          ? MIN_COMM_BOUNDS_KM / (MIN_KM_PER_DEGREE * longitudeScale)
-          : LONGITUDE_DEGREES_RANGE.max - LONGITUDE_DEGREES_RANGE.min;
-        longitude = this.expandRangeToMinSpan(
-          west,
-          east,
-          minLngSpan,
-          LONGITUDE_DEGREES_RANGE
-        );
-      }
-
-      return {
-        minLatE6: Math.round(latitude.min * 1e6),
-        minLngE6: Math.round(longitude.min * 1e6),
-        maxLatE6: Math.round(latitude.max * 1e6),
-        maxLngE6: Math.round(longitude.max * 1e6),
-      };
-    }
-
-    // Fall back or handle null
-    return {
-      minLatE6: -90000000,
-      minLngE6: -180000000,
-      maxLatE6: 90000000,
-      maxLngE6: 180000000,
-    };
-  }
-
   public setOnReceiveMsgCallback(callback: () => void): void {
     this.callbacks.push(callback);
   }
@@ -255,5 +158,102 @@ export class CommManager {
     } catch (e) {
       logManager.error(LOG_TAG, `Failed to fetch ${channel} comms`, e);
     }
+  }
+
+  private expandRangeToMinSpan(
+    min: number,
+    max: number,
+    minSpan: number,
+    range: { min: number; max: number }
+  ): {
+    min: number;
+    max: number;
+  } {
+    const fullSpan = range.max - range.min;
+    if (minSpan >= fullSpan) {
+      return range;
+    }
+
+    if (max - min >= minSpan) {
+      return {
+        min: Math.max(min, range.min),
+        max: Math.min(max, range.max),
+      };
+    }
+
+    // Expand around the current view center so tiny zoomed-in views still fetch a useful comm area.
+    const center = (min + max) / 2;
+    let expandedMin = center - minSpan / 2;
+    let expandedMax = center + minSpan / 2;
+
+    if (expandedMin < range.min) {
+      expandedMax += range.min - expandedMin;
+      expandedMin = range.min;
+    }
+    if (expandedMax > range.max) {
+      expandedMin -= expandedMax - range.max;
+      expandedMax = range.max;
+    }
+
+    return {
+      min: Math.max(expandedMin, range.min),
+      max: Math.min(expandedMax, range.max),
+    };
+  }
+
+  private getBounds(): {
+    minLatE6: number;
+    minLngE6: number;
+    maxLatE6: number;
+    maxLngE6: number;
+  } {
+    const viewRect = this.viewer.camera.computeViewRectangle();
+    if (viewRect) {
+      const south = Cesium.Math.toDegrees(viewRect.south);
+      const west = Cesium.Math.toDegrees(viewRect.west);
+      const north = Cesium.Math.toDegrees(viewRect.north);
+      const east = Cesium.Math.toDegrees(viewRect.east);
+      const center = Cesium.Rectangle.center(viewRect);
+      const centerLat = Cesium.Math.toDegrees(center.latitude);
+
+      // Use the smallest latitude degree length so the converted span is always at least 5 km.
+      const minLatSpan = MIN_COMM_BOUNDS_KM / MIN_KM_PER_DEGREE;
+      const latitude = this.expandRangeToMinSpan(
+        south,
+        north,
+        minLatSpan,
+        LATITUDE_DEGREES_RANGE
+      );
+
+      let longitude = LONGITUDE_DEGREES_RANGE;
+      if (east >= west) {
+        // Longitude degrees shrink by cos(latitude); near the poles, 5 km may require the full line.
+        const longitudeScale = Math.cos(Cesium.Math.toRadians(centerLat));
+        const minLngSpan = longitudeScale > 0
+          ? MIN_COMM_BOUNDS_KM / (MIN_KM_PER_DEGREE * longitudeScale)
+          : LONGITUDE_DEGREES_RANGE.max - LONGITUDE_DEGREES_RANGE.min;
+        longitude = this.expandRangeToMinSpan(
+          west,
+          east,
+          minLngSpan,
+          LONGITUDE_DEGREES_RANGE
+        );
+      }
+
+      return {
+        minLatE6: Math.round(latitude.min * 1e6),
+        minLngE6: Math.round(longitude.min * 1e6),
+        maxLatE6: Math.round(latitude.max * 1e6),
+        maxLngE6: Math.round(longitude.max * 1e6),
+      };
+    }
+
+    // Fall back or handle null
+    return {
+      minLatE6: -90000000,
+      minLngE6: -180000000,
+      maxLatE6: 90000000,
+      maxLngE6: 180000000,
+    };
   }
 }
