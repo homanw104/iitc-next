@@ -4,7 +4,7 @@
  * The flow is intentionally staged: collect screen-space candidates from the
  * current view, sort them by display priority, then accept candidates into a
  * grid so overlap checks only compare nearby labels. Terrain/rendered-depth
- * visibility checks are throttled across animation frames because they can be
+ * visibility checks are sliced as background work because they can be
  * comparatively expensive on dense views.
  */
 
@@ -20,8 +20,9 @@ import { isPortalLabelEntityPositionVisible } from "./portalLabelEntityVisibilit
 const PORTAL_LABEL_ENTITY_OVERLAP_PADDING_PX = 24;
 const PORTAL_LABEL_ENTITY_OVERLAP_HIDE_HYSTERESIS_PX = 8;
 const PORTAL_LABEL_ENTITY_OVERLAP_GRID_CELL_SIZE_PX = 128;
-const PORTAL_LABEL_ENTITY_OVERLAP_ACCEPTED_LABELS_PER_FRAME = 1;
-const PORTAL_LABEL_ENTITY_OCCLUSION_CHECKS_PER_FRAME = 8;
+const PORTAL_LABEL_ENTITY_OVERLAP_MOVING_SLICE_MS = 1.5;
+const PORTAL_LABEL_ENTITY_OVERLAP_IDLE_SLICE_MS = 4;
+const PORTAL_LABEL_ENTITY_OVERLAP_YIELD_TIMEOUT_MS = 16;
 const PORTAL_LABEL_ENTITY_VIEW_RECTANGLE_MAX_PITCH = Cesium.Math.toRadians(-30);
 
 const windowPositionScratch = new Cesium.Cartesian2();
@@ -43,61 +44,86 @@ interface PortalLabelOverlapCandidate {
 
 type AcceptedCandidateGrid = Map<string, PortalLabelOverlapCandidate[]>;
 
+interface PortalLabelOverlapRefreshOptions {
+  isCameraMoving?: () => boolean;
+}
+
+interface PortalLabelOverlapWorkScheduler {
+  shouldYield(): boolean;
+  waitForNextSlice(): Promise<void>;
+}
+
 export async function getNonOverlappingPortalLabelEntityGuids(
   viewer: Cesium.Viewer,
   labels: Map<string, PortalLabel>,
   time: Cesium.JulianDate,
   shouldContinue: () => boolean = () => true,
+  options: PortalLabelOverlapRefreshOptions = {},
 ): Promise<Set<string>> {
-  const candidates = collectPortalLabelOverlapCandidates(viewer, labels, time, shouldContinue);
+  const scheduler = createPortalLabelOverlapWorkScheduler(options);
+  const candidates = await collectPortalLabelOverlapCandidates(viewer, labels, time, shouldContinue, scheduler);
   if (!candidates) return new Set<string>();
+
+  if (scheduler.shouldYield()) await scheduler.waitForNextSlice();
+  if (!shouldContinue()) return new Set<string>();
 
   candidates.sort(comparePortalLabelOverlapCandidates);
 
-  return acceptNonOverlappingPortalLabelGuids(viewer, candidates, shouldContinue);
+  if (scheduler.shouldYield()) await scheduler.waitForNextSlice();
+  if (!shouldContinue()) return new Set<string>();
+
+  return acceptNonOverlappingPortalLabelGuids(viewer, candidates, shouldContinue, scheduler);
 }
 
-function collectPortalLabelOverlapCandidates(
+async function collectPortalLabelOverlapCandidates(
   viewer: Cesium.Viewer,
   labels: Map<string, PortalLabel>,
   time: Cesium.JulianDate,
   shouldContinue: () => boolean,
-): PortalLabelOverlapCandidate[] | undefined {
+  scheduler: PortalLabelOverlapWorkScheduler,
+): Promise<PortalLabelOverlapCandidate[] | undefined> {
   const candidates: PortalLabelOverlapCandidate[] = [];
   const viewRectangle = getVisibleLabelViewRectangle(viewer);
 
   for (const [guid, label] of labels) {
     if (!shouldContinue()) return undefined;
-    if (label.isFallbackPosition) continue;
 
-    const labelPosition = label.entity.position?.getValue(time);
-    if (!labelPosition) continue;
-    if (!isLabelPositionInViewRectangle(viewer, labelPosition, viewRectangle)) continue;
+    if (!label.isFallbackPosition) {
+      const labelPosition = label.entity.position?.getValue(time);
+      if (labelPosition && isLabelPositionInViewRectangle(viewer, labelPosition, viewRectangle)) {
+        const windowPosition = Cesium.SceneTransforms.worldToWindowCoordinates(
+          viewer.scene,
+          labelPosition,
+          windowPositionScratch,
+        );
 
-    const windowPosition = Cesium.SceneTransforms.worldToWindowCoordinates(
-      viewer.scene,
-      labelPosition,
-      windowPositionScratch,
-    );
-    if (!windowPosition) continue;
+        if (windowPosition) {
+          const distanceToCamera = Cesium.Cartesian3.distance(viewer.camera.positionWC, labelPosition);
+          const bounds = getLabelScreenBounds(label, windowPosition, distanceToCamera);
 
-    const distanceToCamera = Cesium.Cartesian3.distance(viewer.camera.positionWC, labelPosition);
-    const bounds = getLabelScreenBounds(label, windowPosition, distanceToCamera);
-    if (!areScreenBoundsInCanvas(bounds, viewer.scene.canvas)) continue;
-    const isCurrentlyVisible = isLabelCurrentlyVisible(label);
+          if (areScreenBoundsInCanvas(bounds, viewer.scene.canvas)) {
+            const isCurrentlyVisible = isLabelCurrentlyVisible(label);
+            candidates.push({
+              guid,
+              position: labelPosition,
+              windowPosition: Cesium.Cartesian2.clone(windowPosition),
+              bounds,
+              rejectionInsetPx: isCurrentlyVisible ? PORTAL_LABEL_ENTITY_OVERLAP_HIDE_HYSTERESIS_PX : 0,
+              isCurrentlyVisible,
+              firstShownAt: label.firstShownAt,
+              linkCount: label.linkCount,
+              level: label.data.level ?? 0,
+              distanceToCamera,
+            });
+          }
+        }
+      }
+    }
 
-    candidates.push({
-      guid,
-      position: labelPosition,
-      windowPosition: Cesium.Cartesian2.clone(windowPosition),
-      bounds,
-      rejectionInsetPx: isCurrentlyVisible ? PORTAL_LABEL_ENTITY_OVERLAP_HIDE_HYSTERESIS_PX : 0,
-      isCurrentlyVisible,
-      firstShownAt: label.firstShownAt,
-      linkCount: label.linkCount,
-      level: label.data.level ?? 0,
-      distanceToCamera,
-    });
+    if (scheduler.shouldYield()) {
+      await scheduler.waitForNextSlice();
+      if (!shouldContinue()) return undefined;
+    }
   }
 
   return candidates;
@@ -107,38 +133,62 @@ async function acceptNonOverlappingPortalLabelGuids(
   viewer: Cesium.Viewer,
   candidates: PortalLabelOverlapCandidate[],
   shouldContinue: () => boolean,
+  scheduler: PortalLabelOverlapWorkScheduler,
 ): Promise<Set<string>> {
   const acceptedGuids = new Set<string>();
   const acceptedCandidateGrid: AcceptedCandidateGrid = new Map();
-  let acceptedSinceLastFrame = 0;
-  let occlusionChecksSinceLastFrame = 0;
   for (const candidate of candidates) {
     if (!shouldContinue()) return acceptedGuids;
-    if (doesCandidateOverlapAcceptedLabels(candidate, acceptedCandidateGrid)) continue;
 
-    occlusionChecksSinceLastFrame++;
-    if (occlusionChecksSinceLastFrame >= PORTAL_LABEL_ENTITY_OCCLUSION_CHECKS_PER_FRAME) {
-      occlusionChecksSinceLastFrame = 0;
-      await waitForNextFrame();
+    if (scheduler.shouldYield()) {
+      await scheduler.waitForNextSlice();
       if (!shouldContinue()) return acceptedGuids;
     }
+
+    if (doesCandidateOverlapAcceptedLabels(candidate, acceptedCandidateGrid)) continue;
+
+    if (scheduler.shouldYield()) {
+      await scheduler.waitForNextSlice();
+      if (!shouldContinue()) return acceptedGuids;
+    }
+
     if (!isPortalLabelEntityPositionVisible(viewer, candidate.position, candidate.windowPosition)) continue;
 
     acceptedGuids.add(candidate.guid);
     addAcceptedCandidateToGrid(candidate, acceptedCandidateGrid);
-    acceptedSinceLastFrame++;
-
-    if (acceptedSinceLastFrame >= PORTAL_LABEL_ENTITY_OVERLAP_ACCEPTED_LABELS_PER_FRAME) {
-      acceptedSinceLastFrame = 0;
-      await waitForNextFrame();
-      if (!shouldContinue()) return acceptedGuids;
-    }
   }
   return acceptedGuids;
 }
 
-function waitForNextFrame(): Promise<void> {
-  return new Promise(resolve => window.requestAnimationFrame(() => resolve()));
+function createPortalLabelOverlapWorkScheduler(
+  options: PortalLabelOverlapRefreshOptions,
+): PortalLabelOverlapWorkScheduler {
+  let sliceStartedAt = performance.now();
+
+  return {
+    shouldYield: () => performance.now() - sliceStartedAt >= getPortalLabelOverlapSliceMs(options),
+    waitForNextSlice: async () => {
+      await waitForBackgroundWork();
+      sliceStartedAt = performance.now();
+    },
+  };
+}
+
+function getPortalLabelOverlapSliceMs(options: PortalLabelOverlapRefreshOptions): number {
+  return options.isCameraMoving?.() === true ?
+    PORTAL_LABEL_ENTITY_OVERLAP_MOVING_SLICE_MS :
+    PORTAL_LABEL_ENTITY_OVERLAP_IDLE_SLICE_MS;
+}
+
+function waitForBackgroundWork(): Promise<void> {
+  if (window.requestIdleCallback) {
+    return new Promise(resolve => window.requestIdleCallback(
+      () => resolve(),
+      { timeout: PORTAL_LABEL_ENTITY_OVERLAP_YIELD_TIMEOUT_MS },
+    ));
+  }
+
+  return new Promise(resolve => window.setTimeout(resolve, 0));
 }
 
 function comparePortalLabelOverlapCandidates(

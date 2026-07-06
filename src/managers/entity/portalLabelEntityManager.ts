@@ -352,6 +352,7 @@ export class PortalLabelEntityManager {
       this.labels,
       time,
       () => overlapRefreshGeneration === this.overlapRefreshGeneration,
+      { isCameraMoving: () => this.cameraMoveTracker.getIsMoving() },
     );
     if (overlapRefreshGeneration !== this.overlapRefreshGeneration) return false;
 

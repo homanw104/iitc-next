@@ -42,6 +42,10 @@ export class PortalLabelEntityCameraMoveTracker {
     this.hasCameraSnapshot = true;
   }
 
+  public getIsMoving(): boolean {
+    return this.isMoving;
+  }
+
   private handleMoveStart(): void {
     this.isMoving = true;
     this.lastVisibilityUpdate = performance.now();
