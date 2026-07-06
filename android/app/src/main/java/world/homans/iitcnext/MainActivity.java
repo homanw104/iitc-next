@@ -20,7 +20,6 @@ import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
     private final ScriptInjector scriptInjector = new ScriptInjector();
-    private static final String INTEL_URL = "https://intel.ingress.com/intel";
     private IITCNativeInterface nativeInterface;
     private Insets systemBarInsets = Insets.NONE;
 
@@ -81,7 +80,7 @@ public class MainActivity extends BridgeActivity {
     }
 
     public void openIntelMap() {
-        openMainWebViewUrl(INTEL_URL);
+        openMainWebViewUrl(IITCUrlPolicy.INTEL_MAP_URL);
     }
 
     public void openMainWebViewUrl(String url) {

@@ -10,7 +10,6 @@ import androidx.webkit.UserAgentMetadata;
 import androidx.webkit.WebSettingsCompat;
 import androidx.webkit.WebViewFeature;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -26,11 +25,12 @@ public final class IITCWebViewSettings {
         String userAgent = getBrowserUserAgent(context);
         settings.setUserAgentString(userAgent);
         configureUserAgentMetadata(settings, userAgent);
-        configureRequestedWithHeader(settings);
     }
 
     public static String getBrowserUserAgent(Context context) {
         String defaultUA = WebSettings.getDefaultUserAgent(context);
+
+        // Some Android WebViews report Chrome/N.0.0.0; Google auth rejects that shape on some devices.
         String chromeVersion = sanitizeChromeVersion(extractChromeVersion(defaultUA));
         String androidVersion = cleanUserAgentToken(Build.VERSION.RELEASE);
         String deviceModel = cleanUserAgentToken(Build.MODEL);
@@ -59,6 +59,7 @@ public final class IITCWebViewSettings {
     private static void configureUserAgentMetadata(WebSettings settings, String userAgent) {
         if (!WebViewFeature.isFeatureSupported(WebViewFeature.USER_AGENT_METADATA)) return;
 
+        // Google reads UA Client Hints as well as the legacy UA string, so keep both in sync.
         String chromeVersion = extractChromeVersion(userAgent);
         if (chromeVersion.isEmpty()) return;
 
@@ -81,16 +82,6 @@ public final class IITCWebViewSettings {
             WebSettingsCompat.setUserAgentMetadata(settings, metadata);
         } catch (Exception e) {
             Log.w(LOG_TAG, "Could not configure user-agent metadata: " + e.getMessage());
-        }
-    }
-
-    private static void configureRequestedWithHeader(WebSettings settings) {
-        if (!WebViewFeature.isFeatureSupported(WebViewFeature.REQUESTED_WITH_HEADER_ALLOW_LIST)) return;
-
-        try {
-            WebSettingsCompat.setRequestedWithHeaderOriginAllowList(settings, Collections.emptySet());
-        } catch (Exception e) {
-            Log.w(LOG_TAG, "Could not configure X-Requested-With allowlist: " + e.getMessage());
         }
     }
 

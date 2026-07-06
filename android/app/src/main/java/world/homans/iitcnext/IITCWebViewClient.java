@@ -17,15 +17,11 @@ public class IITCWebViewClient extends BridgeWebViewClient {
 
     private boolean shouldInjectIITC(String url) {
         if (url == null) return false;
-
-        Uri uri = Uri.parse(url);
-        String path = uri.getPath();
-        return IITCAuthUrlHelper.isIntelHost(uri)
-            && (path == null || (!path.startsWith("/login") && !path.startsWith("/signinhandler")));
+        return IITCUrlPolicy.isInjectableIntelPage(Uri.parse(url));
     }
 
     private boolean isIntelSignInHandler(String url) {
-        return url != null && IITCAuthUrlHelper.isIntelSignInHandler(Uri.parse(url));
+        return url != null && IITCUrlPolicy.isIntelSignInHandler(Uri.parse(url));
     }
 
     private void injectIITC(WebView view, String url) {
@@ -41,7 +37,7 @@ public class IITCWebViewClient extends BridgeWebViewClient {
             return true;
         }
 
-        if (request.isForMainFrame() && !IITCAuthUrlHelper.isAllowedAuthHost(uri)) {
+        if (request.isForMainFrame() && !IITCUrlPolicy.shouldStayInAuthWebView(uri)) {
             ExternalLinkHandler.open(activity, uri);
             return true;
         }

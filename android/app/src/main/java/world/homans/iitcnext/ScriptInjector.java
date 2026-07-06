@@ -5,6 +5,7 @@ import android.util.Log;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -14,6 +15,12 @@ import java.util.regex.Pattern;
 import org.json.JSONObject;
 
 public class ScriptInjector {
+    private static final String LOG_TAG = "IITC-Next";
+    private static final String USER_SCRIPT_ASSET_PATH = "public/iitc-next.user.js";
+    private static final Pattern METADATA_BLOCK_PATTERN = Pattern.compile("// ==UserScript==[\\s\\S]*?// ==/UserScript==");
+    private static final Pattern REQUIRE_PATTERN = Pattern.compile("//\\s+@require\\s+(\\S+)");
+    private static final Pattern RESOURCE_PATTERN = Pattern.compile("//\\s+@resource\\s+(\\S+)\\s+(\\S+)");
+
     private String scriptVersion = BuildConfig.VERSION_NAME;
     private String scriptName = "iitc-next";
 
@@ -22,20 +29,20 @@ public class ScriptInjector {
     private String userScript;
 
     public void loadUserScript(Context context) {
-        try {
-            InputStream is = context.getAssets().open("public/iitc-next.user.js");
-            BufferedReader reader = new BufferedReader(new InputStreamReader(is));
+        try (
+            InputStream is = context.getAssets().open(USER_SCRIPT_ASSET_PATH);
+            BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))
+        ) {
             StringBuilder sb = new StringBuilder();
             String line;
             while ((line = reader.readLine()) != null) {
                 sb.append(line).append("\n");
             }
             userScript = sb.toString();
-            reader.close();
 
             parseMetadata(userScript);
         } catch (Exception e) {
-            Log.e("IITC-Next", "Error loading userscript from assets", e);
+            Log.e(LOG_TAG, "Error loading userscript from assets", e);
         }
     }
 
@@ -45,9 +52,7 @@ public class ScriptInjector {
         requireUrls.clear();
         resourceUrls.clear();
 
-        // Match the metadata block
-        Pattern blockPattern = Pattern.compile("// ==UserScript==[\\s\\S]*?// ==/UserScript==");
-        Matcher blockMatcher = blockPattern.matcher(script);
+        Matcher blockMatcher = METADATA_BLOCK_PATTERN.matcher(script);
         if (blockMatcher.find()) {
             String metadata = blockMatcher.group();
 
@@ -73,8 +78,7 @@ public class ScriptInjector {
     }
 
     private void collectRequires(String metadata) {
-        Pattern pattern = Pattern.compile("//\\s+@require\\s+(\\S+)");
-        Matcher matcher = pattern.matcher(metadata);
+        Matcher matcher = REQUIRE_PATTERN.matcher(metadata);
         while (matcher.find()) {
             String value = matcher.group(1);
             if (value != null) requireUrls.add(value.trim());
@@ -82,8 +86,7 @@ public class ScriptInjector {
     }
 
     private void collectResources(String metadata) {
-        Pattern pattern = Pattern.compile("//\\s+@resource\\s+(\\S+)\\s+(\\S+)");
-        Matcher matcher = pattern.matcher(metadata);
+        Matcher matcher = RESOURCE_PATTERN.matcher(metadata);
         while (matcher.find()) {
             String name = matcher.group(1);
             String url = matcher.group(2);
@@ -134,6 +137,7 @@ public class ScriptInjector {
         String scriptVersionLiteral = JSONObject.quote(scriptVersion);
         String userScriptLiteral = JSONObject.quote(userScript);
 
+        // IITC is packaged as a userscript, so the Android shell provides the small Greasemonkey/browser shims it expects.
         return "javascript:(function() { " +
             "try { " +
             "  if (window.IITC_NEXT_INJECTED) return; " +

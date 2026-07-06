@@ -44,7 +44,7 @@ public class IITCPopupHandler extends BridgeWebChromeClient {
         CookieManager.getInstance().flush();
         dismissAllPopups();
         Uri uri = Uri.parse(url);
-        if (IITCAuthUrlHelper.isIntelSignInHandler(uri)) {
+        if (IITCUrlPolicy.isIntelSignInHandler(uri)) {
             activity.openIntelMap();
         } else {
             activity.openMainWebViewUrl(url);
@@ -87,7 +87,8 @@ public class IITCPopupHandler extends BridgeWebChromeClient {
                     return false;
                 }
 
-                String googleRedirect = IITCAuthUrlHelper.getGoogleRedirectTarget(uri);
+                // Google auth sometimes bounces through /url?q=...; keep the real target in this WebView when safe.
+                String googleRedirect = IITCUrlPolicy.unwrapGoogleRedirect(uri);
                 if (googleRedirect != null) {
                     return loadGoogleRedirect(view, googleRedirect);
                 }
@@ -97,12 +98,12 @@ public class IITCPopupHandler extends BridgeWebChromeClient {
                     return true;
                 }
 
-                if (IITCAuthUrlHelper.isIntelHost(uri) && "GET".equalsIgnoreCase(request.getMethod())) {
+                if (IITCUrlPolicy.isIntelHost(uri) && "GET".equalsIgnoreCase(request.getMethod())) {
                     completeIntelReturn(uri.toString());
                     return true;
                 }
 
-                if (IITCAuthUrlHelper.isAllowedAuthHost(uri)) {
+                if (IITCUrlPolicy.shouldStayInAuthWebView(uri)) {
                     return false;
                 }
 
@@ -114,7 +115,7 @@ public class IITCPopupHandler extends BridgeWebChromeClient {
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 Uri uri = Uri.parse(url);
-                if (IITCAuthUrlHelper.isIntelHost(uri)) {
+                if (IITCUrlPolicy.isIntelHost(uri)) {
                     completeIntelReturn(url);
                 }
             }
@@ -175,7 +176,7 @@ public class IITCPopupHandler extends BridgeWebChromeClient {
         FrameLayout container = new FrameLayout(activity);
         GradientDrawable background = new GradientDrawable();
         background.setColor(Color.WHITE);
-        background.setCornerRadius(dpToPx(POPUP_CORNER_RADIUS_DP));
+        background.setCornerRadius(getPopupCornerRadiusPx());
         container.setBackground(background);
         container.setClipToOutline(true);
 
@@ -188,6 +189,7 @@ public class IITCPopupHandler extends BridgeWebChromeClient {
         return container;
     }
 
+    @SuppressLint("SetJavaScriptEnabled")
     private void configurePopupWebView(WebView webView) {
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -201,13 +203,13 @@ public class IITCPopupHandler extends BridgeWebChromeClient {
         IITCWebViewSettings.configureNianticCookies(webView);
     }
 
-    private int dpToPx(float dp) {
-        return Math.round(dp * activity.getResources().getDisplayMetrics().density);
+    private int getPopupCornerRadiusPx() {
+        return Math.round(POPUP_CORNER_RADIUS_DP * activity.getResources().getDisplayMetrics().density);
     }
 
     private boolean loadGoogleRedirect(WebView view, String url) {
         Uri uri = Uri.parse(url);
-        if (IITCAuthUrlHelper.isAllowedAuthHost(uri)) {
+        if (IITCUrlPolicy.shouldStayInAuthWebView(uri)) {
             view.loadUrl(url);
         } else {
             openExternalAndDismiss(view, uri);
@@ -216,11 +218,13 @@ public class IITCPopupHandler extends BridgeWebChromeClient {
     }
 
     private boolean routeClickedUrlOutsidePopup(WebView view) {
+        // For normal target="_blank" links Android exposes the clicked URL before onCreateWindow creates a WebView.
+        // Google Identity Services popups usually do not, so they fall through to the auth popup path.
         Uri uri = getHitTestUri(view);
         if (uri == null) return false;
 
         if (IngressLinkHandler.openInApp(activity, uri)) return true;
-        if (IITCAuthUrlHelper.isAllowedAuthHost(uri)) return false;
+        if (IITCUrlPolicy.shouldStayInAuthWebView(uri)) return false;
 
         ExternalLinkHandler.open(activity, uri);
         return true;
@@ -228,8 +232,6 @@ public class IITCPopupHandler extends BridgeWebChromeClient {
 
     private Uri getHitTestUri(WebView view) {
         WebView.HitTestResult hitTestResult = view.getHitTestResult();
-        if (hitTestResult == null) return null;
-
         String url = hitTestResult.getExtra();
         if (url == null || url.isEmpty()) return null;
 

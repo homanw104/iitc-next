@@ -1,27 +1,39 @@
 package world.homans.iitcnext;
 
 import android.net.Uri;
+import java.util.Locale;
 import java.util.regex.Pattern;
 
-public final class IITCAuthUrlHelper {
+public final class IITCUrlPolicy {
+    public static final String INTEL_MAP_URL = "https://intel.ingress.com/intel";
+
+    private static final String INTEL_HOST = "intel.ingress.com";
     private static final Pattern GOOGLE_HOSTNAME_PATTERN = Pattern.compile("(^|\\.)google(\\.com|\\.co)?\\.\\w+$");
 
-    private IITCAuthUrlHelper() {
+    private IITCUrlPolicy() {
     }
 
     public static boolean isIntelHost(Uri uri) {
-        String host = getNormalizedHost(uri);
-        return "intel.ingress.com".equals(host);
+        return INTEL_HOST.equals(getNormalizedHost(uri));
     }
 
     public static boolean isIntelSignInHandler(Uri uri) {
         return isIntelHost(uri) && uri.getPath() != null && uri.getPath().startsWith("/signinhandler");
     }
 
-    public static boolean isAllowedAuthHost(Uri uri) {
+    public static boolean isInjectableIntelPage(Uri uri) {
+        if (!isIntelHost(uri)) return false;
+
+        String path = uri.getPath();
+        return path == null || (!path.startsWith("/login") && !path.startsWith("/signinhandler"));
+    }
+
+    public static boolean shouldStayInAuthWebView(Uri uri) {
         String host = getNormalizedHost(uri);
         if (host == null) return false;
 
+        // This is intentionally narrower than Capacitor's allowNavigation list:
+        // only auth/session hosts should remain in the in-app WebView popup.
         return isIntelHost(uri)
             || isGoogleHost(host)
             || host.equals("googleusercontent.com")
@@ -37,7 +49,7 @@ public final class IITCAuthUrlHelper {
             || host.endsWith(".nianticlabs.com");
     }
 
-    public static String getGoogleRedirectTarget(Uri uri) {
+    public static String unwrapGoogleRedirect(Uri uri) {
         String host = getNormalizedHost(uri);
         if (host == null || !isGoogleHost(host)) return null;
         if (!"/url".equals(uri.getPath())) return null;
@@ -54,6 +66,6 @@ public final class IITCAuthUrlHelper {
 
     private static String getNormalizedHost(Uri uri) {
         String host = uri.getHost();
-        return host == null ? null : host.toLowerCase();
+        return host == null ? null : host.toLowerCase(Locale.ROOT);
     }
 }

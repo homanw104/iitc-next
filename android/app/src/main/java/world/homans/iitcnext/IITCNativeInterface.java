@@ -1,6 +1,7 @@
 package world.homans.iitcnext;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Location;
@@ -17,11 +18,13 @@ import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import org.json.JSONObject;
 
 public class IITCNativeInterface {
     public static final int LOCATION_PERMISSION_REQUEST_CODE = 1234;
+    private static final String LOG_TAG = "IITC-Next";
     private static final int GEOLOCATION_PERMISSION_DENIED = 1;
     private static final int GEOLOCATION_POSITION_UNAVAILABLE = 2;
 
@@ -49,21 +52,25 @@ public class IITCNativeInterface {
     }
 
     @JavascriptInterface
+    @SuppressWarnings("unused")
     public void log(String msg) {
-        Log.i("IITC-Next", "JS Log: " + msg);
+        Log.i(LOG_TAG, "JS Log: " + msg);
     }
 
     @JavascriptInterface
+    @SuppressWarnings("unused")
     public void diag(String data) {
-        Log.d("IITC-Next", "JS Diag: " + data);
+        Log.d(LOG_TAG, "JS Diag: " + data);
     }
 
     @JavascriptInterface
+    @SuppressWarnings("unused")
     public void hideStartupSplash() {
         // Compatibility shim for older injected bootstrap code.
     }
 
     @JavascriptInterface
+    @SuppressWarnings("unused")
     public void getCurrentPosition() {
         webView.post(() -> {
             if (!hasLocationPermission()) {
@@ -74,9 +81,8 @@ public class IITCNativeInterface {
         });
     }
 
-    public boolean onRequestPermissionsResult(int requestCode) {
-        if (requestCode != LOCATION_PERMISSION_REQUEST_CODE) return false;
-        if (!pendingLocationRequest) return true;
+    public void onRequestPermissionsResult(int requestCode) {
+        if (requestCode != LOCATION_PERMISSION_REQUEST_CODE || !pendingLocationRequest) return;
 
         pendingLocationRequest = false;
         webView.post(() -> {
@@ -90,7 +96,6 @@ public class IITCNativeInterface {
                 getLocationPermissionDeniedMessage()
             );
         });
-        return true;
     }
 
     private void requestLocationPermission() {
@@ -106,6 +111,7 @@ public class IITCNativeInterface {
 
     private void requestCurrentPosition() {
         try {
+            // Return a cached fix immediately when possible, then ask Android for one fresh provider update.
             Location lastKnown = getBestLastKnownLocation();
             if (lastKnown != null) {
                 sendLocationToJs(lastKnown);
@@ -124,9 +130,9 @@ public class IITCNativeInterface {
 
             locationManager.requestSingleUpdate(provider, new LocationListener() {
                 @Override public void onLocationChanged(@NonNull Location location) { sendLocationToJs(location); }
-                @Override public void onStatusChanged(String provider, int status, Bundle extras) {}
-                @Override public void onProviderEnabled(String provider) {}
-                @Override public void onProviderDisabled(String provider) {
+                @Override public void onStatusChanged(@NonNull String provider, int status, @NonNull Bundle extras) {}
+                @Override public void onProviderEnabled(@NonNull String provider) {}
+                @Override public void onProviderDisabled(@NonNull String provider) {
                     sendLocationErrorToJs(
                         GEOLOCATION_POSITION_UNAVAILABLE,
                         "Location provider is disabled"
@@ -134,10 +140,10 @@ public class IITCNativeInterface {
                 }
             }, null);
         } catch (SecurityException e) {
-            Log.e("IITC-Next", "Location permission missing", e);
+            Log.e(LOG_TAG, "Location permission missing", e);
             sendLocationErrorToJs(GEOLOCATION_PERMISSION_DENIED, "Location permission is missing");
         } catch (Exception e) {
-            Log.e("IITC-Next", "Error getting location", e);
+            Log.e(LOG_TAG, "Error getting location", e);
             sendLocationErrorToJs(GEOLOCATION_POSITION_UNAVAILABLE, "Unable to get current location");
         }
     }
@@ -154,14 +160,17 @@ public class IITCNativeInterface {
         return bestLocation;
     }
 
+    @SuppressLint("MissingPermission")
     private Location getLastKnownLocation(String provider) {
         try {
+            if (!hasLocationPermission()) return null;
+            if (LocationManager.GPS_PROVIDER.equals(provider) && !hasFineLocationPermission()) return null;
             if (!LocationManager.PASSIVE_PROVIDER.equals(provider) && !locationManager.isProviderEnabled(provider)) {
                 return null;
             }
             return locationManager.getLastKnownLocation(provider);
         } catch (Exception e) {
-            Log.d("IITC-Next", "Could not read last known location from " + provider, e);
+            Log.d(LOG_TAG, "Could not read last known location from " + provider, e);
             return null;
         }
     }
@@ -217,15 +226,19 @@ public class IITCNativeInterface {
     }
 
     @JavascriptInterface
+    @SuppressWarnings("unused")
     public void saveFile(String content, String filename, String mimeType) {
         webView.post(() -> {
             try {
                 File cachePath = new File(webView.getContext().getCacheDir(), "exports");
-                cachePath.mkdirs();
-                File file = new File(cachePath, filename);
-                FileOutputStream stream = new FileOutputStream(file);
-                stream.write(content.getBytes());
-                stream.close();
+                if (!cachePath.isDirectory() && !cachePath.mkdirs()) {
+                    throw new IllegalStateException("Could not create export directory");
+                }
+                String safeFilename = getSafeExportFileName(filename);
+                File file = new File(cachePath, safeFilename);
+                try (FileOutputStream stream = new FileOutputStream(file)) {
+                    stream.write(content.getBytes(StandardCharsets.UTF_8));
+                }
 
                 Uri contentUri = FileProvider.getUriForFile(webView.getContext(),
                         webView.getContext().getPackageName() + ".fileprovider", file);
@@ -237,11 +250,19 @@ public class IITCNativeInterface {
                     shareIntent.putExtra(Intent.EXTRA_STREAM, contentUri);
                     shareIntent.setType(mimeType);
 
-                    webView.getContext().startActivity(Intent.createChooser(shareIntent, "Save/Share " + filename));
+                    webView.getContext().startActivity(Intent.createChooser(shareIntent, "Save/Share " + safeFilename));
                 }
             } catch (Exception e) {
-                Log.e("IITC-Next", "Error saving/sharing file", e);
+                Log.e(LOG_TAG, "Error saving/sharing file", e);
             }
         });
+    }
+
+    private String getSafeExportFileName(String filename) {
+        if (filename == null || filename.trim().isEmpty()) {
+            return "iitc-next-export";
+        }
+        String safeFilename = new File(filename).getName();
+        return safeFilename.isEmpty() ? "iitc-next-export" : safeFilename;
     }
 }
