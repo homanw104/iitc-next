@@ -36,7 +36,13 @@ public class IITCWebViewClient extends BridgeWebViewClient {
 
     @Override
     public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-        if (IngressLinkHandler.openInApp(activity, request.getUrl())) {
+        Uri uri = request.getUrl();
+        if (IngressLinkHandler.openInApp(activity, uri)) {
+            return true;
+        }
+
+        if (request.isForMainFrame() && !IITCAuthUrlHelper.isAllowedAuthHost(uri)) {
+            ExternalLinkHandler.open(activity, uri);
             return true;
         }
 

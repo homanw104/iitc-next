@@ -2,7 +2,6 @@ package world.homans.iitcnext;
 
 import android.annotation.SuppressLint;
 import android.app.Dialog;
-import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
@@ -21,7 +20,6 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
-import androidx.browser.customtabs.CustomTabsIntent;
 import com.getcapacitor.Bridge;
 import com.getcapacitor.BridgeWebChromeClient;
 import java.util.ArrayList;
@@ -62,6 +60,7 @@ public class IITCPopupHandler extends BridgeWebChromeClient {
     @Override
     public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, Message resultMsg) {
         if (!isUserGesture) return false;
+        if (routeClickedUrlOutsidePopup(view)) return false;
 
         final WebView newWebView = createPopupWebView();
         showPopupDialog(newWebView);
@@ -107,7 +106,7 @@ public class IITCPopupHandler extends BridgeWebChromeClient {
                     return false;
                 }
 
-                openExternal(uri);
+                openExternalAndDismiss(view, uri);
                 return true;
             }
 
@@ -127,6 +126,7 @@ public class IITCPopupHandler extends BridgeWebChromeClient {
             @Override
             public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, Message resultMsg) {
                 if (!isUserGesture) return false;
+                if (routeClickedUrlOutsidePopup(view)) return false;
 
                 WebView nestedWebView = createPopupWebView();
                 showPopupDialog(nestedWebView);
@@ -210,20 +210,36 @@ public class IITCPopupHandler extends BridgeWebChromeClient {
         if (IITCAuthUrlHelper.isAllowedAuthHost(uri)) {
             view.loadUrl(url);
         } else {
-            openExternal(uri);
+            openExternalAndDismiss(view, uri);
         }
         return true;
     }
 
-    private void openExternal(Uri uri) {
-        try {
-            CustomTabsIntent.Builder builder = new CustomTabsIntent.Builder();
-            CustomTabsIntent customTabsIntent = builder.build();
-            customTabsIntent.launchUrl(activity, uri);
-        } catch (Exception e) {
-            Intent intent = new Intent(Intent.ACTION_VIEW, uri);
-            activity.startActivity(intent);
-        }
+    private boolean routeClickedUrlOutsidePopup(WebView view) {
+        Uri uri = getHitTestUri(view);
+        if (uri == null) return false;
+
+        if (IngressLinkHandler.openInApp(activity, uri)) return true;
+        if (IITCAuthUrlHelper.isAllowedAuthHost(uri)) return false;
+
+        ExternalLinkHandler.open(activity, uri);
+        return true;
+    }
+
+    private Uri getHitTestUri(WebView view) {
+        WebView.HitTestResult hitTestResult = view.getHitTestResult();
+        if (hitTestResult == null) return null;
+
+        String url = hitTestResult.getExtra();
+        if (url == null || url.isEmpty()) return null;
+
+        Uri uri = Uri.parse(url);
+        return uri.getScheme() == null ? null : uri;
+    }
+
+    private void openExternalAndDismiss(WebView webView, Uri uri) {
+        ExternalLinkHandler.open(activity, uri);
+        dismissPopup(webView);
     }
 
     private void dismissPopup(WebView webView) {

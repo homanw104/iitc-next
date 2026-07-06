@@ -23,8 +23,6 @@ public final class IITCAuthUrlHelper {
         if (host == null) return false;
 
         return isIntelHost(uri)
-            || host.equals("ingress.com")
-            || host.endsWith(".ingress.com")
             || isGoogleHost(host)
             || host.equals("googleusercontent.com")
             || host.endsWith(".googleusercontent.com")
