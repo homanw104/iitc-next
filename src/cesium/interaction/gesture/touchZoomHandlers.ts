@@ -85,7 +85,7 @@ export function createTouchZoomHandlers(
   let hasActiveMouseGesture = false;
   let isMousePanning = false;
   let hasPendingDragFrame = false;
-  let dragFrameRequestId: number | null = null;
+  let hasRequestedDragRenderFrame = false;
   let inertiaResetTimeoutId: number | null = null;
   let revertHasJustMovedTimeoutId: number | null = null;
   let revertHasJustDoubleTappedTimeoutId: number | null = null;
@@ -150,9 +150,7 @@ export function createTouchZoomHandlers(
     hasLastTouchPosition = false;
     isMouseLeftDown = false;
 
-    if (dragFrameRequestId !== null) {
-      window.cancelAnimationFrame(dragFrameRequestId);
-      dragFrameRequestId = null;
+    if (hasPendingDragFrame) {
       applyQueuedDragFrame();
     }
 
@@ -314,20 +312,18 @@ export function createTouchZoomHandlers(
     Cesium.Cartesian2.clone(endPosition, pendingDragEndPosition);
     pendingDragEventTime = now;
 
-    if (dragFrameRequestId !== null) return;
-    dragFrameRequestId = window.requestAnimationFrame(applyQueuedDragFrame);
+    if (hasRequestedDragRenderFrame) return;
+    hasRequestedDragRenderFrame = true;
+    viewer.scene.requestRender();
   };
 
   const cancelQueuedDragFrame = () => {
-    if (dragFrameRequestId !== null) {
-      window.cancelAnimationFrame(dragFrameRequestId);
-      dragFrameRequestId = null;
-    }
+    hasRequestedDragRenderFrame = false;
     hasPendingDragFrame = false;
   };
 
   const applyQueuedDragFrame = () => {
-    dragFrameRequestId = null;
+    hasRequestedDragRenderFrame = false;
 
     if (!hasPendingDragFrame) return;
     hasPendingDragFrame = false;
@@ -553,6 +549,11 @@ export function createTouchZoomHandlers(
   };
 
   const registerNativeEventListeners = () => {
+    viewer.scene.preUpdate.addEventListener(() => {
+      if (!hasPendingDragFrame) return;
+      applyQueuedDragFrame();
+    });
+
     canvas.addEventListener("touchstart", handleNativeTouchStart, TOUCH_EVENT_OPTIONS);
     canvas.addEventListener("touchmove", handleNativeTouchMove, TOUCH_EVENT_OPTIONS);
     canvas.addEventListener("touchend", handleNativeTouchEnd, TOUCH_EVENT_OPTIONS);
