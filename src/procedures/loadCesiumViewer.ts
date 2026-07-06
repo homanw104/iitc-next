@@ -11,7 +11,7 @@ import { keepRestoredCameraAboveTerrain } from "../cesium/setup/keepRestoredCame
 import { restoreLastView } from "../cesium/setup/restoreLastView.ts";
 import { restoreBaseLayer } from "../cesium/setup/restoreBaseLayer.ts";
 import { moveCreditWidget } from "../cesium/setup/moveCreditWidget.ts";
-import { setUpEntityPositionRefresh } from "../cesium/setup/setUpEntityPositionRefresh.ts";
+import { setUpEntityTerrainRefresh } from "../cesium/setup/setUpEntityTerrainRefresh.ts";
 import { setUpInteractionHandlers } from "../cesium/setup/setUpInteractionHandlers.ts";
 import { setUpTileUpdateWhenMove } from "../cesium/setup/setUpTileUpdateWhenMove.ts";
 import { setUpDebugTilesRefresh } from "../cesium/setup/setUpDebugTilesRefresh.ts";
@@ -37,6 +37,7 @@ export default function loadCesiumViewer(appContext: AppContext): void {
 
   const managers = createCoreManagers(viewer, container);
   const entityPositionManager = managers.entityPositionManager;
+  const entityTranslucencyManager = managers.entityTranslucencyManager;
   const portalEntityManager = managers.portalEntityManager;
   const portalLabelEntityManager = managers.portalLabelEntityManager;
   const portalOrnamentEntityManager = managers.portalOrnamentEntityManager;
@@ -55,7 +56,7 @@ export default function loadCesiumViewer(appContext: AppContext): void {
   configureCameraControls(viewer);
   keepRestoredCameraAboveTerrain(viewer, entityPositionManager, restoredPosition);
   setUpDebugTilesRefresh(tileRequestManager, debugTileEntityManager);
-  setUpEntityPositionRefresh(viewer, entityPositionManager, loadingProgressManager);
+  setUpEntityTerrainRefresh(viewer, entityPositionManager, entityTranslucencyManager, loadingProgressManager);
   setUpInteractionHandlers(viewer, container, portalDetailPaneController, portalEntityManager, portalLabelEntityManager, portalOrnamentEntityManager, portalHistoryEntityManager, scoutHistoryEntityManager, portalDetailState);
   setUpTileUpdateWhenMove(viewer, tileRequestManager);
 

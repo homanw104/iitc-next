@@ -15,46 +15,78 @@ const CAMERA_TERRAIN_SAMPLE_LEVEL = 11;
 const CAMERA_TERRAIN_RESAMPLE_EPSILON_RADIANS = 1e-5;
 const CAMERA_TERRAIN_SAMPLE_RETRY_DELAY_MS = 500;
 
+export type TranslucencyByDistanceCallback = (translucencyByDistance: Cesium.NearFarScalar) => void;
+
 export class EntityTranslucencyManager {
   private readonly useGoogle3dTiles = settingsManager.getUseGoogle3dTiles();
-  private readonly callbackProperty: Cesium.CallbackProperty;
-  private readonly callbackPropertyNearFarScalar: Cesium.NearFarScalar;
-  private callbackPropertyCameraHeight: number | undefined;
+  private readonly translucencyByDistance = new Cesium.ConstantProperty(new Cesium.NearFarScalar());
+  private readonly currentTranslucencyByDistance = new Cesium.NearFarScalar();
+  private readonly scratchTranslucencyByDistance = new Cesium.NearFarScalar();
+  private readonly translucencyByDistanceCallbacks = new Set<TranslucencyByDistanceCallback>();
   private worldTerrainProviderPromise: Promise<Cesium.TerrainProvider | undefined> | undefined;
   private cameraTerrainSampleInFlight = false;
   private nextCameraTerrainSampleTimeMs = 0;
   private sampledTerrainPosition: Cesium.Cartographic | undefined;
   private sampledTerrainHeight: number | undefined;
+  private terrainSampleGeneration = 0;
 
   constructor(
     private readonly viewer: Cesium.Viewer,
   ) {
-    this.callbackPropertyNearFarScalar = new Cesium.NearFarScalar();
-    this.callbackProperty = new Cesium.CallbackProperty(
-      (_time, result) => this.getCallbackPropertyNearFarScalar(result),
-      false,
-    );
+    generateTranslucencyByDistance(0, this.currentTranslucencyByDistance);
+    this.translucencyByDistance.setValue(this.currentTranslucencyByDistance);
+
+    viewer.camera.moveStart.addEventListener(() => {
+      this.clearSamplingWork();
+    });
+
+    viewer.camera.moveEnd.addEventListener(() => {
+      this.newSamplingWork();
+    });
+
+    this.newSamplingWork();
   }
 
-  public getCallbackProperty(): Cesium.CallbackProperty {
-    return this.callbackProperty;
+  public getTranslucencyByDistance(): Cesium.ConstantProperty {
+    return this.translucencyByDistance;
   }
 
-  private getCallbackPropertyNearFarScalar(
-    result?: Cesium.NearFarScalar,
-  ): Cesium.NearFarScalar {
+  public setOnTranslucencyByDistanceChangedCallback(callback: TranslucencyByDistanceCallback): void {
+    this.translucencyByDistanceCallbacks.add(callback);
+    callback(this.currentTranslucencyByDistance);
+  }
+
+  public unsetOnTranslucencyByDistanceChangedCallback(callback: TranslucencyByDistanceCallback): void {
+    this.translucencyByDistanceCallbacks.delete(callback);
+  }
+
+  public clearSamplingWork(): void {
+    this.terrainSampleGeneration++;
+    this.cameraTerrainSampleInFlight = false;
+  }
+
+  public newSamplingWork(): void {
+    this.updateTranslucencyByDistance();
+  }
+
+  public invalidateTerrainSample(): void {
+    this.sampledTerrainPosition = undefined;
+    this.sampledTerrainHeight = undefined;
+  }
+
+  private updateTranslucencyByDistance(): void {
     const cameraHeight = this.getCameraHeightAboveTerrain();
     const clampedCameraHeight = Number.isFinite(cameraHeight) ? cameraHeight : 0;
+    generateTranslucencyByDistance(clampedCameraHeight, this.scratchTranslucencyByDistance);
 
-    if (clampedCameraHeight !== this.callbackPropertyCameraHeight) {
-      generateCallbackPropertyNearFarScaler(
-        clampedCameraHeight,
-        this.callbackPropertyNearFarScalar,
-      );
-      this.callbackPropertyCameraHeight = clampedCameraHeight;
-    }
+    if (Cesium.NearFarScalar.equals(this.currentTranslucencyByDistance, this.scratchTranslucencyByDistance)) return;
 
-    return Cesium.NearFarScalar.clone(this.callbackPropertyNearFarScalar, result);
+    Cesium.NearFarScalar.clone(this.scratchTranslucencyByDistance, this.currentTranslucencyByDistance);
+
+    // setValue() will trigger entity consumers to update
+    this.translucencyByDistance.setValue(this.currentTranslucencyByDistance);
+    this.translucencyByDistanceCallbacks.forEach((callback) => callback(this.currentTranslucencyByDistance));
+    this.viewer.scene.requestRender();
   }
 
   private getCameraHeightAboveTerrain(): number {
@@ -71,6 +103,7 @@ export class EntityTranslucencyManager {
   private requestTerrainHeightSample(cartographic: Cesium.Cartographic): void {
     if (!this.shouldSampleTerrainHeight(cartographic)) return;
 
+    const generation = this.terrainSampleGeneration;
     this.cameraTerrainSampleInFlight = true;
     this.nextCameraTerrainSampleTimeMs = Date.now() + CAMERA_TERRAIN_SAMPLE_RETRY_DELAY_MS;
     const samplePosition = new Cesium.Cartographic(cartographic.longitude, cartographic.latitude);
@@ -80,17 +113,21 @@ export class EntityTranslucencyManager {
         ? Cesium.sampleTerrain(terrainProvider, CAMERA_TERRAIN_SAMPLE_LEVEL, [samplePosition])
         : Promise.resolve(undefined))
       .then((sampledPositions) => {
+        if (generation !== this.terrainSampleGeneration) return;
+
         const sampledHeight = sampledPositions?.[0]?.height;
         if (sampledHeight === undefined || !Number.isFinite(sampledHeight)) return;
 
         this.sampledTerrainPosition = samplePosition;
         this.sampledTerrainHeight = sampledHeight;
-        this.viewer.scene.requestRender();
+        this.updateTranslucencyByDistance();
       })
       .catch(() => {
+        if (generation !== this.terrainSampleGeneration) return;
         this.nextCameraTerrainSampleTimeMs = Date.now() + CAMERA_TERRAIN_SAMPLE_RETRY_DELAY_MS;
       })
       .finally(() => {
+        if (generation !== this.terrainSampleGeneration) return;
         this.cameraTerrainSampleInFlight = false;
       });
   }
@@ -125,7 +162,7 @@ function hasMovedPastTerrainSampleEpsilon(
     latitudeDelta > CAMERA_TERRAIN_RESAMPLE_EPSILON_RADIANS;
 }
 
-function generateCallbackPropertyNearFarScaler(cameraHeight: number, result?: Cesium.NearFarScalar): Cesium.NearFarScalar {
+function generateTranslucencyByDistance(cameraHeight: number, result?: Cesium.NearFarScalar): Cesium.NearFarScalar {
   const nearFarScalar = result ?? new Cesium.NearFarScalar();
 
   nearFarScalar.near = Math.max(

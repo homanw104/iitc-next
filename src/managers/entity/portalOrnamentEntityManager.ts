@@ -139,7 +139,7 @@ export class PortalOrnamentEntityManager {
         horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
         verticalOrigin: Cesium.VerticalOrigin.CENTER,
         scaleByDistance: createPortalNearFarScalar(),
-        translucencyByDistance: this.entityTranslucencyManager.getCallbackProperty(),
+        translucencyByDistance: this.entityTranslucencyManager.getTranslucencyByDistance(),
       },
     });
     return { entity, occlusionEntity };

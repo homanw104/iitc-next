@@ -65,9 +65,9 @@ export class EntityPositionManager {
   }
 
   public clearSamplingWork(): void {
+    window.clearTimeout(this.samplingScheduledTimeoutId);
     this.entityPositionsSamplingQueue.clear();
     this.entityPositionsNowSampling.clear();
-    window.clearTimeout(this.samplingScheduledTimeoutId);
     this.samplingScheduled = false;
     this.samplingScheduledTimeoutId = undefined;
     this.samplingIdleCallbacks.forEach((callback) => callback());
