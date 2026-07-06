@@ -31,12 +31,14 @@ public class IITCNativeInterface {
     private final WebView webView;
     private final MainActivity activity;
     private final LocationManager locationManager;
+    private final IITCNativeHttpClient nativeHttpClient;
     private boolean pendingLocationRequest;
 
     public IITCNativeInterface(WebView webView, MainActivity activity) {
         this.webView = webView;
         this.activity = activity;
         this.locationManager = (LocationManager) webView.getContext().getSystemService(android.content.Context.LOCATION_SERVICE);
+        this.nativeHttpClient = new IITCNativeHttpClient(webView);
     }
 
     private boolean hasLocationPermission() {
@@ -67,6 +69,18 @@ public class IITCNativeInterface {
     @SuppressWarnings("unused")
     public void hideStartupSplash() {
         // Compatibility shim for older injected bootstrap code.
+    }
+
+    @JavascriptInterface
+    @SuppressWarnings("unused")
+    public void xmlHttpRequest(String requestJson) {
+        nativeHttpClient.request(requestJson);
+    }
+
+    @JavascriptInterface
+    @SuppressWarnings("unused")
+    public void abortXmlHttpRequest(String id) {
+        nativeHttpClient.abort(id);
     }
 
     @JavascriptInterface

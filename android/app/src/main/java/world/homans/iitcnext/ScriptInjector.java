@@ -127,24 +127,110 @@ public class ScriptInjector {
         return builder.toString();
     }
 
-    public String getInjectionJs() {
-        if (userScript == null) return "";
+    private String getNativeXmlHttpRequestShimJs() {
+        // The bundled userscript snapshots GM_xmlhttpRequest during module startup, so install this before injecting it.
+        return
+            "  function installNativeXmlHttpRequest() { " +
+            "    if (!window.IITC_Native || typeof window.IITC_Native.xmlHttpRequest !== 'function') return; " +
+            "    var nextNativeXhrId = 1; " +
+            "    var nativeXhrCallbacks = {}; " +
+            "    function getHeadersObject(headers) { " +
+            "      var result = {}; " +
+            "      if (!headers || typeof headers !== 'object') return result; " +
+            "      Object.keys(headers).forEach(function(key) { " +
+            "        var value = headers[key]; " +
+            "        if (value != null) result[key] = String(value); " +
+            "      }); " +
+            "      return result; " +
+            "    } " +
+            "    function base64ToBytes(base64) { " +
+            "      var binary = window.atob(base64 || ''); " +
+            "      var bytes = new Uint8Array(binary.length); " +
+            "      for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i); " +
+            "      return bytes; " +
+            "    } " +
+            "    function bytesToText(bytes) { " +
+            "      if (window.TextDecoder) return new TextDecoder('utf-8').decode(bytes); " +
+            "      var text = ''; " +
+            "      for (var i = 0; i < bytes.length; i++) text += String.fromCharCode(bytes[i]); " +
+            "      return text; " +
+            "    } " +
+            "    function createResponse(details, payload) { " +
+            "      var bytes = base64ToBytes(payload.bodyBase64); " +
+            "      var responseType = String(details.responseType || '').toLowerCase(); " +
+            "      var responseText = responseType === 'blob' || responseType === 'arraybuffer' ? '' : bytesToText(bytes); " +
+            "      var response = responseText; " +
+            "      if (responseType === 'blob') response = new Blob([bytes], { type: payload.mimeType || '' }); " +
+            "      if (responseType === 'arraybuffer') response = bytes.buffer; " +
+            "      if (responseType === 'json') response = responseText ? JSON.parse(responseText) : null; " +
+            "      return { " +
+            "        finalUrl: payload.finalUrl || details.url || '', " +
+            "        readyState: 4, " +
+            "        response: response, " +
+            "        responseHeaders: payload.responseHeaders || '', " +
+            "        responseText: responseText, " +
+            "        status: payload.status || 0, " +
+            "        statusText: payload.statusText || '' " +
+            "      }; " +
+            "    } " +
+            "    window.IITC_NEXT_NATIVE_XHR_RESPONSE = function(id, eventName, payload) { " +
+            "      var details = nativeXhrCallbacks[id]; " +
+            "      if (!details) return; " +
+            "      delete nativeXhrCallbacks[id]; " +
+            "      try { " +
+            "        var response = createResponse(details, payload || {}); " +
+            "        if (eventName === 'load' && typeof details.onload === 'function') details.onload(response); " +
+            "        if (eventName === 'timeout' && typeof details.ontimeout === 'function') details.ontimeout(response); " +
+            "        if (eventName === 'error' && typeof details.onerror === 'function') details.onerror(response); " +
+            "      } catch (e) { " +
+            "        if (typeof details.onerror === 'function') details.onerror({ status: 0, statusText: String(e), responseText: '' }); " +
+            "      } " +
+            "    }; " +
+            "    window.GM_xmlhttpRequest = window.GM_xmlhttpRequest || function(details) { " +
+            "      details = details || {}; " +
+            "      var id = 'native-xhr-' + (nextNativeXhrId++); " +
+            "      nativeXhrCallbacks[id] = details; " +
+            "      try { " +
+            "        window.IITC_Native.xmlHttpRequest(JSON.stringify({ " +
+            "          id: id, " +
+            "          method: details.method || 'GET', " +
+            "          url: String(details.url || ''), " +
+            "          responseType: details.responseType || '', " +
+            "          timeout: Number(details.timeout) || 0, " +
+            "          headers: getHeadersObject(details.headers), " +
+            "          data: typeof details.data === 'string' ? details.data : undefined " +
+            "        })); " +
+            "      } catch (e) { " +
+            "        delete nativeXhrCallbacks[id]; " +
+            "        window.setTimeout(function() { " +
+            "          if (typeof details.onerror === 'function') details.onerror({ status: 0, statusText: String(e), responseText: '' }); " +
+            "        }, 0); " +
+            "      } " +
+            "      return { " +
+            "        abort: function() { " +
+            "          if (!nativeXhrCallbacks[id]) return; " +
+            "          delete nativeXhrCallbacks[id]; " +
+            "          try { window.IITC_Native.abortXmlHttpRequest(id); } catch (e) {} " +
+            "          if (typeof details.onabort === 'function') details.onabort({ status: 0, statusText: 'abort', responseText: '' }); " +
+            "        } " +
+            "      }; " +
+            "    }; " +
+            "    window.GM = window.GM || {}; " +
+            "    window.GM.xmlHttpRequest = window.GM.xmlHttpRequest || window.GM_xmlhttpRequest; " +
+            "  } " +
+            "  installNativeXmlHttpRequest(); ";
+    }
 
-        String requireUrlsLiteral = toJsonArray(requireUrls);
-        String resourceUrlsLiteral = toJsonObject(resourceUrls);
-        String cesiumBaseUrlLiteral = JSONObject.quote(findCesiumBaseUrl());
-        String scriptNameLiteral = JSONObject.quote(scriptName);
-        String scriptVersionLiteral = JSONObject.quote(scriptVersion);
-        String userScriptLiteral = JSONObject.quote(userScript);
-
-        // IITC is packaged as a userscript, so the Android shell provides the small Greasemonkey/browser shims it expects.
-        return "javascript:(function() { " +
-            "try { " +
+    private String getInjectionBootstrapJs() {
+        return
             "  if (window.IITC_NEXT_INJECTED) return; " +
             "  if (window.IITC_NEXT_INJECTING) return; " +
             "  window.IITC_NEXT_INJECTING = true; " +
-            "  window.unsafeWindow = window; " +
+            "  window.unsafeWindow = window; ";
+    }
 
+    private String getAndroidGeolocationShimJs() {
+        return
             "  if (window.IITC_Native) { " +
             "    window.navigator.geolocation.getCurrentPosition = function(success, error) { " +
             "      window.onAndroidLocation = function(lat, lng, acc) { " +
@@ -159,9 +245,16 @@ public class ScriptInjector {
             "      }; " +
             "      window.IITC_Native.getCurrentPosition(); " +
             "    }; " +
-            "  } " +
+            "  } ";
+    }
 
-            "  var requires = " + requireUrlsLiteral + "; " +
+    private String getUserscriptRuntimeShimJs(
+        String resourceUrlsLiteral,
+        String cesiumBaseUrlLiteral,
+        String scriptNameLiteral,
+        String scriptVersionLiteral
+    ) {
+        return
             "  var resources = " + resourceUrlsLiteral + "; " +
             "  var head = document.head || document.documentElement; " +
             "  window.CESIUM_BASE_URL = " + cesiumBaseUrlLiteral + "; " +
@@ -183,7 +276,12 @@ public class ScriptInjector {
             "      link.setAttribute('data-iitc-next-resource', name); " +
             "      head.appendChild(link); " +
             "    } " +
-            "  }); " +
+            "  }); ";
+    }
+
+    private String getDependencyLoaderJs(String requireUrlsLiteral, String userScriptLiteral) {
+        return
+            "  var requires = " + requireUrlsLiteral + "; " +
             "  function fail(message, detail) { " +
             "    window.IITC_NEXT_INJECTING = false; " +
             "    console.error(message, detail || ''); " +
@@ -223,7 +321,26 @@ public class ScriptInjector {
             "    window.IITC_NEXT_INJECTED = true; " +
             "    window.IITC_NEXT_INJECTING = false; " +
             "  } " +
-            "  loadRequire(0); " +
+            "  loadRequire(0); ";
+    }
+
+    public String getInjectionJs() {
+        if (userScript == null) return "";
+
+        String requireUrlsLiteral = toJsonArray(requireUrls);
+        String resourceUrlsLiteral = toJsonObject(resourceUrls);
+        String cesiumBaseUrlLiteral = JSONObject.quote(findCesiumBaseUrl());
+        String scriptNameLiteral = JSONObject.quote(scriptName);
+        String scriptVersionLiteral = JSONObject.quote(scriptVersion);
+        String userScriptLiteral = JSONObject.quote(userScript);
+
+        return "javascript:(function() { " +
+            "try { " +
+            getInjectionBootstrapJs() +
+            getAndroidGeolocationShimJs() +
+            getNativeXmlHttpRequestShimJs() +
+            getUserscriptRuntimeShimJs(resourceUrlsLiteral, cesiumBaseUrlLiteral, scriptNameLiteral, scriptVersionLiteral) +
+            getDependencyLoaderJs(requireUrlsLiteral, userScriptLiteral) +
             "} catch(e) { " +
             "  window.IITC_NEXT_INJECTING = false; " +
             "  console.error('IITC-Next injection error:', e); " +
