@@ -48,6 +48,12 @@ interface PlayerActivity {
   positionCallback: EntityPositionCallback;
 }
 
+interface PlayerActivityTooltip {
+  title: string;
+  activities: PlayerActivityData[];
+  rowLabel: "name" | "portalName";
+}
+
 class PlayerActivityPlugin {
   public id = "player-activity-tracker";
   public name = "Player Activity Tracker";
@@ -73,7 +79,10 @@ class PlayerActivityPlugin {
 
   private tooltipEl: HTMLElement | null = null;
   private hoverHandler: Cesium.ScreenSpaceEventHandler | undefined;
-  private hoverAction: Cesium.ScreenSpaceEventHandler.MotionEventCallback = () => {};
+  private readonly hoverAction: Cesium.ScreenSpaceEventHandler.MotionEventCallback = (movement) => this.handleHoverMove(movement);
+  private readonly cameraMoveStartAction = () => this.handleCameraMoveStart();
+  private readonly cameraMoveEndAction = () => this.handleCameraMoveEnd();
+  private isCameraMoving = false;
 
   public init() {
     const iitc = safeWindow.iitc;
@@ -137,18 +146,7 @@ class PlayerActivityPlugin {
 
   private setUpTooltipElement() {
     const container = this.interfaceManager.getContainer();
-
-    this.tooltipEl = (
-      <div id="cesium-rich-tooltip" style={{
-        display: "none",
-        position: "absolute",
-        backgroundColor: "rgba(42, 42, 42, 0.9)",
-        border: "1px solid #555",
-        padding: "4px",
-        color: "white",
-      }} />
-    ) as HTMLElement;
-
+    this.tooltipEl = PlayerActivityTooltipElement();
     container.appendChild(this.tooltipEl);
   }
 
@@ -158,92 +156,95 @@ class PlayerActivityPlugin {
   }
 
   private setUpHoverAction() {
-    this.hoverAction = (movement: Cesium.ScreenSpaceEventHandler.MotionEvent) => {
-      const pickedObject = this.viewer.scene.pick(movement.endPosition);
-      if (Cesium.defined(pickedObject) && pickedObject.id) {
-        const entity = pickedObject.id as Cesium.Entity | Cesium.Entity[];
-        if (Array.isArray(entity) && entity[0].id.startsWith("player-activity")) {
-          // Multiplayer activities
-          const allPlayersLastActivitiesData: PlayerActivityData[] = entity.map(e => {
-            const specificPlayerActivitiesData: PlayerActivityData[] = e.properties?.activities.getValue();
-            const activity = this.getLatestActivity(specificPlayerActivitiesData);
-            if (!activity) return null;
-            return {
-              name: activity.name,
-              team: activity.team,
-              timestamp: activity.timestamp,
-              weight: activity.weight,
-              portalName: activity.portalName,
-              latE6: activity.latE6,
-              lngE6: activity.lngE6,
-            };
-          }).filter((activity): activity is PlayerActivityData => !!activity);
-          if (allPlayersLastActivitiesData.length === 0) return;
-          allPlayersLastActivitiesData.sort((a, b) => b.timestamp - a.timestamp);
-          const table = (
-            <table>
-              <thead>
-                <tr>
-                  <th style={{ textAlign: "left" }}>{entity.length + " players"}</th>
-                </tr>
-              </thead>
-              {allPlayersLastActivitiesData.map(activity => {
-                return (
-                  <tr style={{ fontSize: "12px" }}>
-                    <td style={{ paddingRight: "8px" }}>{activity.name}</td>
-                    <td style={{ textAlign: "right" }}>{calcTimeAgoStr(activity.timestamp)}</td>
-                  </tr>
-                ) as HTMLElement;
-              })}
-            </table>
-          ) as HTMLElement;
-          this.configureTooltipElement(table, allPlayersLastActivitiesData, movement);
-        } else if (!Array.isArray(entity) && entity.id.startsWith("player-activity")) {
-          // Single player activities
-          const activitiesData: PlayerActivityData[] = entity.properties?.activities.getValue();
-          const newestActivitiesData = [...activitiesData].sort((a, b) => b.timestamp - a.timestamp);
-          const latestActivityData = newestActivitiesData[0];
-          if (!latestActivityData) return;
-          const table = (
-            <table>
-              <thead>
-                <tr>
-                  <th style={{ textAlign: "left" }}>{latestActivityData.name}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {newestActivitiesData.slice(0, 6).map(activity => {
-                  return (
-                    <tr style={{ fontSize: "12px" }}>
-                      <td style={{ paddingRight: "8px" }}>{activity.portalName}</td>
-                      <td style={{ textAlign: "right" }}>{calcTimeAgoStr(activity.timestamp)}</td>
-                    </tr>
-                  ) as HTMLElement;
-                })}
-              </tbody>
-            </table>
-          ) as HTMLElement;
-          if (!this.tooltipEl) return;
-          this.configureTooltipElement(table, newestActivitiesData, movement);
-        } else {
-          // Hover out
-          if (!this.tooltipEl) return;
-          this.tooltipEl.innerHTML = "";
-          this.tooltipEl.style.display = "none";
-        }
-      } else {
-        if (!this.tooltipEl) return;
-        this.tooltipEl.innerHTML = "";
-        this.tooltipEl.style.display = "none";
-      }
-    };
     this.hoverHandler?.setInputAction(this.hoverAction, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+    this.viewer.camera.moveStart.addEventListener(this.cameraMoveStartAction);
+    this.viewer.camera.moveEnd.addEventListener(this.cameraMoveEndAction);
   }
 
   private unsetHoverAction() {
+    this.viewer.camera.moveStart.removeEventListener(this.cameraMoveStartAction);
+    this.viewer.camera.moveEnd.removeEventListener(this.cameraMoveEndAction);
     this.hoverHandler?.removeInputAction(Cesium.ScreenSpaceEventType.MOUSE_MOVE);
     this.hoverHandler?.destroy();
     this.hoverHandler = undefined;
+    this.isCameraMoving = false;
+  }
+
+  private handleCameraMoveStart(): void {
+    this.isCameraMoving = true;
+    this.hideTooltip();
+  }
+
+  private handleCameraMoveEnd(): void {
+    this.isCameraMoving = false;
+  }
+
+  private handleHoverMove(movement: Cesium.ScreenSpaceEventHandler.MotionEvent): void {
+    if (this.isCameraMoving) {
+      this.hideTooltip();
+      return;
+    }
+
+    const tooltip = this.getPickedPlayerActivityTooltip(movement.endPosition);
+    if (!tooltip) {
+      this.hideTooltip();
+      return;
+    }
+
+    this.showTooltip(
+      PlayerActivityTooltipTable({ tooltip }),
+      tooltip.activities,
+      movement,
+    );
+  }
+
+  private getPickedPlayerActivityTooltip(position: Cesium.Cartesian2): PlayerActivityTooltip | undefined {
+    const pickedObject = this.viewer.scene.pick(position) as { id?: Cesium.Entity | Cesium.Entity[] } | undefined;
+    const entity = pickedObject?.id;
+
+    if (Array.isArray(entity)) return this.getClusteredPlayerActivityTooltip(entity);
+    if (entity) return this.getSinglePlayerActivityTooltip(entity);
+
+    return undefined;
+  }
+
+  private getClusteredPlayerActivityTooltip(entities: Cesium.Entity[]): PlayerActivityTooltip | undefined {
+    if (!this.isPlayerActivityEntity(entities[0])) return undefined;
+
+    const activities = entities
+      .map((entity) => this.getLatestActivity(this.getPlayerActivityEntityActivities(entity)))
+      .filter((activity): activity is PlayerActivityData => !!activity)
+      .sort(comparePlayerActivityTimestampDescending);
+    if (activities.length === 0) return undefined;
+
+    return {
+      title: `${entities.length} players`,
+      activities,
+      rowLabel: "name",
+    };
+  }
+
+  private getSinglePlayerActivityTooltip(entity: Cesium.Entity): PlayerActivityTooltip | undefined {
+    if (!this.isPlayerActivityEntity(entity)) return undefined;
+
+    const activities = [...this.getPlayerActivityEntityActivities(entity)]
+      .sort(comparePlayerActivityTimestampDescending);
+    const latestActivity = activities[0];
+    if (!latestActivity) return undefined;
+
+    return {
+      title: latestActivity.name,
+      activities: activities.slice(0, 6),
+      rowLabel: "portalName",
+    };
+  }
+
+  private isPlayerActivityEntity(entity: Cesium.Entity | undefined): entity is Cesium.Entity {
+    return typeof entity?.id === "string" && entity.id.startsWith("player-activity");
+  }
+
+  private getPlayerActivityEntityActivities(entity: Cesium.Entity): PlayerActivityData[] {
+    return entity.properties?.activities?.getValue() ?? [];
   }
 
   private configureDataSource(source: Cesium.DataSource) {
@@ -295,7 +296,7 @@ class PlayerActivityPlugin {
     });
   }
 
-  private configureTooltipElement(table: HTMLElement, activitiesData: PlayerActivityData[], movement: Cesium.ScreenSpaceEventHandler.MotionEvent ): void {
+  private showTooltip(table: HTMLElement, activitiesData: PlayerActivityData[], movement: Cesium.ScreenSpaceEventHandler.MotionEvent): void {
     if (!this.tooltipEl) return;
     this.tooltipEl.innerHTML = "";
     this.tooltipEl.appendChild(table);
@@ -316,6 +317,12 @@ class PlayerActivityPlugin {
       this.tooltipEl.style.bottom = "";
       this.tooltipEl.style.top = (movement.endPosition.y + 15) + "px";
     }
+  }
+
+  private hideTooltip(): void {
+    if (!this.tooltipEl) return;
+    this.tooltipEl.innerHTML = "";
+    this.tooltipEl.style.display = "none";
   }
 
   private updatePlayerActivity(): void {
@@ -571,6 +578,48 @@ class PlayerActivityPlugin {
       entity.polyline.positions = new Cesium.ConstantProperty(positions);
     }
   }
+}
+
+const PlayerActivityTooltipElement = (): HTMLElement => {
+  return (
+    <div id="cesium-rich-tooltip" style={{
+      display: "none",
+      position: "absolute",
+      backgroundColor: "rgba(42, 42, 42, 0.9)",
+      border: "1px solid #555",
+      padding: "4px",
+      color: "white",
+      zIndex: "10500",
+    }} />
+  ) as HTMLElement;
+};
+
+const PlayerActivityTooltipTable = ({tooltip}: {
+  tooltip: PlayerActivityTooltip;
+}): HTMLElement => {
+  return (
+    <table>
+      <thead>
+      <tr>
+        <th style={{ textAlign: "left" }}>{tooltip.title}</th>
+      </tr>
+      </thead>
+      <tbody>
+      {tooltip.activities.map(activity => {
+        return (
+          <tr style={{ fontSize: "12px" }}>
+            <td style={{ paddingRight: "8px" }}>{activity[tooltip.rowLabel]}</td>
+            <td style={{ textAlign: "right" }}>{calcTimeAgoStr(activity.timestamp)}</td>
+          </tr>
+        ) as HTMLElement;
+      })}
+      </tbody>
+    </table>
+  ) as HTMLElement;
+};
+
+function comparePlayerActivityTimestampDescending(a: PlayerActivityData, b: PlayerActivityData): number {
+  return b.timestamp - a.timestamp;
 }
 
 function calcTimeAgoStr(time: number) {
