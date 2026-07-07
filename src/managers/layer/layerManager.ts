@@ -18,17 +18,21 @@ import {
   setPortalChildFilters,
 } from "./layerFilters";
 import { LayerOverlay } from "./layerOverlay";
+import { LayerPrimitives } from "./layerPrimitives";
 
 const LOG_TAG = "LayerManager";
 
 export class LayerManager {
   private static readonly DEFAULT_OVERLAY_Z_INDEX = 1000;
 
-  // Links, portals, etc., use normal DataSource layers, named by layer visibility id.
+  // Links, fields, etc., use normal DataSource layers, named by layer visibility id.
   private dataSources: Map<string, Cesium.DataSource> = new Map();
 
   // Player activity markers, etc., use custom overlay layers, named by layer visibility id.
   private overlayLayers: Map<string, LayerOverlay> = new Map();
+
+  // Primitive-backed layers for performance-sensitive visuals, named by layer visibility id.
+  private primitiveLayers: Map<string, LayerPrimitives> = new Map();
 
   // Fine-grained layer visibility state, such as "portals-l8-enlightened".
   private layerVisibility: Map<string, boolean> = new Map();
@@ -106,6 +110,18 @@ export class LayerManager {
     return layer.source;
   }
 
+  public getOrCreatePrimitiveLayer(name: string): LayerPrimitives {
+    this.registerPluginFilterIfNeeded(name);
+
+    let layer = this.primitiveLayers.get(name);
+    if (!layer) {
+      layer = new LayerPrimitives(this.viewer, this.getLayerVisibility(name));
+      this.primitiveLayers.set(name, layer);
+      this.refreshOverlays();
+    }
+    return layer;
+  }
+
   public async withEntityCollectionEventsSuspended<T>(
     layers: { name: string; type: "dataSource" | "overlay" }[],
     callback: () => Promise<T>
@@ -178,6 +194,15 @@ export class LayerManager {
     if (layer) {
       layer.destroy();
       this.overlayLayers.delete(name);
+    }
+    this.unregisterPluginFilterIfNeeded(name);
+  }
+
+  public removePrimitiveLayer(name: string): void {
+    const layer = this.primitiveLayers.get(name);
+    if (layer) {
+      layer.destroy();
+      this.primitiveLayers.delete(name);
     }
     this.unregisterPluginFilterIfNeeded(name);
   }
@@ -288,6 +313,9 @@ export class LayerManager {
 
     const overlay = this.overlayLayers.get(name);
     if (overlay) overlay.setVisible(visible);
+
+    const primitiveLayer = this.primitiveLayers.get(name);
+    if (primitiveLayer) primitiveLayer.setVisible(visible);
 
     if (previousVisible !== visible) this.refreshScene();
   }

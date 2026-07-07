@@ -1,3 +1,7 @@
+/**
+ * Defines layer filter state and maps filters to render layer visibility.
+ */
+
 import { PORTAL_LEVELS, TEAMS } from "../../types/common/common.ts";
 
 export const FILTER_STATES_STORAGE_KEY = "iitc-next-filter-states";

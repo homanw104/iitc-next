@@ -1,3 +1,8 @@
+/**
+ * Manages overlay render layers that are shown atop of other layers,
+ * backed by an isolated data source display.
+ */
+
 import * as Cesium from "cesium";
 
 const CESIUM_PASS_OVERLAY = 13;
