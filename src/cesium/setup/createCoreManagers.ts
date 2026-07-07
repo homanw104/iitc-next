@@ -49,8 +49,8 @@ export function createCoreManagers(viewer: Cesium.Viewer, container: HTMLElement
   const portalEntityManager = new PortalEntityManager(viewer, layerManager, entityPositionManager, entityTranslucencyManager);
   const portalLabelEntityManager = new PortalLabelEntityManager(viewer, layerManager, entityPositionManager);
   const portalOrnamentEntityManager = new PortalOrnamentEntityManager(layerManager, entityPositionManager, entityTranslucencyManager);
-  const portalHistoryEntityManager = new PortalHistoryEntityManager(layerManager, entityPositionManager, entityTranslucencyManager);
-  const scoutHistoryEntityManager = new ScoutHistoryEntityManager(layerManager, entityPositionManager, entityTranslucencyManager);
+  const portalHistoryEntityManager = new PortalHistoryEntityManager(viewer, layerManager, entityPositionManager, entityTranslucencyManager);
+  const scoutHistoryEntityManager = new ScoutHistoryEntityManager(viewer, layerManager, entityPositionManager, entityTranslucencyManager);
   const linkEntityManager = new LinkEntityManager(layerManager, portalEntityManager);
   const fieldEntityManager = new FieldEntityManager(layerManager, portalEntityManager);
   const debugTileEntityManager = new DebugTileEntityManager(viewer, layerManager);

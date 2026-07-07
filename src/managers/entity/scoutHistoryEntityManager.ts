@@ -1,12 +1,12 @@
 /**
- * Manage scout control halo entities.
+ * Manage scout control halo point primitives.
  */
 
 import * as Cesium from "cesium";
 import type { PortalData } from "../../types/iitc/portal.ts";
 import type { LayerManager } from "../layer/layerManager";
 import type { EntityPosition, EntityPositionCallback, EntityPositionManager } from "./entityPositionManager";
-import type { EntityTranslucencyManager } from "./entityTranslucencyManager";
+import type { EntityTranslucencyManager, TranslucencyByDistanceCallback } from "./entityTranslucencyManager";
 import {
   PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
   PORTAL_OCCLUDED_ALPHA,
@@ -16,8 +16,8 @@ import {
   getPortalDisableDepthTestDistance,
 } from "./portalEntityManager.ts";
 
-const DATA_SOURCE_LAYER_NAME = "history-scout-control";
-const DATA_SOURCE_LAYER_NAME_REVERSE = "history-scout-control-reverse";
+const PRIMITIVE_LAYER_NAME = "history-scout-control";
+const PRIMITIVE_LAYER_NAME_REVERSE = "history-scout-control-reverse";
 const HALO_POINT_PIXEL_SIZE = PORTAL_POINT_PIXEL_SIZE + PORTAL_POINT_OUTLINE_WIDTH;
 const HALO_POINT_OUTLINE_WIDTH = 4;
 const HALO_POINT_ALPHA = 1.0;
@@ -27,216 +27,198 @@ type ScoutHistoryState = "none" | "controlled";
 
 interface ScoutHistoryHalo {
   data: PortalData;
-  entity?: Cesium.Entity;
-  occlusionEntity?: Cesium.Entity;
-  reverseEntity?: Cesium.Entity;
-  reverseOcclusionEntity?: Cesium.Entity;
+  pointPrimitive?: Cesium.PointPrimitive;
+  occlusionPointPrimitive?: Cesium.PointPrimitive;
+  reversePointPrimitive?: Cesium.PointPrimitive;
+  reverseOcclusionPointPrimitive?: Cesium.PointPrimitive;
   positionCallback: EntityPositionCallback;
 }
 
 export class ScoutHistoryEntityManager {
   private scoutControlHalos: Map<string, ScoutHistoryHalo> = new Map();
   private scoutControlHalosPendingCreation: Set<string> = new Set();
+  private readonly currentTranslucencyByDistance = new Cesium.NearFarScalar();
+  private readonly translucencyByDistanceCallback: TranslucencyByDistanceCallback;
 
   constructor(
+    private viewer: Cesium.Viewer,
     private layerManager: LayerManager,
     private entityPositionManager: EntityPositionManager,
-    private entityTranslucencyManager: EntityTranslucencyManager
-  ) {}
+    entityTranslucencyManager: EntityTranslucencyManager
+  ) {
+    this.translucencyByDistanceCallback = (translucencyByDistance) => {
+      Cesium.NearFarScalar.clone(translucencyByDistance, this.currentTranslucencyByDistance);
+      this.scoutControlHalos.forEach((scoutControlHalo) => {
+        if (scoutControlHalo.occlusionPointPrimitive) {
+          scoutControlHalo.occlusionPointPrimitive.translucencyByDistance = this.currentTranslucencyByDistance;
+        }
+        if (scoutControlHalo.reverseOcclusionPointPrimitive) {
+          scoutControlHalo.reverseOcclusionPointPrimitive.translucencyByDistance = this.currentTranslucencyByDistance;
+        }
+      });
+      if (this.scoutControlHalos.size > 0) this.viewer.scene.requestRender();
+    };
+    entityTranslucencyManager.setOnTranslucencyByDistanceChangedCallback(this.translucencyByDistanceCallback);
+  }
 
   public async addOrUpdateScoutControlHalos(portals: PortalData[]): Promise<void> {
-    await this.layerManager.withEntityCollectionEventsSuspended(
-      [
-        { name: DATA_SOURCE_LAYER_NAME, type: "dataSource" },
-        { name: DATA_SOURCE_LAYER_NAME_REVERSE, type: "dataSource" },
-      ],
-      async () => {
-        await Promise.all(portals.map((portal) => this.addOrUpdateScoutControlHalo(portal)));
-      }
-    );
+    await Promise.all(portals.map((portal) => this.addOrUpdateScoutControlHaloPrimitive(portal)));
+    this.viewer.scene.requestRender();
   }
 
   public async addOrUpdateScoutControlHalo(data: PortalData): Promise<void> {
-    const existing = this.scoutControlHalos.get(data.guid);
-    if (existing) {
-      await this.updateScoutControlHaloEntity(existing, data);
-      this.updateScoutControlPositionSubscription(existing, data);
-      existing.data = data;
-    } else {
-      if (this.scoutControlHalosPendingCreation.has(data.guid)) return;
-      this.scoutControlHalosPendingCreation.add(data.guid);
-      try {
-        const { entity, occlusionEntity, reverseEntity, reverseOcclusionEntity } = await this.createScoutControlHaloEntity(data);
-        const scoutHistoryHalo: ScoutHistoryHalo = {
-          data,
-          entity,
-          occlusionEntity,
-          reverseEntity,
-          reverseOcclusionEntity,
-          positionCallback: (entityPosition: EntityPosition) => {
-            if (scoutHistoryHalo.entity) {
-              scoutHistoryHalo.entity.position = new Cesium.ConstantPositionProperty(entityPosition.position);
-              scoutHistoryHalo.entity.show = !entityPosition.isFallbackPosition;
-            }
-            if (scoutHistoryHalo.occlusionEntity) {
-              scoutHistoryHalo.occlusionEntity.position = new Cesium.ConstantPositionProperty(entityPosition.position);
-              scoutHistoryHalo.occlusionEntity.show = !entityPosition.isFallbackPosition;
-            }
-            if (scoutHistoryHalo.reverseEntity) {
-              scoutHistoryHalo.reverseEntity.position = new Cesium.ConstantPositionProperty(entityPosition.position);
-              scoutHistoryHalo.reverseEntity.show = !entityPosition.isFallbackPosition;
-            }
-            if (scoutHistoryHalo.reverseOcclusionEntity) {
-              scoutHistoryHalo.reverseOcclusionEntity.position = new Cesium.ConstantPositionProperty(entityPosition.position);
-              scoutHistoryHalo.reverseOcclusionEntity.show = !entityPosition.isFallbackPosition;
-            }
-          },
-        };
-        this.entityPositionManager.setOnPositionChangedCallback(data, scoutHistoryHalo.positionCallback);
-        this.scoutControlHalos.set(data.guid, scoutHistoryHalo);
-      } finally {
-        this.scoutControlHalosPendingCreation.delete(data.guid);
-      }
-    }
+    await this.addOrUpdateScoutControlHaloPrimitive(data);
+    this.viewer.scene.requestRender();
   }
 
   public removeScoutControlHalo(guid: string): void {
-    this.removeScoutControlHaloEntity(guid);
+    if (this.removeScoutControlHaloPrimitive(guid)) this.viewer.scene.requestRender();
   }
 
   public removeScoutControlHalosInView(viewRect: Cesium.Rectangle): void {
-    this.removeScoutControlHaloEntitiesInView(viewRect);
+    this.removeScoutControlHaloPrimitivesInView(viewRect);
   }
 
-  private async createScoutControlHaloEntity(data: PortalData): Promise<{
-    entity: Cesium.Entity | undefined;
-    occlusionEntity: Cesium.Entity | undefined;
-    reverseEntity: Cesium.Entity | undefined;
-    reverseOcclusionEntity: Cesium.Entity | undefined;
+  private async addOrUpdateScoutControlHaloPrimitive(data: PortalData): Promise<void> {
+    const existing = this.scoutControlHalos.get(data.guid);
+    if (existing) {
+      await this.updateScoutControlHaloPrimitives(existing, data);
+      this.updateScoutControlPositionSubscription(existing, data);
+      existing.data = data;
+    } else {
+      await this.createAndStoreScoutControlHalo(data);
+    }
+  }
+
+  private async createAndStoreScoutControlHalo(data: PortalData): Promise<void> {
+    if (this.scoutControlHalosPendingCreation.has(data.guid)) return;
+
+    this.scoutControlHalosPendingCreation.add(data.guid);
+    try {
+      const {
+        pointPrimitive,
+        occlusionPointPrimitive,
+        reversePointPrimitive,
+        reverseOcclusionPointPrimitive,
+      } = await this.createScoutControlHaloPrimitives(data);
+
+      const scoutHistoryHalo: ScoutHistoryHalo = {
+        data,
+        pointPrimitive,
+        occlusionPointPrimitive,
+        reversePointPrimitive,
+        reverseOcclusionPointPrimitive,
+        positionCallback: (entityPosition: EntityPosition) => {
+          applyScoutControlHaloPosition(scoutHistoryHalo, entityPosition);
+        },
+      };
+      this.entityPositionManager.setOnPositionChangedCallback(data, scoutHistoryHalo.positionCallback);
+      this.scoutControlHalos.set(data.guid, scoutHistoryHalo);
+    } finally {
+      this.scoutControlHalosPendingCreation.delete(data.guid);
+    }
+  }
+
+  private async createScoutControlHaloPrimitives(data: PortalData): Promise<{
+    pointPrimitive: Cesium.PointPrimitive | undefined;
+    occlusionPointPrimitive: Cesium.PointPrimitive | undefined;
+    reversePointPrimitive: Cesium.PointPrimitive | undefined;
+    reverseOcclusionPointPrimitive: Cesium.PointPrimitive | undefined;
   }> {
-    const entities = this.layerManager.getOrCreateDataSource(DATA_SOURCE_LAYER_NAME).entities;
-    const reverseEntities = this.layerManager.getOrCreateDataSource(DATA_SOURCE_LAYER_NAME_REVERSE).entities;
+    const pointPrimitives = this.layerManager.getOrCreatePrimitiveLayer(PRIMITIVE_LAYER_NAME).pointPrimitives;
+    const reversePointPrimitives = this.layerManager.getOrCreatePrimitiveLayer(PRIMITIVE_LAYER_NAME_REVERSE).pointPrimitives;
     const scoutHistoryState = getScoutHistoryState(data);
     const entityPosition = await this.entityPositionManager.getEntityPosition(data);
 
-    let entity: Cesium.Entity | undefined = undefined;
-    let occlusionEntity: Cesium.Entity | undefined = undefined;
-    let reverseEntity: Cesium.Entity | undefined = undefined;
-    let reverseOcclusionEntity: Cesium.Entity | undefined = undefined;
+    let pointPrimitive: Cesium.PointPrimitive | undefined = undefined;
+    let occlusionPointPrimitive: Cesium.PointPrimitive | undefined = undefined;
+    let reversePointPrimitive: Cesium.PointPrimitive | undefined = undefined;
+    let reverseOcclusionPointPrimitive: Cesium.PointPrimitive | undefined = undefined;
 
     if (scoutHistoryState === "controlled") {
-      entity = entities.add({
-        id: `scout-halo-${data.guid}`,
-        position: entityPosition.position,
-        show: !entityPosition.isFallbackPosition,
-        point: {
-          pixelSize: HALO_POINT_PIXEL_SIZE,
-          color: Cesium.Color.TRANSPARENT,
-          outlineColor: Cesium.Color.fromCssColorString(SCOUT_CONTROL_COLOR).withAlpha(HALO_POINT_ALPHA),
-          outlineWidth: HALO_POINT_OUTLINE_WIDTH,
-          scaleByDistance: createPortalNearFarScalar(),
-          heightReference: Cesium.HeightReference.NONE,
-          disableDepthTestDistance: getPortalDisableDepthTestDistance(),
-        },
-      });
-      occlusionEntity = entities.add({
-        id: `scout-halo-occluded-${data.guid}`,
-        position: entityPosition.position,
-        show: !entityPosition.isFallbackPosition,
-        point: {
-          pixelSize: HALO_POINT_PIXEL_SIZE,
-          color: Cesium.Color.TRANSPARENT,
-          outlineColor: Cesium.Color.fromCssColorString(SCOUT_CONTROL_COLOR).withAlpha(PORTAL_OCCLUDED_ALPHA),
-          outlineWidth: HALO_POINT_OUTLINE_WIDTH,
-          scaleByDistance: createPortalNearFarScalar(),
-          translucencyByDistance: this.entityTranslucencyManager.getTranslucencyByDistance(),
-          heightReference: Cesium.HeightReference.NONE,
-          disableDepthTestDistance: PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
-        },
-      });
+      pointPrimitive = addScoutControlHaloPointPrimitive(
+        pointPrimitives,
+        `scout-halo-${data.guid}`,
+        entityPosition,
+      );
+      occlusionPointPrimitive = addScoutControlHaloOcclusionPointPrimitive(
+        pointPrimitives,
+        `scout-halo-occluded-${data.guid}`,
+        entityPosition,
+        this.currentTranslucencyByDistance,
+      );
     } else {
-      reverseEntity = reverseEntities.add({
-        id: `scout-halo-reverse-${data.guid}`,
-        position: entityPosition.position,
-        show: !entityPosition.isFallbackPosition,
-        point: {
-          pixelSize: HALO_POINT_PIXEL_SIZE,
-          color: Cesium.Color.TRANSPARENT,
-          outlineColor: Cesium.Color.fromCssColorString(SCOUT_CONTROL_COLOR).withAlpha(HALO_POINT_ALPHA),
-          outlineWidth: HALO_POINT_OUTLINE_WIDTH,
-          scaleByDistance: createPortalNearFarScalar(),
-          heightReference: Cesium.HeightReference.NONE,
-          disableDepthTestDistance: getPortalDisableDepthTestDistance(),
-        },
-      });
-      reverseOcclusionEntity = reverseEntities.add({
-        id: `scout-halo-reverse-occluded-${data.guid}`,
-        position: entityPosition.position,
-        show: !entityPosition.isFallbackPosition,
-        point: {
-          pixelSize: HALO_POINT_PIXEL_SIZE,
-          color: Cesium.Color.TRANSPARENT,
-          outlineColor: Cesium.Color.fromCssColorString(SCOUT_CONTROL_COLOR).withAlpha(PORTAL_OCCLUDED_ALPHA),
-          outlineWidth: HALO_POINT_OUTLINE_WIDTH,
-          scaleByDistance: createPortalNearFarScalar(),
-          translucencyByDistance: this.entityTranslucencyManager.getTranslucencyByDistance(),
-          heightReference: Cesium.HeightReference.NONE,
-          disableDepthTestDistance: PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
-        },
-      });
+      reversePointPrimitive = addScoutControlHaloPointPrimitive(
+        reversePointPrimitives,
+        `scout-halo-reverse-${data.guid}`,
+        entityPosition,
+      );
+      reverseOcclusionPointPrimitive = addScoutControlHaloOcclusionPointPrimitive(
+        reversePointPrimitives,
+        `scout-halo-reverse-occluded-${data.guid}`,
+        entityPosition,
+        this.currentTranslucencyByDistance,
+      );
     }
 
-    return { entity, occlusionEntity, reverseEntity, reverseOcclusionEntity };
+    return { pointPrimitive, occlusionPointPrimitive, reversePointPrimitive, reverseOcclusionPointPrimitive };
   }
 
-  private async updateScoutControlHaloEntity(scoutHistoryHalo: ScoutHistoryHalo, data: PortalData): Promise<void> {
-    this.removeScoutControlHaloEntityGroup(scoutHistoryHalo);
-    const { entity, occlusionEntity, reverseEntity, reverseOcclusionEntity } = await this.createScoutControlHaloEntity(data);
-    scoutHistoryHalo.entity = entity;
-    scoutHistoryHalo.occlusionEntity = occlusionEntity;
-    scoutHistoryHalo.reverseEntity = reverseEntity;
-    scoutHistoryHalo.reverseOcclusionEntity = reverseOcclusionEntity;
+  private async updateScoutControlHaloPrimitives(scoutHistoryHalo: ScoutHistoryHalo, data: PortalData): Promise<void> {
+    this.removeScoutControlHaloPrimitiveGroup(scoutHistoryHalo);
+    const {
+      pointPrimitive,
+      occlusionPointPrimitive,
+      reversePointPrimitive,
+      reverseOcclusionPointPrimitive,
+    } = await this.createScoutControlHaloPrimitives(data);
+    scoutHistoryHalo.pointPrimitive = pointPrimitive;
+    scoutHistoryHalo.occlusionPointPrimitive = occlusionPointPrimitive;
+    scoutHistoryHalo.reversePointPrimitive = reversePointPrimitive;
+    scoutHistoryHalo.reverseOcclusionPointPrimitive = reverseOcclusionPointPrimitive;
   }
 
   private updateScoutControlPositionSubscription(scoutControlHalo: ScoutHistoryHalo, data: PortalData): void {
-    if (scoutControlHalo.data.latE6 === data.latE6 && scoutControlHalo.data.lngE6 === data.lngE6) return;
-
     this.entityPositionManager.unsetOnPositionChangedCallback(scoutControlHalo.data, scoutControlHalo.positionCallback);
     this.entityPositionManager.setOnPositionChangedCallback(data, scoutControlHalo.positionCallback);
   }
 
-  private removeScoutControlHaloEntity(guid: string): void {
+  private removeScoutControlHaloPrimitive(guid: string): boolean {
     const scoutControlHalo = this.scoutControlHalos.get(guid);
-    if (scoutControlHalo) {
-      this.removeScoutControlHaloEntityGroup(scoutControlHalo);
-      this.entityPositionManager.unsetOnPositionChangedCallback(scoutControlHalo.data, scoutControlHalo.positionCallback);
-      this.scoutControlHalos.delete(guid);
+    if (!scoutControlHalo) {
+      this.scoutControlHalosPendingCreation.delete(guid);
+      return false;
     }
+
+    this.removeScoutControlHaloPrimitiveGroup(scoutControlHalo);
+    this.entityPositionManager.unsetOnPositionChangedCallback(scoutControlHalo.data, scoutControlHalo.positionCallback);
+    this.scoutControlHalos.delete(guid);
     this.scoutControlHalosPendingCreation.delete(guid);
+    return true;
   }
 
-  private removeScoutControlHaloEntityGroup(scoutControlHalo: ScoutHistoryHalo): void {
-    const entities = this.layerManager.getOrCreateDataSource(DATA_SOURCE_LAYER_NAME).entities;
-    const reverseEntities = this.layerManager.getOrCreateDataSource(DATA_SOURCE_LAYER_NAME_REVERSE).entities;
+  private removeScoutControlHaloPrimitiveGroup(scoutControlHalo: ScoutHistoryHalo): void {
+    const pointPrimitives = this.layerManager.getOrCreatePrimitiveLayer(PRIMITIVE_LAYER_NAME).pointPrimitives;
+    const reversePointPrimitives = this.layerManager.getOrCreatePrimitiveLayer(PRIMITIVE_LAYER_NAME_REVERSE).pointPrimitives;
 
-    if (scoutControlHalo.entity) entities.remove(scoutControlHalo.entity);
-    if (scoutControlHalo.occlusionEntity) entities.remove(scoutControlHalo.occlusionEntity);
-    if (scoutControlHalo.reverseEntity) reverseEntities.remove(scoutControlHalo.reverseEntity);
-    if (scoutControlHalo.reverseOcclusionEntity) reverseEntities.remove(scoutControlHalo.reverseOcclusionEntity);
+    if (scoutControlHalo.pointPrimitive) pointPrimitives.remove(scoutControlHalo.pointPrimitive);
+    if (scoutControlHalo.occlusionPointPrimitive) pointPrimitives.remove(scoutControlHalo.occlusionPointPrimitive);
+    if (scoutControlHalo.reversePointPrimitive) reversePointPrimitives.remove(scoutControlHalo.reversePointPrimitive);
+    if (scoutControlHalo.reverseOcclusionPointPrimitive) reversePointPrimitives.remove(scoutControlHalo.reverseOcclusionPointPrimitive);
 
-    scoutControlHalo.entity = undefined;
-    scoutControlHalo.occlusionEntity = undefined;
-    scoutControlHalo.reverseEntity = undefined;
-    scoutControlHalo.reverseOcclusionEntity = undefined;
+    scoutControlHalo.pointPrimitive = undefined;
+    scoutControlHalo.occlusionPointPrimitive = undefined;
+    scoutControlHalo.reversePointPrimitive = undefined;
+    scoutControlHalo.reverseOcclusionPointPrimitive = undefined;
   }
 
-  private removeScoutControlHaloEntitiesInView(viewRect: Cesium.Rectangle): void {
+  private removeScoutControlHaloPrimitivesInView(viewRect: Cesium.Rectangle): void {
     const toRemove: string[] = [];
     this.scoutControlHalos.forEach((info, guid) => {
-      const position = info.entity?.position?.getValue(Cesium.JulianDate.now())
-        ?? info.occlusionEntity?.position?.getValue(Cesium.JulianDate.now())
-        ?? info.reverseEntity?.position?.getValue(Cesium.JulianDate.now())
-        ?? info.reverseOcclusionEntity?.position?.getValue(Cesium.JulianDate.now());
+      const position = info.pointPrimitive?.position
+        ?? info.occlusionPointPrimitive?.position
+        ?? info.reversePointPrimitive?.position
+        ?? info.reverseOcclusionPointPrimitive?.position;
       if (position) {
         const cartographic = Cesium.Cartographic.fromCartesian(position);
         if (Cesium.Rectangle.contains(viewRect, cartographic)) {
@@ -246,14 +228,71 @@ export class ScoutHistoryEntityManager {
     });
     if (toRemove.length === 0) return;
 
-    this.layerManager.withEntityCollectionEventsSuspendedSync(
-      [
-        { name: DATA_SOURCE_LAYER_NAME, type: "dataSource" },
-        { name: DATA_SOURCE_LAYER_NAME_REVERSE, type: "dataSource" },
-      ],
-      () => toRemove.forEach(guid => this.removeScoutControlHalo(guid))
-    );
+    toRemove.forEach(guid => this.removeScoutControlHaloPrimitive(guid));
+    this.viewer.scene.requestRender();
   }
+}
+
+function applyScoutControlHaloPosition(
+  scoutControlHalo: ScoutHistoryHalo,
+  entityPosition: EntityPosition,
+): void {
+  const show = !entityPosition.isFallbackPosition;
+
+  if (scoutControlHalo.pointPrimitive) {
+    scoutControlHalo.pointPrimitive.position = entityPosition.position;
+    scoutControlHalo.pointPrimitive.show = show;
+  }
+  if (scoutControlHalo.occlusionPointPrimitive) {
+    scoutControlHalo.occlusionPointPrimitive.position = entityPosition.position;
+    scoutControlHalo.occlusionPointPrimitive.show = show;
+  }
+  if (scoutControlHalo.reversePointPrimitive) {
+    scoutControlHalo.reversePointPrimitive.position = entityPosition.position;
+    scoutControlHalo.reversePointPrimitive.show = show;
+  }
+  if (scoutControlHalo.reverseOcclusionPointPrimitive) {
+    scoutControlHalo.reverseOcclusionPointPrimitive.position = entityPosition.position;
+    scoutControlHalo.reverseOcclusionPointPrimitive.show = show;
+  }
+}
+
+function addScoutControlHaloPointPrimitive(
+  pointPrimitives: Cesium.PointPrimitiveCollection,
+  id: string,
+  entityPosition: EntityPosition,
+): Cesium.PointPrimitive {
+  return pointPrimitives.add({
+    id,
+    position: entityPosition.position,
+    show: !entityPosition.isFallbackPosition,
+    pixelSize: HALO_POINT_PIXEL_SIZE,
+    color: Cesium.Color.TRANSPARENT,
+    outlineColor: Cesium.Color.fromCssColorString(SCOUT_CONTROL_COLOR).withAlpha(HALO_POINT_ALPHA),
+    outlineWidth: HALO_POINT_OUTLINE_WIDTH,
+    scaleByDistance: createPortalNearFarScalar(),
+    disableDepthTestDistance: getPortalDisableDepthTestDistance(),
+  });
+}
+
+function addScoutControlHaloOcclusionPointPrimitive(
+  pointPrimitives: Cesium.PointPrimitiveCollection,
+  id: string,
+  entityPosition: EntityPosition,
+  translucencyByDistance: Cesium.NearFarScalar,
+): Cesium.PointPrimitive {
+  return pointPrimitives.add({
+    id,
+    position: entityPosition.position,
+    show: !entityPosition.isFallbackPosition,
+    pixelSize: HALO_POINT_PIXEL_SIZE,
+    color: Cesium.Color.TRANSPARENT,
+    outlineColor: Cesium.Color.fromCssColorString(SCOUT_CONTROL_COLOR).withAlpha(PORTAL_OCCLUDED_ALPHA),
+    outlineWidth: HALO_POINT_OUTLINE_WIDTH,
+    scaleByDistance: createPortalNearFarScalar(),
+    translucencyByDistance,
+    disableDepthTestDistance: PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
+  });
 }
 
 function getScoutHistoryState(data: PortalData): ScoutHistoryState {
