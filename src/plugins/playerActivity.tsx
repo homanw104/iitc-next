@@ -2,7 +2,7 @@
  * Player Activity Plugin for IITC Next
  *
  * This plugin tracks player activity by monitoring chat messages for player interactions with portals.
- * It displays player locations and movement paths on the map using Cesium entities.
+ * It displays player locations with Cesium primitives and movement paths with Cesium entities.
  */
 
 import * as Cesium from "cesium";
@@ -22,6 +22,14 @@ const ACTIVITY_PATH_ENL_LAYER_NAME = "Activity Path Enl";
 const ACTIVITY_PATH_RES_LAYER_NAME = "Activity Path Res";
 const ACTIVITY_PATH_LINE_COLOR = "#E130DE";
 const ACTIVITY_PATH_LINE_ALPHA = 0.9;
+const PLAYER_ACTIVITY_CLUSTER_PIXEL_RANGE = 20;
+const PLAYER_ACTIVITY_CLUSTER_MINIMUM_SIZE = 2;
+const PLAYER_ACTIVITY_CLUSTER_MAX_VISIBLE_PLAYERS = 2;
+const PLAYER_ACTIVITY_LABEL_FONT = "16px coda_regular, arial, helvetica, sans-serif";
+const PLAYER_ACTIVITY_LABEL_OUTLINE_WIDTH = 6;
+const PLAYER_ACTIVITY_BILLBOARD_SIZE_PX = 40;
+const PLAYER_ACTIVITY_LABEL_AVERAGE_CHARACTER_WIDTH_PX = 9;
+const PLAYER_ACTIVITY_LABEL_HEIGHT_PX = 20;
 
 interface Player {
   name: string;
@@ -52,9 +60,30 @@ interface PlayerLocation {
   currentLayerName: string;
 }
 
+interface PlayerLocationCluster {
+  id: PlayerLocationPrimitiveId[];
+  label: Cesium.Label;
+  billboard: Cesium.Billboard;
+  currentLayerName: string;
+}
+
 interface PlayerLocationPrimitiveId {
   id: string;
   activities: PlayerActivityData[];
+}
+
+interface PlayerLocationClusterCandidate {
+  location: PlayerLocation;
+  windowPosition: Cesium.Cartesian2;
+  bounds: PlayerLocationClusterBounds;
+  clustered: boolean;
+}
+
+interface PlayerLocationClusterBounds {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
 }
 
 interface PlayerActivity {
@@ -86,9 +115,12 @@ class PlayerActivityPlugin {
   private pathDataSourceRes: Cesium.CustomDataSource = new Cesium.CustomDataSource("activity-path-res");
   private playerActivities: Map<string, PlayerActivity> = new Map();
   private playerLocations: Map<string, PlayerLocation> = new Map();
+  private playerLocationClusters: PlayerLocationCluster[] = [];
   private playerLocationsPendingCreation: Set<string> = new Set();
   private playerPaths: Map<string, Cesium.Entity> = new Map();
   private playerPathsPendingCreation: Set<string> = new Set();
+  private playerLocationClustersDirty = true;
+  private playerLocationBillboardImage: HTMLCanvasElement | undefined;
   private onReceiveCommMsgCallback: () => void = () => {};
 
   private tooltipEl: HTMLElement | null = null;
@@ -96,6 +128,8 @@ class PlayerActivityPlugin {
   private readonly hoverAction: Cesium.ScreenSpaceEventHandler.MotionEventCallback = (movement) => this.handleHoverMove(movement);
   private readonly cameraMoveStartAction = () => this.handleCameraMoveStart();
   private readonly cameraMoveEndAction = () => this.handleCameraMoveEnd();
+  private readonly cameraChangedAction = () => this.markPlayerLocationClustersDirty();
+  private readonly playerLocationClusterPreRenderAction = () => this.refreshPlayerLocationClustersIfDirty();
   private isCameraMoving = false;
 
   public init() {
@@ -127,6 +161,7 @@ class PlayerActivityPlugin {
       this.overlayLayerRes = this.layerManager.getOrCreateOverlayLayer(PLAYER_ACTIVITY_RES_LAYER_NAME);
       this.pathDataSourceEnl = this.layerManager.getOrCreateDataSource(ACTIVITY_PATH_ENL_LAYER_NAME);
       this.pathDataSourceRes = this.layerManager.getOrCreateDataSource(ACTIVITY_PATH_RES_LAYER_NAME);
+      this.setUpPlayerLocationClustering();
       this.onReceiveCommMsgCallback = () => this.updatePlayerActivity();
       this.commManager.setOnReceiveMsgCallback(this.onReceiveCommMsgCallback);
       this.updatePlayerActivity();
@@ -140,6 +175,7 @@ class PlayerActivityPlugin {
     try {
       this.unsetPlayerPositionSubscriptions();
       this.commManager.unsetOnReceiveMsgCallback(this.onReceiveCommMsgCallback);
+      this.unsetPlayerLocationClustering();
       this.layerManager.removeOverlayLayer(PLAYER_ACTIVITY_ENL_LAYER_NAME);
       this.layerManager.removeOverlayLayer(PLAYER_ACTIVITY_RES_LAYER_NAME);
       this.layerManager.removeDataSourceLayer(ACTIVITY_PATH_ENL_LAYER_NAME);
@@ -149,6 +185,7 @@ class PlayerActivityPlugin {
       this.playerLocationsPendingCreation.clear();
       this.playerPathsPendingCreation.clear();
       this.playerActivities.clear();
+      this.playerLocationBillboardImage = undefined;
       this.unsetHoverAction();
       this.unsetTooltipElement();
     } catch (e) {
@@ -180,6 +217,19 @@ class PlayerActivityPlugin {
     this.hoverHandler?.destroy();
     this.hoverHandler = undefined;
     this.isCameraMoving = false;
+  }
+
+  private setUpPlayerLocationClustering(): void {
+    this.viewer.camera.changed.addEventListener(this.cameraChangedAction);
+    this.viewer.scene.preRender.addEventListener(this.playerLocationClusterPreRenderAction);
+    this.markPlayerLocationClustersDirty();
+  }
+
+  private unsetPlayerLocationClustering(): void {
+    this.viewer.camera.changed.removeEventListener(this.cameraChangedAction);
+    this.viewer.scene.preRender.removeEventListener(this.playerLocationClusterPreRenderAction);
+    this.removePlayerLocationClusters();
+    this.playerLocationClustersDirty = false;
   }
 
   private handleCameraMoveStart(): void {
@@ -376,6 +426,7 @@ class PlayerActivityPlugin {
       if (!primitive) return;
 
       this.updatePlayerLocationPrimitivePosition(primitive, entityPosition);
+      this.markPlayerLocationClustersDirty();
       this.viewer.scene.requestRender();
     };
     this.entityPositionManager.setOnPositionChangedCallback(activityData, callback);
@@ -417,6 +468,7 @@ class PlayerActivityPlugin {
 
       this.setPlayerPositionSubscription(lastActivity);
       this.playerLocations.set(playerName, primitive);
+      this.markPlayerLocationClustersDirty();
     } finally {
       this.playerLocationsPendingCreation.delete(playerName);
     }
@@ -440,13 +492,13 @@ class PlayerActivityPlugin {
       position: lastEntityPosition.position,
       show,
       text: playerName,
-      font: "16px coda_regular, arial, helvetica, sans-serif",
+      font: PLAYER_ACTIVITY_LABEL_FONT,
       verticalOrigin: Cesium.VerticalOrigin.CENTER,
       horizontalOrigin: lastActivityData.team === "ENLIGHTENED" ? Cesium.HorizontalOrigin.LEFT : Cesium.HorizontalOrigin.RIGHT,
       pixelOffset: getPlayerActivityLabelPixelOffset(lastActivityData.team),
       fillColor: getTeamColor(lastActivityData.team),
       outlineColor: Cesium.Color.BLACK,
-      outlineWidth: 6,
+      outlineWidth: PLAYER_ACTIVITY_LABEL_OUTLINE_WIDTH,
       style: Cesium.LabelStyle.FILL_AND_OUTLINE,
       heightReference: Cesium.HeightReference.NONE,
       disableDepthTestDistance: Number.POSITIVE_INFINITY,
@@ -455,7 +507,7 @@ class PlayerActivityPlugin {
       id,
       position: lastEntityPosition.position,
       show,
-      image: buildCanvas(),
+      image: this.getPlayerLocationBillboardImage(),
       heightReference: Cesium.HeightReference.NONE,
       disableDepthTestDistance: Number.POSITIVE_INFINITY,
     });
@@ -513,6 +565,209 @@ class PlayerActivityPlugin {
 
     layer.removeLabel(primitive.label);
     layer.removeBillboard(primitive.billboard);
+    this.markPlayerLocationClustersDirty();
+  }
+
+  private refreshPlayerLocationClustersIfDirty(): void {
+    if (!this.playerLocationClustersDirty) return;
+
+    this.playerLocationClustersDirty = false;
+    this.refreshPlayerLocationClusters();
+  }
+
+  private refreshPlayerLocationClusters(): void {
+    const candidatesByLayerName = new Map<string, PlayerLocationClusterCandidate[]>();
+
+    this.playerLocations.forEach((location) => {
+      setPlayerLocationClusterShow(location, true);
+
+      const candidate = this.createPlayerLocationClusterCandidate(location);
+      if (!candidate) return;
+
+      const candidates = candidatesByLayerName.get(location.currentLayerName) ?? [];
+      candidates.push(candidate);
+      candidatesByLayerName.set(location.currentLayerName, candidates);
+    });
+
+    let nextClusterIndex = 0;
+    candidatesByLayerName.forEach((candidates, layerName) => {
+      nextClusterIndex = this.clusterPlayerLocationCandidates(layerName, candidates, nextClusterIndex);
+    });
+
+    this.hideUnusedPlayerLocationClusters(nextClusterIndex);
+  }
+
+  private createPlayerLocationClusterCandidate(location: PlayerLocation): PlayerLocationClusterCandidate | undefined {
+    if (!location.label.show || !location.billboard.show) return undefined;
+
+    const windowPosition = location.billboard.computeScreenSpacePosition(this.viewer.scene);
+    if (!windowPosition || !isWindowPositionInCanvas(windowPosition, this.viewer.scene.canvas)) return undefined;
+
+    return {
+      location,
+      windowPosition,
+      bounds: getPlayerLocationClusterBounds(location, windowPosition),
+      clustered: false,
+    };
+  }
+
+  private clusterPlayerLocationCandidates(
+    layerName: string,
+    candidates: PlayerLocationClusterCandidate[],
+    clusterIndex: number,
+  ): number {
+    candidates.forEach((candidate) => {
+      if (candidate.clustered) return;
+
+      const clusterCandidates = this.getPlayerLocationClusterCandidates(candidate, candidates);
+      if (clusterCandidates.length < PLAYER_ACTIVITY_CLUSTER_MINIMUM_SIZE) {
+        candidate.clustered = true;
+        return;
+      }
+
+      clusterCandidates.forEach((clusterCandidate) => {
+        clusterCandidate.clustered = true;
+        setPlayerLocationClusterShow(clusterCandidate.location, false);
+      });
+      this.showPlayerLocationCluster(clusterIndex, layerName, clusterCandidates);
+      clusterIndex++;
+    });
+
+    return clusterIndex;
+  }
+
+  private getPlayerLocationClusterCandidates(
+    candidate: PlayerLocationClusterCandidate,
+    candidates: PlayerLocationClusterCandidate[],
+  ): PlayerLocationClusterCandidate[] {
+    return candidates.filter((otherCandidate) => {
+      return !otherCandidate.clustered &&
+        isWindowPositionInBounds(otherCandidate.windowPosition, candidate.bounds);
+    });
+  }
+
+  private showPlayerLocationCluster(
+    index: number,
+    layerName: string,
+    candidates: PlayerLocationClusterCandidate[],
+  ): void {
+    const cluster = this.getOrCreatePlayerLocationCluster(index, layerName);
+    const ids = candidates.map(candidate => candidate.location.id);
+    const position = getPlayerLocationClusterPosition(candidates);
+
+    cluster.id = ids;
+    cluster.label.id = ids;
+    cluster.billboard.id = ids;
+    cluster.label.position = position;
+    cluster.billboard.position = position;
+    cluster.label.show = true;
+    cluster.billboard.show = true;
+    setPlayerLocationClusterPrimitiveShow(cluster, true);
+    this.applyPlayerLocationClusterStyle(cluster);
+  }
+
+  private getOrCreatePlayerLocationCluster(index: number, layerName: string): PlayerLocationCluster {
+    const existing = this.playerLocationClusters[index];
+    if (existing && existing.currentLayerName === layerName) return existing;
+
+    if (existing) this.removePlayerLocationCluster(existing);
+
+    const cluster = this.createPlayerLocationCluster(layerName);
+    this.playerLocationClusters[index] = cluster;
+    return cluster;
+  }
+
+  private createPlayerLocationCluster(layerName: string): PlayerLocationCluster {
+    const layer = this.getPlayerActivityOverlayLayerByName(layerName);
+    if (!layer) throw new Error(`Unknown player activity layer: ${layerName}`);
+
+    const id: PlayerLocationPrimitiveId[] = [];
+    return {
+      id,
+      label: layer.addLabel({
+        id,
+        position: Cesium.Cartesian3.ZERO,
+        show: false,
+        text: "",
+        font: PLAYER_ACTIVITY_LABEL_FONT,
+        verticalOrigin: Cesium.VerticalOrigin.CENTER,
+        fillColor: Cesium.Color.WHITE,
+        outlineColor: Cesium.Color.BLACK,
+        outlineWidth: PLAYER_ACTIVITY_LABEL_OUTLINE_WIDTH,
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        heightReference: Cesium.HeightReference.NONE,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      }),
+      billboard: layer.addBillboard({
+        id,
+        position: Cesium.Cartesian3.ZERO,
+        show: false,
+        image: this.getPlayerLocationBillboardImage(),
+        heightReference: Cesium.HeightReference.NONE,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      }),
+      currentLayerName: layerName,
+    };
+  }
+
+  private applyPlayerLocationClusterStyle(cluster: PlayerLocationCluster): void {
+    const playerActivitiesData = cluster.id
+      .map(id => this.getLatestActivity(id.activities))
+      .filter((activity): activity is PlayerActivityData => !!activity)
+      .sort(comparePlayerActivityTimestampDescending);
+    if (playerActivitiesData.length === 0) return;
+
+    const displayText = getPlayerLocationClusterText(playerActivitiesData);
+    const team = playerActivitiesData[0].team;
+
+    cluster.label.text = displayText;
+    cluster.label.font = PLAYER_ACTIVITY_LABEL_FONT;
+    cluster.label.verticalOrigin = Cesium.VerticalOrigin.CENTER;
+    cluster.label.horizontalOrigin = team === "ENLIGHTENED" ?
+      Cesium.HorizontalOrigin.LEFT :
+      Cesium.HorizontalOrigin.RIGHT;
+    cluster.label.pixelOffset = getPlayerActivityLabelPixelOffset(team);
+    cluster.label.fillColor = getTeamColor(team);
+    cluster.label.outlineColor = Cesium.Color.BLACK;
+    cluster.label.outlineWidth = PLAYER_ACTIVITY_LABEL_OUTLINE_WIDTH;
+    cluster.label.style = Cesium.LabelStyle.FILL_AND_OUTLINE;
+    cluster.label.disableDepthTestDistance = Number.POSITIVE_INFINITY;
+    cluster.billboard.disableDepthTestDistance = Number.POSITIVE_INFINITY;
+  }
+
+  private hideUnusedPlayerLocationClusters(firstUnusedClusterIndex: number): void {
+    for (let i = firstUnusedClusterIndex; i < this.playerLocationClusters.length; i++) {
+      const cluster = this.playerLocationClusters[i];
+      cluster.id = [];
+      cluster.label.id = cluster.id;
+      cluster.billboard.id = cluster.id;
+      cluster.label.show = false;
+      cluster.billboard.show = false;
+      setPlayerLocationClusterPrimitiveShow(cluster, false);
+    }
+  }
+
+  private removePlayerLocationClusters(): void {
+    this.playerLocationClusters.forEach((cluster) => this.removePlayerLocationCluster(cluster));
+    this.playerLocationClusters = [];
+  }
+
+  private removePlayerLocationCluster(cluster: PlayerLocationCluster): void {
+    const layer = this.getPlayerActivityOverlayLayerByName(cluster.currentLayerName);
+    if (!layer) return;
+
+    layer.removeLabel(cluster.label);
+    layer.removeBillboard(cluster.billboard);
+  }
+
+  private markPlayerLocationClustersDirty(): void {
+    this.playerLocationClustersDirty = true;
+    this.viewer.scene.requestRender();
+  }
+
+  private getPlayerLocationBillboardImage(): HTMLCanvasElement {
+    this.playerLocationBillboardImage ??= buildCanvas();
+    return this.playerLocationBillboardImage;
   }
 
   private getPlayerActivityOverlayLayer(team: Team): LayerOverlay | undefined {
@@ -631,6 +886,136 @@ function getPlayerActivityLayerName(team: Team): string | undefined {
 
 function getPlayerActivityLabelPixelOffset(team: Team): Cesium.Cartesian2 {
   return team === "ENLIGHTENED" ? new Cesium.Cartesian2(25, 0) : new Cesium.Cartesian2(-25, 0);
+}
+
+function getPlayerLocationClusterText(playerActivitiesData: PlayerActivityData[]): string {
+  const visiblePlayerNames = playerActivitiesData
+    .slice(0, PLAYER_ACTIVITY_CLUSTER_MAX_VISIBLE_PLAYERS)
+    .map(player => player.name)
+    .join("\n");
+  const remainingPlayers = playerActivitiesData.length - PLAYER_ACTIVITY_CLUSTER_MAX_VISIBLE_PLAYERS;
+
+  if (remainingPlayers === 1) {
+    return `${visiblePlayerNames}\n${playerActivitiesData[PLAYER_ACTIVITY_CLUSTER_MAX_VISIBLE_PLAYERS].name}`;
+  }
+  if (remainingPlayers > 1) return `${visiblePlayerNames}\n(${remainingPlayers} more)`;
+  return visiblePlayerNames;
+}
+
+function getPlayerLocationClusterPosition(
+  candidates: PlayerLocationClusterCandidate[],
+): Cesium.Cartesian3 {
+  const position = new Cesium.Cartesian3();
+  candidates.forEach((candidate) => {
+    Cesium.Cartesian3.add(candidate.location.billboard.position, position, position);
+  });
+  return Cesium.Cartesian3.multiplyByScalar(position, 1 / candidates.length, position);
+}
+
+function getPlayerLocationClusterBounds(
+  location: PlayerLocation,
+  windowPosition: Cesium.Cartesian2,
+): PlayerLocationClusterBounds {
+  const billboardHalfSize = PLAYER_ACTIVITY_BILLBOARD_SIZE_PX / 2;
+  const bounds = expandPlayerLocationClusterBounds({
+    left: windowPosition.x - billboardHalfSize,
+    top: windowPosition.y - billboardHalfSize,
+    right: windowPosition.x + billboardHalfSize,
+    bottom: windowPosition.y + billboardHalfSize,
+  });
+
+  return unionPlayerLocationClusterBounds(
+    bounds,
+    expandPlayerLocationClusterBounds(getPlayerLocationLabelBounds(location, windowPosition)),
+  );
+}
+
+function getPlayerLocationLabelBounds(
+  location: PlayerLocation,
+  windowPosition: Cesium.Cartesian2,
+): PlayerLocationClusterBounds {
+  const isResistance = location.currentLayerName === PLAYER_ACTIVITY_RES_LAYER_NAME;
+  const offset = isResistance ?
+    getPlayerActivityLabelPixelOffset("RESISTANCE") :
+    getPlayerActivityLabelPixelOffset("ENLIGHTENED");
+  const width = location.label.text.length * PLAYER_ACTIVITY_LABEL_AVERAGE_CHARACTER_WIDTH_PX +
+    PLAYER_ACTIVITY_LABEL_OUTLINE_WIDTH * 2;
+  const height = PLAYER_ACTIVITY_LABEL_HEIGHT_PX + PLAYER_ACTIVITY_LABEL_OUTLINE_WIDTH * 2;
+  const x = windowPosition.x + offset.x;
+  const y = windowPosition.y + offset.y;
+
+  if (isResistance) {
+    return {
+      left: x - width,
+      top: y - height / 2,
+      right: x,
+      bottom: y + height / 2,
+    };
+  }
+
+  return {
+    left: x,
+    top: y - height / 2,
+    right: x + width,
+    bottom: y + height / 2,
+  };
+}
+
+function expandPlayerLocationClusterBounds(
+  bounds: PlayerLocationClusterBounds,
+): PlayerLocationClusterBounds {
+  return {
+    left: bounds.left - PLAYER_ACTIVITY_CLUSTER_PIXEL_RANGE,
+    top: bounds.top - PLAYER_ACTIVITY_CLUSTER_PIXEL_RANGE,
+    right: bounds.right + PLAYER_ACTIVITY_CLUSTER_PIXEL_RANGE,
+    bottom: bounds.bottom + PLAYER_ACTIVITY_CLUSTER_PIXEL_RANGE,
+  };
+}
+
+function unionPlayerLocationClusterBounds(
+  a: PlayerLocationClusterBounds,
+  b: PlayerLocationClusterBounds,
+): PlayerLocationClusterBounds {
+  return {
+    left: Math.min(a.left, b.left),
+    top: Math.min(a.top, b.top),
+    right: Math.max(a.right, b.right),
+    bottom: Math.max(a.bottom, b.bottom),
+  };
+}
+
+function isWindowPositionInBounds(
+  position: Cesium.Cartesian2,
+  bounds: PlayerLocationClusterBounds,
+): boolean {
+  return position.x >= bounds.left &&
+    position.x <= bounds.right &&
+    position.y >= bounds.top &&
+    position.y <= bounds.bottom;
+}
+
+function isWindowPositionInCanvas(
+  position: Cesium.Cartesian2,
+  canvas: HTMLCanvasElement,
+): boolean {
+  return position.x >= 0 &&
+    position.x <= canvas.clientWidth &&
+    position.y >= 0 &&
+    position.y <= canvas.clientHeight;
+}
+
+function setPlayerLocationClusterShow(location: PlayerLocation, show: boolean): void {
+  setClusterShow(location.label, show);
+  setClusterShow(location.billboard, show);
+}
+
+function setPlayerLocationClusterPrimitiveShow(cluster: PlayerLocationCluster, show: boolean): void {
+  setClusterShow(cluster.label, show);
+  setClusterShow(cluster.billboard, show);
+}
+
+function setClusterShow(primitive: Cesium.Label | Cesium.Billboard, show: boolean): void {
+  (primitive as Cesium.Label & Cesium.Billboard & { clusterShow: boolean }).clusterShow = show;
 }
 
 function comparePlayerActivityTimestampDescending(a: PlayerActivityData, b: PlayerActivityData): number {

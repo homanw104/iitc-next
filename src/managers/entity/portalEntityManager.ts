@@ -365,6 +365,7 @@ function addPortalOcclusionPointPrimitive(
 ): Cesium.PointPrimitive {
   const position = entity.position?.getValue(Cesium.JulianDate.now()) ?? getFallbackPortalPosition(data);
   return pointPrimitives.add({
+    id: entity,
     position,
     show: entity.show,
     pixelSize: PORTAL_POINT_PIXEL_SIZE,
