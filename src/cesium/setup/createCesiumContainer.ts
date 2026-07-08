@@ -27,6 +27,18 @@ export function createCesiumContainer(): HTMLDivElement {
 
   // Set the CSS rules for the Cesium viewer
   cesiumStyle.textContent = `
+    .cesium-credit-wrapper:has(a[href="https://cesium.com/pricing/"]),
+    .cesium-credit-wrapper:has(a[href="https://cesium.com/pricing/"])
+      + .cesium-credit-delimiter {
+      display: none !important;
+    }
+    
+    .cesium-credit-wrapper:has(a[href="https://cesium.com/pricing/"])
+      + .cesium-credit-delimiter
+      + .cesium-credit-wrapper {
+      padding-left: 5px;
+    }
+
     #cesium-container .cesium-viewer-toolbar {
       top: calc(var(--iitc-system-top-inset, 0px) + 5px);
       right: calc(var(--iitc-system-right-inset, 0px) + 5px);
