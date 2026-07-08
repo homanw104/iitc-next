@@ -28,7 +28,7 @@ export class LayerManager {
   // Links, fields, etc., use normal DataSource layers, named by layer visibility id.
   private dataSources: Map<string, Cesium.DataSource> = new Map();
 
-  // Player activity markers, etc., use custom overlay layers, named by layer visibility id.
+  // Player activity markers, labels, etc., use primitive-backed overlay layers, named by layer visibility id.
   private overlayLayers: Map<string, LayerOverlay> = new Map();
 
   // Primitive-backed layers for performance-sensitive visuals, named by layer visibility id.
@@ -90,14 +90,13 @@ export class LayerManager {
     return source;
   }
 
-  public getOrCreateOverlayLayer(name: string, zIndex?: number): Cesium.DataSource {
+  public getOrCreateOverlayLayer(name: string, zIndex?: number): LayerOverlay {
     this.registerPluginFilterIfNeeded(name);
 
     let layer = this.overlayLayers.get(name);
     if (!layer) {
       layer = new LayerOverlay(
         this.viewer,
-        name,
         this.getLayerVisibility(name),
         zIndex ?? LayerManager.DEFAULT_OVERLAY_Z_INDEX,
       );
@@ -107,7 +106,7 @@ export class LayerManager {
       layer.setZIndex(zIndex);
       this.refreshOverlays();
     }
-    return layer.source;
+    return layer;
   }
 
   public getOrCreatePrimitiveLayer(name: string): LayerPrimitives {
@@ -123,7 +122,7 @@ export class LayerManager {
   }
 
   public async withEntityCollectionEventsSuspended<T>(
-    layers: { name: string; type: "dataSource" | "overlay" }[],
+    layers: { name: string; type: "dataSource" }[],
     callback: () => Promise<T>
   ): Promise<T> {
     const suspendedCollections = this.getEntityCollections(layers);
@@ -139,7 +138,7 @@ export class LayerManager {
   }
 
   public withEntityCollectionEventsSuspendedSync<T>(
-    layers: { name: string; type: "dataSource" | "overlay" }[],
+    layers: { name: string; type: "dataSource" }[],
     callback: () => T
   ): T {
     const suspendedCollections = this.getEntityCollections(layers);
@@ -159,13 +158,11 @@ export class LayerManager {
     }
   }
 
-  private getEntityCollections(layers: { name: string; type: "dataSource" | "overlay" }[]): Set<Cesium.EntityCollection> {
+  private getEntityCollections(layers: { name: string; type: "dataSource" }[]): Set<Cesium.EntityCollection> {
     const collections = new Set<Cesium.EntityCollection>();
 
-    layers.forEach(({ name, type }) => {
-      const source = type === "dataSource" ?
-        this.getOrCreateDataSource(name) :
-        this.getOrCreateOverlayLayer(name);
+    layers.forEach(({ name }) => {
+      const source = this.getOrCreateDataSource(name);
       collections.add(source.entities);
     });
 

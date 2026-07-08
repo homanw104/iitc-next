@@ -1,5 +1,5 @@
 /**
- * Manage portal label entities.
+ * Manage portal label primitives.
  */
 
 import * as Cesium from "cesium";
@@ -11,7 +11,8 @@ import {
   PORTAL_LABEL_ENTITY_FONT,
   PORTAL_LABEL_ENTITY_INITIAL_OPACITY,
   PORTAL_LABEL_ENTITY_OUTLINE_WIDTH,
-  createPortalLabelEntityPixelOffsetCallback,
+  createPortalLabelEntityPixelOffset,
+  createPortalLabelEntityPixelOffsetScaleByDistance,
   getPortalLabelLinkCount,
   getPortalLabelEntityTextLayout,
 } from "./portalLabelEntityLayout";
@@ -63,20 +64,8 @@ export class PortalLabelEntityManager {
   }
 
   public async addOrUpdateLabels(portals: PortalData[]): Promise<void> {
-    const layers = new Set<string>();
-    portals.forEach((portal) => {
-      const existing = this.labels.get(portal.guid);
-      if (existing) layers.add(existing.currentLayerId);
-      if (portal.title) layers.add(getPortalLabelEntityLayerId(portal));
-    });
-
     await this.deferVisibilityUpdates(async () => {
-      await this.layerManager.withEntityCollectionEventsSuspended(
-        Array.from(layers, (name) => ({ name, type: "overlay" as const })),
-        async () => {
-          await Promise.all(portals.map((portalData) => this.addOrUpdateLabel(portalData)));
-        }
-      );
+      await Promise.all(portals.map((portalData) => this.addOrUpdateLabel(portalData)));
     });
   }
 
@@ -119,7 +108,14 @@ export class PortalLabelEntityManager {
 
       const label = {
         data,
-        entity: this.createLabelEntity(data, layout, entityPosition, (): number => label.currentOpacity),
+        primitive: this.createLabelPrimitive(
+          data,
+          layout,
+          entityPosition.position,
+          PORTAL_LABEL_ENTITY_INITIAL_OPACITY,
+          false,
+        ),
+        position: Cesium.Cartesian3.clone(entityPosition.position),
         positionCallback: this.createLabelPositionCallback(data.guid),
         wrappedText: layout.wrappedText,
         screenBoxWidth: layout.screenBoxWidth,
@@ -141,38 +137,32 @@ export class PortalLabelEntityManager {
     }
   }
 
-  private createLabelEntity(data: PortalData, layout: PortalLabelTextLayout, entityPosition: EntityPosition, getOpacity: () => number): Cesium.Entity {
-    const layerId = getPortalLabelEntityLayerId(data);
-    const entities = this.layerManager.getOrCreateOverlayLayer(layerId).entities;
-    const entityReference: { entity?: Cesium.Entity } = {};
-
-    const entity = entities.add({
+  private createLabelPrimitive(
+    data: PortalData,
+    layout: PortalLabelTextLayout,
+    position: Cesium.Cartesian3,
+    opacity: number,
+    show: boolean,
+    layerId = getPortalLabelEntityLayerId(data),
+  ): Cesium.Label {
+    return this.layerManager.getOrCreateOverlayLayer(layerId).addLabel({
       id: `label-${data.guid}`,
-      position: entityPosition.position,
-      show: false,
-      label: {
-        text: layout.wrappedText,
-        font: PORTAL_LABEL_ENTITY_FONT,
-        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        fillColor: new Cesium.CallbackProperty((_time, result) =>
-          Cesium.Color.WHITE.withAlpha(getOpacity(), result), false),
-        outlineColor: new Cesium.CallbackProperty((_time, result) =>
-          Cesium.Color.BLACK.withAlpha(getOpacity(), result), false),
-        outlineWidth: PORTAL_LABEL_ENTITY_OUTLINE_WIDTH,
-        showBackground: false,
-        heightReference: Cesium.HeightReference.NONE,
-        disableDepthTestDistance: PORTAL_LABEL_ENTITY_DISABLE_DEPTH_TEST_DISTANCE,
-        horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-        pixelOffset: createPortalLabelEntityPixelOffsetCallback(
-          this.viewer,
-          (time) => entityReference.entity?.position?.getValue(time) ?? entityPosition.position,
-        ),
-      },
+      position,
+      show,
+      text: layout.wrappedText,
+      font: PORTAL_LABEL_ENTITY_FONT,
+      style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+      fillColor: Cesium.Color.WHITE.withAlpha(opacity),
+      outlineColor: Cesium.Color.BLACK.withAlpha(opacity),
+      outlineWidth: PORTAL_LABEL_ENTITY_OUTLINE_WIDTH,
+      showBackground: false,
+      heightReference: Cesium.HeightReference.NONE,
+      disableDepthTestDistance: PORTAL_LABEL_ENTITY_DISABLE_DEPTH_TEST_DISTANCE,
+      horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+      verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+      pixelOffset: createPortalLabelEntityPixelOffset(),
+      pixelOffsetScaleByDistance: createPortalLabelEntityPixelOffsetScaleByDistance(),
     });
-    entityReference.entity = entity;
-
-    return entity;
   }
 
   private createLabelPositionCallback(guid: string): EntityPositionCallback {
@@ -188,10 +178,12 @@ export class PortalLabelEntityManager {
   }
 
   private updateLabelEntity(label: PortalLabel, layout: PortalLabelTextLayout, entityPosition: EntityPosition): void {
-    label.entity.position = new Cesium.ConstantPositionProperty(entityPosition.position);
+    Cesium.Cartesian3.clone(entityPosition.position, label.position);
+    label.primitive.position = label.position;
     label.isFallbackPosition = entityPosition.isFallbackPosition;
     if (label.isFallbackPosition) this.setLabelTargetVisibility(label, false);
-    if (label.entity.label) label.entity.label.text = new Cesium.ConstantProperty(layout.wrappedText);
+    label.primitive.text = layout.wrappedText;
+    this.viewer.scene.requestRender();
   }
 
   private updateLabelPositionSubscription(label: PortalLabel, data: PortalData): void {
@@ -204,9 +196,7 @@ export class PortalLabelEntityManager {
   private removeLabelEntity(guid: string): void {
     const labelInfo = this.labels.get(guid);
     if (labelInfo) {
-      const entities = this.layerManager.getOrCreateOverlayLayer(labelInfo.currentLayerId).entities;
-
-      entities.remove(labelInfo.entity);
+      this.layerManager.getOrCreateOverlayLayer(labelInfo.currentLayerId).removeLabel(labelInfo.primitive);
       this.entityPositionManager.unsetOnPositionChangedCallback(labelInfo.data, labelInfo.positionCallback);
       this.labels.delete(guid);
       this.queueAllVisibilityUpdates();
@@ -218,32 +208,38 @@ export class PortalLabelEntityManager {
 
   private removeLabelEntitiesInView(viewRect: Cesium.Rectangle): void {
     const toRemove: string[] = [];
-    const layers = new Set<string>();
-    const time = Cesium.JulianDate.now();
     this.labels.forEach((portalLabel, guid) => {
-      const position = portalLabel.entity.position?.getValue(time);
+      const position = portalLabel.position;
       if (position) {
         const cartographic = Cesium.Cartographic.fromCartesian(position);
         if (Cesium.Rectangle.contains(viewRect, cartographic)) {
           toRemove.push(guid);
-          layers.add(portalLabel.currentLayerId);
         }
       }
     });
     if (toRemove.length === 0) return;
 
-    this.layerManager.withEntityCollectionEventsSuspendedSync(
-      Array.from(layers, (name) => ({ name, type: "overlay" as const })),
-      () => toRemove.forEach(guid => this.removeLabelEntity(guid))
-    );
+    toRemove.forEach(guid => this.removeLabelEntity(guid));
   }
 
-  private moveLabelToLayer(labelInfo: PortalLabel, newLayerId: string): void {
-    if (labelInfo.currentLayerId === newLayerId) return;
+  private moveLabelToLayer(label: PortalLabel, newLayerId: string): void {
+    if (label.currentLayerId === newLayerId) return;
 
-    this.layerManager.getOrCreateOverlayLayer(labelInfo.currentLayerId).entities.remove(labelInfo.entity);
-    this.layerManager.getOrCreateOverlayLayer(newLayerId).entities.add(labelInfo.entity);
-    labelInfo.currentLayerId = newLayerId;
+    const show = label.primitive.show;
+    this.layerManager.getOrCreateOverlayLayer(label.currentLayerId).removeLabel(label.primitive);
+    label.primitive = this.createLabelPrimitive(
+      label.data,
+      {
+        wrappedText: label.wrappedText,
+        screenBoxWidth: label.screenBoxWidth,
+        screenBoxHeight: label.screenBoxHeight,
+      },
+      label.position,
+      label.currentOpacity,
+      show,
+      newLayerId,
+    );
+    label.currentLayerId = newLayerId;
   }
 
   private queueAllVisibilityUpdates(): void {

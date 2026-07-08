@@ -28,6 +28,7 @@ const Cesium = getCesium();
 export default Cesium;
 
 export const ArcType = Cesium.ArcType;
+export const BillboardCollection = Cesium.BillboardCollection;
 export const CallbackProperty = Cesium.CallbackProperty;
 export const Camera = Cesium.Camera;
 export const CameraEventType = Cesium.CameraEventType;
@@ -59,6 +60,7 @@ export const IonGeocodeProviderType = Cesium.IonGeocodeProviderType;
 export const ImageryLayer = Cesium.ImageryLayer;
 export const JulianDate = Cesium.JulianDate;
 export const KeyboardEventModifier = Cesium.KeyboardEventModifier;
+export const LabelCollection = Cesium.LabelCollection;
 export const LabelStyle = Cesium.LabelStyle;
 export const Math = Cesium.Math;
 export const Matrix4 = Cesium.Matrix4;

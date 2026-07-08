@@ -1,7 +1,7 @@
 /**
  * Shared portal label entity state.
  *
- * PortalLabel combines the Cesium entity reference with cached text bounds,
+ * PortalLabel combines the Cesium label primitive with cached text bounds,
  * layer membership, and fade state. Bounds are approximate screen-space values
  * used by overlap selection, while current/fade opacity fields are kept flat so
  * the fade loop can update them without allocating per frame.
@@ -13,7 +13,8 @@ import type { EntityPositionCallback } from "./entityPositionManager";
 
 export interface PortalLabel {
   data: PortalData;
-  entity: Cesium.Entity;
+  primitive: Cesium.Label;
+  position: Cesium.Cartesian3;
   positionCallback: EntityPositionCallback;
   wrappedText: string;
   screenBoxWidth: number;

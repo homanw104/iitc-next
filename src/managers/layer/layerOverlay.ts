@@ -1,16 +1,11 @@
 /**
  * Manages overlay render layers that are shown atop of other layers,
- * backed by an isolated data source display.
+ * backed by direct primitive collections.
  */
 
 import * as Cesium from "cesium";
 
 const CESIUM_PASS_OVERLAY = 13;
-
-type DataSourceDisplayWithCollections = Cesium.DataSourceDisplay & {
-  _primitives: Cesium.PrimitiveCollection;
-  _groundPrimitives: Cesium.PrimitiveCollection;
-};
 
 interface LayerRenderCommand {
   pass?: unknown;
@@ -40,56 +35,32 @@ type CesiumWithPrivateRenderer = typeof Cesium & {
 };
 
 export class LayerOverlay {
-  public viewer: Cesium.Viewer;
-  public source: Cesium.DataSource;
+  public readonly collection: Cesium.PrimitiveCollection;
+  public readonly labels: Cesium.LabelCollection;
+  public readonly billboards: Cesium.BillboardCollection;
+  public readonly points: Cesium.PointPrimitiveCollection;
   public zIndex: number;
-  private readonly dataSourceCollection = new Cesium.DataSourceCollection();
-  private readonly display: Cesium.DataSourceDisplay;
-  private readonly ready: Promise<Cesium.DataSource>;
-  private readonly removeClockListener: () => void;
-  private readonly removeCollectionListener: () => void;
   private isDestroyed: boolean = false;
 
   constructor(
-    viewer: Cesium.Viewer,
-    name: string,
+    private readonly viewer: Cesium.Viewer,
     visible: boolean,
     zIndex: number,
   ) {
-    this.viewer = viewer;
-    this.source = new Cesium.CustomDataSource(name);
-    this.source.show = visible;
     this.zIndex = zIndex;
 
-    this.ready = this.dataSourceCollection.add(this.source);
-    this.display = new Cesium.DataSourceDisplay({
-      scene: this.viewer.scene,
-      dataSourceCollection: this.dataSourceCollection,
-    });
+    this.collection = new Cesium.PrimitiveCollection({ show: visible });
+    this.labels = this.collection.add(new Cesium.LabelCollection({ scene: this.viewer.scene }));
+    this.billboards = this.collection.add(new Cesium.BillboardCollection({ scene: this.viewer.scene }));
+    this.points = this.collection.add(new Cesium.PointPrimitiveCollection());
 
     this.installOverlayHooks();
-
-    this.ready.then(() => {
-      if (this.isDestroyed) {
-        this.dataSourceCollection.remove(this.source, true);
-        return;
-      }
-      this.raiseToTop();
-    });
-
-    this.removeClockListener = this.viewer.clock.onTick.addEventListener((clock) => {
-      if (this.isDestroyed || this.viewer.isDestroyed()) return;
-      this.display.update(clock.currentTime);
-    });
-
-    this.removeCollectionListener = this.source.entities.collectionChanged.addEventListener(() => {
-      if (this.isDestroyed || this.viewer.isDestroyed()) return;
-      this.viewer.scene.requestRender();
-    });
+    this.viewer.scene.primitives.add(this.collection);
   }
 
   public setVisible(visible: boolean): void {
-    this.source.show = visible;
+    this.collection.show = visible;
+    this.viewer.scene.requestRender();
   }
 
   public setZIndex(zIndex: number): void {
@@ -101,37 +72,64 @@ export class LayerOverlay {
   public raiseToTop(): void {
     if (this.isDestroyed || this.viewer.isDestroyed()) return;
 
-    const collections = this.display as DataSourceDisplayWithCollections;
-    if (this.viewer.scene.primitives.contains(collections._primitives)) {
-      this.viewer.scene.primitives.raiseToTop(collections._primitives);
-    }
-    if (this.viewer.scene.groundPrimitives.contains(collections._groundPrimitives)) {
-      this.viewer.scene.groundPrimitives.raiseToTop(collections._groundPrimitives);
+    if (this.viewer.scene.primitives.contains(this.collection)) {
+      this.viewer.scene.primitives.raiseToTop(this.collection);
     }
     this.viewer.scene.requestRender();
+  }
+
+  public addLabel(options: Cesium.Label.ConstructorOptions): Cesium.Label {
+    const label = this.labels.add(options);
+    this.viewer.scene.requestRender();
+    return label;
+  }
+
+  public removeLabel(label: Cesium.Label): boolean {
+    const removed = this.labels.remove(label);
+    if (removed) this.viewer.scene.requestRender();
+    return removed;
+  }
+
+  public addBillboard(options: Cesium.Billboard.ConstructorOptions): Cesium.Billboard {
+    const billboard = this.billboards.add(options);
+    this.viewer.scene.requestRender();
+    return billboard;
+  }
+
+  public removeBillboard(billboard: Cesium.Billboard): boolean {
+    const removed = this.billboards.remove(billboard);
+    if (removed) this.viewer.scene.requestRender();
+    return removed;
+  }
+
+  public addPoint(options?: Parameters<Cesium.PointPrimitiveCollection["add"]>[0]): Cesium.PointPrimitive {
+    const point = this.points.add(options);
+    this.viewer.scene.requestRender();
+    return point;
+  }
+
+  public removePoint(point: Cesium.PointPrimitive): boolean {
+    const removed = this.points.remove(point);
+    if (removed) this.viewer.scene.requestRender();
+    return removed;
   }
 
   public destroy(): void {
     if (this.isDestroyed) return;
     this.isDestroyed = true;
 
-    this.removeClockListener();
-    this.removeCollectionListener();
-    this.display.destroy();
-    this.dataSourceCollection.remove(this.source, true);
+    this.viewer.scene.primitives.remove(this.collection);
   }
 
   private installOverlayHooks(): void {
-    const collections = this.display as DataSourceDisplayWithCollections;
-    this.installOverlayHook(collections._primitives as unknown as PrimitiveCollectionWithUpdate);
-    this.installOverlayHook(collections._groundPrimitives as unknown as PrimitiveCollectionWithUpdate);
+    this.installOverlayHook(this.collection as unknown as PrimitiveCollectionWithUpdate);
   }
 
   private installOverlayHook(collection: PrimitiveCollectionWithUpdate): void {
     const originalUpdate = collection.update.bind(collection);
 
     collection.update = (frameState: LayerFrameState) => {
-      // Only rewrite commands emitted by this overlay display, not commands already
+      // Only rewrite commands emitted by this overlay collection, not commands already
       // queued by the main viewer or other overlays earlier in the frame.
       const firstCommand = frameState.commandList.length;
       originalUpdate(frameState);
@@ -143,12 +141,12 @@ export class LayerOverlay {
       for (let i = firstCommand; i < frameState.commandList.length; i++) {
         const command = frameState.commandList[i];
 
-        // Draw this data source in Cesium's final overlay pass so it does not
-        // visually blend with normal data source entities.
+        // Draw this layer in Cesium's final overlay pass so it does not
+        // visually blend with normal entities or primitives.
         command.pass = CESIUM_PASS_OVERLAY;
 
-        // Overlay entities should render on top of terrain/tiles regardless of
-        // their original visualizer depth state.
+        // Overlay primitives should render on top of terrain/tiles regardless
+        // of their collection's original depth state.
         command.renderState = getNoDepthRenderState(command.renderState);
 
         // Billboard and label atlases can be one render turn behind during

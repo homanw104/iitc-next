@@ -2,9 +2,9 @@
  * Portal label fade state helpers.
  *
  * The manager decides when labels should be visible; this module only updates
- * the flat fade fields on PortalLabel and keeps the Cesium entity show flag in
- * sync once a fade-to-hidden finishes. The result is a small numeric status so
- * the animation loop can avoid per-label object allocations.
+ * the flat fade fields on PortalLabel and keeps the Cesium primitive show flag
+ * in sync once a fade-to-hidden finishes. The result is a small numeric status,
+ * so the animation loop can avoid per-label object allocations.
  */
 
 import * as Cesium from "cesium";
@@ -33,7 +33,7 @@ export function setPortalLabelEntityTargetVisibility(label: PortalLabel, visible
   label.fadeTargetOpacity = targetOpacity;
   label.fadeStartTime = startTime;
   if (visible) {
-    label.entity.show = true;
+    label.primitive.show = true;
     label.firstShownAt ??= startTime;
   }
 
@@ -50,8 +50,8 @@ export function updatePortalLabelEntityFade(label: PortalLabel, timestamp: numbe
   if (setPortalLabelEntityCurrentOpacity(label, label.fadeTargetOpacity)) {
     changed = true;
   }
-  if (isPortalLabelEntityFadeTargetHidden(label) && label.entity.show) {
-    label.entity.show = false;
+  if (isPortalLabelEntityFadeTargetHidden(label) && label.primitive.show) {
+    label.primitive.show = false;
     changed = true;
   }
 
@@ -73,7 +73,7 @@ export function isPortalLabelEntityFadeTargetVisible(label: PortalLabel): boolea
 }
 
 export function isPortalLabelEntityFadingOut(label: PortalLabel): boolean {
-  return label.entity.show &&
+  return label.primitive.show &&
     isPortalLabelEntityFadeTargetHidden(label) &&
     label.currentOpacity > PORTAL_LABEL_ENTITY_HIDDEN_OPACITY + Cesium.Math.EPSILON6;
 }

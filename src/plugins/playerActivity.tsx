@@ -7,6 +7,7 @@
 
 import * as Cesium from "cesium";
 import type { EntityPosition, EntityPositionCallback } from "../managers/entity/entityPositionManager";
+import type { LayerOverlay } from "../managers/layer/layerOverlay";
 import type { IITCCore } from "../types/iitc/iitc.ts";
 import type { Team } from "../types/common/common.ts";
 import type { PlextMark } from "../types/api/getPlexts.ts";
@@ -43,6 +44,19 @@ interface PlayerActivityData {
   lngE6: number;
 }
 
+
+interface PlayerLocation {
+  id: PlayerLocationPrimitiveId;
+  label: Cesium.Label;
+  billboard: Cesium.Billboard;
+  currentLayerName: string;
+}
+
+interface PlayerLocationPrimitiveId {
+  id: string;
+  activities: PlayerActivityData[];
+}
+
 interface PlayerActivity {
   data: PlayerActivityData;
   positionCallback: EntityPositionCallback;
@@ -66,12 +80,12 @@ class PlayerActivityPlugin {
   private commManager!: NonNullable<IITCCore["commManager"]>;
   private entityPositionManager!: NonNullable<IITCCore["entityPositionManager"]>;
 
-  private dataSourceEnl: Cesium.CustomDataSource = new Cesium.CustomDataSource("player-activity-enl");
-  private dataSourceRes: Cesium.CustomDataSource = new Cesium.CustomDataSource("player-activity-res");
+  private overlayLayerEnl!: LayerOverlay;
+  private overlayLayerRes!: LayerOverlay;
   private pathDataSourceEnl: Cesium.CustomDataSource = new Cesium.CustomDataSource("activity-path-enl");
   private pathDataSourceRes: Cesium.CustomDataSource = new Cesium.CustomDataSource("activity-path-res");
   private playerActivities: Map<string, PlayerActivity> = new Map();
-  private playerLocations: Map<string, Cesium.Entity> = new Map();
+  private playerLocations: Map<string, PlayerLocation> = new Map();
   private playerLocationsPendingCreation: Set<string> = new Set();
   private playerPaths: Map<string, Cesium.Entity> = new Map();
   private playerPathsPendingCreation: Set<string> = new Set();
@@ -109,12 +123,10 @@ class PlayerActivityPlugin {
       this.hoverHandler = new Cesium.ScreenSpaceEventHandler(this.viewer.scene.canvas);
       this.setUpTooltipElement();
       this.setUpHoverAction();
-      this.dataSourceEnl = this.layerManager.getOrCreateOverlayLayer(PLAYER_ACTIVITY_ENL_LAYER_NAME);
-      this.dataSourceRes = this.layerManager.getOrCreateOverlayLayer(PLAYER_ACTIVITY_RES_LAYER_NAME);
+      this.overlayLayerEnl = this.layerManager.getOrCreateOverlayLayer(PLAYER_ACTIVITY_ENL_LAYER_NAME);
+      this.overlayLayerRes = this.layerManager.getOrCreateOverlayLayer(PLAYER_ACTIVITY_RES_LAYER_NAME);
       this.pathDataSourceEnl = this.layerManager.getOrCreateDataSource(ACTIVITY_PATH_ENL_LAYER_NAME);
       this.pathDataSourceRes = this.layerManager.getOrCreateDataSource(ACTIVITY_PATH_RES_LAYER_NAME);
-      this.configureDataSource(this.dataSourceEnl);
-      this.configureDataSource(this.dataSourceRes);
       this.onReceiveCommMsgCallback = () => this.updatePlayerActivity();
       this.commManager.setOnReceiveMsgCallback(this.onReceiveCommMsgCallback);
       this.updatePlayerActivity();
@@ -199,35 +211,34 @@ class PlayerActivityPlugin {
   }
 
   private getPickedPlayerActivityTooltip(position: Cesium.Cartesian2): PlayerActivityTooltip | undefined {
-    const pickedObject = this.viewer.scene.pick(position) as { id?: Cesium.Entity | Cesium.Entity[] } | undefined;
-    const entity = pickedObject?.id;
+    const pickedObject = this.viewer.scene.pick(position) as { id?: unknown } | undefined;
+    const id = pickedObject?.id;
 
-    if (Array.isArray(entity)) return this.getClusteredPlayerActivityTooltip(entity);
-    if (entity) return this.getSinglePlayerActivityTooltip(entity);
+    if (Array.isArray(id)) return this.getClusteredPlayerActivityTooltip(id);
+    if (this.isPlayerLocationPrimitiveId(id)) return this.getSinglePlayerActivityTooltip(id);
 
     return undefined;
   }
 
-  private getClusteredPlayerActivityTooltip(entities: Cesium.Entity[]): PlayerActivityTooltip | undefined {
-    if (!this.isPlayerActivityEntity(entities[0])) return undefined;
+  private getClusteredPlayerActivityTooltip(ids: unknown[]): PlayerActivityTooltip | undefined {
+    if (!this.isPlayerLocationPrimitiveId(ids[0])) return undefined;
 
-    const activities = entities
-      .map((entity) => this.getLatestActivity(this.getPlayerActivityEntityActivities(entity)))
+    const activities = ids
+      .filter((id): id is PlayerLocationPrimitiveId => this.isPlayerLocationPrimitiveId(id))
+      .map((id) => this.getLatestActivity(id.activities))
       .filter((activity): activity is PlayerActivityData => !!activity)
       .sort(comparePlayerActivityTimestampDescending);
     if (activities.length === 0) return undefined;
 
     return {
-      title: `${entities.length} players`,
+      title: `${ids.length} players`,
       activities,
       rowLabel: "name",
     };
   }
 
-  private getSinglePlayerActivityTooltip(entity: Cesium.Entity): PlayerActivityTooltip | undefined {
-    if (!this.isPlayerActivityEntity(entity)) return undefined;
-
-    const activities = [...this.getPlayerActivityEntityActivities(entity)]
+  private getSinglePlayerActivityTooltip(id: PlayerLocationPrimitiveId): PlayerActivityTooltip | undefined {
+    const activities = [...id.activities]
       .sort(comparePlayerActivityTimestampDescending);
     const latestActivity = activities[0];
     if (!latestActivity) return undefined;
@@ -239,61 +250,13 @@ class PlayerActivityPlugin {
     };
   }
 
-  private isPlayerActivityEntity(entity: Cesium.Entity | undefined): entity is Cesium.Entity {
-    return typeof entity?.id === "string" && entity.id.startsWith("player-activity");
-  }
+  private isPlayerLocationPrimitiveId(value: unknown): value is PlayerLocationPrimitiveId {
+    if (typeof value !== "object" || value === null) return false;
 
-  private getPlayerActivityEntityActivities(entity: Cesium.Entity): PlayerActivityData[] {
-    return entity.properties?.activities?.getValue() ?? [];
-  }
-
-  private configureDataSource(source: Cesium.DataSource) {
-    source.clustering.enabled = true;
-    source.clustering.pixelRange = 20;
-    source.clustering.minimumClusterSize = 2;
-    source.clustering.clusterLabels = true;
-    source.clustering.clusterBillboards = true;
-    source.clustering.clusterEvent.addEventListener((clusteredEntities, cluster) => {
-      const maxPlayers = 2;
-      const playerActivitiesData: PlayerActivityData[] = clusteredEntities.map(e => {
-        const specificPlayerActivitiesData: PlayerActivityData[] = e.properties?.activities.getValue();
-        const lastActivity = this.getLatestActivity(specificPlayerActivitiesData);
-        if (!lastActivity) return null;
-        return {
-          name: lastActivity.name,
-          team: lastActivity.team,
-          timestamp: lastActivity.timestamp,
-          weight: lastActivity.weight,
-          portalName: lastActivity.portalName,
-          latE6: lastActivity.latE6,
-          lngE6: lastActivity.lngE6,
-        };
-      }).filter((activityData): activityData is PlayerActivityData => !!activityData);
-      if (playerActivitiesData.length === 0) return;
-      playerActivitiesData.sort((a, b) => b.timestamp - a.timestamp);
-
-      const visiblePlayerNames = playerActivitiesData.slice(0, maxPlayers).map(p => p.name).join("\n");
-      const remainingPlayers = playerActivitiesData.length - maxPlayers;
-      const displayText = remainingPlayers === 1
-        ? `${visiblePlayerNames}\n${playerActivitiesData[maxPlayers].name}`
-        : remainingPlayers > 1
-          ? `${visiblePlayerNames}\n(${remainingPlayers} more)`
-          : visiblePlayerNames;
-      cluster.label.show = true;
-      cluster.label.text = displayText;
-      cluster.label.font = "16px coda_regular, arial, helvetica, sans-serif";
-      cluster.label.verticalOrigin = Cesium.VerticalOrigin.CENTER;
-      cluster.label.horizontalOrigin = playerActivitiesData[0].team === "ENLIGHTENED" ? Cesium.HorizontalOrigin.LEFT : Cesium.HorizontalOrigin.RIGHT;
-      cluster.label.pixelOffset = playerActivitiesData[0].team === "ENLIGHTENED" ? new Cesium.Cartesian2(25, 0) : new Cesium.Cartesian2(-25, 0);
-      cluster.label.fillColor = getTeamColor(playerActivitiesData[0].team);
-      cluster.label.outlineColor = Cesium.Color.BLACK;
-      cluster.label.outlineWidth = 6;
-      cluster.label.style = Cesium.LabelStyle.FILL_AND_OUTLINE;
-      cluster.label.disableDepthTestDistance = Number.POSITIVE_INFINITY;
-      cluster.billboard.show = true;
-      cluster.billboard.image = buildCanvas().toDataURL();
-      cluster.billboard.disableDepthTestDistance = Number.POSITIVE_INFINITY;
-    });
+    const id = value as Partial<PlayerLocationPrimitiveId>;
+    return typeof id.id === "string" &&
+      id.id.startsWith("player-activity") &&
+      Array.isArray(id.activities);
   }
 
   private showTooltip(table: HTMLElement, activitiesData: PlayerActivityData[], movement: Cesium.ScreenSpaceEventHandler.MotionEvent): void {
@@ -403,14 +366,16 @@ class PlayerActivityPlugin {
     }, undefined);
   }
 
-  private setPlayerPositionSubscription(activityData: PlayerActivityData, entity: Cesium.Entity): void {
+  private setPlayerPositionSubscription(activityData: PlayerActivityData): void {
     const existing = this.playerActivities.get(activityData.name);
     if (existing?.data.latE6 === activityData.latE6 && existing?.data.lngE6 === activityData.lngE6) return;
     if (existing) this.entityPositionManager.unsetOnPositionChangedCallback(existing.data, existing.positionCallback);
 
     const callback: EntityPositionCallback = (entityPosition) => {
-      entity.position = new Cesium.ConstantPositionProperty(entityPosition.position);
-      entity.show = !entityPosition.isFallbackPosition;
+      const primitive = this.playerLocations.get(activityData.name);
+      if (!primitive) return;
+
+      this.updatePlayerLocationPrimitivePosition(primitive, entityPosition);
       this.viewer.scene.requestRender();
     };
     this.entityPositionManager.setOnPositionChangedCallback(activityData, callback);
@@ -442,81 +407,122 @@ class PlayerActivityPlugin {
       const lastEntityPosition = await this.entityPositionManager.getEntityPosition(lastActivity);
       if (!this.playerLocationsPendingCreation.has(playerName)) return;
 
-      let source: Cesium.DataSource;
-      if (lastActivity.team === "ENLIGHTENED") source = this.dataSourceEnl;
-      else if (lastActivity.team === "RESISTANCE") source = this.dataSourceRes;
-      else return;
+      const layer = this.getPlayerActivityOverlayLayer(lastActivity.team);
+      const layerName = getPlayerActivityLayerName(lastActivity.team);
+      if (!layer || !layerName) return;
 
-      let entity = this.playerLocations.get(playerName);
-      if (!entity) entity = this.createPlayerLocationEntity(source, lastEntityPosition, lastActivity, activitiesData, playerName);
-      else this.updatePlayerLocationEntity(entity, lastEntityPosition, lastActivity, activitiesData);
+      let primitive = this.playerLocations.get(playerName);
+      if (!primitive) primitive = this.createPlayerLocationPrimitive(layer, layerName, lastEntityPosition, lastActivity, activitiesData, playerName);
+      else primitive = this.updatePlayerLocationPrimitive(primitive, layer, layerName, lastEntityPosition, lastActivity, activitiesData, playerName);
 
-      this.setPlayerPositionSubscription(lastActivity, entity);
-      this.playerLocations.set(playerName, entity);
+      this.setPlayerPositionSubscription(lastActivity);
+      this.playerLocations.set(playerName, primitive);
     } finally {
       this.playerLocationsPendingCreation.delete(playerName);
     }
   }
 
-  private createPlayerLocationEntity(
-    source: Cesium.DataSource,
+  private createPlayerLocationPrimitive(
+    layer: LayerOverlay,
+    layerName: string,
     lastEntityPosition: EntityPosition,
     lastActivityData: PlayerActivityData,
     activitiesData: PlayerActivityData[],
     playerName: string,
-  ): Cesium.Entity {
-    return source.entities.add({
+  ): PlayerLocation {
+    const id = {
       id: `player-activity-${playerName}`,
+      activities: activitiesData,
+    };
+    const show = !lastEntityPosition.isFallbackPosition;
+    const label = layer.addLabel({
+      id,
       position: lastEntityPosition.position,
-      show: !lastEntityPosition.isFallbackPosition,
-      label: {
-        text: playerName,
-        font: "16px coda_regular, arial, helvetica, sans-serif",
-        verticalOrigin: Cesium.VerticalOrigin.CENTER,
-        horizontalOrigin: lastActivityData.team === "ENLIGHTENED" ? Cesium.HorizontalOrigin.LEFT : Cesium.HorizontalOrigin.RIGHT,
-        pixelOffset: lastActivityData.team === "ENLIGHTENED" ? new Cesium.Cartesian2(25, 0) : new Cesium.Cartesian2(-25, 0),
-        fillColor: getTeamColor(lastActivityData.team),
-        outlineColor: Cesium.Color.BLACK,
-        outlineWidth: 6,
-        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        heightReference: Cesium.HeightReference.NONE,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
-      },
-      billboard: {
-        image: buildCanvas(),
-        heightReference: Cesium.HeightReference.NONE,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
-      },
-      properties: {
-        activities: activitiesData as PlayerActivityData[]
-      },
+      show,
+      text: playerName,
+      font: "16px coda_regular, arial, helvetica, sans-serif",
+      verticalOrigin: Cesium.VerticalOrigin.CENTER,
+      horizontalOrigin: lastActivityData.team === "ENLIGHTENED" ? Cesium.HorizontalOrigin.LEFT : Cesium.HorizontalOrigin.RIGHT,
+      pixelOffset: getPlayerActivityLabelPixelOffset(lastActivityData.team),
+      fillColor: getTeamColor(lastActivityData.team),
+      outlineColor: Cesium.Color.BLACK,
+      outlineWidth: 6,
+      style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+      heightReference: Cesium.HeightReference.NONE,
+      disableDepthTestDistance: Number.POSITIVE_INFINITY,
     });
+    const billboard = layer.addBillboard({
+      id,
+      position: lastEntityPosition.position,
+      show,
+      image: buildCanvas(),
+      heightReference: Cesium.HeightReference.NONE,
+      disableDepthTestDistance: Number.POSITIVE_INFINITY,
+    });
+
+    return {
+      id,
+      label,
+      billboard,
+      currentLayerName: layerName,
+    };
   }
 
-  private updatePlayerLocationEntity(
-    entity: Cesium.Entity,
+  private updatePlayerLocationPrimitive(
+    primitive: PlayerLocation,
+    layer: LayerOverlay,
+    layerName: string,
     lastEntityPosition: EntityPosition,
     lastActivityData: PlayerActivityData,
     activitiesData: PlayerActivityData[],
+    playerName: string,
+  ): PlayerLocation {
+    if (primitive.currentLayerName !== layerName) {
+      this.removePlayerLocationPrimitive(primitive);
+      return this.createPlayerLocationPrimitive(layer, layerName, lastEntityPosition, lastActivityData, activitiesData, playerName);
+    }
+
+    this.updatePlayerLocationPrimitivePosition(primitive, lastEntityPosition);
+    primitive.id.activities = activitiesData;
+
+    // For rare occasions where agents might change their faction.
+    primitive.label.horizontalOrigin = lastActivityData.team === "ENLIGHTENED" ?
+      Cesium.HorizontalOrigin.LEFT :
+      Cesium.HorizontalOrigin.RIGHT;
+    primitive.label.pixelOffset = getPlayerActivityLabelPixelOffset(lastActivityData.team);
+    primitive.label.fillColor = getTeamColor(lastActivityData.team);
+    this.viewer.scene.requestRender();
+
+    return primitive;
+  }
+
+  private updatePlayerLocationPrimitivePosition(
+    primitive: PlayerLocation,
+    entityPosition: EntityPosition,
   ): void {
-    entity.position = new Cesium.ConstantPositionProperty(lastEntityPosition.position);
-    entity.show = !lastEntityPosition.isFallbackPosition;
+    const show = !entityPosition.isFallbackPosition;
+    primitive.label.position = entityPosition.position;
+    primitive.billboard.position = entityPosition.position;
+    primitive.label.show = show;
+    primitive.billboard.show = show;
+  }
 
-    // For rare ocations where agents might change their faction
-    if (entity.label) {
-      entity.label.horizontalOrigin = lastActivityData.team === "ENLIGHTENED" ?
-        new Cesium.ConstantProperty(Cesium.HorizontalOrigin.LEFT) :
-        new Cesium.ConstantProperty(Cesium.HorizontalOrigin.RIGHT);
-      entity.label.pixelOffset = lastActivityData.team === "ENLIGHTENED" ?
-        new Cesium.ConstantProperty(new Cesium.Cartesian2(25, 0)) :
-        new Cesium.ConstantProperty(new Cesium.Cartesian2(-25, 0));
-      entity.label.fillColor = new Cesium.ConstantProperty(getTeamColor(lastActivityData.team));
-    }
+  private removePlayerLocationPrimitive(primitive: PlayerLocation): void {
+    const layer = this.getPlayerActivityOverlayLayerByName(primitive.currentLayerName);
+    if (!layer) return;
 
-    // Update the properties for tooltips
-    if (entity.properties) {
-      entity.properties?.activities.setValue(activitiesData as PlayerActivityData[]);
-    }
+    layer.removeLabel(primitive.label);
+    layer.removeBillboard(primitive.billboard);
+  }
+
+  private getPlayerActivityOverlayLayer(team: Team): LayerOverlay | undefined {
+    if (team === "ENLIGHTENED") return this.overlayLayerEnl;
+    if (team === "RESISTANCE") return this.overlayLayerRes;
+  }
+
+  private getPlayerActivityOverlayLayerByName(name: string): LayerOverlay | undefined {
+    if (name === PLAYER_ACTIVITY_ENL_LAYER_NAME) return this.overlayLayerEnl;
+    if (name === PLAYER_ACTIVITY_RES_LAYER_NAME) return this.overlayLayerRes;
   }
 
   private renderPlayerPaths(playerActivitiesData: Map<string, PlayerActivityData[]>): void {
@@ -617,6 +623,15 @@ const PlayerActivityTooltipTable = ({tooltip}: {
     </table>
   ) as HTMLElement;
 };
+
+function getPlayerActivityLayerName(team: Team): string | undefined {
+  if (team === "ENLIGHTENED") return PLAYER_ACTIVITY_ENL_LAYER_NAME;
+  if (team === "RESISTANCE") return PLAYER_ACTIVITY_RES_LAYER_NAME;
+}
+
+function getPlayerActivityLabelPixelOffset(team: Team): Cesium.Cartesian2 {
+  return team === "ENLIGHTENED" ? new Cesium.Cartesian2(25, 0) : new Cesium.Cartesian2(-25, 0);
+}
 
 function comparePlayerActivityTimestampDescending(a: PlayerActivityData, b: PlayerActivityData): number {
   return b.timestamp - a.timestamp;

@@ -6,6 +6,7 @@
 
 import "../types/iitc/iitc.ts";
 import * as Cesium from "cesium";
+import type { LayerOverlay } from "../managers/layer/layerOverlay";
 import type { IITCCore } from "../types/iitc/iitc.ts";
 import { h } from "../utils/dom.ts";
 import { safeLocalStorage } from "../utils/storage.ts";
@@ -29,6 +30,11 @@ const TOUCH_EVENT_OPTIONS: AddEventListenerOptions = { capture: true, passive: t
 interface TouchStartPosition {
   x: number;
   y: number;
+}
+
+interface LineMarkerPrimitiveId {
+  type: "draw-line-marker";
+  marker: "start" | "end";
 }
 
 class DrawLinesPlugin {
@@ -56,11 +62,13 @@ class DrawLinesPlugin {
   private currentLine: Cesium.Cartesian3[] | undefined;
   private currentLineEntity: Cesium.Entity | undefined;
   private lineMarkerImage: string | undefined;
-  private lineStartMarkerEntity: Cesium.Entity | undefined;
-  private lineEndMarkerEntity: Cesium.Entity | undefined;
+  private lineStartMarkerBillboard: Cesium.Billboard | undefined;
+  private lineEndMarkerBillboard: Cesium.Billboard | undefined;
   private lineMarkerRemovalTimeout: number | undefined;
   private linesDataSource: Cesium.DataSource | undefined;
-  private lineMarkersDataSource: Cesium.DataSource | undefined;
+  private lineMarkersLayer: LayerOverlay | undefined;
+  private readonly lineStartMarkerPrimitiveId: LineMarkerPrimitiveId = { type: "draw-line-marker", marker: "start" };
+  private readonly lineEndMarkerPrimitiveId: LineMarkerPrimitiveId = { type: "draw-line-marker", marker: "end" };
   private touchStartPositions = new Map<number, TouchStartPosition>();
   private isTouchGestureInProgress = false;
   private ignoreTouchGestureUntil = 0;
@@ -96,7 +104,7 @@ class DrawLinesPlugin {
       this.interfaceManager.mountSidebarButton(this.importLinesButtonEl);
 
       this.linesDataSource = this.layerManager.getOrCreateDataSource(LINES_LAYER_NAME);
-      this.lineMarkersDataSource = this.layerManager.getOrCreateOverlayLayer(LINE_MARKERS_LAYER_NAME);
+      this.lineMarkersLayer = this.layerManager.getOrCreateOverlayLayer(LINE_MARKERS_LAYER_NAME);
       this.handler = new Cesium.ScreenSpaceEventHandler(this.viewer.scene.canvas);
       this.bindEvents();
 
@@ -129,7 +137,7 @@ class DrawLinesPlugin {
 
       this.currentLine = undefined;
       this.currentLineEntity = undefined;
-      this.lineMarkersDataSource = undefined;
+      this.lineMarkersLayer = undefined;
       this.linesDataSource = undefined;
       this.isDrawing = false;
       this.isDeleting = false;
@@ -490,31 +498,30 @@ class DrawLinesPlugin {
 
   private showLineMarker(marker: "start" | "end", pos: Cesium.Cartesian3) {
     if (!this.viewer) throw new Error("viewer is undefined");
-    if (!this.lineMarkersDataSource) throw new Error("lineMarkersDataSource is undefined");
+    if (!this.lineMarkersLayer) throw new Error("lineMarkersLayer is undefined");
 
     if (!this.lineMarkerImage) this.lineMarkerImage = this.createLineMarkerImage();
 
-    const existingMarker = marker === "start" ? this.lineStartMarkerEntity : this.lineEndMarkerEntity;
+    const existingMarker = marker === "start" ? this.lineStartMarkerBillboard : this.lineEndMarkerBillboard;
     if (existingMarker) {
-      existingMarker.position = new Cesium.ConstantPositionProperty(pos);
+      existingMarker.position = pos;
     } else {
-      const entity = this.lineMarkersDataSource.entities.add({
+      const billboard = this.lineMarkersLayer.addBillboard({
+        id: marker === "start" ? this.lineStartMarkerPrimitiveId : this.lineEndMarkerPrimitiveId,
         position: pos,
-        billboard: {
-          image: this.lineMarkerImage,
-          width: LINE_MARKER_SIZE_PX,
-          height: LINE_MARKER_SIZE_PX,
-          heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
-          horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-          verticalOrigin: Cesium.VerticalOrigin.CENTER,
-          disableDepthTestDistance: 2e4,
-        },
+        image: this.lineMarkerImage,
+        width: LINE_MARKER_SIZE_PX,
+        height: LINE_MARKER_SIZE_PX,
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+        horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+        verticalOrigin: Cesium.VerticalOrigin.CENTER,
+        disableDepthTestDistance: 2e4,
       });
 
       if (marker === "start") {
-        this.lineStartMarkerEntity = entity;
+        this.lineStartMarkerBillboard = billboard;
       } else {
-        this.lineEndMarkerEntity = entity;
+        this.lineEndMarkerBillboard = billboard;
       }
     }
 
@@ -523,13 +530,13 @@ class DrawLinesPlugin {
 
   private removeLineMarkers() {
     if (!this.viewer) throw new Error("viewer is undefined");
-    if (!this.lineMarkersDataSource) throw new Error("lineMarkersDataSource is undefined");
+    if (!this.lineMarkersLayer) throw new Error("lineMarkersLayer is undefined");
 
     this.cancelLineMarkersRemoval();
-    if (this.lineStartMarkerEntity) this.lineMarkersDataSource.entities.remove(this.lineStartMarkerEntity);
-    if (this.lineEndMarkerEntity) this.lineMarkersDataSource.entities.remove(this.lineEndMarkerEntity);
-    this.lineStartMarkerEntity = undefined;
-    this.lineEndMarkerEntity = undefined;
+    if (this.lineStartMarkerBillboard) this.lineMarkersLayer.removeBillboard(this.lineStartMarkerBillboard);
+    if (this.lineEndMarkerBillboard) this.lineMarkersLayer.removeBillboard(this.lineEndMarkerBillboard);
+    this.lineStartMarkerBillboard = undefined;
+    this.lineEndMarkerBillboard = undefined;
     this.viewer.scene.requestRender();
   }
 
@@ -623,15 +630,26 @@ class DrawLinesPlugin {
     const picked = this.viewer.scene.pick(position);
     if (snap && picked && picked.id instanceof Cesium.Entity) {
       if (
-        picked.id.id.startsWith("portal") ||
-        picked.id === this.lineStartMarkerEntity ||
-        picked.id === this.lineEndMarkerEntity
+        picked.id.id.startsWith("portal")
       ) {
         return picked.id.position.getValue();
       }
     }
+    if (snap && this.isLineMarkerPrimitiveId(picked?.id)) {
+      return this.getLineMarkerPosition(picked.id);
+    }
 
     return this.viewer.camera.pickEllipsoid(position, this.viewer.scene.globe.ellipsoid);
+  }
+
+  private isLineMarkerPrimitiveId(value: unknown): value is LineMarkerPrimitiveId {
+    return value === this.lineStartMarkerPrimitiveId || value === this.lineEndMarkerPrimitiveId;
+  }
+
+  private getLineMarkerPosition(id: LineMarkerPrimitiveId): Cesium.Cartesian3 | undefined {
+    return id.marker === "start" ?
+      this.lineStartMarkerBillboard?.position :
+      this.lineEndMarkerBillboard?.position;
   }
 
   private writeLinesToKml(entities: Cesium.Entity[]): string {
