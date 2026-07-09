@@ -1,12 +1,12 @@
 /**
- * Manage portal ornament entities.
+ * Manage portal ornament billboard primitives.
  */
 
 import * as Cesium from "cesium";
 import type { PortalData } from "../../types/iitc/portal.ts";
 import type { LayerManager } from "../layer/layerManager";
 import type { EntityPosition, EntityPositionCallback, EntityPositionManager } from "./entityPositionManager";
-import type { EntityTranslucencyManager } from "./entityTranslucencyManager";
+import type { EntityTranslucencyManager, TranslucencyByDistanceCallback } from "./entityTranslucencyManager";
 import {
   PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
   PORTAL_OCCLUDED_ALPHA,
@@ -19,13 +19,15 @@ const AP1_ORNAMENT_SIZE = 16;
 const AP1_ORNAMENT_HOLLOW_SIZE = 8;
 const AP1_ORNAMENT_ALPHA = 0.95;
 const CANVAS_DIMENSION = AP1_ORNAMENT_SIZE * 2;
+const ORNAMENT_PRIMITIVE_Z_INDEX = -10;
+const ORNAMENT_IMAGE_ID_PREFIX = "portal-ornament-";
 
 const ornamentImageCache = new Map<string, HTMLCanvasElement>();
 
 interface PortalOrnament {
   data: PortalData;
-  entity: Cesium.Entity;
-  occlusionEntity: Cesium.Entity;
+  billboard: Cesium.Billboard;
+  occlusionBillboard: Cesium.Billboard;
   positionCallback: EntityPositionCallback;
   currentLayerId: string;
 }
@@ -33,32 +35,46 @@ interface PortalOrnament {
 export class PortalOrnamentEntityManager {
   private ornaments: Map<string, PortalOrnament> = new Map();
   private ornamentsPendingCreation: Set<string> = new Set();
+  private readonly currentTranslucencyByDistance = new Cesium.NearFarScalar();
+  private readonly translucencyByDistanceCallback: TranslucencyByDistanceCallback;
 
   constructor(
+    private viewer: Cesium.Viewer,
     private layerManager: LayerManager,
     private entityPositionManager: EntityPositionManager,
-    private entityTranslucencyManager: EntityTranslucencyManager
-  ) {}
+    entityTranslucencyManager: EntityTranslucencyManager
+  ) {
+    this.translucencyByDistanceCallback = (translucencyByDistance) => {
+      Cesium.NearFarScalar.clone(translucencyByDistance, this.currentTranslucencyByDistance);
+      this.ornaments.forEach((ornament) => {
+        ornament.occlusionBillboard.translucencyByDistance = this.currentTranslucencyByDistance;
+      });
+      if (this.ornaments.size > 0) this.viewer.scene.requestRender();
+    };
+    entityTranslucencyManager.setOnTranslucencyByDistanceChangedCallback(this.translucencyByDistanceCallback);
+  }
 
   public async addOrUpdateOrnaments(portals: PortalData[]): Promise<void> {
-    const layers = new Set<string>();
-    portals.forEach((portal) => {
-      const existing = this.ornaments.get(portal.guid);
-      if (existing) layers.add(existing.currentLayerId);
-      if (portal.ornaments?.length) layers.add(getPortalOrnamentEntityLayerId(portal));
-    });
-
-    await this.layerManager.withEntityCollectionEventsSuspended(
-      Array.from(layers, (name) => ({ name, type: "dataSource" as const })),
-      async () => {
-        await Promise.all(portals.map((portal) => this.addOrUpdateOrnament(portal)));
-      }
-    );
+    await Promise.all(portals.map((portal) => this.addOrUpdateOrnamentPrimitive(portal)));
+    this.viewer.scene.requestRender();
   }
 
   public async addOrUpdateOrnament(data: PortalData): Promise<void> {
+    await this.addOrUpdateOrnamentPrimitive(data);
+    this.viewer.scene.requestRender();
+  }
+
+  public removeOrnament(guid: string): void {
+    if (this.removeOrnamentPrimitive(guid)) this.viewer.scene.requestRender();
+  }
+
+  public removeOrnamentsInView(viewRect: Cesium.Rectangle): void {
+    this.removeOrnamentPrimitivesInView(viewRect);
+  }
+
+  private async addOrUpdateOrnamentPrimitive(data: PortalData): Promise<void> {
     if (!data.ornaments?.length) {
-      this.removeOrnament(data.guid);
+      this.removeOrnamentPrimitive(data.guid);
       return;
     }
 
@@ -70,17 +86,9 @@ export class PortalOrnamentEntityManager {
     }
   }
 
-  public removeOrnament(guid: string): void {
-    this.removeOrnamentEntity(guid);
-  }
-
-  public removeOrnamentsInView(viewRect: Cesium.Rectangle): void {
-    this.removeOrnamentEntitiesInView(viewRect);
-  }
-
   private async updateExistingOrnament(ornament: PortalOrnament, data: PortalData): Promise<void> {
     this.moveOrnamentToLayer(ornament, getPortalOrnamentEntityLayerId(data));
-    await this.updateOrnamentEntity(ornament.entity, ornament.occlusionEntity, data);
+    await this.updateOrnamentPrimitives(ornament, data);
     this.updateOrnamentPositionSubscription(ornament, data);
     ornament.data = data;
   }
@@ -90,74 +98,49 @@ export class PortalOrnamentEntityManager {
 
     this.ornamentsPendingCreation.add(data.guid);
     try {
-      const { entity, occlusionEntity } = await this.createOrnamentEntity(data);
-      const positionCallback = createOrnamentPositionCallback(entity, occlusionEntity);
-      this.entityPositionManager.setOnPositionChangedCallback(data, positionCallback);
-      this.ornaments.set(data.guid, {
+      const { billboard, occlusionBillboard } = await this.createOrnamentPrimitives(data);
+      const ornament: PortalOrnament = {
         data,
-        entity,
-        occlusionEntity,
-        positionCallback,
+        billboard,
+        occlusionBillboard,
+        positionCallback: (entityPosition: EntityPosition) => {
+          applyOrnamentPosition(ornament.billboard, ornament.occlusionBillboard, entityPosition);
+        },
         currentLayerId: getPortalOrnamentEntityLayerId(data),
-      });
+      };
+      this.entityPositionManager.setOnPositionChangedCallback(data, ornament.positionCallback);
+      this.ornaments.set(data.guid, ornament);
     } finally {
       this.ornamentsPendingCreation.delete(data.guid);
     }
   }
 
-  private async createOrnamentEntity(data: PortalData): Promise<{
-    entity: Cesium.Entity;
-    occlusionEntity: Cesium.Entity
+  private async createOrnamentPrimitives(data: PortalData): Promise<{
+    billboard: Cesium.Billboard;
+    occlusionBillboard: Cesium.Billboard
   }> {
     const layerId = getPortalOrnamentEntityLayerId(data);
-    const entities = this.layerManager.getOrCreateDataSource(layerId).entities;
+    const billboards = this.getOrnamentBillboards(layerId);
     const entityPosition = await this.entityPositionManager.getEntityPosition(data);
 
-    const entity = entities.add({
-      id: `ornament-${data.guid}`,
-      position: entityPosition.position,
-      show: !entityPosition.isFallbackPosition,
-      billboard: {
-        image: getOrnamentImage(data),
-        heightReference: Cesium.HeightReference.NONE,
-        disableDepthTestDistance: getPortalDisableDepthTestDistance(),
-        horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-        verticalOrigin: Cesium.VerticalOrigin.CENTER,
-        scaleByDistance: createPortalNearFarScalar(),
-      },
-    });
-
-    const occlusionEntity = entities.add({
-      id: `ornament-occluded-${data.guid}`,
-      position: entityPosition.position,
-      show: !entityPosition.isFallbackPosition,
-      billboard: {
-        image: getOrnamentImage(data),
-        color: Cesium.Color.WHITE.withAlpha(PORTAL_OCCLUDED_ALPHA),
-        heightReference: Cesium.HeightReference.NONE,
-        disableDepthTestDistance: PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
-        horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-        verticalOrigin: Cesium.VerticalOrigin.CENTER,
-        scaleByDistance: createPortalNearFarScalar(),
-        translucencyByDistance: this.entityTranslucencyManager.getTranslucencyByDistance(),
-      },
-    });
-    return { entity, occlusionEntity };
+    const show = !entityPosition.isFallbackPosition;
+    const billboard = addOrnamentBillboard(billboards, data, entityPosition.position, show);
+    const occlusionBillboard = addOrnamentOcclusionBillboard(
+      billboards,
+      data,
+      entityPosition.position,
+      show,
+      this.currentTranslucencyByDistance,
+    );
+    return { billboard, occlusionBillboard };
   }
 
-  private async updateOrnamentEntity(entity: Cesium.Entity, occlusionEntity: Cesium.Entity, data: PortalData): Promise<void> {
+  private async updateOrnamentPrimitives(ornament: PortalOrnament, data: PortalData): Promise<void> {
     const entityPosition = await this.entityPositionManager.getEntityPosition(data);
 
-    entity.position = new Cesium.ConstantPositionProperty(entityPosition.position);
-    occlusionEntity.position = new Cesium.ConstantPositionProperty(entityPosition.position);
-    entity.show = !entityPosition.isFallbackPosition;
-    occlusionEntity.show = !entityPosition.isFallbackPosition;
-    if (entity.billboard) {
-      entity.billboard.image = new Cesium.ConstantProperty(getOrnamentImage(data));
-    }
-    if (occlusionEntity.billboard) {
-      occlusionEntity.billboard.image = new Cesium.ConstantProperty(getOrnamentImage(data));
-    }
+    applyOrnamentPosition(ornament.billboard, ornament.occlusionBillboard, entityPosition);
+    setOrnamentBillboardImage(ornament.billboard, data);
+    setOrnamentBillboardImage(ornament.occlusionBillboard, data);
   }
 
   private updateOrnamentPositionSubscription(ornament: PortalOrnament, data: PortalData): void {
@@ -167,66 +150,131 @@ export class PortalOrnamentEntityManager {
     this.entityPositionManager.setOnPositionChangedCallback(data, ornament.positionCallback);
   }
 
-  private removeOrnamentEntity(guid: string): void {
+  private removeOrnamentPrimitive(guid: string): boolean {
     const ornamentInfo = this.ornaments.get(guid);
-    if (ornamentInfo) {
-      const entities = this.layerManager.getOrCreateDataSource(ornamentInfo.currentLayerId).entities;
-
-      entities.remove(ornamentInfo.entity);
-      entities.remove(ornamentInfo.occlusionEntity);
-
-      this.entityPositionManager.unsetOnPositionChangedCallback(ornamentInfo.data, ornamentInfo.positionCallback);
-      this.ornaments.delete(guid);
+    if (!ornamentInfo) {
+      this.ornamentsPendingCreation.delete(guid);
+      return false;
     }
+
+    const billboards = this.getOrnamentBillboards(ornamentInfo.currentLayerId);
+
+    billboards.remove(ornamentInfo.billboard);
+    billboards.remove(ornamentInfo.occlusionBillboard);
+
+    this.entityPositionManager.unsetOnPositionChangedCallback(ornamentInfo.data, ornamentInfo.positionCallback);
+    this.ornaments.delete(guid);
     this.ornamentsPendingCreation.delete(guid);
+    return true;
   }
 
-  private removeOrnamentEntitiesInView(viewRect: Cesium.Rectangle): void {
+  private removeOrnamentPrimitivesInView(viewRect: Cesium.Rectangle): void {
     const toRemove: string[] = [];
-    const layers = new Set<string>();
     this.ornaments.forEach((info, guid) => {
-      const position = info.entity.position?.getValue(Cesium.JulianDate.now());
+      const position = info.billboard.position ?? info.occlusionBillboard.position;
       if (position) {
         const cartographic = Cesium.Cartographic.fromCartesian(position);
         if (Cesium.Rectangle.contains(viewRect, cartographic)) {
           toRemove.push(guid);
-          layers.add(info.currentLayerId);
         }
       }
     });
     if (toRemove.length === 0) return;
 
-    this.layerManager.withEntityCollectionEventsSuspendedSync(
-      Array.from(layers, (name) => ({ name, type: "dataSource" as const })),
-      () => toRemove.forEach(guid => this.removeOrnamentEntity(guid))
-    );
+    toRemove.forEach(guid => this.removeOrnamentPrimitive(guid));
+    this.viewer.scene.requestRender();
   }
 
   private moveOrnamentToLayer(ornamentInfo: PortalOrnament, newLayerId: string): void {
     if (ornamentInfo.currentLayerId === newLayerId) return;
 
-    this.layerManager.getOrCreateDataSource(ornamentInfo.currentLayerId).entities.remove(ornamentInfo.entity);
-    this.layerManager.getOrCreateDataSource(ornamentInfo.currentLayerId).entities.remove(ornamentInfo.occlusionEntity);
-    this.layerManager.getOrCreateDataSource(newLayerId).entities.add(ornamentInfo.entity);
-    this.layerManager.getOrCreateDataSource(newLayerId).entities.add(ornamentInfo.occlusionEntity);
+    const billboardPosition = Cesium.Cartesian3.clone(ornamentInfo.billboard.position);
+    const occlusionBillboardPosition = Cesium.Cartesian3.clone(ornamentInfo.occlusionBillboard.position);
+    const billboardShow = ornamentInfo.billboard.show;
+    const occlusionBillboardShow = ornamentInfo.occlusionBillboard.show;
+    const oldBillboards = this.getOrnamentBillboards(ornamentInfo.currentLayerId);
+    oldBillboards.remove(ornamentInfo.billboard);
+    oldBillboards.remove(ornamentInfo.occlusionBillboard);
+
+    const newBillboards = this.getOrnamentBillboards(newLayerId);
+    ornamentInfo.billboard = addOrnamentBillboard(
+      newBillboards,
+      ornamentInfo.data,
+      billboardPosition,
+      billboardShow,
+    );
+    ornamentInfo.occlusionBillboard = addOrnamentOcclusionBillboard(
+      newBillboards,
+      ornamentInfo.data,
+      occlusionBillboardPosition,
+      occlusionBillboardShow,
+      this.currentTranslucencyByDistance,
+    );
     ornamentInfo.currentLayerId = newLayerId;
+  }
+
+  private getOrnamentBillboards(layerId: string): Cesium.BillboardCollection {
+    return this.layerManager.getOrCreatePrimitiveLayer(layerId, ORNAMENT_PRIMITIVE_Z_INDEX).billboards;
   }
 }
 
-function createOrnamentPositionCallback(
-  entity: Cesium.Entity,
-  occlusionEntity: Cesium.Entity,
-): EntityPositionCallback {
-  return (entityPosition: EntityPosition) => {
-    entity.position = new Cesium.ConstantPositionProperty(entityPosition.position);
-    occlusionEntity.position = new Cesium.ConstantPositionProperty(entityPosition.position);
-    entity.show = !entityPosition.isFallbackPosition;
-    occlusionEntity.show = !entityPosition.isFallbackPosition;
-  };
+function applyOrnamentPosition(
+  billboard: Cesium.Billboard,
+  occlusionBillboard: Cesium.Billboard,
+  entityPosition: EntityPosition,
+): void {
+  const show = !entityPosition.isFallbackPosition;
+  billboard.position = entityPosition.position;
+  billboard.show = show;
+  occlusionBillboard.position = entityPosition.position;
+  occlusionBillboard.show = show;
+}
+
+function addOrnamentBillboard(
+  billboards: Cesium.BillboardCollection,
+  data: PortalData,
+  position: Cesium.Cartesian3,
+  show: boolean,
+): Cesium.Billboard {
+  return billboards.add({
+    position,
+    show,
+    image: getOrnamentImage(data),
+    heightReference: Cesium.HeightReference.NONE,
+    disableDepthTestDistance: getPortalDisableDepthTestDistance(),
+    horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+    verticalOrigin: Cesium.VerticalOrigin.CENTER,
+    scaleByDistance: createPortalNearFarScalar(),
+  });
+}
+
+function addOrnamentOcclusionBillboard(
+  billboards: Cesium.BillboardCollection,
+  data: PortalData,
+  position: Cesium.Cartesian3,
+  show: boolean,
+  translucencyByDistance: Cesium.NearFarScalar,
+): Cesium.Billboard {
+  return billboards.add({
+    position,
+    show,
+    image: getOrnamentImage(data),
+    color: Cesium.Color.WHITE.withAlpha(PORTAL_OCCLUDED_ALPHA),
+    heightReference: Cesium.HeightReference.NONE,
+    disableDepthTestDistance: PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
+    horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+    verticalOrigin: Cesium.VerticalOrigin.CENTER,
+    scaleByDistance: createPortalNearFarScalar(),
+    translucencyByDistance,
+  });
+}
+
+function setOrnamentBillboardImage(billboard: Cesium.Billboard, data: PortalData): void {
+  billboard.setImage(getOrnamentImageId(data), getOrnamentImage(data));
 }
 
 function getOrnamentImage(data: PortalData): HTMLCanvasElement {
-  const cacheKey = (data.ornaments || []).toString();
+  const cacheKey = getOrnamentImageCacheKey(data);
   const cached = ornamentImageCache.get(cacheKey);
   if (cached) return cached;
 
@@ -237,19 +285,29 @@ function getOrnamentImage(data: PortalData): HTMLCanvasElement {
   const context = canvas.getContext("2d");
   if (!context) return canvas;
 
-  if (data.ornaments?.includes("ap1")) {
-    context.fillStyle = `rgba(255, 146, 53, ${AP1_ORNAMENT_ALPHA})`;
-    context.beginPath();
-    context.arc(CANVAS_DIMENSION / 2, CANVAS_DIMENSION / 2, AP1_ORNAMENT_SIZE, 0, 2 * Math.PI);
-    context.fill();
-
-    context.globalCompositeOperation = "destination-out";
-    context.beginPath();
-    context.arc(CANVAS_DIMENSION / 2, CANVAS_DIMENSION / 2, AP1_ORNAMENT_HOLLOW_SIZE, 0, 2 * Math.PI);
-    context.fill();
-    context.globalCompositeOperation = "source-over";
-  }
+  if (data.ornaments?.includes("ap1")) drawAP1(context);
 
   ornamentImageCache.set(cacheKey, canvas);
   return canvas;
+}
+
+function drawAP1(context: CanvasRenderingContext2D): void {
+  context.fillStyle = `rgba(255, 146, 53, ${AP1_ORNAMENT_ALPHA})`;
+  context.beginPath();
+  context.arc(CANVAS_DIMENSION / 2, CANVAS_DIMENSION / 2, AP1_ORNAMENT_SIZE, 0, 2 * Math.PI);
+  context.fill();
+
+  context.globalCompositeOperation = "destination-out";
+  context.beginPath();
+  context.arc(CANVAS_DIMENSION / 2, CANVAS_DIMENSION / 2, AP1_ORNAMENT_HOLLOW_SIZE, 0, 2 * Math.PI);
+  context.fill();
+  context.globalCompositeOperation = "source-over";
+}
+
+function getOrnamentImageId(data: PortalData): string {
+  return `${ORNAMENT_IMAGE_ID_PREFIX}${getOrnamentImageCacheKey(data)}`;
+}
+
+function getOrnamentImageCacheKey(data: PortalData): string {
+  return (data.ornaments || []).toString();
 }

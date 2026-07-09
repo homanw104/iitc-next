@@ -23,6 +23,7 @@ import { LayerPrimitives } from "./layerPrimitives";
 const LOG_TAG = "LayerManager";
 
 export class LayerManager {
+  private static readonly DEFAULT_PRIMITIVE_Z_INDEX = 0;
   private static readonly DEFAULT_OVERLAY_Z_INDEX = 1000;
 
   // Links, fields, etc., use normal DataSource layers, named by layer visibility id.
@@ -84,7 +85,7 @@ export class LayerManager {
     if (!source) {
       source = new Cesium.CustomDataSource(name);
       source.show = this.getLayerVisibility(name);
-      this.viewer.dataSources.add(source).then(() => this.refreshOverlays());
+      this.viewer.dataSources.add(source).then(() => this.refreshRenderLayerOrder());
       this.dataSources.set(name, source);
     }
     return source;
@@ -101,22 +102,29 @@ export class LayerManager {
         zIndex ?? LayerManager.DEFAULT_OVERLAY_Z_INDEX,
       );
       this.overlayLayers.set(name, layer);
-      this.refreshOverlays();
+      this.refreshRenderLayerOrder();
     } else if (zIndex !== undefined) {
       layer.setZIndex(zIndex);
-      this.refreshOverlays();
+      this.refreshRenderLayerOrder();
     }
     return layer;
   }
 
-  public getOrCreatePrimitiveLayer(name: string): LayerPrimitives {
+  public getOrCreatePrimitiveLayer(name: string, zIndex?: number): LayerPrimitives {
     this.registerPluginFilterIfNeeded(name);
 
     let layer = this.primitiveLayers.get(name);
     if (!layer) {
-      layer = new LayerPrimitives(this.viewer, this.getLayerVisibility(name));
+      layer = new LayerPrimitives(
+        this.viewer,
+        this.getLayerVisibility(name),
+        zIndex ?? LayerManager.DEFAULT_PRIMITIVE_Z_INDEX,
+      );
       this.primitiveLayers.set(name, layer);
-      this.refreshOverlays();
+      this.refreshRenderLayerOrder();
+    } else if (zIndex !== undefined && layer.zIndex !== zIndex) {
+      layer.setZIndex(zIndex);
+      this.refreshRenderLayerOrder();
     }
     return layer;
   }
@@ -174,7 +182,7 @@ export class LayerManager {
     if (!layer) return;
 
     layer.setZIndex(zIndex);
-    this.refreshOverlays();
+    this.refreshRenderLayerOrder();
   }
 
   public removeDataSourceLayer(name: string): void {
@@ -321,7 +329,11 @@ export class LayerManager {
     return this.layerVisibility.get(name) !== false;
   }
 
-  private refreshOverlays(): void {
+  private refreshRenderLayerOrder(): void {
+    Array.from(this.primitiveLayers.values())
+      .sort((a, b) => a.zIndex - b.zIndex)
+      .forEach(layer => layer.raiseToTop());
+
     Array.from(this.overlayLayers.values())
       .sort((a, b) => a.zIndex - b.zIndex)
       .forEach(layer => layer.raiseToTop());
