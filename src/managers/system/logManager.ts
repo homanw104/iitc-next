@@ -15,14 +15,9 @@ export interface LogEntry {
 
 export class LogManager {
   private level: LogLevel = "INFO";
-
-  private entryCallbacks = new Set<LogEntryCallback>();
   private isRecording = false;
   private recordedLogs: LogEntry[] = [];
-
-  constructor() {
-    this.level = "INFO";
-  }
+  private entryCallbacks = new Set<LogEntryCallback>();
 
   public setLevel(level: LogLevel): void {
     this.level = level;
@@ -51,37 +46,37 @@ export class LogManager {
   }
 
   public debug(tag: string, ...args: unknown[]): void {
-    const entry = this.createEntry("DEBUG", tag, args);
-    this.record(entry);
     if (this.isLevelLessThanOrEqual(this.level, "DEBUG")) {
       console.log(`[DEBUG][${tag}]`, ...args);
+      const entry = this.createEntry("DEBUG", tag, args);
+      this.record(entry);
       this.emit(entry);
     }
   }
 
   public info(tag: string, ...args: unknown[]): void {
-    const entry = this.createEntry("INFO", tag, args);
-    this.record(entry);
     if (this.isLevelLessThanOrEqual(this.level, "INFO")) {
       console.log(`[INFO][${tag}]`, ...args);
+      const entry = this.createEntry("INFO", tag, args);
+      this.record(entry);
       this.emit(entry);
     }
   }
 
   public warn(tag: string, ...args: unknown[]): void {
-    const entry = this.createEntry("WARN", tag, args);
-    this.record(entry);
     if (this.isLevelLessThanOrEqual(this.level, "WARN")) {
       console.warn(`[WARN][${tag}]`, ...args);
+      const entry = this.createEntry("WARN", tag, args);
+      this.record(entry);
       this.emit(entry);
     }
   }
 
   public error(tag: string, ...args: unknown[]): void {
-    const entry = this.createEntry("ERROR", tag, args);
-    this.record(entry);
     if (this.isLevelLessThanOrEqual(this.level, "ERROR")) {
       console.error(`[ERROR][${tag}]`, ...args);
+      const entry = this.createEntry("ERROR", tag, args);
+      this.record(entry);
       this.emit(entry);
     }
   }

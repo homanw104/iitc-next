@@ -62,6 +62,8 @@ export function mountCoreControllersAndUI(viewer: Cesium.Viewer, container: HTML
   container.appendChild(ProfileButton({ gameDetailPaneController: gameDetailPaneController }));
 
   logManager.subscribe((entry) => {
+    if (entry.level === "DEBUG") return;
+
     portalDetailState.lastLogMsg = entry.args.join(" ");
     if (portalDetailState.portalDetailBar && !portalDetailState.lastPortalData) {
       portalDetailPaneController.updateDetailBarText(undefined, portalDetailState.lastLogMsg);
