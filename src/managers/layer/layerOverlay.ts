@@ -114,6 +114,18 @@ export class LayerOverlay {
     return removed;
   }
 
+  public addPrimitive<T>(primitive: T): T {
+    const added = this.collection.add(primitive) as T;
+    this.viewer.scene.requestRender();
+    return added;
+  }
+
+  public removePrimitive(primitive: unknown): boolean {
+    const removed = this.collection.remove(primitive);
+    if (removed) this.viewer.scene.requestRender();
+    return removed;
+  }
+
   public destroy(): void {
     if (this.isDestroyed) return;
     this.isDestroyed = true;
