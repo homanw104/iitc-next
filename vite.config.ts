@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import monkey from "vite-plugin-monkey";
+import cesiumGlobalBridge from "./vite/cesiumGlobalBridge.ts";
 
 const packageJson = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")) as {
   version: string,
@@ -16,13 +17,14 @@ const cesiumVersion = packageJson.dependencies.cesium.replace(/^[~^]/, "");
 const cesiumBaseUrl = `https://cdn.jsdelivr.net/npm/cesium@${cesiumVersion}/Build/Cesium/`;
 const cesiumWidgetsCssUrl = `${cesiumBaseUrl}Widgets/widgets.css`;
 const cesiumWidgetsCssImport = "cesium/Build/Cesium/Widgets/widgets.css";
+const cesiumGlobalBridgePath = fileURLToPath(new URL("./src/cesium/global/cesium.ts", import.meta.url));
 
 export default defineConfig({
   resolve: {
     alias: [
       {
         find: /^cesium$/,
-        replacement: fileURLToPath(new URL("./src/cesium/global/cesium.ts", import.meta.url)),
+        replacement: cesiumGlobalBridgePath,
       },
     ],
   },
@@ -31,6 +33,7 @@ export default defineConfig({
     __CESIUM_BASE_URL__: JSON.stringify(cesiumBaseUrl),
   },
   plugins: [
+    cesiumGlobalBridge(cesiumGlobalBridgePath),
     monkey({
       entry: "src/bootstrap.ts",
       userscript: {
