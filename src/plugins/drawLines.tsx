@@ -6,6 +6,7 @@
 
 import "../types/iitc/iitc.ts";
 import * as Cesium from "cesium";
+import { pickGestureSurfacePosition as pickSceneSurfacePosition } from "../cesium/interaction/camera/cameraGestures";
 import type { LayerGroundPrimitives } from "../managers/layer/layerGroundPrimitives";
 import type { LayerOverlay } from "../managers/layer/layerOverlay";
 import type { IITCCore } from "../types/iitc/iitc.ts";
@@ -31,7 +32,6 @@ const LINE_ALPHA = 0.8;
 const LINE_WIDTH = 3;
 const DRAW_LINES_PRIMITIVE_Z_INDEX = 100;
 const LINES_PRIMITIVE_KEY = "lines";
-const LINE_PREVIEW_PRIMITIVE_KEY = "preview";
 const LINE_MARKER_SIZE_PX = 12;
 const LINE_MARKER_FILL_COLOR = "#ffffff";
 const LINE_MARKER_BORDER_COLOR = "#4a4a4a";
@@ -101,6 +101,9 @@ class DrawLinesPlugin implements DrawLinesReader, DrawLinesAppearanceController 
   private selectedEntityChangedListener: (() => void) | undefined;
   private handler: Cesium.ScreenSpaceEventHandler | undefined;
   private currentLine: Cesium.Cartesian3[] | undefined;
+  private previewPrimitive: Cesium.GroundPolylinePrimitive | undefined;
+  private previewNeedsRefresh = false;
+  private previewTerrainHeightsReady = false;
   private lineMarkerImage: string | undefined;
   private lineStartMarkerBillboard: Cesium.Billboard | undefined;
   private lineEndMarkerBillboard: Cesium.Billboard | undefined;
@@ -113,6 +116,7 @@ class DrawLinesPlugin implements DrawLinesReader, DrawLinesAppearanceController 
   private drawLinesChangedCallbacks: Set<DrawLinesChangedCallback> = new Set();
   private readonly lineStartMarkerPrimitiveId: LineMarkerPrimitiveId = { type: "draw-line-marker", marker: "start" };
   private readonly lineEndMarkerPrimitiveId: LineMarkerPrimitiveId = { type: "draw-line-marker", marker: "end" };
+  private readonly previewPreUpdateAction = () => this.refreshPreviewPrimitive();
   private touchStartPositions = new Map<number, TouchStartPosition>();
   private isTouchGestureInProgress = false;
   private ignoreTouchGestureUntil = 0;
@@ -151,6 +155,7 @@ class DrawLinesPlugin implements DrawLinesReader, DrawLinesAppearanceController 
       this.lineMarkersLayer = this.layerManager.getOrCreateOverlayLayer(LINE_MARKERS_LAYER_NAME);
       this.handler = new Cesium.ScreenSpaceEventHandler(this.viewer.scene.canvas);
       this.bindEvents();
+      this.initializePreviewTerrainHeights(this.linesLayer);
 
       const lines = this.readLinesFromKml(safeLocalStorage.getItem(STORAGE_KEY) || "");
       lines?.forEach(line => this.addDrawLine(line));
@@ -166,6 +171,7 @@ class DrawLinesPlugin implements DrawLinesReader, DrawLinesAppearanceController 
       this.unbindEvents();
       this.handler = undefined;
 
+      this.removePreview();
       this.removeLineMarkers();
 
       this.layerManager.removeOverlayLayer(LINE_MARKERS_LAYER_NAME);
@@ -182,6 +188,7 @@ class DrawLinesPlugin implements DrawLinesReader, DrawLinesAppearanceController 
       this.drawLinesButtonEl = undefined;
 
       this.currentLine = undefined;
+      this.previewTerrainHeightsReady = false;
       this.lineMarkersLayer = undefined;
       this.linesLayer = undefined;
       this.lines.clear();
@@ -377,6 +384,7 @@ class DrawLinesPlugin implements DrawLinesReader, DrawLinesAppearanceController 
   private startLine(pos: Cesium.Cartesian3) {
     this.currentLine = [pos];
     this.isLineStarted = true;
+    this.viewer.scene.preUpdate.addEventListener(this.previewPreUpdateAction);
     this.removeLineMarkers();
     this.showLineMarker("start", pos);
     this.renderPreview(pos);
@@ -516,29 +524,57 @@ class DrawLinesPlugin implements DrawLinesReader, DrawLinesAppearanceController 
   }
 
   private renderPreview(pos: Cesium.Cartesian3) {
-    if (!this.linesLayer) throw new Error("linesLayer is undefined");
     if (!this.currentLine) throw new Error("currentLine is undefined");
 
     if (this.currentLine.length === 2) this.currentLine.pop();
     this.currentLine.push(pos);
+    this.previewNeedsRefresh = true;
+    this.viewer.scene.requestRender();
+  }
 
-    if (Cesium.Cartesian3.equals(this.currentLine[0], this.currentLine[1])) return;
+  private removePreview() {
+    this.viewer.scene.preUpdate.removeEventListener(this.previewPreUpdateAction);
+    this.previewNeedsRefresh = false;
+    if (this.previewPrimitive && this.linesLayer) {
+      this.linesLayer.removePrimitive(this.previewPrimitive);
+    }
+    this.previewPrimitive = undefined;
+  }
 
-    this.linesLayer.replacePrimitiveWhenReady(LINE_PREVIEW_PRIMITIVE_KEY, createLinePrimitive(
-      [createLineGeometryInstance(this.currentLine, LINE_WIDTH)],
+  private refreshPreviewPrimitive(): void {
+    if (!this.previewNeedsRefresh || !this.previewTerrainHeightsReady) return;
+
+    // Match Cesium's dynamic updater by rebuilding clamped geometry before this frame renders.
+    const linesLayer = this.linesLayer;
+    const currentLine = this.currentLine;
+    if (!linesLayer || !currentLine || currentLine.length < 2) return;
+
+    this.previewNeedsRefresh = false;
+    if (this.previewPrimitive) linesLayer.removePrimitive(this.previewPrimitive);
+    this.previewPrimitive = undefined;
+
+    if (Cesium.Cartesian3.equals(currentLine[0], currentLine[1])) return;
+
+    this.previewPrimitive = linesLayer.addPrimitive(createLinePrimitive(
+      [createLineGeometryInstance(currentLine, LINE_WIDTH)],
       createPolylineAppearance({
         color: PREVIEW_COLOR,
         alpha: LINE_ALPHA,
         width: LINE_WIDTH,
       }),
       false,
+      false,
     ));
   }
 
-  private removePreview() {
-    if (!this.linesLayer) throw new Error("linesLayer is undefined");
+  private initializePreviewTerrainHeights(linesLayer: LayerGroundPrimitives): void {
+    this.previewTerrainHeightsReady = false;
+    void Cesium.GroundPolylinePrimitive.initializeTerrainHeights().then(() => {
+      if (this.linesLayer !== linesLayer) return;
 
-    this.linesLayer.removeManagedPrimitive(LINE_PREVIEW_PRIMITIVE_KEY);
+      this.previewTerrainHeightsReady = true;
+      if (this.previewNeedsRefresh) this.viewer.scene.requestRender();
+    });
   }
 
   private showLineMarker(marker: "start" | "end", pos: Cesium.Cartesian3) {
@@ -681,7 +717,8 @@ class DrawLinesPlugin implements DrawLinesReader, DrawLinesAppearanceController 
       return this.getLineMarkerPosition(picked.id);
     }
 
-    return this.viewer.camera.pickEllipsoid(position, this.viewer.scene.globe.ellipsoid);
+    const surfacePosition = pickSceneSurfacePosition(this.viewer.scene, position);
+    return surfacePosition ? Cesium.Cartesian3.clone(surfacePosition) : undefined;
   }
 
   private isLineMarkerPrimitiveId(value: unknown): value is LineMarkerPrimitiveId {
@@ -869,12 +906,13 @@ function createLinePrimitive(
   geometryInstances: Cesium.GeometryInstance[],
   appearance: Cesium.PolylineMaterialAppearance,
   allowPicking: boolean,
+  asynchronous: boolean = true,
 ): Cesium.GroundPolylinePrimitive {
   return new Cesium.GroundPolylinePrimitive({
     geometryInstances,
     appearance,
     allowPicking,
-    asynchronous: true,
+    asynchronous,
     classificationType: Cesium.ClassificationType.BOTH,
   });
 }
