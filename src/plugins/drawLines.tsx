@@ -6,11 +6,20 @@
 
 import "../types/iitc/iitc.ts";
 import * as Cesium from "cesium";
+import type { LayerGroundPrimitives } from "../managers/layer/layerGroundPrimitives";
 import type { LayerOverlay } from "../managers/layer/layerOverlay";
 import type { IITCCore } from "../types/iitc/iitc.ts";
 import { h } from "../utils/dom.ts";
 import { safeLocalStorage } from "../utils/storage.ts";
 import { safeWindow } from "../utils/window";
+import {
+  DRAW_LINES_PLUGIN_ID,
+  type DrawLineAppearanceOverride,
+  type DrawLineData,
+  type DrawLinesChangedCallback,
+  type DrawLinesAppearanceController,
+  type DrawLinesReader,
+} from "./drawLines/api";
 
 const LOG_TAG = "DrawLines";
 const LINES_LAYER_NAME = "Draw Lines";
@@ -18,7 +27,11 @@ const LINE_MARKERS_LAYER_NAME = "Draw Lines Markers";
 const STORAGE_KEY = "iitc-next-draw-lines";
 const PREVIEW_COLOR = "#cc823f";
 const LINE_COLOR = "#fa8525";
+const LINE_ALPHA = 0.8;
 const LINE_WIDTH = 3;
+const DRAW_LINES_PRIMITIVE_Z_INDEX = 100;
+const LINES_PRIMITIVE_KEY = "lines";
+const LINE_PREVIEW_PRIMITIVE_KEY = "preview";
 const LINE_MARKER_SIZE_PX = 12;
 const LINE_MARKER_FILL_COLOR = "#ffffff";
 const LINE_MARKER_BORDER_COLOR = "#4a4a4a";
@@ -37,8 +50,36 @@ interface LineMarkerPrimitiveId {
   marker: "start" | "end";
 }
 
-class DrawLinesPlugin {
-  public id = "draw-lines";
+interface DrawLinePrimitiveId {
+  type: "draw-line";
+  lineId: string;
+}
+
+interface DrawLine {
+  data: DrawLineData;
+  primitiveId: DrawLinePrimitiveId;
+}
+
+interface DrawLineAppearance {
+  color: string;
+  alpha: number;
+  width: number;
+  dashLength?: number;
+}
+
+interface DrawLinePrimitiveGroup {
+  appearance: DrawLineAppearance;
+  geometryInstances: Cesium.GeometryInstance[];
+}
+
+const DEFAULT_LINE_APPEARANCE: DrawLineAppearance = {
+  color: LINE_COLOR,
+  alpha: LINE_ALPHA,
+  width: LINE_WIDTH,
+};
+
+class DrawLinesPlugin implements DrawLinesReader, DrawLinesAppearanceController {
+  public id = DRAW_LINES_PLUGIN_ID;
   public name = "Draw Lines";
   public description = "This plugin enables you to draw lines on the map.";
 
@@ -60,13 +101,16 @@ class DrawLinesPlugin {
   private selectedEntityChangedListener: (() => void) | undefined;
   private handler: Cesium.ScreenSpaceEventHandler | undefined;
   private currentLine: Cesium.Cartesian3[] | undefined;
-  private currentLineEntity: Cesium.Entity | undefined;
   private lineMarkerImage: string | undefined;
   private lineStartMarkerBillboard: Cesium.Billboard | undefined;
   private lineEndMarkerBillboard: Cesium.Billboard | undefined;
   private lineMarkerRemovalTimeout: number | undefined;
-  private linesDataSource: Cesium.DataSource | undefined;
+  private linesLayer: LayerGroundPrimitives | undefined;
   private lineMarkersLayer: LayerOverlay | undefined;
+  private lines: Map<string, DrawLine> = new Map();
+  private appearanceOverrides: Map<string, Map<string, DrawLineAppearanceOverride>> = new Map();
+  private linePrimitiveKeys: Set<string> = new Set();
+  private drawLinesChangedCallbacks: Set<DrawLinesChangedCallback> = new Set();
   private readonly lineStartMarkerPrimitiveId: LineMarkerPrimitiveId = { type: "draw-line-marker", marker: "start" };
   private readonly lineEndMarkerPrimitiveId: LineMarkerPrimitiveId = { type: "draw-line-marker", marker: "end" };
   private touchStartPositions = new Map<number, TouchStartPosition>();
@@ -103,13 +147,15 @@ class DrawLinesPlugin {
       this.interfaceManager.mountSidebarButton(this.exportLinesButtonEl);
       this.interfaceManager.mountSidebarButton(this.importLinesButtonEl);
 
-      this.linesDataSource = this.layerManager.getOrCreateDataSource(LINES_LAYER_NAME);
+      this.linesLayer = this.layerManager.getOrCreateGroundPrimitiveLayer(LINES_LAYER_NAME, DRAW_LINES_PRIMITIVE_Z_INDEX);
       this.lineMarkersLayer = this.layerManager.getOrCreateOverlayLayer(LINE_MARKERS_LAYER_NAME);
       this.handler = new Cesium.ScreenSpaceEventHandler(this.viewer.scene.canvas);
       this.bindEvents();
 
-      const entities = this.readLinesFromKml(safeLocalStorage.getItem(STORAGE_KEY) || "");
-      if (entities) entities.forEach(line => this.linesDataSource?.entities.add(line));
+      const lines = this.readLinesFromKml(safeLocalStorage.getItem(STORAGE_KEY) || "");
+      lines?.forEach(line => this.addDrawLine(line));
+      this.rebuildLinePrimitives();
+      this.notifyDrawLinesChanged();
     } catch (e) {
       this.logManager.error(LOG_TAG, "Failed to initialize draw lines plugin", e);
     }
@@ -123,7 +169,7 @@ class DrawLinesPlugin {
       this.removeLineMarkers();
 
       this.layerManager.removeOverlayLayer(LINE_MARKERS_LAYER_NAME);
-      this.layerManager.removeDataSourceLayer(LINES_LAYER_NAME);
+      this.layerManager.removeGroundPrimitiveLayer(LINES_LAYER_NAME);
 
       if (this.importLinesButtonEl) this.interfaceManager.unmountSidebarButton(this.importLinesButtonEl);
       if (this.exportLinesButtonEl) this.interfaceManager.unmountSidebarButton(this.exportLinesButtonEl);
@@ -136,9 +182,12 @@ class DrawLinesPlugin {
       this.drawLinesButtonEl = undefined;
 
       this.currentLine = undefined;
-      this.currentLineEntity = undefined;
       this.lineMarkersLayer = undefined;
-      this.linesDataSource = undefined;
+      this.linesLayer = undefined;
+      this.lines.clear();
+      this.appearanceOverrides.clear();
+      this.linePrimitiveKeys.clear();
+      this.notifyDrawLinesChanged();
       this.isDrawing = false;
       this.isDeleting = false;
       this.isLineStarted = false;
@@ -147,13 +196,46 @@ class DrawLinesPlugin {
     }
   }
 
+  public forEachDrawLineData(callback: (data: DrawLineData) => void): void {
+    this.lines.forEach(line => callback(line.data));
+  }
+
+  public addDrawLinesChangedListener(callback: DrawLinesChangedCallback): void {
+    this.drawLinesChangedCallbacks.add(callback);
+  }
+
+  public removeDrawLinesChangedListener(callback: DrawLinesChangedCallback): void {
+    this.drawLinesChangedCallbacks.delete(callback);
+  }
+
+  public setAppearanceOverrides(
+    ownerId: string,
+    overrides: ReadonlyMap<string, DrawLineAppearanceOverride>,
+  ): void {
+    const nextOverrides = new Map(
+      Array.from(overrides, ([lineId, appearance]) => [lineId, { ...appearance }]),
+    );
+    const currentOverrides = this.appearanceOverrides.get(ownerId);
+    if (appearanceOverrideMapsEqual(currentOverrides, nextOverrides)) return;
+
+    if (nextOverrides.size === 0) this.appearanceOverrides.delete(ownerId);
+    else this.appearanceOverrides.set(ownerId, nextOverrides);
+    this.rebuildLinePrimitives();
+  }
+
+  public clearAppearanceOverrides(ownerId: string): void {
+    if (!this.appearanceOverrides.delete(ownerId)) return;
+
+    this.rebuildLinePrimitives();
+  }
+
   private bindEvents() {
     if (!this.viewer) throw new Error("viewer is undefined");
     if (!this.handler) throw new Error("handler is undefined");
 
     // Avoid selection box when drawing or deleting line
     this.selectedEntityChangedListener = () => {
-      if ((this.isDrawing || this.isDeleting) && this.viewer) {
+      if (this.isDrawing || this.isDeleting) {
         this.viewer.selectedEntity = undefined;
       }
     };
@@ -172,9 +254,9 @@ class DrawLinesPlugin {
         }
       }
       if (this.isDeleting) {
-        const entity = this.resolveLine(event.position);
-        if (entity) {
-          this.deleteLine(entity);
+        const line = this.resolveLine(event.position);
+        if (line) {
+          this.deleteLine(line);
         }
       }
     }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
@@ -190,11 +272,11 @@ class DrawLinesPlugin {
         }
       }
       if (this.isDeleting) {
-        const entity = this.resolveLine(event.endPosition);
-        if (entity) {
-          if (this.viewer) this.viewer.scene.canvas.style.cursor = "pointer";
+        const line = this.resolveLine(event.endPosition);
+        if (line) {
+          this.viewer.scene.canvas.style.cursor = "pointer";
         } else {
-          if (this.viewer) this.viewer.scene.canvas.style.cursor = "default";
+          this.viewer.scene.canvas.style.cursor = "default";
         }
       }
     }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
@@ -301,24 +383,16 @@ class DrawLinesPlugin {
   }
 
   private finishLine(pos: Cesium.Cartesian3) {
-    if (!this.linesDataSource) throw new Error("linesDataSource is undefined");
     if (!this.currentLine) throw new Error("currentLine is undefined");
 
     this.renderPreview(pos);  // Ensure this.currentLine has two vertices
-    this.linesDataSource.entities.add({
+    this.addDrawLine({
       id: `draw-line-${crypto.randomUUID()}`,
-      polyline: {
-        positions: this.currentLine,
-        material: Cesium.Color.fromCssColorString(LINE_COLOR).withAlpha(0.8),
-        width: LINE_WIDTH,
-        clampToGround: true,
-      }
+      positions: this.currentLine,
     });
-
-    // Save to storage
-    const entities = Array.from(this.linesDataSource.entities.values);
-    const kml = this.writeLinesToKml(entities);
-    safeLocalStorage.setItem(STORAGE_KEY, kml);
+    this.rebuildLinePrimitives();
+    this.notifyDrawLinesChanged();
+    this.saveLines();
 
     this.removePreview();
     this.showLineMarker("end", pos);
@@ -334,42 +408,33 @@ class DrawLinesPlugin {
     this.isLineStarted = false;
   }
 
-  private deleteLine(entity: Cesium.Entity) {
-    if (!this.linesDataSource) throw new Error("linesDataSource is undefined");
-    if (!this.viewer) throw new Error("viewer is undefined");
-
-    this.linesDataSource.entities.remove(entity);
-    this.viewer.scene.requestRender();
-
-    // Save to storage
-    const entities = Array.from(this.linesDataSource.entities.values);
-    const kml = this.writeLinesToKml(entities);
-    safeLocalStorage.setItem(STORAGE_KEY, kml);
+  private deleteLine(line: DrawLine) {
+    this.lines.delete(line.data.id);
+    this.appearanceOverrides.forEach((overrides, ownerId) => {
+      overrides.delete(line.data.id);
+      if (overrides.size === 0) this.appearanceOverrides.delete(ownerId);
+    });
+    this.rebuildLinePrimitives();
+    this.notifyDrawLinesChanged();
+    this.saveLines();
   }
 
   private clearLines(): void {
     if (!this.interfaceManager) throw new Error("interfaceManager is undefined");
-    if (!this.linesDataSource) throw new Error("linesDataSource is undefined");
-    if (!this.viewer) throw new Error("viewer is undefined");
 
     if (this.isDrawing) this.toggleDrawing();
     if (this.isDeleting) this.toggleDeleting();
     
-    const linesDataSource = this.linesDataSource;
     const container = this.interfaceManager.getContainer();
-    const viewer = this.viewer;
-
     const confirmPane = ConfirmPane({
       msg: "Clear all the lines?",
       onConfirm: () => {
-        linesDataSource.entities.removeAll();
+        this.lines.clear();
+        this.appearanceOverrides.clear();
+        this.rebuildLinePrimitives();
+        this.notifyDrawLinesChanged();
+        this.saveLines();
         container.removeChild(confirmPane);
-        viewer.scene.requestRender();
-
-        // Save to storage
-        const entities = Array.from(linesDataSource.entities.values);
-        const kml = this.writeLinesToKml(entities);
-        safeLocalStorage.setItem(STORAGE_KEY, kml);
       },
       onCancel: () => {
         container.removeChild(confirmPane);
@@ -379,13 +444,10 @@ class DrawLinesPlugin {
   }
 
   private exportLines(): void {
-    if (!this.linesDataSource) throw new Error("linesDataSource is undefined");
-    
     if (this.isDrawing) this.toggleDrawing();
     if (this.isDeleting) this.toggleDeleting();
-    
-    const entities = Array.from(this.linesDataSource.entities.values);
-    const kml = this.writeLinesToKml(entities);
+
+    const kml = this.writeLinesToKml(Array.from(this.lines.values(), line => line.data));
 
     // Support for Android Wrapper
     // @ts-expect-error support for Android wrapper
@@ -419,7 +481,6 @@ class DrawLinesPlugin {
         container.removeChild(confirmPane);
       },
       onCancel: () => {
-        if (!this.interfaceManager) return;
         container.removeChild(confirmPane);
       },
     });
@@ -427,13 +488,6 @@ class DrawLinesPlugin {
   }
 
   private performImport(): void {
-    if (!this.interfaceManager) throw new Error("interfaceManager is undefined");
-    if (!this.linesDataSource) throw new Error("linesDataSource is undefined");
-    if (!this.viewer) throw new Error("viewer is undefined");
-
-    const linesDataSource = this.linesDataSource;
-    const viewer = this.viewer;
-
     const input = document.createElement("input");
     input.type = "file";
     input.accept = ".kml";
@@ -445,17 +499,14 @@ class DrawLinesPlugin {
       reader.onload = (event) => {
         const content = event.target?.result as string;
         if (content) {
-          const entities = this.readLinesFromKml(content);
-          if (entities) {
-            linesDataSource.entities.removeAll();
-            entities.forEach(line => linesDataSource.entities.add(line));
-
-            // Save to storage
-            const updatedEntities = Array.from(linesDataSource.entities.values);
-            const kml = this.writeLinesToKml(updatedEntities);
-            safeLocalStorage.setItem(STORAGE_KEY, kml);
-
-            viewer.scene.requestRender();
+          const lines = this.readLinesFromKml(content);
+          if (lines) {
+            this.lines.clear();
+            this.appearanceOverrides.clear();
+            lines.forEach(line => this.addDrawLine(line));
+            this.rebuildLinePrimitives();
+            this.saveLines();
+            this.notifyDrawLinesChanged();
           }
         }
       };
@@ -465,35 +516,29 @@ class DrawLinesPlugin {
   }
 
   private renderPreview(pos: Cesium.Cartesian3) {
-    if (!this.linesDataSource) throw new Error("linesDataSource is undefined");
+    if (!this.linesLayer) throw new Error("linesLayer is undefined");
     if (!this.currentLine) throw new Error("currentLine is undefined");
-    if (!this.viewer) throw new Error("viewer is undefined");
 
     if (this.currentLine.length === 2) this.currentLine.pop();
     this.currentLine.push(pos);
 
-    if (!this.currentLineEntity) {
-      this.currentLineEntity = this.linesDataSource.entities.add({
-        polyline: {
-          positions: new Cesium.CallbackProperty(() => this.currentLine, false),
-          material: Cesium.Color.fromCssColorString(PREVIEW_COLOR).withAlpha(0.8),
-          width: LINE_WIDTH,
-          clampToGround: true,
-        }
-      });
-    }
+    if (Cesium.Cartesian3.equals(this.currentLine[0], this.currentLine[1])) return;
 
-    this.viewer.scene.requestRender();
+    this.linesLayer.replacePrimitiveWhenReady(LINE_PREVIEW_PRIMITIVE_KEY, createLinePrimitive(
+      [createLineGeometryInstance(this.currentLine, LINE_WIDTH)],
+      createPolylineAppearance({
+        color: PREVIEW_COLOR,
+        alpha: LINE_ALPHA,
+        width: LINE_WIDTH,
+      }),
+      false,
+    ));
   }
 
   private removePreview() {
-    if (!this.viewer) throw new Error("viewer is undefined");
-    if (!this.linesDataSource) throw new Error("linesDataSource is undefined");
+    if (!this.linesLayer) throw new Error("linesLayer is undefined");
 
-    if (this.currentLineEntity) this.linesDataSource.entities.remove(this.currentLineEntity);
-    this.currentLineEntity = undefined;
-
-    this.viewer.scene.requestRender();
+    this.linesLayer.removeManagedPrimitive(LINE_PREVIEW_PRIMITIVE_KEY);
   }
 
   private showLineMarker(marker: "start" | "end", pos: Cesium.Cartesian3) {
@@ -505,6 +550,7 @@ class DrawLinesPlugin {
     const existingMarker = marker === "start" ? this.lineStartMarkerBillboard : this.lineEndMarkerBillboard;
     if (existingMarker) {
       existingMarker.position = pos;
+      this.viewer.scene.requestRender();
     } else {
       const billboard = this.lineMarkersLayer.addBillboard({
         id: marker === "start" ? this.lineStartMarkerPrimitiveId : this.lineEndMarkerPrimitiveId,
@@ -524,12 +570,9 @@ class DrawLinesPlugin {
         this.lineEndMarkerBillboard = billboard;
       }
     }
-
-    this.viewer.scene.requestRender();
   }
 
   private removeLineMarkers() {
-    if (!this.viewer) throw new Error("viewer is undefined");
     if (!this.lineMarkersLayer) throw new Error("lineMarkersLayer is undefined");
 
     this.cancelLineMarkersRemoval();
@@ -537,7 +580,6 @@ class DrawLinesPlugin {
     if (this.lineEndMarkerBillboard) this.lineMarkersLayer.removeBillboard(this.lineEndMarkerBillboard);
     this.lineStartMarkerBillboard = undefined;
     this.lineEndMarkerBillboard = undefined;
-    this.viewer.scene.requestRender();
   }
 
   private scheduleLineMarkersRemoval() {
@@ -590,7 +632,7 @@ class DrawLinesPlugin {
     }
 
     // Ensure the pointer is back to default on touch devices
-    if (this.viewer) this.viewer.scene.canvas.style.cursor = "default";
+    this.viewer.scene.canvas.style.cursor = "default";
   }
 
   private toggleDeleting() {
@@ -611,17 +653,17 @@ class DrawLinesPlugin {
     }
 
     // Ensure the pointer is back to default on touch devices
-    if (this.viewer) this.viewer.scene.canvas.style.cursor = "default";
+    this.viewer.scene.canvas.style.cursor = "default";
   }
 
-  private resolveLine(position: Cesium.Cartesian2): Cesium.Entity | undefined {
+  private resolveLine(position: Cesium.Cartesian2): DrawLine | undefined {
     if (!this.viewer) throw new Error("viewer is undefined");
-    if (!this.linesDataSource) throw new Error("linesDataSource is undefined");
 
     const picked = this.viewer.scene.pick(position);
-    if (picked && picked.id instanceof Cesium.Entity) {
-      return this.linesDataSource.entities.getById(picked.id.id);
-    }
+    if (!this.isDrawLinePrimitiveId(picked?.id)) return;
+
+    const line = this.lines.get(picked.id.lineId);
+    if (line?.primitiveId === picked.id) return line;
   }
 
   private resolvePosition(position: Cesium.Cartesian2, snap: boolean = true): Cesium.Cartesian3 | undefined {
@@ -646,23 +688,29 @@ class DrawLinesPlugin {
     return value === this.lineStartMarkerPrimitiveId || value === this.lineEndMarkerPrimitiveId;
   }
 
+  private isDrawLinePrimitiveId(value: unknown): value is DrawLinePrimitiveId {
+    if (typeof value !== "object" || value === null) return false;
+
+    const id = value as Partial<DrawLinePrimitiveId>;
+    return id.type === "draw-line" && typeof id.lineId === "string";
+  }
+
   private getLineMarkerPosition(id: LineMarkerPrimitiveId): Cesium.Cartesian3 | undefined {
     return id.marker === "start" ?
       this.lineStartMarkerBillboard?.position :
       this.lineEndMarkerBillboard?.position;
   }
 
-  private writeLinesToKml(entities: Cesium.Entity[]): string {
-    const placemarks = entities.filter(e => e.id.startsWith("draw-line")).map((entity) => {
-      const positions: Cesium.Cartesian3[] = entity.polyline?.positions?.getValue(Cesium.JulianDate.now());
-      const cartographic: Cesium.Cartographic[] = positions.map(pos => Cesium.Cartographic.fromCartesian(pos));
+  private writeLinesToKml(lines: DrawLineData[]): string {
+    const placemarks = lines.map((line) => {
+      const cartographic: Cesium.Cartographic[] = line.positions.map(pos => Cesium.Cartographic.fromCartesian(pos));
       const coordinatesString = cartographic.map(c =>
         `          ${Cesium.Math.toDegrees(c.longitude)},${Cesium.Math.toDegrees(c.latitude)},${c.height}\n`
       ).join("");
 
       return `` +
         `    <Placemark>\n` +
-        `      <name>${entity.name || "LineString"}</name>\n` +
+        `      <name>${line.name || "LineString"}</name>\n` +
         `      <LineString>\n` +
         `        <tessellate>1</tessellate>\n` +
         `        <coordinates>\n` +
@@ -682,12 +730,12 @@ class DrawLinesPlugin {
       `</kml>\n`;
   }
 
-  private readLinesFromKml(kml: string): Cesium.Entity[] | undefined {
+  private readLinesFromKml(kml: string): DrawLineData[] | undefined {
     try {
       const parser = new DOMParser();
       const xmlDoc = parser.parseFromString(kml, "text/xml");
       const placemarks = xmlDoc.getElementsByTagName("Placemark");
-      const entities: Cesium.Entity[] = [];
+      const lines: DrawLineData[] = [];
 
       for (let i = 0; i < placemarks.length; i++) {
         const placemark = placemarks[i];
@@ -709,30 +757,174 @@ class DrawLinesPlugin {
               }
             });
 
-            if (positions.length > 0) {
+            if (positions.length >= 2) {
               const nameElement = placemark.getElementsByTagName("name")[0];
               const name = nameElement ? nameElement.textContent || undefined : undefined;
 
-              entities.push(new Cesium.Entity({
+              lines.push({
+                id: `draw-line-${crypto.randomUUID()}`,
                 name,
-                polyline: {
-                  positions: positions,
-                  material: Cesium.Color.fromCssColorString(LINE_COLOR).withAlpha(0.8),
-                  width: LINE_WIDTH,
-                  clampToGround: true,
-                }
-              }));
+                positions,
+              });
             }
           }
         }
       }
 
-      return entities;
+      return lines;
     } catch (error) {
-      this.logManager?.warn(LOG_TAG, "Failed to parse lines from storage", error);
+      this.logManager.warn(LOG_TAG, "Failed to parse lines from storage", error);
       safeLocalStorage.setItem(STORAGE_KEY, "");
     }
   }
+
+  private addDrawLine(data: DrawLineData): void {
+    this.lines.set(data.id, {
+      data,
+      primitiveId: {
+        type: "draw-line",
+        lineId: data.id,
+      },
+    });
+  }
+
+  private rebuildLinePrimitives(): void {
+    const linesLayer = this.linesLayer;
+    if (!linesLayer) return;
+
+    const groups = new Map<string, DrawLinePrimitiveGroup>();
+    this.lines.forEach(line => {
+      const appearance = this.getLineAppearance(line.data.id);
+      const appearanceKey = getLineAppearanceKey(appearance);
+      let group = groups.get(appearanceKey);
+      if (!group) {
+        group = { appearance, geometryInstances: [] };
+        groups.set(appearanceKey, group);
+      }
+
+      group.geometryInstances.push(createLineGeometryInstance(
+        line.data.positions,
+        appearance.width,
+        line.primitiveId,
+      ));
+    });
+
+    const nextPrimitiveKeys = new Set<string>();
+    groups.forEach((group, appearanceKey) => {
+      const primitiveKey = `${LINES_PRIMITIVE_KEY}:${appearanceKey}`;
+      nextPrimitiveKeys.add(primitiveKey);
+      linesLayer.replacePrimitiveWhenReady(primitiveKey, createLinePrimitive(
+        group.geometryInstances,
+        createPolylineAppearance(group.appearance),
+        true,
+      ));
+    });
+
+    this.linePrimitiveKeys.forEach(key => {
+      if (!nextPrimitiveKeys.has(key)) linesLayer.removeManagedPrimitive(key);
+    });
+    this.linePrimitiveKeys = nextPrimitiveKeys;
+  }
+
+  private getLineAppearance(lineId: string): DrawLineAppearance {
+    const appearance = { ...DEFAULT_LINE_APPEARANCE };
+    this.appearanceOverrides.forEach(overrides => {
+      const override = overrides.get(lineId);
+      if (!override) return;
+
+      if (override.color !== undefined) appearance.color = override.color;
+      if (override.alpha !== undefined) appearance.alpha = override.alpha;
+      if (override.width !== undefined) appearance.width = override.width;
+      if (override.dashLength !== undefined) appearance.dashLength = override.dashLength ?? undefined;
+    });
+    return appearance;
+  }
+
+  private saveLines(): void {
+    const kml = this.writeLinesToKml(Array.from(this.lines.values(), line => line.data));
+    safeLocalStorage.setItem(STORAGE_KEY, kml);
+  }
+
+  private notifyDrawLinesChanged(): void {
+    this.drawLinesChangedCallbacks.forEach(callback => callback());
+  }
+}
+
+function createLineGeometryInstance(
+  positions: Cesium.Cartesian3[],
+  width: number,
+  id?: DrawLinePrimitiveId,
+): Cesium.GeometryInstance {
+  return new Cesium.GeometryInstance({
+    id,
+    geometry: new Cesium.GroundPolylineGeometry({
+      positions,
+      width,
+      arcType: Cesium.ArcType.GEODESIC,
+    }),
+  });
+}
+
+function createLinePrimitive(
+  geometryInstances: Cesium.GeometryInstance[],
+  appearance: Cesium.PolylineMaterialAppearance,
+  allowPicking: boolean,
+): Cesium.GroundPolylinePrimitive {
+  return new Cesium.GroundPolylinePrimitive({
+    geometryInstances,
+    appearance,
+    allowPicking,
+    asynchronous: true,
+    classificationType: Cesium.ClassificationType.BOTH,
+  });
+}
+
+function createPolylineAppearance(appearance: DrawLineAppearance): Cesium.PolylineMaterialAppearance {
+  const materialType = appearance.dashLength === undefined
+    ? Cesium.Material.ColorType
+    : Cesium.Material.PolylineDashType;
+  const uniforms: Record<string, unknown> = {
+    color: Cesium.Color.fromCssColorString(appearance.color).withAlpha(appearance.alpha),
+  };
+  if (appearance.dashLength !== undefined) uniforms.dashLength = appearance.dashLength;
+
+  return new Cesium.PolylineMaterialAppearance({
+    material: Cesium.Material.fromType(materialType, uniforms),
+    translucent: appearance.alpha < 1,
+  });
+}
+
+function getLineAppearanceKey(appearance: DrawLineAppearance): string {
+  return JSON.stringify([
+    appearance.color,
+    appearance.alpha,
+    appearance.width,
+    appearance.dashLength ?? null,
+  ]);
+}
+
+function appearanceOverrideMapsEqual(
+  a: ReadonlyMap<string, DrawLineAppearanceOverride> | undefined,
+  b: ReadonlyMap<string, DrawLineAppearanceOverride>,
+): boolean {
+  if (!a) return b.size === 0;
+  if (a.size !== b.size) return false;
+
+  for (const [lineId, appearance] of a) {
+    const other = b.get(lineId);
+    if (!other || !appearanceOverridesEqual(appearance, other)) return false;
+  }
+  return true;
+}
+
+function appearanceOverridesEqual(
+  a: DrawLineAppearanceOverride,
+  b: DrawLineAppearanceOverride,
+): boolean {
+  return a.color === b.color &&
+    a.alpha === b.alpha &&
+    a.width === b.width &&
+    a.dashLength === b.dashLength;
 }
 
 const DrawLinesButton = ({ onClick }: {

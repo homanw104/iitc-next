@@ -57,6 +57,14 @@ export class PluginManager {
     return this.activePlugins.has(pluginId);
   }
 
+  public getPlugin(pluginId: string): IITCPlugin | undefined {
+    return this.plugins.get(pluginId);
+  }
+
+  public getPlugins(): IITCPlugin[] {
+    return Array.from(this.plugins.values());
+  }
+
   public registerPlugin(plugin: IITCPlugin) {
     logManager.debug(LOG_TAG, `Registering plugin ${plugin.name} (${plugin.id})`);
     if (this.plugins.has(plugin.id)) {
@@ -133,10 +141,6 @@ export class PluginManager {
       this.activePlugins.delete(pluginId);
       logManager.info(LOG_TAG, `Disabled plugin ${plugin.name}: Reload needed`);
     }
-  }
-
-  getPlugins(): IITCPlugin[] {
-    return Array.from(this.plugins.values());
   }
 }
 

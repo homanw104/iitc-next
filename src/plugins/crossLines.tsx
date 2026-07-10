@@ -1,5 +1,5 @@
 /**
- * Cross line plugin for IITC Next
+ * Cross Lines plugin for IITC Next
  *
  * This plugin will highlight crossed links from the draw lines plugin.
  * safeWindow is provided for access to the IITC Next core components.
@@ -7,13 +7,20 @@
 
 import "../types/iitc/iitc.ts";
 import * as Cesium from "cesium";
+import type { LayerGroundPrimitives } from "../managers/layer/layerGroundPrimitives";
 import type { IITCCore } from "../types/iitc/iitc.ts";
 import type { LinkData } from "../types/iitc/link.ts";
 import { safeWindow } from "../utils/window";
+import {
+  DRAW_LINES_PLUGIN_ID,
+  isDrawLinesReader,
+  type DrawLinesReader,
+} from "./drawLines/api";
 
 const LOG_TAG = "CrossLinesPlugin";
-const DRAW_LINES_LAYER_NAME = "Draw Lines";
 const CROSS_LINES_LAYER_NAME = "Cross Lines";
+const CROSS_LINES_PRIMITIVE_KEY = "crossed-links";
+const CROSS_LINES_PRIMITIVE_Z_INDEX = 110;
 const HIGHLIGHT_COLOR = "#ff0000";
 const HIGHLIGHT_WIDTH = 4;
 const DASH_LENGTH = 16;
@@ -31,45 +38,38 @@ class CrossLinesPlugin {
   public name = "Cross Lines";
   public description = "Highlight crossed links from the draw lines plugin.";
 
-  private viewer!: NonNullable<IITCCore["viewer"]>;
   private logManager!: NonNullable<IITCCore["logManager"]>;
   private layerManager!: NonNullable<IITCCore["layerManager"]>;
   private linkEntityManager!: NonNullable<IITCCore["linkEntityManager"]>;
+  private drawLinesReader!: DrawLinesReader;
 
-  private drawLinesSource: Cesium.DataSource | undefined;
-  private highlightSource: Cesium.DataSource | undefined;
-  private updateQueued = false;
-  private trackedSources: Set<Cesium.DataSource> = new Set();
+  private highlightLayer: LayerGroundPrimitives | undefined;
+  private updateFrame: number | undefined;
   private linksChangedListener = () => this.scheduleUpdate();
-  private entityCollectionChangedListener: Cesium.EntityCollection.CollectionChangedEventCallback = () => this.scheduleUpdate();
-  private dataSourceAddedListener = (source: Cesium.DataSource) => this.trackSource(source);
-  private dataSourceRemovedListener = (source: Cesium.DataSource) => this.untrackSource(source);
+  private drawLinesChangedListener = () => this.scheduleUpdate();
 
   public init() {
     const iitc: IITCCore = safeWindow.iitc;
-    this.viewer = iitc.viewer!;
     this.logManager = iitc.logManager!;
     this.layerManager = iitc.layerManager!;
     this.linkEntityManager = iitc.linkEntityManager!;
+    const drawLinesPlugin = iitc.pluginManager?.getPlugin(DRAW_LINES_PLUGIN_ID);
 
-    if (!this.viewer || !this.logManager || !this.layerManager || !this.linkEntityManager) {
+    if (!this.logManager || !this.layerManager || !this.linkEntityManager || !isDrawLinesReader(drawLinesPlugin)) {
       console.warn(`[WARN][${LOG_TAG}] IITC Next core components missing`, {
-        viewer: !!this.viewer,
         logManager: !!this.logManager,
         layerManager: !!this.layerManager,
         linkEntityManager: !!this.linkEntityManager,
+        drawLinesReader: isDrawLinesReader(drawLinesPlugin),
       });
       return;
     }
+    this.drawLinesReader = drawLinesPlugin;
 
     try {
-      this.drawLinesSource = this.layerManager.getOrCreateDataSource(DRAW_LINES_LAYER_NAME);
-      this.highlightSource = this.layerManager.getOrCreateDataSource(CROSS_LINES_LAYER_NAME);
-      this.viewer.dataSources.dataSourceAdded.addEventListener(this.dataSourceAddedListener);
-      this.viewer.dataSources.dataSourceRemoved.addEventListener(this.dataSourceRemovedListener);
-      this.trackSource(this.drawLinesSource);
-      this.forEachDataSource(source => this.trackSource(source));
+      this.highlightLayer = this.layerManager.getOrCreateGroundPrimitiveLayer(CROSS_LINES_LAYER_NAME, CROSS_LINES_PRIMITIVE_Z_INDEX);
       this.linkEntityManager.addLinksChangedListener(this.linksChangedListener);
+      this.drawLinesReader.addDrawLinesChangedListener(this.drawLinesChangedListener);
       this.scheduleUpdate();
     } catch (e) {
       this.logManager.error(LOG_TAG, "Failed to initialize cross lines plugin", e);
@@ -78,81 +78,44 @@ class CrossLinesPlugin {
 
   public deinit() {
     try {
-      this.viewer?.dataSources.dataSourceAdded.removeEventListener(this.dataSourceAddedListener);
-      this.viewer?.dataSources.dataSourceRemoved.removeEventListener(this.dataSourceRemovedListener);
+      if (this.updateFrame !== undefined) window.cancelAnimationFrame(this.updateFrame);
+      this.updateFrame = undefined;
       this.linkEntityManager?.removeLinksChangedListener(this.linksChangedListener);
-      this.trackedSources.forEach(source => this.untrackSource(source));
-      this.trackedSources.clear();
-      this.layerManager.removeDataSourceLayer(CROSS_LINES_LAYER_NAME);
-      this.highlightSource = undefined;
-      this.drawLinesSource = undefined;
-      this.updateQueued = false;
+      this.drawLinesReader?.removeDrawLinesChangedListener(this.drawLinesChangedListener);
+      this.layerManager.removeGroundPrimitiveLayer(CROSS_LINES_LAYER_NAME);
+      this.highlightLayer = undefined;
     } catch (e) {
       this.logManager.error(LOG_TAG, "Failed to deinitialize cross lines plugin", e);
     }
   }
 
-  private forEachDataSource(callback: (source: Cesium.DataSource) => void) {
-    if (!this.viewer) return;
-
-    const sources = this.viewer.dataSources;
-    for (let i = 0; i < sources.length; i++) {
-      callback(sources.get(i));
-    }
-  }
-
-  private trackSource(source: Cesium.DataSource) {
-    if (!this.isRelevantSource(source) || this.trackedSources.has(source)) return;
-
-    if (source.name === DRAW_LINES_LAYER_NAME) this.drawLinesSource = source;
-    source.entities.collectionChanged.addEventListener(this.entityCollectionChangedListener);
-    this.trackedSources.add(source);
-    this.scheduleUpdate();
-  }
-
-  private untrackSource(source: Cesium.DataSource) {
-    if (!this.trackedSources.has(source)) return;
-
-    source.entities.collectionChanged.removeEventListener(this.entityCollectionChangedListener);
-    this.trackedSources.delete(source);
-    if (this.drawLinesSource === source) this.drawLinesSource = undefined;
-    this.scheduleUpdate();
-  }
-
-  private isRelevantSource(source: Cesium.DataSource): boolean {
-    return source.name === DRAW_LINES_LAYER_NAME;
-  }
-
   private scheduleUpdate() {
-    if (this.updateQueued) return;
+    if (this.updateFrame !== undefined) return;
 
-    this.updateQueued = true;
-    window.requestAnimationFrame(() => {
-      this.updateQueued = false;
+    this.updateFrame = window.requestAnimationFrame(() => {
+      this.updateFrame = undefined;
       this.updateHighlights();
     });
   }
 
   private updateHighlights() {
-    if (!this.viewer || !this.highlightSource) return;
-
-    this.highlightSource.entities.removeAll();
+    if (!this.highlightLayer) return;
 
     const drawLineSegments = this.getDrawLineSegments();
     if (drawLineSegments.length === 0) {
-      this.viewer.scene.requestRender();
+      this.highlightLayer.removeManagedPrimitive(CROSS_LINES_PRIMITIVE_KEY);
       return;
     }
 
+    const geometryInstances: Cesium.GeometryInstance[] = [];
     this.linkEntityManager.forEachLinkData(link => {
       const linkSegment = this.getLinkSegment(link);
 
       const isCrossed = drawLineSegments.some(drawLine => this.segmentsIntersect(drawLine[0], drawLine[1], linkSegment[0], linkSegment[1]));
       if (!isCrossed) return;
 
-      this.highlightSource?.entities.add({
-        id: `cross-lines-${link.guid}`,
-        polyline: {
+      geometryInstances.push(new Cesium.GeometryInstance({
+        geometry: new Cesium.GroundPolylineGeometry({
           positions: Cesium.Cartesian3.fromDegreesArray([
             link.oLngE6 / 1e6,
             link.oLatE6 / 1e6,
@@ -160,29 +123,39 @@ class CrossLinesPlugin {
             link.dLatE6 / 1e6,
           ]),
           width: HIGHLIGHT_WIDTH,
-          material: new Cesium.PolylineDashMaterialProperty({
-            color: Cesium.Color.fromCssColorString(HIGHLIGHT_COLOR).withAlpha(1),
-            dashLength: DASH_LENGTH,
-          }),
           arcType: Cesium.ArcType.GEODESIC,
-          clampToGround: true,
-        },
-      });
+        }),
+      }));
     });
 
-    this.viewer.scene.requestRender();
+    if (geometryInstances.length === 0) {
+      this.highlightLayer.removeManagedPrimitive(CROSS_LINES_PRIMITIVE_KEY);
+    } else {
+      this.highlightLayer.replacePrimitiveWhenReady(CROSS_LINES_PRIMITIVE_KEY, new Cesium.GroundPolylinePrimitive({
+        geometryInstances,
+        appearance: new Cesium.PolylineMaterialAppearance({
+          material: Cesium.Material.fromType(Cesium.Material.PolylineDashType, {
+            color: Cesium.Color.fromCssColorString(HIGHLIGHT_COLOR),
+            dashLength: DASH_LENGTH,
+          }),
+          translucent: false,
+        }),
+        allowPicking: false,
+        asynchronous: true,
+        classificationType: Cesium.ClassificationType.BOTH,
+      }));
+    }
   }
 
   private getDrawLineSegments(): Segment[] {
     const segments: Segment[] = [];
 
-    this.drawLinesSource?.entities.values.forEach(entity => {
-      const positions = entity.polyline?.positions?.getValue(Cesium.JulianDate.now()) as Cesium.Cartesian3[] | undefined;
-      if (!positions || positions.length < 2) return;
+    this.drawLinesReader.forEachDrawLineData(line => {
+      if (line.positions.length < 2) return;
 
-      for (let i = 0; i < positions.length - 1; i++) {
-        const a = this.toPoint(positions[i]);
-        const b = this.toPoint(positions[i + 1]);
+      for (let i = 0; i < line.positions.length - 1; i++) {
+        const a = this.toPoint(line.positions[i]);
+        const b = this.toPoint(line.positions[i + 1]);
         if (a && b) segments.push([a, b]);
       }
     });

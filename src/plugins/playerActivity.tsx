@@ -2,11 +2,12 @@
  * Player Activity Plugin for IITC Next
  *
  * This plugin tracks player activity by monitoring chat messages for player interactions with portals.
- * It displays player locations with Cesium primitives and movement paths with Cesium entities.
+ * It displays player locations and movement paths with Cesium primitives.
  */
 
 import * as Cesium from "cesium";
 import type { EntityPosition, EntityPositionCallback } from "../managers/entity/entityPositionManager";
+import type { LayerGroundPrimitives } from "../managers/layer/layerGroundPrimitives";
 import type { LayerOverlay } from "../managers/layer/layerOverlay";
 import type { IITCCore } from "../types/iitc/iitc.ts";
 import type { Team } from "../types/common/common.ts";
@@ -22,6 +23,10 @@ const ACTIVITY_PATH_ENL_LAYER_NAME = "Activity Path Enl";
 const ACTIVITY_PATH_RES_LAYER_NAME = "Activity Path Res";
 const ACTIVITY_PATH_LINE_COLOR = "#E130DE";
 const ACTIVITY_PATH_LINE_ALPHA = 0.9;
+const ACTIVITY_PATH_LINE_WIDTH = 3;
+const ACTIVITY_PATH_DASH_LENGTH = 12;
+const ACTIVITY_PATH_PRIMITIVE_KEY = "paths";
+const ACTIVITY_PATH_PRIMITIVE_Z_INDEX = 100;
 const PLAYER_ACTIVITY_CLUSTER_PIXEL_RANGE = 20;
 const PLAYER_ACTIVITY_CLUSTER_MINIMUM_SIZE = 2;
 const PLAYER_ACTIVITY_CLUSTER_MAX_VISIBLE_PLAYERS = 2;
@@ -86,6 +91,11 @@ interface PlayerLocationClusterBounds {
   bottom: number;
 }
 
+interface PlayerPath {
+  positions: Cesium.Cartesian3[];
+  currentLayerName: string;
+}
+
 interface PlayerActivity {
   data: PlayerActivityData;
   positionCallback: EntityPositionCallback;
@@ -111,14 +121,13 @@ class PlayerActivityPlugin {
 
   private overlayLayerEnl!: LayerOverlay;
   private overlayLayerRes!: LayerOverlay;
-  private pathDataSourceEnl: Cesium.CustomDataSource = new Cesium.CustomDataSource("activity-path-enl");
-  private pathDataSourceRes: Cesium.CustomDataSource = new Cesium.CustomDataSource("activity-path-res");
+  private pathLayerEnl!: LayerGroundPrimitives;
+  private pathLayerRes!: LayerGroundPrimitives;
   private playerActivities: Map<string, PlayerActivity> = new Map();
   private playerLocations: Map<string, PlayerLocation> = new Map();
   private playerLocationClusters: PlayerLocationCluster[] = [];
   private playerLocationsPendingCreation: Set<string> = new Set();
-  private playerPaths: Map<string, Cesium.Entity> = new Map();
-  private playerPathsPendingCreation: Set<string> = new Set();
+  private playerPaths: Map<string, PlayerPath> = new Map();
   private playerLocationClustersDirty = true;
   private playerLocationBillboardImage: HTMLCanvasElement | undefined;
   private onReceiveCommMsgCallback: () => void = () => {};
@@ -159,8 +168,8 @@ class PlayerActivityPlugin {
       this.setUpHoverAction();
       this.overlayLayerEnl = this.layerManager.getOrCreateOverlayLayer(PLAYER_ACTIVITY_ENL_LAYER_NAME);
       this.overlayLayerRes = this.layerManager.getOrCreateOverlayLayer(PLAYER_ACTIVITY_RES_LAYER_NAME);
-      this.pathDataSourceEnl = this.layerManager.getOrCreateDataSource(ACTIVITY_PATH_ENL_LAYER_NAME);
-      this.pathDataSourceRes = this.layerManager.getOrCreateDataSource(ACTIVITY_PATH_RES_LAYER_NAME);
+      this.pathLayerEnl = this.layerManager.getOrCreateGroundPrimitiveLayer(ACTIVITY_PATH_ENL_LAYER_NAME, ACTIVITY_PATH_PRIMITIVE_Z_INDEX);
+      this.pathLayerRes = this.layerManager.getOrCreateGroundPrimitiveLayer(ACTIVITY_PATH_RES_LAYER_NAME, ACTIVITY_PATH_PRIMITIVE_Z_INDEX);
       this.setUpPlayerLocationClustering();
       this.onReceiveCommMsgCallback = () => this.updatePlayerActivity();
       this.commManager.setOnReceiveMsgCallback(this.onReceiveCommMsgCallback);
@@ -178,12 +187,11 @@ class PlayerActivityPlugin {
       this.unsetPlayerLocationClustering();
       this.layerManager.removeOverlayLayer(PLAYER_ACTIVITY_ENL_LAYER_NAME);
       this.layerManager.removeOverlayLayer(PLAYER_ACTIVITY_RES_LAYER_NAME);
-      this.layerManager.removeDataSourceLayer(ACTIVITY_PATH_ENL_LAYER_NAME);
-      this.layerManager.removeDataSourceLayer(ACTIVITY_PATH_RES_LAYER_NAME);
+      this.layerManager.removeGroundPrimitiveLayer(ACTIVITY_PATH_ENL_LAYER_NAME);
+      this.layerManager.removeGroundPrimitiveLayer(ACTIVITY_PATH_RES_LAYER_NAME);
       this.playerLocations.clear();
       this.playerPaths.clear();
       this.playerLocationsPendingCreation.clear();
-      this.playerPathsPendingCreation.clear();
       this.playerActivities.clear();
       this.playerLocationBillboardImage = undefined;
       this.unsetHoverAction();
@@ -406,7 +414,6 @@ class PlayerActivityPlugin {
 
     this.renderPlayerLocations(playerActivitiesData);
     this.renderPlayerPaths(playerActivitiesData);
-    this.viewer.scene.requestRender();
   }
 
   private getLatestActivity(activitiesData: PlayerActivityData[] | undefined): PlayerActivityData | undefined {
@@ -427,7 +434,6 @@ class PlayerActivityPlugin {
 
       this.updatePlayerLocationPrimitivePosition(primitive, entityPosition);
       this.markPlayerLocationClustersDirty();
-      this.viewer.scene.requestRender();
     };
     this.entityPositionManager.setOnPositionChangedCallback(activityData, callback);
     this.playerActivities.set(activityData.name, {
@@ -543,7 +549,6 @@ class PlayerActivityPlugin {
       Cesium.HorizontalOrigin.RIGHT;
     primitive.label.pixelOffset = getPlayerActivityLabelPixelOffset(lastActivityData.team);
     primitive.label.fillColor = getTeamColor(lastActivityData.team);
-    this.viewer.scene.requestRender();
 
     return primitive;
   }
@@ -784,61 +789,68 @@ class PlayerActivityPlugin {
     playerActivitiesData.forEach((activities, playerName) => {
       const lastActivity = this.getLatestActivity(activities);
       if (!lastActivity) return;
-      this.renderPlayerPath(playerName, activities, lastActivity).then();
+      this.renderPlayerPath(playerName, activities, lastActivity);
+    });
+
+    this.rebuildPlayerPathLayer(ACTIVITY_PATH_ENL_LAYER_NAME, this.pathLayerEnl);
+    this.rebuildPlayerPathLayer(ACTIVITY_PATH_RES_LAYER_NAME, this.pathLayerRes);
+  }
+
+  private renderPlayerPath(playerName: string, activities: PlayerActivityData[], lastActivity: PlayerActivityData): void {
+    const pathActivities = activities.filter((activity, index) => {
+      const previous = activities[index - 1];
+      return !previous || previous.latE6 !== activity.latE6 || previous.lngE6 !== activity.lngE6;
+    });
+    if (pathActivities.length < 2) return;
+
+    const currentLayerName = getActivityPathLayerName(lastActivity.team);
+    if (!currentLayerName) return;
+
+    const coordinates: number[] = [];
+    pathActivities.forEach(activity => coordinates.push(activity.lngE6 / 1e6, activity.latE6 / 1e6));
+    this.playerPaths.set(playerName, {
+      positions: Cesium.Cartesian3.fromDegreesArray(coordinates),
+      currentLayerName,
     });
   }
 
-  private async renderPlayerPath(playerName: string, activities: PlayerActivityData[], lastActivity: PlayerActivityData): Promise<void> {
-    if (this.playerPathsPendingCreation.has(playerName)) return;
-    this.playerPathsPendingCreation.add(playerName);
+  private rebuildPlayerPathLayer(layerName: string, layer: LayerGroundPrimitives): void {
+    const geometryInstances: Cesium.GeometryInstance[] = [];
+    this.playerPaths.forEach(path => {
+      if (path.currentLayerName !== layerName) return;
 
-    try {
-      const pathActivities = activities.filter((activity, index) => {
-        const previous = activities[index - 1];
-        return !previous || previous.latE6 !== activity.latE6 || previous.lngE6 !== activity.lngE6;
-      });
-      if (pathActivities.length < 2) return;
-
-      const coordinates: number[] = [];
-      pathActivities.forEach(activity => coordinates.push(activity.lngE6 / 1e6, activity.latE6 / 1e6));
-      const positions = Cesium.Cartesian3.fromDegreesArray(coordinates);
-
-      let source: Cesium.DataSource;
-      if (lastActivity.team === "ENLIGHTENED") source = this.pathDataSourceEnl;
-      else if (lastActivity.team === "RESISTANCE") source = this.pathDataSourceRes;
-      else return;
-
-      let entity = this.playerPaths.get(playerName);
-      if (!entity) entity = this.createPlayerPathEntity(source, positions);
-      else this.updatePlayerPathEntity(entity, positions);
-
-      this.playerPaths.set(playerName, entity);
-      this.viewer.scene.requestRender();
-    } finally {
-      this.playerPathsPendingCreation.delete(playerName);
-    }
-  }
-
-  private createPlayerPathEntity(source: Cesium.DataSource, positions: Cesium.Cartesian3[]): Cesium.Entity {
-    return source.entities.add({
-      polyline: {
-        positions: positions,
-        clampToGround: true,
-        width: 3,
-        arcType: Cesium.ArcType.GEODESIC,
-        material: new Cesium.PolylineDashMaterialProperty({
-          color: Cesium.Color.fromCssColorString(ACTIVITY_PATH_LINE_COLOR).withAlpha(ACTIVITY_PATH_LINE_ALPHA),
-          dashLength: 12,
+      geometryInstances.push(new Cesium.GeometryInstance({
+        geometry: new Cesium.GroundPolylineGeometry({
+          positions: path.positions,
+          width: ACTIVITY_PATH_LINE_WIDTH,
+          arcType: Cesium.ArcType.GEODESIC,
         }),
-      }
+      }));
     });
-  }
 
-  private updatePlayerPathEntity(entity: Cesium.Entity, positions: Cesium.Cartesian3[]): void {
-    if (entity.polyline) {
-      entity.polyline.positions = new Cesium.ConstantProperty(positions);
+    if (geometryInstances.length === 0) {
+      layer.removeManagedPrimitive(ACTIVITY_PATH_PRIMITIVE_KEY);
+    } else {
+      layer.replacePrimitiveWhenReady(ACTIVITY_PATH_PRIMITIVE_KEY, new Cesium.GroundPolylinePrimitive({
+        geometryInstances,
+        appearance: new Cesium.PolylineMaterialAppearance({
+          material: Cesium.Material.fromType(Cesium.Material.PolylineDashType, {
+            color: Cesium.Color.fromCssColorString(ACTIVITY_PATH_LINE_COLOR).withAlpha(ACTIVITY_PATH_LINE_ALPHA),
+            dashLength: ACTIVITY_PATH_DASH_LENGTH,
+          }),
+          translucent: true,
+        }),
+        allowPicking: false,
+        asynchronous: true,
+        classificationType: Cesium.ClassificationType.BOTH,
+      }));
     }
   }
+}
+
+function getActivityPathLayerName(team: Team): string | undefined {
+  if (team === "ENLIGHTENED") return ACTIVITY_PATH_ENL_LAYER_NAME;
+  if (team === "RESISTANCE") return ACTIVITY_PATH_RES_LAYER_NAME;
 }
 
 const PlayerActivityTooltipElement = (): HTMLElement => {
