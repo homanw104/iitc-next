@@ -20,6 +20,11 @@ export const PORTAL_POINT_OUTLINE_WIDTH = 2;
 export const PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE = 1e4;
 export const PORTAL_OCCLUDED_ALPHA = 0.5;
 
+export interface PortalPrimitiveId {
+  type: "portal";
+  guid: string;
+}
+
 const PORTAL_NEAR_FAR_SCALAR_NEAR = 1e1;
 const PORTAL_NEAR_FAR_SCALAR_NEAR_VALUE = 1;
 const PORTAL_NEAR_FAR_SCALAR_FAR = 1e4;
@@ -30,6 +35,7 @@ const PORTAL_DISABLE_DEPTH_TEST_DISTANCE_GOOGLE = 0;
 interface Portal {
   data: PortalData;
   entity: Cesium.Entity;
+  primitiveId: PortalPrimitiveId;
   pointPrimitive: Cesium.PointPrimitive;
   occlusionPointPrimitive: Cesium.PointPrimitive;
   positionCallback: EntityPositionCallback;
@@ -98,6 +104,11 @@ export class PortalEntityManager {
     return this.portals.get(guid)?.entity;
   }
 
+  public getPortalPosition(guid: string): Cesium.Cartesian3 | undefined {
+    const position = this.portals.get(guid)?.pointPrimitive.position;
+    return position ? Cesium.Cartesian3.clone(position) : undefined;
+  }
+
   public getPortalData(guid: string): PortalData | undefined {
     return this.portals.get(guid)?.data;
   }
@@ -153,12 +164,14 @@ export class PortalEntityManager {
 
     this.portalsPendingCreation.add(data.guid);
     try {
-      const { entity, pointPrimitive, occlusionPointPrimitive } = await this.createPortalPrimitives(data);
+      const primitiveId = createPortalPrimitiveId(data.guid);
+      const { entity, pointPrimitive, occlusionPointPrimitive } = await this.createPortalPrimitives(data, primitiveId);
       const positionCallback = createPortalPositionCallback(entity, pointPrimitive, occlusionPointPrimitive);
       this.entityPositionManager.setOnPositionChangedCallback(data, positionCallback);
       this.portals.set(data.guid, {
         data,
         entity,
+        primitiveId,
         pointPrimitive,
         occlusionPointPrimitive,
         positionCallback,
@@ -169,7 +182,7 @@ export class PortalEntityManager {
     }
   }
 
-  private async createPortalPrimitives(data: PortalData): Promise<{
+  private async createPortalPrimitives(data: PortalData, primitiveId: PortalPrimitiveId): Promise<{
     entity: Cesium.Entity;
     pointPrimitive: Cesium.PointPrimitive;
     occlusionPointPrimitive: Cesium.PointPrimitive;
@@ -189,12 +202,14 @@ export class PortalEntityManager {
 
     const pointPrimitive = addPortalPointPrimitive(
       pointPrimitives,
+      primitiveId,
       entity,
       data
     );
 
     const occlusionPointPrimitive = addPortalOcclusionPointPrimitive(
       pointPrimitives,
+      primitiveId,
       entity,
       data,
       this.currentTranslucencyByDistance,
@@ -294,12 +309,14 @@ export class PortalEntityManager {
 
     portalInfo.pointPrimitive = addPortalPointPrimitive(
       newPointPrimitives,
+      portalInfo.primitiveId,
       portalInfo.entity,
       portalInfo.data
     );
 
     portalInfo.occlusionPointPrimitive = addPortalOcclusionPointPrimitive(
       newPointPrimitives,
+      portalInfo.primitiveId,
       portalInfo.entity,
       portalInfo.data,
       this.currentTranslucencyByDistance,
@@ -340,12 +357,13 @@ function applyPortalPosition(
 
 function addPortalPointPrimitive(
   pointPrimitives: Cesium.PointPrimitiveCollection,
+  primitiveId: PortalPrimitiveId,
   entity: Cesium.Entity,
   data: PortalData,
 ): Cesium.PointPrimitive {
   const position = entity.position?.getValue(Cesium.JulianDate.now()) ?? getFallbackPortalPosition(data);
   return pointPrimitives.add({
-    id: entity,
+    id: primitiveId,
     position,
     show: entity.show,
     pixelSize: PORTAL_POINT_PIXEL_SIZE,
@@ -359,13 +377,14 @@ function addPortalPointPrimitive(
 
 function addPortalOcclusionPointPrimitive(
   pointPrimitives: Cesium.PointPrimitiveCollection,
+  primitiveId: PortalPrimitiveId,
   entity: Cesium.Entity,
   data: PortalData,
   translucencyByDistance: Cesium.NearFarScalar,
 ): Cesium.PointPrimitive {
   const position = entity.position?.getValue(Cesium.JulianDate.now()) ?? getFallbackPortalPosition(data);
   return pointPrimitives.add({
-    id: entity,
+    id: primitiveId,
     position,
     show: entity.show,
     pixelSize: PORTAL_POINT_PIXEL_SIZE,
@@ -406,4 +425,15 @@ export function getPortalNearFarScale(distance: number): number {
     PORTAL_NEAR_FAR_SCALAR_FAR_VALUE,
     (distance - PORTAL_NEAR_FAR_SCALAR_NEAR) / (PORTAL_NEAR_FAR_SCALAR_FAR - PORTAL_NEAR_FAR_SCALAR_NEAR),
   );
+}
+
+export function createPortalPrimitiveId(guid: string): PortalPrimitiveId {
+  return { type: "portal", guid };
+}
+
+export function isPortalPrimitiveId(value: unknown): value is PortalPrimitiveId {
+  if (typeof value !== "object" || value === null) return false;
+
+  const id = value as Partial<PortalPrimitiveId>;
+  return id.type === "portal" && typeof id.guid === "string";
 }

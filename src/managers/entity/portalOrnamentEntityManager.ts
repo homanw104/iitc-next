@@ -11,7 +11,9 @@ import {
   PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
   PORTAL_OCCLUDED_ALPHA,
   createPortalNearFarScalar,
+  createPortalPrimitiveId,
   getPortalDisableDepthTestDistance,
+  type PortalPrimitiveId,
 } from "./portalEntityManager.ts";
 import { getPortalOrnamentEntityLayerId } from "./portalEntityLayers";
 
@@ -26,6 +28,7 @@ const ornamentImageCache = new Map<string, HTMLCanvasElement>();
 
 interface PortalOrnament {
   data: PortalData;
+  primitiveId: PortalPrimitiveId;
   billboard: Cesium.Billboard;
   occlusionBillboard: Cesium.Billboard;
   positionCallback: EntityPositionCallback;
@@ -98,9 +101,11 @@ export class PortalOrnamentEntityManager {
 
     this.ornamentsPendingCreation.add(data.guid);
     try {
-      const { billboard, occlusionBillboard } = await this.createOrnamentPrimitives(data);
+      const primitiveId = createPortalPrimitiveId(data.guid);
+      const { billboard, occlusionBillboard } = await this.createOrnamentPrimitives(data, primitiveId);
       const ornament: PortalOrnament = {
         data,
+        primitiveId,
         billboard,
         occlusionBillboard,
         positionCallback: (entityPosition: EntityPosition) => {
@@ -115,7 +120,7 @@ export class PortalOrnamentEntityManager {
     }
   }
 
-  private async createOrnamentPrimitives(data: PortalData): Promise<{
+  private async createOrnamentPrimitives(data: PortalData, primitiveId: PortalPrimitiveId): Promise<{
     billboard: Cesium.Billboard;
     occlusionBillboard: Cesium.Billboard
   }> {
@@ -124,9 +129,10 @@ export class PortalOrnamentEntityManager {
     const entityPosition = await this.entityPositionManager.getEntityPosition(data);
 
     const show = !entityPosition.isFallbackPosition;
-    const billboard = addOrnamentBillboard(billboards, data, entityPosition.position, show);
+    const billboard = addOrnamentBillboard(billboards, primitiveId, data, entityPosition.position, show);
     const occlusionBillboard = addOrnamentOcclusionBillboard(
       billboards,
+      primitiveId,
       data,
       entityPosition.position,
       show,
@@ -199,12 +205,14 @@ export class PortalOrnamentEntityManager {
     const newBillboards = this.getOrnamentBillboards(newLayerId);
     ornamentInfo.billboard = addOrnamentBillboard(
       newBillboards,
+      ornamentInfo.primitiveId,
       ornamentInfo.data,
       billboardPosition,
       billboardShow,
     );
     ornamentInfo.occlusionBillboard = addOrnamentOcclusionBillboard(
       newBillboards,
+      ornamentInfo.primitiveId,
       ornamentInfo.data,
       occlusionBillboardPosition,
       occlusionBillboardShow,
@@ -232,11 +240,13 @@ function applyOrnamentPosition(
 
 function addOrnamentBillboard(
   billboards: Cesium.BillboardCollection,
+  primitiveId: PortalPrimitiveId,
   data: PortalData,
   position: Cesium.Cartesian3,
   show: boolean,
 ): Cesium.Billboard {
   return billboards.add({
+    id: primitiveId,
     position,
     show,
     image: getOrnamentImage(data),
@@ -250,12 +260,14 @@ function addOrnamentBillboard(
 
 function addOrnamentOcclusionBillboard(
   billboards: Cesium.BillboardCollection,
+  primitiveId: PortalPrimitiveId,
   data: PortalData,
   position: Cesium.Cartesian3,
   show: boolean,
   translucencyByDistance: Cesium.NearFarScalar,
 ): Cesium.Billboard {
   return billboards.add({
+    id: primitiveId,
     position,
     show,
     image: getOrnamentImage(data),

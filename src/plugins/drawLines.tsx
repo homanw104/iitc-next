@@ -7,8 +7,10 @@
 import "../types/iitc/iitc.ts";
 import * as Cesium from "cesium";
 import { pickGestureSurfacePosition as pickSceneSurfacePosition } from "../cesium/interaction/camera/cameraGestures";
+import { restoreSceneAfterPick } from "../cesium/interaction/picking/restoreSceneAfterPick.ts";
 import type { LayerGroundPrimitives } from "../managers/layer/layerGroundPrimitives";
 import type { LayerOverlay } from "../managers/layer/layerOverlay";
+import { isPortalPrimitiveId } from "../managers/entity/portalEntityManager.ts";
 import type { IITCCore } from "../types/iitc/iitc.ts";
 import { h } from "../utils/dom.ts";
 import { safeLocalStorage } from "../utils/storage.ts";
@@ -87,6 +89,7 @@ class DrawLinesPlugin implements DrawLinesReader, DrawLinesAppearanceController 
   private logManager!: NonNullable<IITCCore["logManager"]>;
   private interfaceManager!: NonNullable<IITCCore["interfaceManager"]>;
   private layerManager!: NonNullable<IITCCore["layerManager"]>;
+  private portalEntityManager!: NonNullable<IITCCore["portalEntityManager"]>;
 
   private isDrawing: boolean = false;
   private isDeleting: boolean = false;
@@ -117,6 +120,8 @@ class DrawLinesPlugin implements DrawLinesReader, DrawLinesAppearanceController 
   private readonly lineStartMarkerPrimitiveId: LineMarkerPrimitiveId = { type: "draw-line-marker", marker: "start" };
   private readonly lineEndMarkerPrimitiveId: LineMarkerPrimitiveId = { type: "draw-line-marker", marker: "end" };
   private readonly previewPreUpdateAction = () => this.refreshPreviewPrimitive();
+  private pendingPointerPosition: Cesium.Cartesian2 | undefined;
+  private pointerActionFrameId: number | undefined;
   private touchStartPositions = new Map<number, TouchStartPosition>();
   private isTouchGestureInProgress = false;
   private ignoreTouchGestureUntil = 0;
@@ -127,13 +132,15 @@ class DrawLinesPlugin implements DrawLinesReader, DrawLinesAppearanceController 
     this.logManager = iitc.logManager!;
     this.interfaceManager = iitc.interfaceManager!;
     this.layerManager = iitc.layerManager!;
+    this.portalEntityManager = iitc.portalEntityManager!;
 
-    if (!this.viewer || !this.logManager || !this.interfaceManager || !this.layerManager) {
+    if (!this.viewer || !this.logManager || !this.interfaceManager || !this.layerManager || !this.portalEntityManager) {
       console.warn(`[WARN]IITC Next core components missing`, {
         viewer: !!this.viewer,
         logManager: !!this.logManager,
         interfaceManager: !!this.interfaceManager,
         layerManager: !!this.layerManager,
+        portalEntityManager: !!this.portalEntityManager,
       });
       return;
     }
@@ -259,33 +266,19 @@ class DrawLinesPlugin implements DrawLinesReader, DrawLinesAppearanceController 
           if (this.isLineStarted) this.finishLine(pos);
           else this.startLine(pos);
         }
-      }
-      if (this.isDeleting) {
+        this.restoreSceneAfterPointerPick();
+      } else if (this.isDeleting) {
         const line = this.resolveLine(event.position);
         if (line) {
           this.deleteLine(line);
         }
+        this.restoreSceneAfterPointerPick();
       }
     }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
     // MOUSE_MOVE: update preview or update pointer shape
     this.handler.setInputAction((event: Cesium.ScreenSpaceEventHandler.MotionEvent) => {
-      if (this.shouldIgnoreTouchGesture()) return;
-
-      if (this.isDrawing) {
-        const pos = this.resolvePosition(event.endPosition);
-        if (pos) {
-          if (this.isLineStarted) this.renderPreview(pos);
-        }
-      }
-      if (this.isDeleting) {
-        const line = this.resolveLine(event.endPosition);
-        if (line) {
-          this.viewer.scene.canvas.style.cursor = "pointer";
-        } else {
-          this.viewer.scene.canvas.style.cursor = "default";
-        }
-      }
+      this.queuePointerAction(event.endPosition);
     }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
 
     // RIGHT_CLICK: cancel line
@@ -299,10 +292,43 @@ class DrawLinesPlugin implements DrawLinesReader, DrawLinesAppearanceController 
     this.handler?.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_CLICK);
     this.handler?.removeInputAction(Cesium.ScreenSpaceEventType.MOUSE_MOVE);
     this.handler?.removeInputAction(Cesium.ScreenSpaceEventType.RIGHT_CLICK);
+    this.pendingPointerPosition = undefined;
+    if (this.pointerActionFrameId !== undefined) window.cancelAnimationFrame(this.pointerActionFrameId);
+    this.pointerActionFrameId = undefined;
     if (this.selectedEntityChangedListener) {
       this.viewer?.selectedEntityChanged.removeEventListener(this.selectedEntityChangedListener);
       this.selectedEntityChangedListener = undefined;
     }
+  }
+
+  private queuePointerAction(position: Cesium.Cartesian2): void {
+    if (this.shouldIgnoreTouchGesture() || (!this.isLineStarted && !this.isDeleting)) return;
+
+    this.pendingPointerPosition = Cesium.Cartesian2.clone(position);
+    if (this.pointerActionFrameId !== undefined) return;
+
+    this.pointerActionFrameId = window.requestAnimationFrame(() => this.flushPointerAction());
+  }
+
+  private flushPointerAction(): void {
+    this.pointerActionFrameId = undefined;
+    const position = this.pendingPointerPosition;
+    this.pendingPointerPosition = undefined;
+    if (!position) return;
+
+    if (this.isDrawing && this.isLineStarted) {
+      const resolvedPosition = this.resolvePosition(position);
+      if (resolvedPosition) this.renderPreview(resolvedPosition);
+    } else if (this.isDeleting) {
+      const line = this.resolveLine(position);
+      this.viewer.scene.canvas.style.cursor = line ? "pointer" : "default";
+    } else return;
+
+    this.restoreSceneAfterPointerPick();
+  }
+
+  private restoreSceneAfterPointerPick(): void {
+    restoreSceneAfterPick(this.viewer.scene);
   }
 
   private bindTouchGestureEvents() {
@@ -696,25 +722,23 @@ class DrawLinesPlugin implements DrawLinesReader, DrawLinesAppearanceController 
     if (!this.viewer) throw new Error("viewer is undefined");
 
     const picked = this.viewer.scene.pick(position);
-    if (!this.isDrawLinePrimitiveId(picked?.id)) return;
+    const pickedId = picked?.id;
+    if (!this.isDrawLinePrimitiveId(pickedId)) return;
 
-    const line = this.lines.get(picked.id.lineId);
-    if (line?.primitiveId === picked.id) return line;
+    const line = this.lines.get(pickedId.lineId);
+    if (line?.primitiveId === pickedId) return line;
   }
 
   private resolvePosition(position: Cesium.Cartesian2, snap: boolean = true): Cesium.Cartesian3 | undefined {
     if (!this.viewer) throw new Error("viewer is undefined");
 
     const picked = this.viewer.scene.pick(position);
-    if (snap && picked && picked.id instanceof Cesium.Entity) {
-      if (
-        picked.id.id.startsWith("portal")
-      ) {
-        return picked.id.position.getValue();
-      }
+    const pickedId = picked?.id;
+    if (snap && isPortalPrimitiveId(pickedId)) {
+      return this.portalEntityManager.getPortalPosition(pickedId.guid);
     }
-    if (snap && this.isLineMarkerPrimitiveId(picked?.id)) {
-      return this.getLineMarkerPosition(picked.id);
+    if (snap && this.isLineMarkerPrimitiveId(pickedId)) {
+      return this.getLineMarkerPosition(pickedId);
     }
 
     const surfacePosition = pickSceneSurfacePosition(this.viewer.scene, position);

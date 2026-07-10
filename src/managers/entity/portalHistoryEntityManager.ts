@@ -13,7 +13,9 @@ import {
   PORTAL_POINT_PIXEL_SIZE,
   PORTAL_POINT_OUTLINE_WIDTH,
   createPortalNearFarScalar,
+  createPortalPrimitiveId,
   getPortalDisableDepthTestDistance,
+  type PortalPrimitiveId,
 } from "./portalEntityManager.ts";
 
 const PRIMITIVE_LAYER_NAME = "history-visited-captured";
@@ -28,6 +30,7 @@ type PortalHistoryState = "none" | "visited" | "captured";
 
 interface PortalHistoryHalo {
   data: PortalData;
+  primitiveId: PortalPrimitiveId;
   pointPrimitive?: Cesium.PointPrimitive;
   occlusionPointPrimitive?: Cesium.PointPrimitive;
   reversePointPrimitive?: Cesium.PointPrimitive;
@@ -96,15 +99,17 @@ export class PortalHistoryEntityManager {
 
     this.historyHalosPendingCreation.add(data.guid);
     try {
+      const primitiveId = createPortalPrimitiveId(data.guid);
       const {
         pointPrimitive,
         occlusionPointPrimitive,
         reversePointPrimitive,
         reverseOcclusionPointPrimitive,
-      } = await this.createHistoryHaloPrimitives(data);
+      } = await this.createHistoryHaloPrimitives(data, primitiveId);
 
       const historyHalo: PortalHistoryHalo = {
         data,
+        primitiveId,
         pointPrimitive,
         occlusionPointPrimitive,
         reversePointPrimitive,
@@ -120,7 +125,7 @@ export class PortalHistoryEntityManager {
     }
   }
 
-  private async createHistoryHaloPrimitives(data: PortalData): Promise<{
+  private async createHistoryHaloPrimitives(data: PortalData, primitiveId: PortalPrimitiveId): Promise<{
     pointPrimitive: Cesium.PointPrimitive | undefined;
     occlusionPointPrimitive: Cesium.PointPrimitive | undefined;
     reversePointPrimitive: Cesium.PointPrimitive | undefined;
@@ -140,14 +145,14 @@ export class PortalHistoryEntityManager {
       const color = portalHistoryState === "visited" ? VISITED_COLOR : CAPTURED_COLOR;
       pointPrimitive = addHistoryHaloPointPrimitive(
         pointPrimitives,
-        `history-halo-${data.guid}`,
+        primitiveId,
         entityPosition,
         color,
         true,
       );
       occlusionPointPrimitive = addHistoryHaloOcclusionPointPrimitive(
         pointPrimitives,
-        `history-halo-occluded-${data.guid}`,
+        primitiveId,
         entityPosition,
         color,
         this.currentTranslucencyByDistance,
@@ -158,14 +163,14 @@ export class PortalHistoryEntityManager {
       const color = portalHistoryState === "visited" ? VISITED_COLOR : CAPTURED_COLOR;
       reversePointPrimitive = addHistoryHaloPointPrimitive(
         reversePointPrimitives,
-        `history-halo-reverse-${data.guid}`,
+        primitiveId,
         entityPosition,
         color,
         true,
       );
       reverseOcclusionPointPrimitive = addHistoryHaloOcclusionPointPrimitive(
         reversePointPrimitives,
-        `history-halo-reverse-occluded-${data.guid}`,
+        primitiveId,
         entityPosition,
         color,
         this.currentTranslucencyByDistance,
@@ -182,7 +187,7 @@ export class PortalHistoryEntityManager {
       occlusionPointPrimitive,
       reversePointPrimitive,
       reverseOcclusionPointPrimitive,
-    } = await this.createHistoryHaloPrimitives(data);
+    } = await this.createHistoryHaloPrimitives(data, portalHistoryHalo.primitiveId);
     portalHistoryHalo.pointPrimitive = pointPrimitive;
     portalHistoryHalo.occlusionPointPrimitive = occlusionPointPrimitive;
     portalHistoryHalo.reversePointPrimitive = reversePointPrimitive;
@@ -270,13 +275,13 @@ function applyHistoryHaloPosition(
 
 function addHistoryHaloPointPrimitive(
   pointPrimitives: Cesium.PointPrimitiveCollection,
-  id: string,
+  primitiveId: PortalPrimitiveId,
   entityPosition: EntityPosition,
   color: string,
   fadeByDistance: boolean,
 ): Cesium.PointPrimitive {
   return pointPrimitives.add({
-    id,
+    id: primitiveId,
     position: entityPosition.position,
     show: !entityPosition.isFallbackPosition,
     pixelSize: HALO_POINT_PIXEL_SIZE,
@@ -291,13 +296,13 @@ function addHistoryHaloPointPrimitive(
 
 function addHistoryHaloOcclusionPointPrimitive(
   pointPrimitives: Cesium.PointPrimitiveCollection,
-  id: string,
+  primitiveId: PortalPrimitiveId,
   entityPosition: EntityPosition,
   color: string,
   translucencyByDistance: Cesium.NearFarScalar,
 ): Cesium.PointPrimitive {
   return pointPrimitives.add({
-    id,
+    id: primitiveId,
     position: entityPosition.position,
     show: !entityPosition.isFallbackPosition,
     pixelSize: HALO_POINT_PIXEL_SIZE,

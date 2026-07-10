@@ -32,7 +32,7 @@ export function setPortalLabelEntityTargetVisibility(label: PortalLabel, visible
   label.fadeStartOpacity = label.currentOpacity;
   label.fadeTargetOpacity = targetOpacity;
   label.fadeStartTime = startTime;
-  if (visible) {
+  if (visible && label.primitive) {
     label.primitive.show = true;
     label.firstShownAt ??= startTime;
   }
@@ -50,7 +50,7 @@ export function updatePortalLabelEntityFade(label: PortalLabel, timestamp: numbe
   if (setPortalLabelEntityCurrentOpacity(label, label.fadeTargetOpacity)) {
     changed = true;
   }
-  if (isPortalLabelEntityFadeTargetHidden(label) && label.primitive.show) {
+  if (isPortalLabelEntityFadeTargetHidden(label) && label.primitive?.show) {
     label.primitive.show = false;
     changed = true;
   }
@@ -73,7 +73,7 @@ export function isPortalLabelEntityFadeTargetVisible(label: PortalLabel): boolea
 }
 
 export function isPortalLabelEntityFadingOut(label: PortalLabel): boolean {
-  return label.primitive.show &&
+  return label.primitive?.show === true &&
     isPortalLabelEntityFadeTargetHidden(label) &&
     label.currentOpacity > PORTAL_LABEL_ENTITY_HIDDEN_OPACITY + Cesium.Math.EPSILON6;
 }

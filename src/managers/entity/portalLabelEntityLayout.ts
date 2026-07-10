@@ -55,8 +55,10 @@ export function setPortalLabelEntityCurrentOpacity(label: PortalLabel, opacity: 
   if (Math.abs(label.currentOpacity - clampedOpacity) < Cesium.Math.EPSILON6) return false;
 
   label.currentOpacity = clampedOpacity;
-  label.primitive.fillColor = Cesium.Color.WHITE.withAlpha(clampedOpacity, labelFillColorScratch);
-  label.primitive.outlineColor = Cesium.Color.BLACK.withAlpha(clampedOpacity, labelOutlineColorScratch);
+  if (label.primitive) {
+    label.primitive.fillColor = Cesium.Color.WHITE.withAlpha(clampedOpacity, labelFillColorScratch);
+    label.primitive.outlineColor = Cesium.Color.BLACK.withAlpha(clampedOpacity, labelOutlineColorScratch);
+  }
   return true;
 }
 

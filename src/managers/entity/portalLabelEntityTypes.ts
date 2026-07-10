@@ -10,10 +10,12 @@
 import type * as Cesium from "cesium";
 import type { PortalData } from "../../types/iitc/portal.ts";
 import type { EntityPositionCallback } from "./entityPositionManager";
+import type { PortalPrimitiveId } from "./portalEntityManager.ts";
 
 export interface PortalLabel {
   data: PortalData;
-  primitive: Cesium.Label;
+  primitive?: Cesium.Label;
+  primitiveId: PortalPrimitiveId;
   position: Cesium.Cartesian3;
   positionCallback: EntityPositionCallback;
   wrappedText: string;

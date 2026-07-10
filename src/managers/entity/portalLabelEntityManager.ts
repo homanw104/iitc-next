@@ -28,6 +28,7 @@ import {
 } from "./portalLabelEntityFade";
 import { getNonOverlappingPortalLabelEntityGuids } from "./portalLabelEntityOverlap";
 import type { PortalLabel, PortalLabelTextLayout } from "./portalLabelEntityTypes";
+import { createPortalPrimitiveId } from "./portalEntityManager.ts";
 import {
   PORTAL_LABEL_ENTITY_VISIBILITY_BATCH_DELAY_MS,
   PORTAL_LABEL_ENTITY_VISIBILITY_BATCH_SIZE,
@@ -106,15 +107,9 @@ export class PortalLabelEntityManager {
       const layout = getPortalLabelEntityTextLayout(title);
       const entityPosition = await this.entityPositionManager.getEntityPosition(data);
 
-      const label = {
+      const label: PortalLabel = {
         data,
-        primitive: this.createLabelPrimitive(
-          data,
-          layout,
-          entityPosition.position,
-          PORTAL_LABEL_ENTITY_INITIAL_OPACITY,
-          false,
-        ),
+        primitiveId: createPortalPrimitiveId(data.guid),
         position: Cesium.Cartesian3.clone(entityPosition.position),
         positionCallback: this.createLabelPositionCallback(data.guid),
         wrappedText: layout.wrappedText,
@@ -138,22 +133,18 @@ export class PortalLabelEntityManager {
   }
 
   private createLabelPrimitive(
-    data: PortalData,
-    layout: PortalLabelTextLayout,
-    position: Cesium.Cartesian3,
-    opacity: number,
+    label: PortalLabel,
     show: boolean,
-    layerId = getPortalLabelEntityLayerId(data),
   ): Cesium.Label {
-    return this.layerManager.getOrCreateOverlayLayer(layerId).addLabel({
-      id: `label-${data.guid}`,
-      position,
+    return this.layerManager.getOrCreateOverlayLayer(label.currentLayerId).addLabel({
+      id: label.primitiveId,
+      position: label.position,
       show,
-      text: layout.wrappedText,
+      text: label.wrappedText,
       font: PORTAL_LABEL_ENTITY_FONT,
       style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-      fillColor: Cesium.Color.WHITE.withAlpha(opacity),
-      outlineColor: Cesium.Color.BLACK.withAlpha(opacity),
+      fillColor: Cesium.Color.WHITE.withAlpha(label.currentOpacity),
+      outlineColor: Cesium.Color.BLACK.withAlpha(label.currentOpacity),
       outlineWidth: PORTAL_LABEL_ENTITY_OUTLINE_WIDTH,
       showBackground: false,
       heightReference: Cesium.HeightReference.NONE,
@@ -179,11 +170,13 @@ export class PortalLabelEntityManager {
 
   private updateLabelEntity(label: PortalLabel, layout: PortalLabelTextLayout, entityPosition: EntityPosition): void {
     Cesium.Cartesian3.clone(entityPosition.position, label.position);
-    label.primitive.position = label.position;
     label.isFallbackPosition = entityPosition.isFallbackPosition;
     if (label.isFallbackPosition) this.setLabelTargetVisibility(label, false);
-    label.primitive.text = layout.wrappedText;
-    this.viewer.scene.requestRender();
+    if (label.primitive) {
+      label.primitive.position = label.position;
+      label.primitive.text = layout.wrappedText;
+      this.viewer.scene.requestRender();
+    }
   }
 
   private updateLabelPositionSubscription(label: PortalLabel, data: PortalData): void {
@@ -196,9 +189,10 @@ export class PortalLabelEntityManager {
   private removeLabelEntity(guid: string): void {
     const labelInfo = this.labels.get(guid);
     if (labelInfo) {
-      this.layerManager.getOrCreateOverlayLayer(labelInfo.currentLayerId).removeLabel(labelInfo.primitive);
+      this.removeLabelPrimitive(labelInfo);
       this.entityPositionManager.unsetOnPositionChangedCallback(labelInfo.data, labelInfo.positionCallback);
       this.labels.delete(guid);
+      this.overlapVisibleGuids.delete(guid);
       this.queueAllVisibilityUpdates();
     }
     this.labelsPendingCreation.delete(guid);
@@ -225,21 +219,10 @@ export class PortalLabelEntityManager {
   private moveLabelToLayer(label: PortalLabel, newLayerId: string): void {
     if (label.currentLayerId === newLayerId) return;
 
-    const show = label.primitive.show;
-    this.layerManager.getOrCreateOverlayLayer(label.currentLayerId).removeLabel(label.primitive);
-    label.primitive = this.createLabelPrimitive(
-      label.data,
-      {
-        wrappedText: label.wrappedText,
-        screenBoxWidth: label.screenBoxWidth,
-        screenBoxHeight: label.screenBoxHeight,
-      },
-      label.position,
-      label.currentOpacity,
-      show,
-      newLayerId,
-    );
+    const show = label.primitive?.show ?? false;
+    this.removeLabelPrimitive(label);
     label.currentLayerId = newLayerId;
+    if (show) label.primitive = this.createLabelPrimitive(label, true);
   }
 
   private queueAllVisibilityUpdates(): void {
@@ -429,6 +412,7 @@ export class PortalLabelEntityManager {
 
   private setLabelTargetVisibility(label: PortalLabel, visible: boolean): boolean {
     const shouldShow = visible && !label.isFallbackPosition;
+    if (shouldShow) this.ensureLabelPrimitive(label);
     if (!setPortalLabelEntityTargetVisibility(label, shouldShow)) return false;
 
     this.fadingLabelGuids.add(label.data.guid);
@@ -457,7 +441,10 @@ export class PortalLabelEntityManager {
 
       const result = updatePortalLabelEntityFade(label, timestamp);
       if (didPortalLabelEntityFadeChange(result)) changed = true;
-      if (isPortalLabelEntityFadeComplete(result)) this.fadingLabelGuids.delete(guid);
+      if (isPortalLabelEntityFadeComplete(result)) {
+        this.fadingLabelGuids.delete(guid);
+        if (!isPortalLabelEntityFadeTargetVisible(label) && this.removeLabelPrimitive(label)) changed = true;
+      }
     });
 
     if (!this.hasAnyLabelFadingOut() && this.revealPendingAcceptedOverlapLabels()) changed = true;
@@ -472,5 +459,18 @@ export class PortalLabelEntityManager {
     }
 
     return false;
+  }
+
+  private ensureLabelPrimitive(label: PortalLabel): void {
+    if (label.primitive) return;
+    label.primitive = this.createLabelPrimitive(label, true);
+  }
+
+  private removeLabelPrimitive(label: PortalLabel): boolean {
+    if (!label.primitive) return false;
+
+    const removed = this.layerManager.getOrCreateOverlayLayer(label.currentLayerId).removeLabel(label.primitive);
+    label.primitive = undefined;
+    return removed;
   }
 }

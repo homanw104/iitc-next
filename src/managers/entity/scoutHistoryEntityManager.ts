@@ -13,7 +13,9 @@ import {
   PORTAL_POINT_PIXEL_SIZE,
   PORTAL_POINT_OUTLINE_WIDTH,
   createPortalNearFarScalar,
+  createPortalPrimitiveId,
   getPortalDisableDepthTestDistance,
+  type PortalPrimitiveId,
 } from "./portalEntityManager.ts";
 
 const PRIMITIVE_LAYER_NAME = "history-scout-control";
@@ -27,6 +29,7 @@ type ScoutHistoryState = "none" | "controlled";
 
 interface ScoutHistoryHalo {
   data: PortalData;
+  primitiveId: PortalPrimitiveId;
   pointPrimitive?: Cesium.PointPrimitive;
   occlusionPointPrimitive?: Cesium.PointPrimitive;
   reversePointPrimitive?: Cesium.PointPrimitive;
@@ -95,15 +98,17 @@ export class ScoutHistoryEntityManager {
 
     this.scoutControlHalosPendingCreation.add(data.guid);
     try {
+      const primitiveId = createPortalPrimitiveId(data.guid);
       const {
         pointPrimitive,
         occlusionPointPrimitive,
         reversePointPrimitive,
         reverseOcclusionPointPrimitive,
-      } = await this.createScoutControlHaloPrimitives(data);
+      } = await this.createScoutControlHaloPrimitives(data, primitiveId);
 
       const scoutHistoryHalo: ScoutHistoryHalo = {
         data,
+        primitiveId,
         pointPrimitive,
         occlusionPointPrimitive,
         reversePointPrimitive,
@@ -119,7 +124,7 @@ export class ScoutHistoryEntityManager {
     }
   }
 
-  private async createScoutControlHaloPrimitives(data: PortalData): Promise<{
+  private async createScoutControlHaloPrimitives(data: PortalData, primitiveId: PortalPrimitiveId): Promise<{
     pointPrimitive: Cesium.PointPrimitive | undefined;
     occlusionPointPrimitive: Cesium.PointPrimitive | undefined;
     reversePointPrimitive: Cesium.PointPrimitive | undefined;
@@ -138,24 +143,24 @@ export class ScoutHistoryEntityManager {
     if (scoutHistoryState === "controlled") {
       pointPrimitive = addScoutControlHaloPointPrimitive(
         pointPrimitives,
-        `scout-halo-${data.guid}`,
+        primitiveId,
         entityPosition,
       );
       occlusionPointPrimitive = addScoutControlHaloOcclusionPointPrimitive(
         pointPrimitives,
-        `scout-halo-occluded-${data.guid}`,
+        primitiveId,
         entityPosition,
         this.currentTranslucencyByDistance,
       );
     } else {
       reversePointPrimitive = addScoutControlHaloPointPrimitive(
         reversePointPrimitives,
-        `scout-halo-reverse-${data.guid}`,
+        primitiveId,
         entityPosition,
       );
       reverseOcclusionPointPrimitive = addScoutControlHaloOcclusionPointPrimitive(
         reversePointPrimitives,
-        `scout-halo-reverse-occluded-${data.guid}`,
+        primitiveId,
         entityPosition,
         this.currentTranslucencyByDistance,
       );
@@ -171,7 +176,7 @@ export class ScoutHistoryEntityManager {
       occlusionPointPrimitive,
       reversePointPrimitive,
       reverseOcclusionPointPrimitive,
-    } = await this.createScoutControlHaloPrimitives(data);
+    } = await this.createScoutControlHaloPrimitives(data, scoutHistoryHalo.primitiveId);
     scoutHistoryHalo.pointPrimitive = pointPrimitive;
     scoutHistoryHalo.occlusionPointPrimitive = occlusionPointPrimitive;
     scoutHistoryHalo.reversePointPrimitive = reversePointPrimitive;
@@ -259,11 +264,11 @@ function applyScoutControlHaloPosition(
 
 function addScoutControlHaloPointPrimitive(
   pointPrimitives: Cesium.PointPrimitiveCollection,
-  id: string,
+  primitiveId: PortalPrimitiveId,
   entityPosition: EntityPosition,
 ): Cesium.PointPrimitive {
   return pointPrimitives.add({
-    id,
+    id: primitiveId,
     position: entityPosition.position,
     show: !entityPosition.isFallbackPosition,
     pixelSize: HALO_POINT_PIXEL_SIZE,
@@ -277,12 +282,12 @@ function addScoutControlHaloPointPrimitive(
 
 function addScoutControlHaloOcclusionPointPrimitive(
   pointPrimitives: Cesium.PointPrimitiveCollection,
-  id: string,
+  primitiveId: PortalPrimitiveId,
   entityPosition: EntityPosition,
   translucencyByDistance: Cesium.NearFarScalar,
 ): Cesium.PointPrimitive {
   return pointPrimitives.add({
-    id,
+    id: primitiveId,
     position: entityPosition.position,
     show: !entityPosition.isFallbackPosition,
     pixelSize: HALO_POINT_PIXEL_SIZE,

@@ -1,85 +1,231 @@
 # Architecture
 
-IITC Next is a Vite-built TypeScript userscript, with Capacitor shells for
-Android and iOS. The web runtime is injected into `https://intel.ingress.com/`
-and replaces the stock Intel map with a full-screen Cesium viewer.
+IITC Next is a Vite-built TypeScript userscript that replaces the stock Intel
+map with a Cesium viewer. Capacitor shells reuse the same runtime on Android
+and iOS.
 
-The userscript entry starts in `src/bootstrap.ts`, which installs the vanilla
-Intel blocker before dynamically importing normal app code from `src/app.ts`.
-The main boot flow in `src/app.ts`:
+## Runtime surfaces
 
-* Initialize safe storage and the `window.iitc` integration object.
-* Set up the log manager, API request manager, settings manager, and player info
-  manager. API setup extracts or restores the Ingress API version used by
-  `/r/...` requests.
-* If the user is logged in, create the Cesium viewer, core managers, UI
-  controllers, plugins, and splash-screen lifecycle.
+The web userscript is injected into `https://intel.ingress.com/`. It owns the
+page after login, mounts a full-screen Cesium viewer, and exposes its core API
+through `window.iitc` for built-in and separately built plugins.
 
-`src/procedures/` contains this startup orchestration. Keep most one-time
-application wiring there instead of hiding it in constructors.
+The native projects in `android/` and `ios/` load that userscript in a
+WebView/WKWebView. They provide Cesium/SystemJS injection fallbacks, login-popup
+handling, safe-area CSS variables, and bridges for native capabilities such as
+geolocation and file sharing.
 
-`src/cesium/setup/` contains Cesium-specific runtime wiring:
+## Boot and composition
 
-* `createBaseLayersViewModels.ts` assembles the base imagery options used by
-  Cesium's base layer picker.
-* `createCesiumViewer.ts` creates the viewer, configures Cesium assets and Ion,
-  applies scene defaults, and optionally enables Google Photorealistic 3D Tiles.
-* `createCoreManagers.ts` constructs the manager graph, while
-  `exposeCoreManagers.ts` publishes those managers to `window.iitc` for plugins.
-* `mountCoreControllersAndUI.ts` mounts the built-in UI buttons and panes, and
-  keeps the portal detail bar connected to log and portal-selection state.
-* The remaining setup helpers restore camera state, configure controls, connect
-  interaction handlers, refresh terrain-backed entity positions, and wire tile
-  request status into debug tile rendering.
+### Browser bootstrap
 
-`src/managers/` is the main domain/runtime layer and is grouped by concern:
+`src/bootstrap.ts` runs first. It installs the vanilla Intel load blocker before
+dynamically importing `src/app.ts`, which prevents the stock dashboard and IITC
+Next from racing to initialize the page.
 
-* `tiles/` owns view-to-tile calculation, request queueing, raw tile parsing,
-  entity hydration, and the `TileRequestManager` facade.
-* `entity/` owns Cesium entities for portals, labels, ornaments, history
-  halos, scout-control halos, links, fields, debug tiles, shared terrain
-  positions, and translucency.
-* `layer/` owns Cesium data sources, overlay data sources, visibility filters,
-  plugin layer registration, and persisted layer state.
-* `comm/` wraps Ingress comm API state and requests.
-* `game/` wraps player info, scoreboard data, and passcode redemption.
-* `system/` contains app-wide managers for API requests, logs, settings,
-  plugins, scene readiness, and plugin-facing interface mounting.
+`src/app.ts` then:
 
-`src/cesium/` is Cesium-specific infrastructure. `global/` holds global Cesium
-typing, `imagery/` implements custom imagery providers, `layer/` defines base
-layer provider models, `setup/` wires the runtime together, and `interaction/`
-contains the custom touch, pinch, camera, and portal-selection logic. Some
-Cesium integration uses private/internal Cesium structures, especially overlay
-rendering in `LayerManager`; touch those paths carefully and verify on real
-rendering paths.
+1. Checks the page route and prevents duplicate boot.
+2. Configures responsive behavior, stylesheets, and the early splash screen.
+3. Initializes safe storage and the `window.iitc` integration object.
+4. Sets up logging, API requests, settings, and player information.
+5. Shows the login UI or loads Cesium and starts the map runtime.
+
+One-time application wiring belongs in `src/procedures/`. Cesium-dependent
+modules remain lazy until the Cesium UMD bundle is available; this is why
+`startIITCNextRuntime.ts` dynamically imports viewer and plugin setup.
+
+### Cesium runtime assembly
+
+`loadCesiumViewer.ts` is the composition root for the map runtime. It:
+
+1. Replaces the page body and creates the Cesium container.
+2. Creates base-layer view models and the viewer.
+3. Restores the previous camera and base layer.
+4. Constructs the core manager graph with `createCoreManagers.ts`.
+5. Publishes the viewer and managers through `window.iitc`.
+6. Mounts core controllers and UI.
+7. Connects camera controls, terrain refresh, picking, tile refresh, and debug
+   rendering.
+
+The remaining files in `src/cesium/setup/` are focused setup procedures rather
+than service owners. Keep long-lived state and domain behavior in managers.
+
+## Data and rendering pipeline
+
+### Tile lifecycle
+
+Camera changes enter the tile pipeline through `setUpTileUpdateWhenMove.ts`.
+The modules in `src/managers/tiles/` divide the work as follows:
+
+* `tileRequestViewCalculator.ts` and `tileRequestMath.ts` convert the current
+  view into requested tile coordinates.
+* `tileRequestQueue.ts` deduplicates, schedules, and tracks network requests.
+* `tileRequestEntityParser.ts` converts raw Ingress responses into typed portal,
+  link, and field data.
+* `tileRequestEntityHydrator.ts` collects placeholders and forwards parsed data
+  to the domain render managers.
+* `tileRequestManager.ts` is the facade used by Cesium setup and refresh code.
+
+The tile manager owns fetching and hydration order. Portal, link, field, and
+decoration managers own their records and Cesium representations.
+
+### Domain render managers
+
+`src/managers/entity/` is a historical directory name. Its managers now use a
+mixture of the remaining Cesium entities and direct primitives:
+
+* `portalEntityManager.ts` owns portal records, selectable entities, point
+  primitives, portal positions, and portal detail refreshes.
+* The portal label, ornament, history, and scout-control managers own the
+  corresponding label, billboard, and point primitives.
+* Link and field managers build primitive geometry by layer and replace it when
+  refreshed data is ready.
+* `debugTileEntityManager.ts` renders tile diagnostics in overlay layers.
+* `entityPositionManager.ts` centralizes terrain-backed positions and notifies
+  consumers through callbacks.
+* `entityTranslucencyManager.ts` computes camera-dependent translucency once and
+  publishes the current `NearFarScalar` to registered consumers.
+
+Managers should expose domain data or focused read APIs to plugins. Consumers
+should not depend on a manager's internal Cesium primitive records.
+
+### Layer model
+
+`LayerManager` owns visibility filters, persisted filter state, plugin layer
+registration, and render ordering across four layer backends:
+
+* **Data sources** hold compatibility or plugin features that still use Cesium
+  entities.
+* **Primitive layers** (`LayerPrimitives`) hold normally rendered billboard and
+  point collections, plus other direct primitives.
+* **Overlay layers** (`LayerOverlay`) hold labels, billboards, points, and
+  primitives that must render above normal scene content. Their collection
+  update hook rewrites only color-render commands into Cesium's overlay pass and
+  disables depth testing; pick passes retain Cesium's normal commands.
+* **Ground primitive layers** (`LayerGroundPrimitives`) hold terrain-clamped
+  geometry. `AsyncPrimitiveReplacer` keeps the active geometry visible until a
+  replacement primitive is ready, avoiding blank refresh frames.
+
+Layer wrappers own collection lifetime and call `requestRender` after visible
+state changes. `LayerManager` owns relative ordering between wrappers.
+
+## Cesium interaction and picking
+
+### Gesture pipeline
+
+`src/cesium/interaction/` contains the custom camera and selection behavior:
+
+* `gesture/` coordinates touch zoom and pinch lifecycle.
+* `camera/` resolves terrain or ellipsoid gesture anchors and applies pan, zoom,
+  and tilt camera changes.
+* `state/interactionGestureState.ts` shares cancellation state between gesture
+  and selection handlers.
+* `selection/portalSelection.ts` performs portal prefetch and detail selection.
+
+The core interaction handlers are installed by
+`src/cesium/setup/setUpInteractionHandlers.ts` after the viewer and managers
+exist.
+
+### Portal primitive picking
+
+Portal points and their visual decorations use the same pick-ID contract,
+exported by `portalEntityManager.ts`:
+
+```ts
+interface PortalPrimitiveId {
+  type: "portal";
+  guid: string;
+}
+```
+
+Point primitives, occlusion points, labels, ornaments, history halos, and
+scout-control halos each keep a stable `PortalPrimitiveId` with their portal
+record and reuse it when primitives are recreated or moved between layers. The
+objects do not need to share identity; consumers recognize the `type` and
+`guid` fields with `isPortalPrimitiveId`.
+
+This makes every pickable portal representation resolve to the same domain
+object. Portal selection can inspect the top result from one `Scene.pick`
+instead of using `Scene.drillPick`, which repeatedly performs pick passes while
+hiding previous results. Draw Lines uses the same ID to resolve the portal's
+current primitive position for snapping.
+
+New pickable portal decorations should use this ID instead of a manager-local
+string or `Cesium.Entity`. Consumers must narrow unknown pick IDs with
+`isPortalPrimitiveId` before reading the GUID. Purely decorative primitive
+batches that must not participate in portal selection should use
+`allowPicking: false` where Cesium supports it.
+
+### Restoring color after picking
+
+The viewer uses `requestRenderMode`, and Cesium does not draw a normal color
+frame as part of synchronous `Scene.pick`. Every synchronous pick caller must
+therefore call `restoreSceneAfterPick` immediately after picking:
+
+```ts
+const pickedObject = viewer.scene.pick(windowPosition);
+restoreSceneAfterPick(viewer.scene);
+```
+
+The helper coalesces picks made in one JavaScript task and renders one normal
+color frame in a microtask. This prevents invalidated WebGL drawing-buffer
+regions from remaining visible while the scene is otherwise idle.
+
+Current interactions intentionally use synchronous, throttled picks. Do not
+replace them with `Scene.pickAsync` without retesting request-render behavior,
+GPU-fence progress, and coordination between consumers of Cesium's scene pick
+framebuffer.
+
+## UI and plugins
+
+### DOM UI
 
 `src/components/` and `src/controllers/` implement the UI without React at
 runtime. TSX is compiled through the custom JSX factory in `src/utils/dom.ts`,
-which returns real DOM nodes. Components are mostly pure DOM factories;
-controllers hold DOM references, pane state, callbacks, and re-render by
-replacing nodes.
+which returns real DOM nodes.
 
-`src/plugins/` contains built-in plugins registered during startup from
-`registerPlugins.ts`. Plugins implement the `IITCPlugin` interface, wait for
-`window.iitc.pluginManager`, then use exposed managers such as `viewer`,
-`layerManager`, `interfaceManager`, `commManager`, and `entityPositionManager`.
-Plugins should clean up data sources, overlays, event handlers, timers, and DOM
-nodes in `deinit`.
+Components are primarily DOM factories. Controllers retain pane state and DOM
+references, coordinate callbacks, and re-render by replacing nodes. Core UI is
+mounted from `mountCoreControllersAndUI.ts` after manager construction.
 
-`src/utils/` contains browser, DOM, storage, map-coordinate, text, window, and
-color helpers. `safeLocalStorage` bridges normal `localStorage`, in-memory
-fallback storage, and Capacitor Preferences on native platforms.
+### Plugin lifecycle
 
-The native shells in `android/` and `ios/` load the built userscript into a
-WebView/WKWebView, provide Cesium/SystemJS injection fallbacks, handle login
-popups, publish safe-area insets as CSS variables, and bridge native features
-such as geolocation and file sharing back into JavaScript.
+Built-in plugins live in `src/plugins/` and are registered by
+`registerPlugins.ts`. Separately built plugin userscripts wait for
+`window.iitc.pluginManager` and register through the same interface.
 
-Build-related files:
+Plugins consume the manager APIs exposed on `window.iitc`, including `viewer`,
+`layerManager`, `interfaceManager`, `commManager`, and the domain managers.
+Cross-plugin contracts should live beside the owning plugin, such as
+`src/plugins/drawLines/api.ts`, rather than in core IITC types.
 
-* `vite.config.ts` builds the main userscript with Cesium loaded from CDN.
+Every plugin must release its layers, subscriptions, event handlers, timers,
+and DOM nodes in `deinit`. `PluginManager` owns enablement and lifecycle, while
+`LayerManager` owns plugin layer filters and persisted visibility.
+
+## Supporting services
+
+Other manager groups provide application services without owning the Cesium
+render graph:
+
+* `src/managers/comm/` wraps Ingress communication state and requests.
+* `src/managers/game/` owns player information, scores, and passcode redemption.
+* `src/managers/system/` owns API requests, logging, settings, plugin lifecycle,
+  loading progress, and plugin-facing UI mounting.
+* `src/utils/` contains browser, DOM, storage, coordinate, text, window, and
+  color helpers.
+
+`safeLocalStorage` bridges browser `localStorage`, an in-memory fallback, and
+Capacitor Preferences on native platforms.
+
+## Build and distribution
+
+* `vite.config.ts` builds the main userscript with Cesium loaded from its CDN
+  bundle.
 * `vite.plugin.config.ts` and `scripts/build-plugins.ts` build plugins as
   separate userscripts.
-* `scripts/sync-version.ts` keeps package, native project, README, and native
-  script-injector Cesium versions in sync.
+* `scripts/sync-version.ts` keeps package metadata, native projects, the README,
+  and native script-injector Cesium versions aligned.
+* Capacitor configuration and the `android/` and `ios/` projects package the
+  same userscript runtime for native distribution.

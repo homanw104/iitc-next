@@ -6,6 +6,7 @@
  */
 
 import * as Cesium from "cesium";
+import { restoreSceneAfterPick } from "../cesium/interaction/picking/restoreSceneAfterPick.ts";
 import type { EntityPosition, EntityPositionCallback } from "../managers/entity/entityPositionManager";
 import type { LayerGroundPrimitives } from "../managers/layer/layerGroundPrimitives";
 import type { LayerOverlay } from "../managers/layer/layerOverlay";
@@ -140,6 +141,8 @@ class PlayerActivityPlugin {
   private readonly cameraChangedAction = () => this.markPlayerLocationClustersDirty();
   private readonly playerLocationClusterPreRenderAction = () => this.refreshPlayerLocationClustersIfDirty();
   private isCameraMoving = false;
+  private pendingHoverPosition: Cesium.Cartesian2 | undefined;
+  private hoverPickFrameId: number | undefined;
 
   public init() {
     const iitc = safeWindow.iitc;
@@ -224,6 +227,7 @@ class PlayerActivityPlugin {
     this.hoverHandler?.removeInputAction(Cesium.ScreenSpaceEventType.MOUSE_MOVE);
     this.hoverHandler?.destroy();
     this.hoverHandler = undefined;
+    this.cancelPendingHoverPick();
     this.isCameraMoving = false;
   }
 
@@ -242,6 +246,7 @@ class PlayerActivityPlugin {
 
   private handleCameraMoveStart(): void {
     this.isCameraMoving = true;
+    this.cancelPendingHoverPick();
     this.hideTooltip();
   }
 
@@ -251,21 +256,43 @@ class PlayerActivityPlugin {
 
   private handleHoverMove(movement: Cesium.ScreenSpaceEventHandler.MotionEvent): void {
     if (this.isCameraMoving) {
+      this.cancelPendingHoverPick();
       this.hideTooltip();
       return;
     }
 
-    const tooltip = this.getPickedPlayerActivityTooltip(movement.endPosition);
+    this.pendingHoverPosition = Cesium.Cartesian2.clone(movement.endPosition);
+    if (this.hoverPickFrameId !== undefined) return;
+
+    this.hoverPickFrameId = window.requestAnimationFrame(() => {
+      this.hoverPickFrameId = undefined;
+      this.flushPendingHoverPick();
+    });
+  }
+
+  private flushPendingHoverPick(): void {
+    const position = this.pendingHoverPosition;
+    this.pendingHoverPosition = undefined;
+    if (!position || this.isCameraMoving) return;
+
+    const tooltip = this.getPickedPlayerActivityTooltip(position);
     if (!tooltip) {
       this.hideTooltip();
-      return;
+    } else {
+      this.showTooltip(
+        PlayerActivityTooltipTable({ tooltip }),
+        tooltip.activities,
+        position,
+      );
     }
 
-    this.showTooltip(
-      PlayerActivityTooltipTable({ tooltip }),
-      tooltip.activities,
-      movement,
-    );
+    restoreSceneAfterPick(this.viewer.scene);
+  }
+
+  private cancelPendingHoverPick(): void {
+    if (this.hoverPickFrameId !== undefined) window.cancelAnimationFrame(this.hoverPickFrameId);
+    this.hoverPickFrameId = undefined;
+    this.pendingHoverPosition = undefined;
   }
 
   private getPickedPlayerActivityTooltip(position: Cesium.Cartesian2): PlayerActivityTooltip | undefined {
@@ -317,26 +344,26 @@ class PlayerActivityPlugin {
       Array.isArray(id.activities);
   }
 
-  private showTooltip(table: HTMLElement, activitiesData: PlayerActivityData[], movement: Cesium.ScreenSpaceEventHandler.MotionEvent): void {
+  private showTooltip(table: HTMLElement, activitiesData: PlayerActivityData[], position: Cesium.Cartesian2): void {
     if (!this.tooltipEl) return;
     this.tooltipEl.innerHTML = "";
     this.tooltipEl.appendChild(table);
     this.tooltipEl.style.display = "block";
     this.tooltipEl.style.borderColor = getTeamColor(activitiesData[0].team).toCssColorString();
     const container = this.interfaceManager.getContainer();
-    if (container && container.clientWidth - movement.endPosition.x - this.tooltipEl.clientWidth < 30) {
+    if (container && container.clientWidth - position.x - this.tooltipEl.clientWidth < 30) {
       this.tooltipEl.style.left = "";
       this.tooltipEl.style.right = "15px";
     } else {
       this.tooltipEl.style.right = "";
-      this.tooltipEl.style.left = (movement.endPosition.x + 15) + "px";
+      this.tooltipEl.style.left = (position.x + 15) + "px";
     }
-    if (container && container.clientHeight - movement.endPosition.y < 200) {
+    if (container && container.clientHeight - position.y < 200) {
       this.tooltipEl.style.top = "";
-      this.tooltipEl.style.bottom = (container.clientHeight - movement.endPosition.y + 15) + "px";
+      this.tooltipEl.style.bottom = (container.clientHeight - position.y + 15) + "px";
     } else {
       this.tooltipEl.style.bottom = "";
-      this.tooltipEl.style.top = (movement.endPosition.y + 15) + "px";
+      this.tooltipEl.style.top = (position.y + 15) + "px";
     }
   }
 
@@ -848,11 +875,6 @@ class PlayerActivityPlugin {
   }
 }
 
-function getActivityPathLayerName(team: Team): string | undefined {
-  if (team === "ENLIGHTENED") return ACTIVITY_PATH_ENL_LAYER_NAME;
-  if (team === "RESISTANCE") return ACTIVITY_PATH_RES_LAYER_NAME;
-}
-
 const PlayerActivityTooltipElement = (): HTMLElement => {
   return (
     <div id="cesium-rich-tooltip" style={{
@@ -894,6 +916,11 @@ const PlayerActivityTooltipTable = ({tooltip}: {
 function getPlayerActivityLayerName(team: Team): string | undefined {
   if (team === "ENLIGHTENED") return PLAYER_ACTIVITY_ENL_LAYER_NAME;
   if (team === "RESISTANCE") return PLAYER_ACTIVITY_RES_LAYER_NAME;
+}
+
+function getActivityPathLayerName(team: Team): string | undefined {
+  if (team === "ENLIGHTENED") return ACTIVITY_PATH_ENL_LAYER_NAME;
+  if (team === "RESISTANCE") return ACTIVITY_PATH_RES_LAYER_NAME;
 }
 
 function getPlayerActivityLabelPixelOffset(team: Team): Cesium.Cartesian2 {

@@ -212,7 +212,8 @@ function compareFirstShownAt(a: number | undefined, b: number | undefined): numb
 }
 
 function isLabelCurrentlyVisible(label: PortalLabel): boolean {
-  return label.primitive.show && getPortalLabelEntityFadeTargetOpacity(label) === PORTAL_LABEL_ENTITY_VISIBLE_OPACITY;
+  return label.primitive?.show === true &&
+    getPortalLabelEntityFadeTargetOpacity(label) === PORTAL_LABEL_ENTITY_VISIBLE_OPACITY;
 }
 
 function getVisibleLabelViewRectangle(viewer: Cesium.Viewer): Cesium.Rectangle | undefined {
