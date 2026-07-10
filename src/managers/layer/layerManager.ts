@@ -19,6 +19,7 @@ import {
 } from "./layerFilters";
 import { LayerOverlay } from "./layerOverlay";
 import { LayerPrimitives } from "./layerPrimitives";
+import { LayerGroundPrimitives } from "./layerGroundPrimitives";
 
 const LOG_TAG = "LayerManager";
 
@@ -26,20 +27,23 @@ export class LayerManager {
   private static readonly DEFAULT_PRIMITIVE_Z_INDEX = 0;
   private static readonly DEFAULT_OVERLAY_Z_INDEX = 1000;
 
-  // Links, fields, etc., use normal DataSource layers, named by layer visibility id.
+  // Entity-backed layers, named by layer visibility id.
   private dataSources: Map<string, Cesium.DataSource> = new Map();
 
-  // Player activity markers, labels, etc., use primitive-backed overlay layers, named by layer visibility id.
+  // Primitive-backed layers with overlay hooks, used by labels, etc., named by layer visibility id.
   private overlayLayers: Map<string, LayerOverlay> = new Map();
 
-  // Primitive-backed layers for performance-sensitive visuals, named by layer visibility id.
+  // Primitive-backed layers use by portals, links, etc., named by layer visibility id.
   private primitiveLayers: Map<string, LayerPrimitives> = new Map();
+
+  // Ground primitive-backed layers for clamped geometry, named by layer visibility id.
+  private groundPrimitiveLayers: Map<string, LayerGroundPrimitives> = new Map();
 
   // Fine-grained layer visibility state, such as "portals-l8-enlightened".
   private layerVisibility: Map<string, boolean> = new Map();
 
   // Master filter visibility settings, such as "portals", that govern fine-grained layers.
-  // THIS IS THE SOURCE OF THE OPTIONS SHOWN IN THE LAYER PANE.
+  // THIS IS THE SOURCE OF TRUTH OF THOSE SHOWN IN THE LAYER PANE.
   private filterState: Map<string, boolean> = new Map();
 
   private pendingRenderFrame: number | null = null;
@@ -129,52 +133,23 @@ export class LayerManager {
     return layer;
   }
 
-  public async withEntityCollectionEventsSuspended<T>(
-    layers: { name: string; type: "dataSource" }[],
-    callback: () => Promise<T>
-  ): Promise<T> {
-    const suspendedCollections = this.getEntityCollections(layers);
+  public getOrCreateGroundPrimitiveLayer(name: string, zIndex?: number): LayerGroundPrimitives {
+    this.registerPluginFilterIfNeeded(name);
 
-    // Coalesce Cesium collection change notifications while an async batch adds,
-    // removes, or moves entities across the affected layers.
-    suspendedCollections.forEach((entities) => entities.suspendEvents());
-    try {
-      return await callback();
-    } finally {
-      Array.from(suspendedCollections).reverse().forEach((entities) => entities.resumeEvents());
+    let layer = this.groundPrimitiveLayers.get(name);
+    if (!layer) {
+      layer = new LayerGroundPrimitives(
+        this.viewer,
+        this.getLayerVisibility(name),
+        zIndex ?? LayerManager.DEFAULT_PRIMITIVE_Z_INDEX,
+      );
+      this.groundPrimitiveLayers.set(name, layer);
+      this.refreshRenderLayerOrder();
+    } else if (zIndex !== undefined && layer.zIndex !== zIndex) {
+      layer.setZIndex(zIndex);
+      this.refreshRenderLayerOrder();
     }
-  }
-
-  public withEntityCollectionEventsSuspendedSync<T>(
-    layers: { name: string; type: "dataSource" }[],
-    callback: () => T
-  ): T {
-    const suspendedCollections = this.getEntityCollections(layers);
-
-    // Synchronous variant for non-awaiting mutation loops. Use this when all
-    // entity mutations happen before the callback returns, for example,
-    //
-    // withEntityCollectionEventsSuspendedSync(layers, () => ids.forEach(removeEntity));
-    //
-    // If the callback awaits terrain, network, or any other async work, use
-    // withEntityCollectionEventsSuspended so events stay suspended until done.
-    suspendedCollections.forEach((entities) => entities.suspendEvents());
-    try {
-      return callback();
-    } finally {
-      Array.from(suspendedCollections).reverse().forEach((entities) => entities.resumeEvents());
-    }
-  }
-
-  private getEntityCollections(layers: { name: string; type: "dataSource" }[]): Set<Cesium.EntityCollection> {
-    const collections = new Set<Cesium.EntityCollection>();
-
-    layers.forEach(({ name }) => {
-      const source = this.getOrCreateDataSource(name);
-      collections.add(source.entities);
-    });
-
-    return collections;
+    return layer;
   }
 
   public setOverlayZIndex(name: string, zIndex: number): void {
@@ -208,6 +183,15 @@ export class LayerManager {
     if (layer) {
       layer.destroy();
       this.primitiveLayers.delete(name);
+    }
+    this.unregisterPluginFilterIfNeeded(name);
+  }
+
+  public removeGroundPrimitiveLayer(name: string): void {
+    const layer = this.groundPrimitiveLayers.get(name);
+    if (layer) {
+      layer.destroy();
+      this.groundPrimitiveLayers.delete(name);
     }
     this.unregisterPluginFilterIfNeeded(name);
   }
@@ -322,6 +306,9 @@ export class LayerManager {
     const primitiveLayer = this.primitiveLayers.get(name);
     if (primitiveLayer) primitiveLayer.setVisible(visible);
 
+    const groundPrimitiveLayer = this.groundPrimitiveLayers.get(name);
+    if (groundPrimitiveLayer) groundPrimitiveLayer.setVisible(visible);
+
     if (previousVisible !== visible) this.refreshScene();
   }
 
@@ -330,6 +317,10 @@ export class LayerManager {
   }
 
   private refreshRenderLayerOrder(): void {
+    Array.from(this.groundPrimitiveLayers.values())
+      .sort((a, b) => a.zIndex - b.zIndex)
+      .forEach(layer => layer.raiseToTop());
+
     Array.from(this.primitiveLayers.values())
       .sort((a, b) => a.zIndex - b.zIndex)
       .forEach(layer => layer.raiseToTop());

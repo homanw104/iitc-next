@@ -1,170 +1,169 @@
 /**
- * Manage field entities.
+ * Manage field primitives.
  */
 
 import * as Cesium from "cesium";
-import type { FieldData } from "../../types/iitc/field.ts";
+import type { FieldData, FieldPoint } from "../../types/iitc/field.ts";
 import type { PortalData } from "../../types/iitc/portal.ts";
-import { getTeamColor } from "../../utils/color";
 import type { LayerManager } from "../layer/layerManager";
-import { settingsManager } from "../system/settingsManager.ts";
 import type { PortalEntityManager } from "./portalEntityManager";
+import { getTeamColor } from "../../utils/color";
+import { TEAMS } from "../../types/common/common.ts";
+import { settingsManager } from "../system/settingsManager.ts";
 
-const FIELD_Z_INDEX = 0;
-const FIELD_FILL_ALPHA = 0.2;
+const FIELD_ALPHA = 0.2;
+const FIELD_PRIMITIVE_Z_INDEX = 0;
+const FIELD_PRIMITIVE_KEY = "fields";
 
 interface Field {
   data: FieldData;
-  entity: Cesium.Entity;
-  currentLayerId: string;
+  positions: Cesium.Cartesian3[];
 }
+
+export type FieldsChangedCallback = () => void;
 
 export class FieldEntityManager {
   private fields: Map<string, Field> = new Map();
+  private fieldsChangedCallbacks: Set<FieldsChangedCallback> = new Set();
 
-  constructor(private layerManager: LayerManager, private portalManager: PortalEntityManager) {}
+  constructor(
+    private layerManager: LayerManager,
+    private portalManager: PortalEntityManager
+  ) {}
 
   public async addOrUpdateFields(fields: FieldData[]): Promise<void> {
-    await this.addPlaceholderPortals(fields);
+    if (fields.length === 0) return;
 
-    const layers = new Set<string>();
-    fields.forEach((field) => {
-      const existing = this.fields.get(field.guid);
-      if (existing) layers.add(existing.currentLayerId);
-      layers.add(getFieldLayerId(field));
-    });
-
-    await this.layerManager.withEntityCollectionEventsSuspended(
-      Array.from(layers, (name) => ({ name, type: "dataSource" as const })),
-      async () => {
-        fields.forEach((field) => this.addOrUpdateField(field, false));
-      }
-    );
-  }
-
-  public addOrUpdateField(data: FieldData, hydrateAnchorPortals = true): Cesium.Entity {
-    if (hydrateAnchorPortals) {
-      this.addPlaceholderPortals([data]).then();
-    }
-
-    const existing = this.fields.get(data.guid);
-    if (existing) {
-      if (data.timestamp > existing.data.timestamp) {
-        const newLayerId = getFieldLayerId(data);
-        this.moveFieldToLayer(existing, newLayerId);
-        this.updateFieldEntity(existing.entity, data);
-        existing.data = data;
-      }
-      return existing.entity;
-    }
-
-    const entity = this.createFieldEntity(data);
-    this.fields.set(data.guid, { data, entity, currentLayerId: getFieldLayerId(data) });
-    return entity;
-  }
-
-  private async addPlaceholderPortals(fields: FieldData[]): Promise<void> {
     const placeholders = new Map<string, PortalData>();
     fields.forEach((field) => {
-      field.points.forEach((point) => {
-        if (!this.portalManager.addPortalField(point.guid, field)) {
-          setNewestPlaceholder(placeholders, {
-            guid: point.guid,
-            team: field.team,
-            latE6: point.latE6,
-            lngE6: point.lngE6,
-            timestamp: field.timestamp,
-            isPlaceholder: true,
-            fields: [field],
-          });
-        }
-      });
+      this.addOrUpdatePlaceholders(placeholders, field);
+      this.addOrUpdateFieldData(field);
     });
 
-    if (placeholders.size === 0) return;
-
-    await this.portalManager.addOrUpdatePortals(Array.from(placeholders.values()));
-  }
-
-  public removeField(guid: string): boolean {
-    const fieldInfo = this.fields.get(guid);
-    if (fieldInfo) {
-      this.layerManager.getOrCreateDataSource(fieldInfo.currentLayerId).entities.remove(fieldInfo.entity);
-      this.fields.delete(guid);
-      return true;
+    if (placeholders.size > 0) {
+      await this.portalManager.addOrUpdatePortals(Array.from(placeholders.values()));
     }
-    return false;
+
+    this.rebuildLayers();
+    this.notifyFieldsChanged();
   }
 
   public removeFieldsInView(viewRect: Cesium.Rectangle): void {
-    this.removeFieldEntityInView(viewRect);
+    this.removeFieldPrimitivesInView(viewRect);
   }
 
-  private createFieldEntity(data: FieldData): Cesium.Entity {
-    const layerId = getFieldLayerId(data);
-    const points = data.points.flatMap(p => [p.lngE6 / 1e6, p.latE6 / 1e6]);
-    return this.layerManager.getOrCreateDataSource(layerId).entities.add({
-      id: `field-${data.guid}`,
-      polygon: {
-        hierarchy: createFieldHierarchy(points),
-        material: getTeamColor(data.team).withAlpha(FIELD_FILL_ALPHA),
-        outline: false,
-        classificationType: getFieldClassificationType(),
-        zIndex: FIELD_Z_INDEX,
-      },
-    });
+  public getFieldData(guid: string): FieldData | undefined {
+    return this.fields.get(guid)?.data;
   }
 
-  private removeFieldEntityInView(viewRect: Cesium.Rectangle): void {
-    const toRemove: string[] = [];
-    const layers = new Set<string>();
-    this.fields.forEach((info, guid) => {
-      if (info.entity.polygon && info.entity.polygon.hierarchy) {
-        const hierarchy = info.entity.polygon.hierarchy.getValue(Cesium.JulianDate.now()) as Cesium.PolygonHierarchy;
-        if (hierarchy && hierarchy.positions && hierarchy.positions.length > 0) {
-          const cartographics = hierarchy.positions.map(p => Cesium.Cartographic.fromCartesian(p));
-          const fieldRect = Cesium.Rectangle.fromCartographicArray(cartographics);
-          if (Cesium.Rectangle.intersection(viewRect, fieldRect)) {
-            toRemove.push(guid);
-            layers.add(info.currentLayerId);
-          }
-        }
+  public forEachFieldData(callback: (data: FieldData) => void): void {
+    this.fields.forEach(field => callback(field.data));
+  }
+
+  public addFieldsChangedListener(callback: FieldsChangedCallback): void {
+    this.fieldsChangedCallbacks.add(callback);
+  }
+
+  public removeFieldsChangedListener(callback: FieldsChangedCallback): void {
+    this.fieldsChangedCallbacks.delete(callback);
+  }
+
+  private addOrUpdatePlaceholders(placeholders: Map<string, PortalData>, field: FieldData): void {
+    field.points.forEach((point) => {
+      if (this.portalManager.getPortalData(point.guid)) {
+        this.portalManager.addPortalField(point.guid, field);
+      } else {
+        collectFieldPointPlaceholder(placeholders, field, point);
       }
     });
-
-    if (toRemove.length === 0) return;
-
-    this.layerManager.withEntityCollectionEventsSuspendedSync(
-      Array.from(layers, (name) => ({ name, type: "dataSource" as const })),
-      () => toRemove.forEach(guid => this.removeField(guid))
-    );
   }
 
-  private updateFieldEntity(entity: Cesium.Entity, data: FieldData): void {
-    if (entity.polygon) {
-      const points = data.points.flatMap(p => [p.lngE6 / 1e6, p.latE6 / 1e6]);
-      entity.polygon.hierarchy = new Cesium.ConstantProperty(createFieldHierarchy(points));
-      entity.polygon.height = undefined;
-      entity.polygon.heightReference = undefined;
-      entity.polygon.extrudedHeight = undefined;
-      entity.polygon.extrudedHeightReference = undefined;
-      entity.polygon.material = new Cesium.ColorMaterialProperty(getTeamColor(data.team).withAlpha(FIELD_FILL_ALPHA));
-      entity.polygon.classificationType = new Cesium.ConstantProperty(getFieldClassificationType());
-      entity.polygon.zIndex = new Cesium.ConstantProperty(FIELD_Z_INDEX);
+  private addOrUpdateFieldData(data: FieldData): void {
+    const existing = this.fields.get(data.guid);
+    if (existing && data.timestamp <= existing.data.timestamp) return;
+
+    const positions = createFieldPositions(data);
+    if (existing) {
+      existing.data = data;
+      existing.positions = positions;
+      return;
+    }
+
+    this.fields.set(data.guid, { data, positions });
+  }
+
+  private removeFieldPrimitivesInView(viewRect: Cesium.Rectangle): void {
+    const toRemove: string[] = [];
+    this.fields.forEach((field, guid) => {
+      if (isFieldInView(field, viewRect)) toRemove.push(guid);
+    });
+
+    if (toRemove.length > 0) {
+      toRemove.forEach(guid => this.fields.delete(guid));
+      this.rebuildLayers();
+      this.notifyFieldsChanged();
     }
   }
 
-  private moveFieldToLayer(fieldInfo: Field, newLayerId: string): void {
-    if (fieldInfo.currentLayerId === newLayerId) return;
+  private rebuildLayers(): void {
+    TEAMS.forEach((team) => {
+      this.rebuildLayer(`fields-${team.toLowerCase()}`);
+    });
+  }
 
-    this.layerManager.getOrCreateDataSource(fieldInfo.currentLayerId).entities.remove(fieldInfo.entity);
-    this.layerManager.getOrCreateDataSource(newLayerId).entities.add(fieldInfo.entity);
-    fieldInfo.currentLayerId = newLayerId;
+  private rebuildLayer(layerId: string): void {
+    const layer = this.layerManager.getOrCreateGroundPrimitiveLayer(layerId, FIELD_PRIMITIVE_Z_INDEX);
+
+    const geometryInstances = Array.from(this.fields.values())
+      .filter(field => getFieldLayerId(field.data) === layerId)
+      .map(field => createFieldGeometryInstance(field));
+
+    if (geometryInstances.length === 0) {
+      layer.removeManagedPrimitive(FIELD_PRIMITIVE_KEY);
+    } else {
+      layer.replacePrimitiveWhenReady(FIELD_PRIMITIVE_KEY, new Cesium.GroundPrimitive({
+        geometryInstances,
+        appearance: new Cesium.PerInstanceColorAppearance({
+          flat: true,
+          translucent: true,
+        }),
+        allowPicking: false,
+        asynchronous: true,
+        classificationType: getFieldClassificationType(),
+      }));
+    }
+  }
+
+  private notifyFieldsChanged(): void {
+    this.fieldsChangedCallbacks.forEach(callback => callback());
   }
 }
 
-function createFieldHierarchy(points: number[]): Cesium.PolygonHierarchy {
-  return new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray(points));
+function createFieldGeometryInstance(field: Field): Cesium.GeometryInstance {
+  return new Cesium.GeometryInstance({
+    geometry: new Cesium.PolygonGeometry({
+      polygonHierarchy: new Cesium.PolygonHierarchy(field.positions),
+      vertexFormat: Cesium.PerInstanceColorAppearance.VERTEX_FORMAT,
+    }),
+    attributes: {
+      color: Cesium.ColorGeometryInstanceAttribute.fromColor(getTeamColor(field.data.team).withAlpha(FIELD_ALPHA)),
+    },
+  });
+}
+
+function createFieldPositions(data: FieldData): Cesium.Cartesian3[] {
+  return data.points.map(point => Cesium.Cartesian3.fromDegrees(point.lngE6 / 1e6, point.latE6 / 1e6));
+}
+
+function isFieldInView(field: Field, viewRect: Cesium.Rectangle): boolean {
+  const cartographics = field.positions.map(position => Cesium.Cartographic.fromCartesian(position));
+  const fieldRect = Cesium.Rectangle.fromCartographicArray(cartographics);
+  return Cesium.Rectangle.intersection(viewRect, fieldRect) !== undefined;
+}
+
+function getFieldLayerId(data: FieldData): string {
+  const team = data.team.toLowerCase();
+  return `fields-${team}`;
 }
 
 function getFieldClassificationType(): Cesium.ClassificationType {
@@ -173,30 +172,28 @@ function getFieldClassificationType(): Cesium.ClassificationType {
     : Cesium.ClassificationType.TERRAIN;
 }
 
-function getFieldLayerId(data: FieldData): string {
-  const team = data.team.toLowerCase();
-  return `fields-${team}`;
+function collectFieldPointPlaceholder(
+  placeholders: Map<string, PortalData>,
+  field: FieldData,
+  point: FieldPoint,
+): void {
+  const existing = placeholders.get(point.guid);
+  if (existing) {
+    addPortalField(existing, field);
+  } else {
+    placeholders.set(point.guid, {
+      guid: point.guid,
+      team: field.team,
+      latE6: point.latE6,
+      lngE6: point.lngE6,
+      isPlaceholder: true,
+      fields: [field],
+    });
+  }
 }
 
-function setNewestPlaceholder(placeholders: Map<string, PortalData>, placeholder: PortalData): void {
-  const existing = placeholders.get(placeholder.guid);
-  if (!existing) {
-    placeholders.set(placeholder.guid, placeholder);
-    return;
+function addPortalField(portal: PortalData, field: FieldData): void {
+  if (!portal.fields?.some((existingField) => existingField.guid === field.guid)) {
+    (portal.fields ??= []).push(field);
   }
-
-  placeholder.fields?.forEach((field) => addPortalField(existing, field));
-  if (placeholder.timestamp && placeholder.timestamp > (existing.timestamp ?? 0)) {
-    existing.team = placeholder.team;
-    existing.latE6 = placeholder.latE6;
-    existing.lngE6 = placeholder.lngE6;
-    existing.timestamp = placeholder.timestamp;
-  }
-}
-
-function addPortalField(portal: PortalData, field: FieldData): boolean {
-  if (portal.fields?.some((existingField) => existingField.guid === field.guid)) return false;
-
-  (portal.fields ??= []).push(field);
-  return true;
 }

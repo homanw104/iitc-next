@@ -20,8 +20,6 @@ import type { TileRequestQueue } from "./tileRequestQueue";
 
 const LOG_TAG = "TileRequestEntityHydrator";
 const PORTAL_HYDRATION_BATCH_SIZE = 64;
-const LINK_HYDRATION_BATCH_SIZE = 128;
-const FIELD_HYDRATION_BATCH_SIZE = 128;
 
 export class TileEntityHydrator {
   constructor(
@@ -125,12 +123,8 @@ export class TileEntityHydrator {
         this.scoutHistoryEntityManager.addOrUpdateScoutControlHalos(batch),
       ]);
     });
-    await hydrateInBatches(Array.from(linksToHydrate.values()), LINK_HYDRATION_BATCH_SIZE, (batch) =>
-      this.linkEntityManager.addOrUpdateLinks(batch)
-    );
-    await hydrateInBatches(Array.from(fieldsToHydrate.values()), FIELD_HYDRATION_BATCH_SIZE, (batch) =>
-      this.fieldEntityManager.addOrUpdateFields(batch)
-    );
+    await this.linkEntityManager.addOrUpdateLinks(Array.from(linksToHydrate.values()));
+    await this.fieldEntityManager.addOrUpdateFields(Array.from(fieldsToHydrate.values()));
 
     logManager.debug(LOG_TAG, `Processed ${entitiesFound} entities`);
     this.viewer.scene.requestRender();

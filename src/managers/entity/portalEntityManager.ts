@@ -40,8 +40,8 @@ interface Portal {
 export class PortalEntityManager {
   private portals: Map<string, Portal> = new Map();
   private portalsPendingCreation: Set<string> = new Set();
+  private portalsPendingLayerMove: Set<string> = new Set();
   private selectedPortalGuid?: string;
-  private layerMovePostponedPortalGuids: Set<string> = new Set();
   private readonly currentTranslucencyByDistance = new Cesium.NearFarScalar();
   private readonly translucencyByDistanceCallback: TranslucencyByDistanceCallback;
 
@@ -61,9 +61,9 @@ export class PortalEntityManager {
     this.entityTranslucencyManager.setOnTranslucencyByDistanceChangedCallback(this.translucencyByDistanceCallback);
 
     this.viewer.selectedEntityChanged.addEventListener((selectedEntity) => {
-      const selectedPortalGuid = this.getSelectablePortalGuid(selectedEntity);
+      const selectedPortalGuid = this.getSelectedPortalGuid(selectedEntity);
       if (this.selectedPortalGuid && this.selectedPortalGuid !== selectedPortalGuid) {
-        this.layerMovePostponedPortalGuids.delete(this.selectedPortalGuid);
+        this.portalsPendingLayerMove.delete(this.selectedPortalGuid);
         this.flushPendingLayerMove(this.selectedPortalGuid);
       }
       this.selectedPortalGuid = selectedPortalGuid;
@@ -83,37 +83,23 @@ export class PortalEntityManager {
   }
 
   public postponeLayerMove(guid: string): void {
-    this.layerMovePostponedPortalGuids.add(guid);
+    this.portalsPendingLayerMove.add(guid);
   }
 
   public releasePostponedLayerMove(guid: string): void {
-    this.layerMovePostponedPortalGuids.delete(guid);
+    this.portalsPendingLayerMove.delete(guid);
     const portalInfo = this.portals.get(guid);
-    if (!portalInfo || this.viewer.selectedEntity === portalInfo.entity) return;
+    if (portalInfo && this.viewer.selectedEntity !== portalInfo.entity) {
+      this.flushPendingLayerMove(guid);
+    }
+  }
 
-    this.flushPendingLayerMove(guid);
+  public getPortalEntity(guid: string): Cesium.Entity | undefined {
+    return this.portals.get(guid)?.entity;
   }
 
   public getPortalData(guid: string): PortalData | undefined {
     return this.portals.get(guid)?.data;
-  }
-
-  public addPortalLink(guid: string, link: LinkData): boolean {
-    const portal = this.getPortalData(guid);
-    if (!portal) return false;
-    if (portal.links?.some((existingLink) => existingLink.guid === link.guid)) return true;
-
-    (portal.links ??= []).push(link);
-    return true;
-  }
-
-  public addPortalField(guid: string, field: FieldData): boolean {
-    const portal = this.getPortalData(guid);
-    if (!portal) return false;
-    if (portal.fields?.some((existingField) => existingField.guid === field.guid)) return true;
-
-    (portal.fields ??= []).push(field);
-    return true;
   }
 
   public getPortalDataByCoordinates(latE6: number, lngE6: number): PortalData | undefined {
@@ -122,8 +108,22 @@ export class PortalEntityManager {
     )?.data;
   }
 
-  public getPortalEntity(guid: string): Cesium.Entity | undefined {
-    return this.portals.get(guid)?.entity;
+  public forEachPortalData(callback: (data: PortalData) => void): void {
+    this.portals.forEach(portal => callback(portal.data));
+  }
+
+  public addPortalLink(guid: string, link: LinkData): void {
+    const portal = this.getPortalData(guid);
+    if (portal && !portal.links?.some((existingLink) => existingLink.guid === link.guid)) {
+      (portal.links ??= []).push(link);
+    }
+  }
+
+  public addPortalField(guid: string, field: FieldData): void {
+    const portal = this.getPortalData(guid);
+    if (portal && !portal.fields?.some((existingField) => existingField.guid === field.guid)) {
+      (portal.fields ??= []).push(field);
+    }
   }
 
   public removePortalsInView(viewRect: Cesium.Rectangle): void {
@@ -247,7 +247,7 @@ export class PortalEntityManager {
     this.viewer.scene.requestRender();
   }
 
-  private getSelectablePortalGuid(entity: Cesium.Entity | undefined): string | undefined {
+  private getSelectedPortalGuid(entity: Cesium.Entity | undefined): string | undefined {
     if (!entity?.id.startsWith("portal-")) return undefined;
     if (!entity.properties?.selectable?.getValue()) return undefined;
 
@@ -264,7 +264,7 @@ export class PortalEntityManager {
 
   private shouldPostponeLayerMove(portalInfo: Portal, guid: string): boolean {
     return this.viewer.selectedEntity === portalInfo.entity ||
-      this.layerMovePostponedPortalGuids.has(guid);
+      this.portalsPendingLayerMove.has(guid);
   }
 
   private syncPortalLayer(portal: Portal, data: PortalData): void {
