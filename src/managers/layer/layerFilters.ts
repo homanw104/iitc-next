@@ -99,6 +99,8 @@ export function applyLayerFilters(
   setLayerVisibility("history-visited-captured-reverse", isEnabled(filterState, "history-reverse"));
   setLayerVisibility("history-scout-control", isEnabled(filterState, "scout-control"));
   setLayerVisibility("history-scout-control-reverse", isEnabled(filterState, "scout-control-reverse"));
+  setLayerVisibility("user-location", isEnabled(filterState, "user-location"));
+  setLayerVisibility("user-location-range", isEnabled(filterState, "user-location-range"));
   setLayerVisibility("debug-tiles", isEnabled(filterState, "debug-tiles"));
 
   for (const filter of pluginFilterNames) {
@@ -120,6 +122,8 @@ function createDefaultFilterEntries(): Array<[string, boolean]> {
     ["scout-control", false],
     ["history-reverse", false],
     ["scout-control-reverse", false],
+    ["user-location", false],
+    ["user-location-range", false],
     ["debug-tiles", false],
   );
 
@@ -132,6 +136,8 @@ function createBuiltInDataSourceAndOverlayNames(): string[] {
     "history-visited-captured-reverse",
     "history-scout-control",
     "history-scout-control-reverse",
+    "user-location",
+    "user-location-range",
     "debug-tiles",
   ];
 

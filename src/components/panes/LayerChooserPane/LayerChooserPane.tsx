@@ -68,7 +68,9 @@ const LayerChooserPane = ({ layerManager, onToggle }: {
       <LayerCheckbox label="Not Visited/Captured" id="history-reverse" layerManager={layerManager} onToggle={onToggle} />
       <LayerCheckbox label="Not Scout Controlled" id="scout-control-reverse" layerManager={layerManager} onToggle={onToggle} />
 
-      <LayerSection name="Debug" />
+      <LayerSection name="Misc" />
+      <LayerCheckbox label="User Location" id="user-location" layerManager={layerManager} onToggle={onToggle} />
+      <LayerCheckbox label="User Location Range" id="user-location-range" layerManager={layerManager} onToggle={onToggle} />
       <LayerCheckbox label="Debug Tiles" id="debug-tiles" layerManager={layerManager} onToggle={onToggle} />
 
       {pluginFilters.length > 0 && <LayerSection name="Plugins" />}

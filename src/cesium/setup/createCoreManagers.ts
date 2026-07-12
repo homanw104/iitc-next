@@ -14,6 +14,7 @@ import { PortalHistoryManager } from "../../managers/entity/portalHistoryManager
 import { PortalLabelManager } from "../../managers/entity/portalLabelManager.ts";
 import { PortalOrnamentManager } from "../../managers/entity/portalOrnamentManager.ts";
 import { ScoutHistoryManager } from "../../managers/entity/scoutHistoryManager.ts";
+import { UserLocationManager } from "../../managers/entity/userLocationManager.ts";
 import { RedeemManager } from "../../managers/game/redeemManager.ts";
 import { ScoreManager } from "../../managers/game/scoreManager.ts";
 import { LayerManager } from "../../managers/layer/layerManager.ts";
@@ -34,6 +35,7 @@ export interface CoreManagers {
   linkManager: LinkManager;
   fieldManager: FieldManager;
   debugTileManager: DebugTileManager;
+  userLocationManager: UserLocationManager;
   tileRequestManager: TileRequestManager;
   commManager: CommManager;
   scoreManager: ScoreManager;
@@ -54,6 +56,7 @@ export function createCoreManagers(viewer: Cesium.Viewer, container: HTMLElement
   const linkManager = new LinkManager(layerManager, portalManager);
   const fieldManager = new FieldManager(layerManager, portalManager);
   const debugTileManager = new DebugTileManager(viewer, layerManager);
+  const userLocationManager = new UserLocationManager(layerManager);
   const tileRequestManager = new TileRequestManager(viewer, portalManager, portalLabelManager, portalOrnamentManager, portalHistoryManager, scoutHistoryManager, linkManager, fieldManager);
   const commManager = new CommManager(viewer);
   const scoreManager = new ScoreManager();
@@ -73,6 +76,7 @@ export function createCoreManagers(viewer: Cesium.Viewer, container: HTMLElement
     linkManager,
     fieldManager,
     debugTileManager,
+    userLocationManager,
     tileRequestManager,
     commManager,
     scoreManager,

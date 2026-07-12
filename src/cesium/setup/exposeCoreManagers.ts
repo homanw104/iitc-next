@@ -19,6 +19,7 @@ export function exposeCoreManagers(iitc: IITCCore, viewer: Cesium.Viewer, manage
   iitc.scoutHistoryManager = managers.scoutHistoryManager;
   iitc.linkManager = managers.linkManager;
   iitc.fieldManager = managers.fieldManager;
+  iitc.userLocationManager = managers.userLocationManager;
   iitc.tileRequestManager = managers.tileRequestManager;
   iitc.commManager = managers.commManager;
   iitc.scoreManager = managers.scoreManager;

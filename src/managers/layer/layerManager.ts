@@ -23,6 +23,8 @@ import { GroundPrimitivesLayer } from "./groundPrimitivesLayer";
 
 const LOG_TAG = "LayerManager";
 
+export type FilterChangedCallback = (name: string, enabled: boolean) => void;
+
 export class LayerManager {
   private static readonly DEFAULT_PRIMITIVE_Z_INDEX = 0;
   private static readonly DEFAULT_OVERLAY_Z_INDEX = 1000;
@@ -48,6 +50,7 @@ export class LayerManager {
 
   private pendingRenderFrame: number | null = null;
   private pluginDataSourceAndOverlayNames: Set<string> = new Set();
+  private filterChangedCallbacks: Set<FilterChangedCallback> = new Set();
 
   constructor(private readonly viewer: Cesium.Viewer) {
     this.loadDefaults();
@@ -65,6 +68,15 @@ export class LayerManager {
     this.filterState.set(name, enabled);
     this.applyFilters();
     this.saveStorageState();
+    this.filterChangedCallbacks.forEach(callback => callback(name, enabled));
+  }
+
+  public addFilterChangedCallback(callback: FilterChangedCallback): void {
+    this.filterChangedCallbacks.add(callback);
+  }
+
+  public removeFilterChangedCallback(callback: FilterChangedCallback): void {
+    this.filterChangedCallbacks.delete(callback);
   }
 
   public isFilterEnabled(name: string): boolean {

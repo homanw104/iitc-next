@@ -10,6 +10,7 @@ import PortalDetailBar from "../../components/buttons/PortalDetailBar/PortalDeta
 import ProfileButton from "../../components/buttons/ProfileButton/ProfileButton.tsx";
 import SoftRefreshButton from "../../components/buttons/SoftRefreshButton/SoftRefreshButton.tsx";
 import { CommPaneController } from "../../controllers/CommPaneController.tsx";
+import { GetLocationButtonController } from "../../controllers/GetLocationButtonController.tsx";
 import { LayerChooserPaneController } from "../../controllers/LayerChooserPaneController.tsx";
 import { PortalDetailPaneController } from "../../controllers/PortalDetailPaneController.tsx";
 import { ProfilePaneController } from "../../controllers/ProfilePaneController.tsx";
@@ -51,6 +52,7 @@ export function mountCoreControllersAndUI(viewer: Cesium.Viewer, container: HTML
   };
 
   const softRefreshButtonController = new SoftRefreshButtonController(managers.tileRequestManager);
+  const getLocationButtonController = new GetLocationButtonController(viewer, managers.userLocationManager);
   const layerChooserPaneController = new LayerChooserPaneController(
     container,
     managers.layerManager,
@@ -82,12 +84,12 @@ export function mountCoreControllersAndUI(viewer: Cesium.Viewer, container: HTML
     registerActivePaneCloseCallback,
   );
 
-  portalDetailState.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailPaneController: portalDetailPaneController }));
-  container.appendChild(GetLocationButton({ viewer }));
-  container.appendChild(SoftRefreshButton({ softRefreshButtonController: softRefreshButtonController }));
-  container.appendChild(CommButton({ commDetailPaneController: commDetailPaneController }));
-  container.appendChild(LayerChooserButton({ layerChooserPaneController: layerChooserPaneController }));
-  container.appendChild(ProfileButton({ gameDetailPaneController: gameDetailPaneController }));
+  portalDetailState.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailPaneController }));
+  container.appendChild(GetLocationButton({ getLocationButtonController }));
+  container.appendChild(SoftRefreshButton({ softRefreshButtonController }));
+  container.appendChild(CommButton({ commDetailPaneController }));
+  container.appendChild(LayerChooserButton({ layerChooserPaneController }));
+  container.appendChild(ProfileButton({ gameDetailPaneController }));
 
   logManager.subscribe((entry) => {
     if (entry.level === "DEBUG") return;

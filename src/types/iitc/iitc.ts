@@ -9,6 +9,7 @@ import type { PortalHistoryManager } from "../../managers/entity/portalHistoryMa
 import type { PortalLabelManager } from "../../managers/entity/portalLabelManager.ts";
 import type { PortalOrnamentManager } from "../../managers/entity/portalOrnamentManager.ts";
 import type { ScoutHistoryManager } from "../../managers/entity/scoutHistoryManager.ts";
+import type { UserLocationManager } from "../../managers/entity/userLocationManager.ts";
 import type { PlayerInfoManager } from "../../managers/game/playerInfoManager.ts";
 import type { RedeemManager } from "../../managers/game/redeemManager.ts";
 import type { ScoreManager } from "../../managers/game/scoreManager.ts";
@@ -47,6 +48,7 @@ export interface IITCCore {
   portalOrnamentManager?: PortalOrnamentManager;
   portalHistoryManager?: PortalHistoryManager;
   scoutHistoryManager?: ScoutHistoryManager;
+  userLocationManager?: UserLocationManager;
   tileRequestManager?: TileRequestManager;
   scoreManager?: ScoreManager;
   redeemManager?: RedeemManager;
