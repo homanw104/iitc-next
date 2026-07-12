@@ -2,11 +2,11 @@ import type { Viewer } from "cesium";
 import type { PortalDetailPaneController } from "../../../controllers/PortalDetailPaneController.tsx";
 import type { PortalDetailState } from "../../../cesium/setup/mountCoreControllersAndUI.ts";
 import type { CommManager } from "../../../managers/comm/commManager.ts";
-import type { PortalEntityManager } from "../../../managers/entity/portalEntityManager.ts";
-import type { PortalHistoryEntityManager } from "../../../managers/entity/portalHistoryEntityManager.ts";
-import type { PortalLabelEntityManager } from "../../../managers/entity/portalLabelEntityManager.ts";
-import type { PortalOrnamentEntityManager } from "../../../managers/entity/portalOrnamentEntityManager.ts";
-import type { ScoutHistoryEntityManager } from "../../../managers/entity/scoutHistoryEntityManager.ts";
+import type { PortalManager } from "../../../managers/entity/portalManager.ts";
+import type { PortalHistoryManager } from "../../../managers/entity/portalHistoryManager.ts";
+import type { PortalLabelManager } from "../../../managers/entity/portalLabelManager.ts";
+import type { PortalOrnamentManager } from "../../../managers/entity/portalOrnamentManager.ts";
+import type { ScoutHistoryManager } from "../../../managers/entity/scoutHistoryManager.ts";
 import type { TileRequestManager } from "../../../managers/tiles/tileRequestManager.ts";
 import type { Channel } from "../../../types/common/common.ts";
 import { h } from "../../../utils/dom.ts";
@@ -23,11 +23,11 @@ const CommPane = ({
   viewer,
   commManager,
   tileRequestManager,
-  portalEntityManager,
-  portalLabelEntityManager,
-  portalOrnamentEntityManager,
-  portalHistoryEntityManager,
-  scoutHistoryEntityManager,
+  portalManager,
+  portalLabelManager,
+  portalOrnamentManager,
+  portalHistoryManager,
+  scoutHistoryManager,
   portalDetailPaneController,
   portalDetailState,
   container,
@@ -46,11 +46,11 @@ const CommPane = ({
   viewer: Viewer;
   commManager: CommManager;
   tileRequestManager: TileRequestManager;
-  portalEntityManager: PortalEntityManager;
-  portalLabelEntityManager: PortalLabelEntityManager;
-  portalOrnamentEntityManager: PortalOrnamentEntityManager;
-  portalHistoryEntityManager: PortalHistoryEntityManager;
-  scoutHistoryEntityManager: ScoutHistoryEntityManager;
+  portalManager: PortalManager;
+  portalLabelManager: PortalLabelManager;
+  portalOrnamentManager: PortalOrnamentManager;
+  portalHistoryManager: PortalHistoryManager;
+  scoutHistoryManager: ScoutHistoryManager;
   portalDetailPaneController: PortalDetailPaneController;
   portalDetailState: PortalDetailState;
   container: HTMLElement;
@@ -86,11 +86,11 @@ const CommPane = ({
         message={message}
         viewer={viewer}
         tileRequestManager={tileRequestManager}
-        portalEntityManager={portalEntityManager}
-        portalLabelEntityManager={portalLabelEntityManager}
-        portalOrnamentEntityManager={portalOrnamentEntityManager}
-        portalHistoryEntityManager={portalHistoryEntityManager}
-        scoutHistoryEntityManager={scoutHistoryEntityManager}
+        portalManager={portalManager}
+        portalLabelManager={portalLabelManager}
+        portalOrnamentManager={portalOrnamentManager}
+        portalHistoryManager={portalHistoryManager}
+        scoutHistoryManager={scoutHistoryManager}
         portalDetailPaneController={portalDetailPaneController}
         portalDetailState={portalDetailState}
         container={container}

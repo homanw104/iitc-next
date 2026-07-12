@@ -1,9 +1,9 @@
 /**
- * Build correctness-first field batches when coverage preprocessing is unavailable.
+ * Builds correctness-first field batches when coverage preprocessing is unavailable.
  */
 
 import * as Cesium from "cesium";
-import type { FieldData } from "../../types/iitc/field.ts";
+import type { FieldData } from "../../types/iitc/field";
 
 interface FieldRecord {
   data: FieldData;
@@ -18,14 +18,14 @@ interface PreparedField<T extends FieldRecord> {
 const SPHERICAL_GEOMETRY_EPSILON = 1e-12;
 
 export function createOverlapAwareFieldBatches<T extends FieldRecord>(fields: T[]): T[][] {
-  const preparedFields = fields.map(field => prepareField(field)).sort((first, second) =>
-    second.sphericalArea - first.sphericalArea || first.field.data.guid.localeCompare(second.field.data.guid)
+  const preparedFields = fields.map((field) => prepareField(field)).sort((first, second) =>
+    second.sphericalArea - first.sphericalArea || first.field.data.guid.localeCompare(second.field.data.guid),
   );
   const batches: Array<Array<PreparedField<T>>> = [];
 
   preparedFields.forEach((field) => {
-    const availableBatch = batches.find(batch =>
-      batch.every(existing => !doSphericalTrianglesOverlap(field.unitPositions, existing.unitPositions))
+    const availableBatch = batches.find((batch) =>
+      batch.every((existing) => !doSphericalTrianglesOverlap(field.unitPositions, existing.unitPositions)),
     );
 
     if (availableBatch) {
@@ -33,9 +33,9 @@ export function createOverlapAwareFieldBatches<T extends FieldRecord>(fields: T[
     } else {
       batches.push([field]);
     }
-  });
+  },);
 
-  return batches.map(batch => batch.map(field => field.field));
+  return batches.map((batch) => batch.map((field) => field.field));
 }
 
 function prepareField<T extends FieldRecord>(field: T): PreparedField<T> {
@@ -48,7 +48,7 @@ function prepareField<T extends FieldRecord>(field: T): PreparedField<T> {
       cosLatitude * Math.sin(longitude),
       Math.sin(latitude),
     );
-  });
+  },);
 
   return {
     field,
@@ -73,8 +73,8 @@ function doSphericalTrianglesOverlap(
   if (first.length !== 3 || second.length !== 3) return true;
   if (haveSameVertices(first, second)) return true;
 
-  if (first.some(position => isStrictlyInsideSphericalTriangle(position, second))) return true;
-  if (second.some(position => isStrictlyInsideSphericalTriangle(position, first))) return true;
+  if (first.some((position) => isStrictlyInsideSphericalTriangle(position, second))) return true;
+  if (second.some((position) => isStrictlyInsideSphericalTriangle(position, first))) return true;
 
   for (let firstIndex = 0; firstIndex < 3; firstIndex += 1) {
     const firstStart = first[firstIndex];
@@ -90,8 +90,8 @@ function doSphericalTrianglesOverlap(
 }
 
 function haveSameVertices(first: Cesium.Cartesian3[], second: Cesium.Cartesian3[]): boolean {
-  return first.every(firstPosition =>
-    second.some(secondPosition => isSamePosition(firstPosition, secondPosition))
+  return first.every((firstPosition) =>
+    second.some((secondPosition) => isSamePosition(firstPosition, secondPosition)),
   );
 }
 

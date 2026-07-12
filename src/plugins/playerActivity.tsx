@@ -453,7 +453,7 @@ class PlayerActivityPlugin {
   private setPlayerPositionSubscription(activityData: PlayerActivityData): void {
     const existing = this.playerActivities.get(activityData.name);
     if (existing?.data.latE6 === activityData.latE6 && existing?.data.lngE6 === activityData.lngE6) return;
-    if (existing) this.entityPositionManager.unsetOnPositionChangedCallback(existing.data, existing.positionCallback);
+    if (existing) this.entityPositionManager.removePositionChangedCallback(existing.data, existing.positionCallback);
 
     const callback: EntityPositionCallback = (entityPosition) => {
       const primitive = this.playerLocations.get(activityData.name);
@@ -462,7 +462,7 @@ class PlayerActivityPlugin {
       this.updatePlayerLocationPrimitivePosition(primitive, entityPosition);
       this.markPlayerLocationClustersDirty();
     };
-    this.entityPositionManager.setOnPositionChangedCallback(activityData, callback);
+    this.entityPositionManager.addPositionChangedCallback(activityData, callback);
     this.playerActivities.set(activityData.name, {
       data: activityData,
       positionCallback: callback,
@@ -471,7 +471,7 @@ class PlayerActivityPlugin {
 
   private unsetPlayerPositionSubscriptions(): void {
     this.playerActivities.forEach(({ data, positionCallback }) => {
-      this.entityPositionManager.unsetOnPositionChangedCallback(data, positionCallback);
+      this.entityPositionManager.removePositionChangedCallback(data, positionCallback);
     });
   }
 

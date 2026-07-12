@@ -36,13 +36,8 @@ export class EntityTranslucencyManager {
     generateTranslucencyByDistance(0, this.currentTranslucencyByDistance);
     this.translucencyByDistance.setValue(this.currentTranslucencyByDistance);
 
-    viewer.camera.moveStart.addEventListener(() => {
-      this.clearSamplingWork();
-    });
-
-    viewer.camera.moveEnd.addEventListener(() => {
-      this.newSamplingWork();
-    });
+    viewer.camera.moveStart.addEventListener(this.handleCameraMoveStart);
+    viewer.camera.moveEnd.addEventListener(this.handleCameraMoveEnd);
 
     this.newSamplingWork();
   }
@@ -51,12 +46,12 @@ export class EntityTranslucencyManager {
     return this.translucencyByDistance;
   }
 
-  public setOnTranslucencyByDistanceChangedCallback(callback: TranslucencyByDistanceCallback): void {
+  public addTranslucencyByDistanceChangedCallback(callback: TranslucencyByDistanceCallback): void {
     this.translucencyByDistanceCallbacks.add(callback);
     callback(this.currentTranslucencyByDistance);
   }
 
-  public unsetOnTranslucencyByDistanceChangedCallback(callback: TranslucencyByDistanceCallback): void {
+  public removeTranslucencyByDistanceChangedCallback(callback: TranslucencyByDistanceCallback): void {
     this.translucencyByDistanceCallbacks.delete(callback);
   }
 
@@ -73,6 +68,9 @@ export class EntityTranslucencyManager {
     this.sampledTerrainPosition = undefined;
     this.sampledTerrainHeight = undefined;
   }
+
+  private readonly handleCameraMoveStart = (): void => this.clearSamplingWork();
+  private readonly handleCameraMoveEnd = (): void => this.newSamplingWork();
 
   private updateTranslucencyByDistance(): void {
     const cameraHeight = this.getCameraHeightAboveTerrain();
@@ -111,7 +109,7 @@ export class EntityTranslucencyManager {
     this.getSamplingTerrainProvider()
       .then((terrainProvider) => terrainProvider
         ? Cesium.sampleTerrain(terrainProvider, CAMERA_TERRAIN_SAMPLE_LEVEL, [samplePosition])
-        : Promise.resolve(undefined))
+        : Promise.resolve(undefined),)
       .then((sampledPositions) => {
         if (generation !== this.terrainSampleGeneration) return;
 
@@ -121,15 +119,15 @@ export class EntityTranslucencyManager {
         this.sampledTerrainPosition = samplePosition;
         this.sampledTerrainHeight = sampledHeight;
         this.updateTranslucencyByDistance();
-      })
+      },)
       .catch(() => {
         if (generation !== this.terrainSampleGeneration) return;
         this.nextCameraTerrainSampleTimeMs = Date.now() + CAMERA_TERRAIN_SAMPLE_RETRY_DELAY_MS;
-      })
+      },)
       .finally(() => {
         if (generation !== this.terrainSampleGeneration) return;
         this.cameraTerrainSampleInFlight = false;
-      });
+      },);
   }
 
   private shouldSampleTerrainHeight(cartographic: Cesium.Cartographic): boolean {

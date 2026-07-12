@@ -10,20 +10,20 @@
 
 import * as Cesium from "cesium";
 import {
-  PORTAL_LABEL_ENTITY_VISIBLE_OPACITY,
-  getPortalLabelEntityFadeTargetOpacity,
-  getPortalLabelEntityPixelOffsetY,
-} from "./portalLabelEntityLayout";
-import type { PortalLabel, PortalLabelScreenBounds } from "./portalLabelEntityTypes";
-import { isPortalLabelEntityPositionVisible } from "./portalLabelEntityVisibility";
+  PORTAL_LABEL_VISIBLE_OPACITY,
+  getPortalLabelFadeTargetOpacity,
+  getPortalLabelPixelOffsetY,
+} from "./portalLabelLayout";
+import type { PortalLabel, PortalLabelScreenBounds } from "./portalLabelTypes";
+import { isPortalLabelPositionVisible } from "./portalLabelVisibility";
 
-const PORTAL_LABEL_ENTITY_OVERLAP_PADDING_PX = 24;
-const PORTAL_LABEL_ENTITY_OVERLAP_HIDE_HYSTERESIS_PX = 8;
-const PORTAL_LABEL_ENTITY_OVERLAP_GRID_CELL_SIZE_PX = 128;
-const PORTAL_LABEL_ENTITY_OVERLAP_MOVING_SLICE_MS = 1.5;
-const PORTAL_LABEL_ENTITY_OVERLAP_IDLE_SLICE_MS = 4;
-const PORTAL_LABEL_ENTITY_OVERLAP_YIELD_TIMEOUT_MS = 16;
-const PORTAL_LABEL_ENTITY_VIEW_RECTANGLE_MAX_PITCH = Cesium.Math.toRadians(-30);
+const PORTAL_LABEL_OVERLAP_PADDING_PX = 24;
+const PORTAL_LABEL_OVERLAP_HIDE_HYSTERESIS_PX = 8;
+const PORTAL_LABEL_OVERLAP_GRID_CELL_SIZE_PX = 128;
+const PORTAL_LABEL_OVERLAP_MOVING_SLICE_MS = 1.5;
+const PORTAL_LABEL_OVERLAP_IDLE_SLICE_MS = 4;
+const PORTAL_LABEL_OVERLAP_YIELD_TIMEOUT_MS = 16;
+const PORTAL_LABEL_VIEW_RECTANGLE_MAX_PITCH = Cesium.Math.toRadians(-30);
 
 const windowPositionScratch = new Cesium.Cartesian2();
 const cartographicScratch = new Cesium.Cartographic();
@@ -53,7 +53,7 @@ interface PortalLabelOverlapWorkScheduler {
   waitForNextSlice(): Promise<void>;
 }
 
-export async function getNonOverlappingPortalLabelEntityGuids(
+export async function getNonOverlappingPortalLabelGuids(
   viewer: Cesium.Viewer,
   labels: Map<string, PortalLabel>,
   time: Cesium.JulianDate,
@@ -108,13 +108,13 @@ async function collectPortalLabelOverlapCandidates(
               position: labelPosition,
               windowPosition: Cesium.Cartesian2.clone(windowPosition),
               bounds,
-              rejectionInsetPx: isCurrentlyVisible ? PORTAL_LABEL_ENTITY_OVERLAP_HIDE_HYSTERESIS_PX : 0,
+              rejectionInsetPx: isCurrentlyVisible ? PORTAL_LABEL_OVERLAP_HIDE_HYSTERESIS_PX : 0,
               isCurrentlyVisible,
               firstShownAt: label.firstShownAt,
               linkCount: label.linkCount,
               level: label.data.level ?? 0,
               distanceToCamera,
-            });
+            },);
           }
         }
       }
@@ -152,7 +152,7 @@ async function acceptNonOverlappingPortalLabelGuids(
       if (!shouldContinue()) return acceptedGuids;
     }
 
-    if (!isPortalLabelEntityPositionVisible(viewer, candidate.position, candidate.windowPosition)) continue;
+    if (!isPortalLabelPositionVisible(viewer, candidate.position, candidate.windowPosition)) continue;
 
     acceptedGuids.add(candidate.guid);
     addAcceptedCandidateToGrid(candidate, acceptedCandidateGrid);
@@ -176,19 +176,19 @@ function createPortalLabelOverlapWorkScheduler(
 
 function getPortalLabelOverlapSliceMs(options: PortalLabelOverlapRefreshOptions): number {
   return options.isCameraMoving?.() === true ?
-    PORTAL_LABEL_ENTITY_OVERLAP_MOVING_SLICE_MS :
-    PORTAL_LABEL_ENTITY_OVERLAP_IDLE_SLICE_MS;
+    PORTAL_LABEL_OVERLAP_MOVING_SLICE_MS :
+    PORTAL_LABEL_OVERLAP_IDLE_SLICE_MS;
 }
 
 function waitForBackgroundWork(): Promise<void> {
   if (window.requestIdleCallback) {
-    return new Promise(resolve => window.requestIdleCallback(
+    return new Promise((resolve) => window.requestIdleCallback(
       () => resolve(),
-      { timeout: PORTAL_LABEL_ENTITY_OVERLAP_YIELD_TIMEOUT_MS },
-    ));
+      { timeout: PORTAL_LABEL_OVERLAP_YIELD_TIMEOUT_MS },
+    ),);
   }
 
-  return new Promise(resolve => window.setTimeout(resolve, 0));
+  return new Promise((resolve) => window.setTimeout(resolve, 0));
 }
 
 function comparePortalLabelOverlapCandidates(
@@ -205,20 +205,19 @@ function comparePortalLabelOverlapCandidates(
 
 function compareFirstShownAt(a: number | undefined, b: number | undefined): number {
   if (a === undefined && b === undefined) return 0;
-  if (a === undefined) return 1;
-  if (b === undefined) return -1;
-
-  return a - b;
+  else if (a === undefined) return 1;
+  else if (b === undefined) return -1;
+  else return a - b;
 }
 
 function isLabelCurrentlyVisible(label: PortalLabel): boolean {
   return label.primitive?.show === true &&
-    getPortalLabelEntityFadeTargetOpacity(label) === PORTAL_LABEL_ENTITY_VISIBLE_OPACITY;
+    getPortalLabelFadeTargetOpacity(label) === PORTAL_LABEL_VISIBLE_OPACITY;
 }
 
 function getVisibleLabelViewRectangle(viewer: Cesium.Viewer): Cesium.Rectangle | undefined {
   const camera = viewer.camera;
-  if (camera.pitch <= PORTAL_LABEL_ENTITY_VIEW_RECTANGLE_MAX_PITCH) {
+  if (camera.pitch <= PORTAL_LABEL_VIEW_RECTANGLE_MAX_PITCH) {
     return camera.computeViewRectangle(viewer.scene.globe.ellipsoid);
   }
 
@@ -228,11 +227,11 @@ function getVisibleLabelViewRectangle(viewer: Cesium.Viewer): Cesium.Rectangle |
     destination: camera.positionWC,
     orientation: {
       heading: camera.heading,
-      pitch: PORTAL_LABEL_ENTITY_VIEW_RECTANGLE_MAX_PITCH,
+      pitch: PORTAL_LABEL_VIEW_RECTANGLE_MAX_PITCH,
       roll: camera.roll,
     },
     endTransform: camera.transform,
-  });
+  },);
 
   return clampedCamera.computeViewRectangle(viewer.scene.globe.ellipsoid);
 }
@@ -265,9 +264,9 @@ function getLabelScreenBounds(
   label: PortalLabel,
   windowPosition: Cesium.Cartesian2,
   distanceToCamera: number,
-  padding = PORTAL_LABEL_ENTITY_OVERLAP_PADDING_PX,
+  padding = PORTAL_LABEL_OVERLAP_PADDING_PX,
 ): PortalLabelScreenBounds {
-  const anchorY = windowPosition.y + getPortalLabelEntityPixelOffsetY(distanceToCamera);
+  const anchorY = windowPosition.y + getPortalLabelPixelOffsetY(distanceToCamera);
 
   return {
     left: windowPosition.x - label.screenBoxWidth / 2 - padding,
@@ -346,10 +345,10 @@ function getScreenBoundsGridRange(bounds: PortalLabelScreenBounds): {
   maxY: number
 } {
   return {
-    minX: Math.floor(bounds.left / PORTAL_LABEL_ENTITY_OVERLAP_GRID_CELL_SIZE_PX),
-    maxX: Math.floor(bounds.right / PORTAL_LABEL_ENTITY_OVERLAP_GRID_CELL_SIZE_PX),
-    minY: Math.floor(bounds.top / PORTAL_LABEL_ENTITY_OVERLAP_GRID_CELL_SIZE_PX),
-    maxY: Math.floor(bounds.bottom / PORTAL_LABEL_ENTITY_OVERLAP_GRID_CELL_SIZE_PX),
+    minX: Math.floor(bounds.left / PORTAL_LABEL_OVERLAP_GRID_CELL_SIZE_PX),
+    maxX: Math.floor(bounds.right / PORTAL_LABEL_OVERLAP_GRID_CELL_SIZE_PX),
+    minY: Math.floor(bounds.top / PORTAL_LABEL_OVERLAP_GRID_CELL_SIZE_PX),
+    maxY: Math.floor(bounds.bottom / PORTAL_LABEL_OVERLAP_GRID_CELL_SIZE_PX),
   };
 }
 

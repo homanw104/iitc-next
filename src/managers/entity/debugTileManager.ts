@@ -5,7 +5,7 @@
 
 import * as Cesium from "cesium";
 import type { LayerManager } from "../layer/layerManager";
-import type { TileStatus } from "../tiles/tileRequestManager.ts";
+import type { TileStatus } from "../tiles/tileRequestManager";
 import { getMapZoomTileParameters, tileToLat, tileToLng } from "../tiles/tileRequestMath";
 
 const DEBUG_TILE_LAYER_ID = "debug-tiles";
@@ -16,15 +16,15 @@ const DEBUG_TILE_REMOVAL_DELAY_MS = 2000;
 interface DebugTile {
   fillPrimitive: Cesium.Primitive;
   outlinePrimitive: Cesium.Primitive;
-  removalTimeout?: number;
+  removalTimeout: number | undefined;
 }
 
-export class DebugTileEntityManager {
-  private debugTiles: Map<string, DebugTile> = new Map();
+export class DebugTileManager {
+  private readonly debugTiles: Map<string, DebugTile> = new Map();
 
   constructor(
-    private viewer: Cesium.Viewer,
-    private layerManager: LayerManager,
+    private readonly viewer: Cesium.Viewer,
+    private readonly layerManager: LayerManager,
   ) {}
 
   public updateTile(key: string, status: TileStatus): void {
@@ -47,7 +47,7 @@ export class DebugTileEntityManager {
     const fillPrimitive = layer.addPrimitive(createTileFillPrimitive(rectangle, color));
     const outlinePrimitive = layer.addPrimitive(createTileOutlinePrimitive(rectangle, color));
 
-    return { fillPrimitive, outlinePrimitive };
+    return { fillPrimitive, outlinePrimitive, removalTimeout: undefined };
   }
 
   private removeTilePrimitives(key: string): boolean {
@@ -70,7 +70,7 @@ export class DebugTileEntityManager {
     tilePrimitives.removalTimeout = window.setTimeout(() => {
       this.removeTilePrimitives(key);
       this.viewer.scene.requestRender();
-    }, DEBUG_TILE_REMOVAL_DELAY_MS);
+    }, DEBUG_TILE_REMOVAL_DELAY_MS,);
   }
 }
 
@@ -111,7 +111,7 @@ function getTileRectangle(key: string): Cesium.Rectangle | undefined {
     finalWest,
     finalSouth,
     finalEast,
-    finalNorth
+    finalNorth,
   );
 }
 
@@ -122,18 +122,18 @@ function createTileFillPrimitive(rectangle: Cesium.Rectangle, color: Cesium.Colo
         rectangle,
         height: 0,
         vertexFormat: Cesium.PerInstanceColorAppearance.FLAT_VERTEX_FORMAT,
-      }),
+      },),
       attributes: {
         color: Cesium.ColorGeometryInstanceAttribute.fromColor(color.withAlpha(DEBUG_TILE_FILL_ALPHA)),
       },
-    }),
+    },),
     appearance: new Cesium.PerInstanceColorAppearance({
       flat: true,
       translucent: true,
-    }),
+    },),
     allowPicking: false,
     asynchronous: false,
-  });
+  },);
 }
 
 function createTileOutlinePrimitive(rectangle: Cesium.Rectangle, color: Cesium.Color): Cesium.Primitive {
@@ -142,18 +142,18 @@ function createTileOutlinePrimitive(rectangle: Cesium.Rectangle, color: Cesium.C
       geometry: new Cesium.RectangleOutlineGeometry({
         rectangle,
         height: 0,
-      }),
+      },),
       attributes: {
         color: Cesium.ColorGeometryInstanceAttribute.fromColor(color),
       },
-    }),
+    },),
     appearance: new Cesium.PerInstanceColorAppearance({
       flat: true,
       translucent: false,
-    }),
+    },),
     allowPicking: false,
     asynchronous: false,
-  });
+  },);
 }
 
 function getStatusColor(status: TileStatus): Cesium.Color {

@@ -1,30 +1,30 @@
 /**
- * Manage field primitives.
+ * Manages field primitives.
  */
 
 import * as Cesium from "cesium";
-import type { FieldData, FieldPoint } from "../../types/iitc/field.ts";
-import type { PortalData } from "../../types/iitc/portal.ts";
-import type { LayerManager } from "../layer/layerManager";
-import type { PortalEntityManager } from "./portalEntityManager";
+import { TEAMS } from "../../types/common/common";
+import type { FieldData, FieldPoint } from "../../types/iitc/field";
+import type { PortalData } from "../../types/iitc/portal";
 import { getTeamColor } from "../../utils/color";
-import { TEAMS } from "../../types/common/common.ts";
-import { settingsManager } from "../system/settingsManager.ts";
-import { logManager } from "../system/logManager.ts";
+import type { LayerManager } from "../layer/layerManager";
+import { logManager } from "../system/logManager";
+import { settingsManager } from "../system/settingsManager";
 import type {
   FieldCoverageLayerInput,
   FieldCoverageMultiPolygon,
   FieldCoveragePolygon,
   FieldCoverageRing,
   FieldCoverageResponse,
-} from "./fieldCoverage.ts";
-import { createFieldCoverageWorker } from "./fieldCoverageWorker.ts";
-import { createOverlapAwareFieldBatches } from "./fieldOverlapBatching.ts";
+} from "./fieldCoverage";
+import { createFieldCoverageWorker } from "./fieldCoverageWorker";
+import { createOverlapAwareFieldBatches } from "./fieldOverlapBatching";
+import type { PortalManager } from "./portalManager";
 
 const FIELD_ALPHA = 0.2;
 const FIELD_PRIMITIVE_Z_INDEX = 0;
 const FIELD_PRIMITIVE_KEY = "fields";
-const LOG_TAG = "FieldEntityManager";
+const LOG_TAG = "FieldManager";
 
 interface Field {
   data: FieldData;
@@ -32,18 +32,16 @@ interface Field {
 }
 
 export type FieldsChangedCallback = () => void;
-export type FieldRenderingMode = "none" | "coverage" | "overlap-fallback";
 
-export class FieldEntityManager {
-  private fields: Map<string, Field> = new Map();
-  private fieldsChangedCallbacks: Set<FieldsChangedCallback> = new Set();
-  private fieldCoverageWorker?: Worker;
+export class FieldManager {
+  private readonly fields: Map<string, Field> = new Map();
+  private readonly fieldsChangedCallbacks: Set<FieldsChangedCallback> = new Set();
+  private fieldCoverageWorker: Worker | undefined;
   private fieldCoverageGeneration = 0;
-  private renderingMode: FieldRenderingMode = "none";
 
   constructor(
-    private layerManager: LayerManager,
-    private portalManager: PortalEntityManager
+    private readonly layerManager: LayerManager,
+    private readonly portalManager: PortalManager,
   ) {}
 
   public async addOrUpdateFields(fields: FieldData[]): Promise<void> {
@@ -52,8 +50,8 @@ export class FieldEntityManager {
     const placeholders = new Map<string, PortalData>();
     fields.forEach((field) => {
       this.addOrUpdatePlaceholders(placeholders, field);
-      this.addOrUpdateFieldData(field);
-    });
+      this.addOrUpdateField(field);
+    },);
 
     if (placeholders.size > 0) {
       await this.portalManager.addOrUpdatePortals(Array.from(placeholders.values()));
@@ -72,14 +70,14 @@ export class FieldEntityManager {
   }
 
   public forEachFieldData(callback: (data: FieldData) => void): void {
-    this.fields.forEach(field => callback(field.data));
+    this.fields.forEach((field) => callback(field.data));
   }
 
-  public addFieldsChangedListener(callback: FieldsChangedCallback): void {
+  public addFieldsChangedCallback(callback: FieldsChangedCallback): void {
     this.fieldsChangedCallbacks.add(callback);
   }
 
-  public removeFieldsChangedListener(callback: FieldsChangedCallback): void {
+  public removeFieldsChangedCallback(callback: FieldsChangedCallback): void {
     this.fieldsChangedCallbacks.delete(callback);
   }
 
@@ -90,10 +88,10 @@ export class FieldEntityManager {
       } else {
         collectFieldPointPlaceholder(placeholders, field, point);
       }
-    });
+    },);
   }
 
-  private addOrUpdateFieldData(data: FieldData): void {
+  private addOrUpdateField(data: FieldData): void {
     const existing = this.fields.get(data.guid);
     if (existing && data.timestamp <= existing.data.timestamp) return;
 
@@ -111,10 +109,10 @@ export class FieldEntityManager {
     const toRemove: string[] = [];
     this.fields.forEach((field, guid) => {
       if (isFieldInView(field, viewRect)) toRemove.push(guid);
-    });
+    },);
 
     if (toRemove.length > 0) {
-      toRemove.forEach(guid => this.fields.delete(guid));
+      toRemove.forEach((guid) => this.fields.delete(guid));
       this.rebuildLayers();
       this.notifyFieldsChanged();
     }
@@ -130,22 +128,19 @@ export class FieldEntityManager {
       const fields = this.getFieldsInLayer(layerId);
       if (fields.length === 0) {
         this.layerManager.getOrCreateGroundPrimitiveLayer(layerId, FIELD_PRIMITIVE_Z_INDEX)
-          .removeManagedPrimitive(FIELD_PRIMITIVE_KEY);
+          .removeManagedPrimitive(FIELD_PRIMITIVE_KEY,);
       } else {
         layers.push({
           layerId,
-          fields: fields.map(field => ({
+          fields: fields.map((field) => ({
             guid: field.data.guid,
             points: field.data.points,
-          })),
-        });
+          }),),
+        },);
       }
-    });
+    },);
 
-    if (layers.length === 0) {
-      this.renderingMode = "none";
-      return;
-    }
+    if (layers.length === 0) return;
 
     try {
       this.fieldCoverageWorker = createFieldCoverageWorker();
@@ -159,7 +154,7 @@ export class FieldEntityManager {
   }
 
   private getFieldsInLayer(layerId: string): Field[] {
-    return Array.from(this.fields.values()).filter(field => getFieldLayerId(field.data) === layerId);
+    return Array.from(this.fields.values()).filter((field) => getFieldLayerId(field.data) === layerId);
   }
 
   private rebuildLayer(layerId: string, coverageByDepth?: FieldCoverageMultiPolygon[]): void {
@@ -173,7 +168,7 @@ export class FieldEntityManager {
     }
   }
 
-  private handleFieldCoverageMessage = (event: MessageEvent<FieldCoverageResponse>): void => {
+  private handleFieldCoverageMessage = (event: MessageEvent<FieldCoverageResponse>): (void) => {
     if (event.data.generation !== this.fieldCoverageGeneration) return;
 
     this.clearFieldCoverageWorker();
@@ -182,35 +177,33 @@ export class FieldEntityManager {
       return;
     }
 
-    if (event.data.layers.some(layer => !layer.coverageByDepth.some(coverage => coverage.length > 0))) {
+    if (event.data.layers.some((layer) => !layer.coverageByDepth.some((coverage) => coverage.length > 0))) {
       this.rebuildLayersWithOverlapBatches("coverage preprocessing returned no geometry");
       return;
     }
 
     try {
-      event.data.layers.forEach(layer => this.rebuildLayer(layer.layerId, layer.coverageByDepth));
+      event.data.layers.forEach((layer) => this.rebuildLayer(layer.layerId, layer.coverageByDepth));
     } catch (error) {
       this.rebuildLayersWithOverlapBatches("coverage geometry could not be created", error);
       return;
     }
 
-    this.renderingMode = "coverage";
     logManager.debug(LOG_TAG, "Using fragmented field coverage");
   };
 
-  private handleFieldCoverageError = (event: ErrorEvent): void => {
+  private handleFieldCoverageError = (event: ErrorEvent): (void) => {
     this.clearFieldCoverageWorker();
     this.rebuildLayersWithOverlapBatches("the coverage worker failed", event.error ?? event.message);
   };
 
   private rebuildLayersWithOverlapBatches(reason: string, error?: unknown): void {
-    this.renderingMode = "overlap-fallback";
     if (error === undefined) {
       logManager.warn(LOG_TAG, `Using overlap-aware field fallback because ${reason}.`);
     } else {
       logManager.warn(LOG_TAG, `Using overlap-aware field fallback because ${reason}.`, error);
     }
-    TEAMS.forEach(team => this.rebuildLayer(`fields-${team.toLowerCase()}`));
+    TEAMS.forEach((team) => this.rebuildLayer(`fields-${team.toLowerCase()}`));
   }
 
   private clearFieldCoverageWorker(): void {
@@ -221,7 +214,7 @@ export class FieldEntityManager {
   }
 
   private notifyFieldsChanged(): void {
-    this.fieldsChangedCallbacks.forEach(callback => callback());
+    this.fieldsChangedCallbacks.forEach((callback) => callback());
   }
 }
 
@@ -230,11 +223,11 @@ function createFieldGeometryInstance(field: Field): Cesium.GeometryInstance {
     geometry: new Cesium.PolygonGeometry({
       polygonHierarchy: new Cesium.PolygonHierarchy(field.positions),
       vertexFormat: Cesium.PerInstanceColorAppearance.VERTEX_FORMAT,
-    }),
+    },),
     attributes: {
       color: Cesium.ColorGeometryInstanceAttribute.fromColor(getTeamColor(field.data.team).withAlpha(FIELD_ALPHA)),
     },
-  });
+  },);
 }
 
 function createFieldCoverageGeometryInstance(
@@ -250,11 +243,11 @@ function createFieldCoverageGeometryInstance(
     geometry: new Cesium.PolygonGeometry({
       polygonHierarchy: hierarchy,
       vertexFormat: Cesium.PerInstanceColorAppearance.VERTEX_FORMAT,
-    }),
+    },),
     attributes: {
       color: Cesium.ColorGeometryInstanceAttribute.fromColor(getTeamColor(field.data.team).withAlpha(alpha)),
     },
-  });
+  },);
 }
 
 function createFieldPrimitives(
@@ -264,24 +257,24 @@ function createFieldPrimitives(
   const appearance = new Cesium.PerInstanceColorAppearance({
     flat: true,
     translucent: true,
-  });
+  },);
   const classificationType = getFieldClassificationType();
 
   // Different depths need separate classification passes, or a shadow volume can supply the wrong alpha.
   const geometryInstanceBatches = coverageByDepth
     ? createFieldCoverageGeometryInstanceBatches(fields, coverageByDepth)
-    : createOverlapAwareFieldBatches(fields).map(batch =>
-      batch.map(field => createFieldGeometryInstance(field))
+    : createOverlapAwareFieldBatches(fields).map((batch) =>
+      batch.map((field) => createFieldGeometryInstance(field)),
     );
   if (geometryInstanceBatches.length === 0) throw new Error("Field geometry is empty.");
 
-  return geometryInstanceBatches.map(geometryInstances => new Cesium.GroundPrimitive({
+  return geometryInstanceBatches.map((geometryInstances) => new Cesium.GroundPrimitive({
     geometryInstances,
     appearance,
     allowPicking: false,
     asynchronous: true,
     classificationType,
-  }));
+  },),);
 }
 
 function createFieldCoverageGeometryInstanceBatches(
@@ -295,8 +288,8 @@ function createFieldCoverageGeometryInstanceBatches(
     coverage.flatMap((polygon) => {
       const instance = createFieldCoverageGeometryInstance(polygon, field, index + 1);
       return instance ? [instance] : [];
-    })
-  ).filter(instances => instances.length > 0);
+    },),
+  ).filter((instances) => instances.length > 0,);
 }
 
 function createPolygonHierarchy(polygon: FieldCoveragePolygon): Cesium.PolygonHierarchy | undefined {
@@ -305,23 +298,23 @@ function createPolygonHierarchy(polygon: FieldCoveragePolygon): Cesium.PolygonHi
   if (positions.length < 3) return undefined;
 
   const holes = holeRings
-    .map(createRingPositions)
-    .filter(holePositions => holePositions.length >= 3)
-    .map(holePositions => new Cesium.PolygonHierarchy(holePositions));
+    .map(createRingPositions,)
+    .filter((holePositions) => holePositions.length >= 3,)
+    .map((holePositions) => new Cesium.PolygonHierarchy(holePositions),);
   return new Cesium.PolygonHierarchy(positions, holes);
 }
 
 function createRingPositions(ring: FieldCoverageRing): Cesium.Cartesian3[] {
   return ring.slice(0, -1)
-    .map(([longitude, latitude]) => Cesium.Cartesian3.fromDegrees(longitude, latitude));
+    .map(([longitude, latitude]) => Cesium.Cartesian3.fromDegrees(longitude, latitude),);
 }
 
 function createFieldPositions(data: FieldData): Cesium.Cartesian3[] {
-  return data.points.map(point => Cesium.Cartesian3.fromDegrees(point.lngE6 / 1e6, point.latE6 / 1e6));
+  return data.points.map((point) => Cesium.Cartesian3.fromDegrees(point.lngE6 / 1e6, point.latE6 / 1e6));
 }
 
 function isFieldInView(field: Field, viewRect: Cesium.Rectangle): boolean {
-  const cartographics = field.positions.map(position => Cesium.Cartographic.fromCartesian(position));
+  const cartographics = field.positions.map((position) => Cesium.Cartographic.fromCartesian(position));
   const fieldRect = Cesium.Rectangle.fromCartographicArray(cartographics);
   return Cesium.Rectangle.intersection(viewRect, fieldRect) !== undefined;
 }
@@ -353,7 +346,7 @@ function collectFieldPointPlaceholder(
       lngE6: point.lngE6,
       isPlaceholder: true,
       fields: [field],
-    });
+    },);
   }
 }
 

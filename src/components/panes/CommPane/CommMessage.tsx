@@ -2,11 +2,11 @@ import * as Cesium from "cesium";
 import type { Viewer } from "cesium";
 import type { PortalDetailPaneController } from "../../../controllers/PortalDetailPaneController.tsx";
 import type { PortalDetailState } from "../../../cesium/setup/mountCoreControllersAndUI.ts";
-import type { PortalEntityManager } from "../../../managers/entity/portalEntityManager.ts";
-import type { PortalHistoryEntityManager } from "../../../managers/entity/portalHistoryEntityManager.ts";
-import type { PortalLabelEntityManager } from "../../../managers/entity/portalLabelEntityManager.ts";
-import type { PortalOrnamentEntityManager } from "../../../managers/entity/portalOrnamentEntityManager.ts";
-import type { ScoutHistoryEntityManager } from "../../../managers/entity/scoutHistoryEntityManager.ts";
+import type { PortalManager } from "../../../managers/entity/portalManager.ts";
+import type { PortalHistoryManager } from "../../../managers/entity/portalHistoryManager.ts";
+import type { PortalLabelManager } from "../../../managers/entity/portalLabelManager.ts";
+import type { PortalOrnamentManager } from "../../../managers/entity/portalOrnamentManager.ts";
+import type { ScoutHistoryManager } from "../../../managers/entity/scoutHistoryManager.ts";
 import type { TileRequestManager } from "../../../managers/tiles/tileRequestManager.ts";
 import type { Channel } from "../../../types/common/common.ts";
 import type { CommResponseItem } from "../../../types/api/getPlexts.ts";
@@ -19,11 +19,11 @@ let latestPortalSelectionRequest = 0;
 async function selectLoadedPortal(
   viewer: Viewer,
   container: HTMLElement,
-  portalEntityManager: PortalEntityManager,
-  portalLabelEntityManager: PortalLabelEntityManager,
-  portalOrnamentEntityManager: PortalOrnamentEntityManager,
-  portalHistoryEntityManager: PortalHistoryEntityManager,
-  scoutHistoryEntityManager: ScoutHistoryEntityManager,
+  portalManager: PortalManager,
+  portalLabelManager: PortalLabelManager,
+  portalOrnamentManager: PortalOrnamentManager,
+  portalHistoryManager: PortalHistoryManager,
+  scoutHistoryManager: ScoutHistoryManager,
   portalDetailPaneController: PortalDetailPaneController,
   portalDetailState: PortalDetailState,
   latE6: number,
@@ -31,26 +31,26 @@ async function selectLoadedPortal(
   requestId: number
 ): Promise<boolean> {
   try {
-    const portalData = portalEntityManager.getPortalDataByCoordinates(latE6, lngE6);
+    const portalData = portalManager.getPortalDataByCoordinates(latE6, lngE6);
     if (!portalData) return false;
 
     const portalGuid = portalData.guid;
-    viewer.selectedEntity = portalEntityManager.getPortalEntity(portalGuid);
+    viewer.selectedEntity = portalManager.getPortalEntity(portalGuid);
 
-    await portalEntityManager.requestPortalDetails(portalGuid);
+    await portalManager.requestPortalDetails(portalGuid);
     if (requestId !== latestPortalSelectionRequest) return true;
 
-    const freshData = portalEntityManager.getPortalData(portalGuid);
+    const freshData = portalManager.getPortalData(portalGuid);
     if (!freshData) return false;
 
     portalDetailState.lastPortalData = freshData;
     portalDetailState.portalDetailBar?.remove();
     portalDetailState.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailPaneController: portalDetailPaneController, data: freshData }));
     portalDetailPaneController.updateDetailPane(freshData);
-    await portalLabelEntityManager.addOrUpdateLabel(freshData);
-    await portalOrnamentEntityManager.addOrUpdateOrnament(freshData);
-    await portalHistoryEntityManager.addOrUpdateHistoryHalo(freshData);
-    await scoutHistoryEntityManager.addOrUpdateScoutControlHalo(freshData);
+    await portalLabelManager.addOrUpdateLabel(freshData);
+    await portalOrnamentManager.addOrUpdateOrnament(freshData);
+    await portalHistoryManager.addOrUpdateHistoryHalo(freshData);
+    await scoutHistoryManager.addOrUpdateScoutControlHalo(freshData);
     return true;
   } catch {
     return false;
@@ -61,11 +61,11 @@ function handleOnClick(
   data: { latE6?: number; lngE6?: number },
   viewer: Viewer,
   container: HTMLElement,
-  portalEntityManager: PortalEntityManager,
-  portalLabelEntityManager: PortalLabelEntityManager,
-  portalOrnamentEntityManager: PortalOrnamentEntityManager,
-  portalHistoryEntityManager: PortalHistoryEntityManager,
-  scoutHistoryEntityManager: ScoutHistoryEntityManager,
+  portalManager: PortalManager,
+  portalLabelManager: PortalLabelManager,
+  portalOrnamentManager: PortalOrnamentManager,
+  portalHistoryManager: PortalHistoryManager,
+  scoutHistoryManager: ScoutHistoryManager,
   tileRequestManager: TileRequestManager,
   portalDetailPaneController: PortalDetailPaneController,
   portalDetailState: PortalDetailState,
@@ -77,11 +77,11 @@ function handleOnClick(
     const cachedSelectionPromise = selectLoadedPortal(
       viewer,
       container,
-      portalEntityManager,
-      portalLabelEntityManager,
-      portalOrnamentEntityManager,
-      portalHistoryEntityManager,
-      scoutHistoryEntityManager,
+      portalManager,
+      portalLabelManager,
+      portalOrnamentManager,
+      portalHistoryManager,
+      scoutHistoryManager,
       portalDetailPaneController,
       portalDetailState,
       latE6,
@@ -108,11 +108,11 @@ function handleOnClick(
           await selectLoadedPortal(
             viewer,
             container,
-            portalEntityManager,
-            portalLabelEntityManager,
-            portalOrnamentEntityManager,
-            portalHistoryEntityManager,
-            scoutHistoryEntityManager,
+            portalManager,
+            portalLabelManager,
+            portalOrnamentManager,
+            portalHistoryManager,
+            scoutHistoryManager,
             portalDetailPaneController,
             portalDetailState,
             latE6,
@@ -130,11 +130,11 @@ const CommMessage = ({
   viewer,
   container,
   tileRequestManager,
-  portalEntityManager,
-  portalLabelEntityManager,
-  portalOrnamentEntityManager,
-  portalHistoryEntityManager,
-  scoutHistoryEntityManager,
+  portalManager,
+  portalLabelManager,
+  portalOrnamentManager,
+  portalHistoryManager,
+  scoutHistoryManager,
   portalDetailPaneController,
   portalDetailState,
   channel,
@@ -143,11 +143,11 @@ const CommMessage = ({
   viewer: Viewer;
   container: HTMLElement;
   tileRequestManager: TileRequestManager;
-  portalEntityManager: PortalEntityManager;
-  portalLabelEntityManager: PortalLabelEntityManager;
-  portalOrnamentEntityManager: PortalOrnamentEntityManager;
-  portalHistoryEntityManager: PortalHistoryEntityManager;
-  scoutHistoryEntityManager: ScoutHistoryEntityManager;
+  portalManager: PortalManager;
+  portalLabelManager: PortalLabelManager;
+  portalOrnamentManager: PortalOrnamentManager;
+  portalHistoryManager: PortalHistoryManager;
+  scoutHistoryManager: ScoutHistoryManager;
   portalDetailPaneController: PortalDetailPaneController;
   portalDetailState: PortalDetailState;
   channel: Channel;
@@ -187,11 +187,11 @@ const CommMessage = ({
                   data,
                   viewer,
                   container,
-                  portalEntityManager,
-                  portalLabelEntityManager,
-                  portalOrnamentEntityManager,
-                  portalHistoryEntityManager,
-                  scoutHistoryEntityManager,
+                  portalManager,
+                  portalLabelManager,
+                  portalOrnamentManager,
+                  portalHistoryManager,
+                  scoutHistoryManager,
                   tileRequestManager,
                   portalDetailPaneController,
                   portalDetailState,

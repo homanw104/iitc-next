@@ -1,5 +1,5 @@
 /**
- * Shared portal label entity state.
+ * Defines shared portal label primitive state.
  *
  * PortalLabel combines the Cesium label primitive with cached text bounds,
  * layer membership, and fade state. Bounds are approximate screen-space values
@@ -8,13 +8,13 @@
  */
 
 import type * as Cesium from "cesium";
-import type { PortalData } from "../../types/iitc/portal.ts";
+import type { PortalData } from "../../types/iitc/portal";
 import type { EntityPositionCallback } from "./entityPositionManager";
-import type { PortalPrimitiveId } from "./portalEntityManager.ts";
+import type { PortalPrimitiveId } from "./portalManager";
 
 export interface PortalLabel {
   data: PortalData;
-  primitive?: Cesium.Label;
+  primitive: Cesium.Label | undefined;
   primitiveId: PortalPrimitiveId;
   position: Cesium.Cartesian3;
   positionCallback: EntityPositionCallback;

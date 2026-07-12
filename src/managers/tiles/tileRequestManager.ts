@@ -3,13 +3,13 @@
  */
 
 import type * as Cesium from "cesium";
-import type { FieldEntityManager } from "../entity/fieldEntityManager";
-import type { LinkEntityManager } from "../entity/linkEntityManager";
-import type { PortalEntityManager } from "../entity/portalEntityManager";
-import type { PortalHistoryEntityManager } from "../entity/portalHistoryEntityManager";
-import type { PortalLabelEntityManager } from "../entity/portalLabelEntityManager";
-import type { PortalOrnamentEntityManager } from "../entity/portalOrnamentEntityManager";
-import type { ScoutHistoryEntityManager } from "../entity/scoutHistoryEntityManager";
+import type { FieldManager } from "../entity/fieldManager";
+import type { LinkManager } from "../entity/linkManager";
+import type { PortalManager } from "../entity/portalManager";
+import type { PortalHistoryManager } from "../entity/portalHistoryManager";
+import type { PortalLabelManager } from "../entity/portalLabelManager";
+import type { PortalOrnamentManager } from "../entity/portalOrnamentManager";
+import type { ScoutHistoryManager } from "../entity/scoutHistoryManager";
 import { logManager } from "../system/logManager";
 import { settingsManager, type RefreshIntervalMs } from "../system/settingsManager";
 import { TileEntityHydrator } from "./tileRequestEntityHydrator";
@@ -29,24 +29,24 @@ export class TileRequestManager {
 
   constructor(
     viewer: Cesium.Viewer,
-    portalEntityManager: PortalEntityManager,
-    portalLabelEntityManager: PortalLabelEntityManager,
-    portalOrnamentEntityManager: PortalOrnamentEntityManager,
-    portalHistoryEntityManager: PortalHistoryEntityManager,
-    scoutHistoryEntityManager: ScoutHistoryEntityManager,
-    linkEntityManager: LinkEntityManager,
-    fieldEntityManager: FieldEntityManager,
+    portalManager: PortalManager,
+    portalLabelManager: PortalLabelManager,
+    portalOrnamentManager: PortalOrnamentManager,
+    portalHistoryManager: PortalHistoryManager,
+    scoutHistoryManager: ScoutHistoryManager,
+    linkManager: LinkManager,
+    fieldManager: FieldManager,
   ) {
     this.viewTileCalculator = new ViewTileCalculator(viewer);
     this.tileEntityHydrator = new TileEntityHydrator(
       viewer,
-      portalEntityManager,
-      portalLabelEntityManager,
-      portalOrnamentEntityManager,
-      portalHistoryEntityManager,
-      scoutHistoryEntityManager,
-      linkEntityManager,
-      fieldEntityManager,
+      portalManager,
+      portalLabelManager,
+      portalOrnamentManager,
+      portalHistoryManager,
+      scoutHistoryManager,
+      linkManager,
+      fieldManager,
     );
     this.tileRequestQueue = new TileRequestQueue(this.handleQueuedResponse);
     this.updateRefreshInterval(settingsManager.getRefreshIntervalMs());

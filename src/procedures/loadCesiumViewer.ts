@@ -38,13 +38,13 @@ export default function loadCesiumViewer(appContext: AppContext): void {
   const managers = createCoreManagers(viewer, container);
   const entityPositionManager = managers.entityPositionManager;
   const entityTranslucencyManager = managers.entityTranslucencyManager;
-  const portalEntityManager = managers.portalEntityManager;
-  const portalLabelEntityManager = managers.portalLabelEntityManager;
-  const portalOrnamentEntityManager = managers.portalOrnamentEntityManager;
-  const portalHistoryEntityManager = managers.portalHistoryEntityManager;
-  const scoutHistoryEntityManager = managers.scoutHistoryEntityManager;
+  const portalManager = managers.portalManager;
+  const portalLabelManager = managers.portalLabelManager;
+  const portalOrnamentManager = managers.portalOrnamentManager;
+  const portalHistoryManager = managers.portalHistoryManager;
+  const scoutHistoryManager = managers.scoutHistoryManager;
   const tileRequestManager = managers.tileRequestManager;
-  const debugTileEntityManager = managers.debugTileEntityManager;
+  const debugTileManager = managers.debugTileManager;
   const loadingProgressManager = managers.loadingProgressManager;
 
   // Expose managers to the global iitc object
@@ -55,9 +55,9 @@ export default function loadCesiumViewer(appContext: AppContext): void {
 
   configureCameraControls(viewer);
   keepRestoredCameraAboveTerrain(viewer, entityPositionManager, restoredPosition);
-  setUpDebugTilesRefresh(tileRequestManager, debugTileEntityManager);
+  setUpDebugTilesRefresh(tileRequestManager, debugTileManager);
   setUpEntityTerrainRefresh(viewer, entityPositionManager, entityTranslucencyManager, loadingProgressManager);
-  setUpInteractionHandlers(viewer, container, portalDetailPaneController, portalEntityManager, portalLabelEntityManager, portalOrnamentEntityManager, portalHistoryEntityManager, scoutHistoryEntityManager, portalDetailState);
+  setUpInteractionHandlers(viewer, container, portalDetailPaneController, portalManager, portalLabelManager, portalOrnamentManager, portalHistoryManager, scoutHistoryManager, portalDetailState);
   setUpTileUpdateWhenMove(viewer, tileRequestManager);
 
   appContext.coreManagers = managers;

@@ -6,11 +6,11 @@ import { ScreenSpaceEventType } from "cesium";
 import * as Cesium from "cesium";
 import type { PortalDetailPaneController } from "../../controllers/PortalDetailPaneController.tsx";
 import type { PortalDetailState } from "./mountCoreControllersAndUI.ts";
-import type { PortalEntityManager } from "../../managers/entity/portalEntityManager.ts";
-import type { PortalHistoryEntityManager } from "../../managers/entity/portalHistoryEntityManager.ts";
-import type { PortalLabelEntityManager } from "../../managers/entity/portalLabelEntityManager.ts";
-import type { PortalOrnamentEntityManager } from "../../managers/entity/portalOrnamentEntityManager.ts";
-import type { ScoutHistoryEntityManager } from "../../managers/entity/scoutHistoryEntityManager.ts";
+import type { PortalManager } from "../../managers/entity/portalManager.ts";
+import type { PortalHistoryManager } from "../../managers/entity/portalHistoryManager.ts";
+import type { PortalLabelManager } from "../../managers/entity/portalLabelManager.ts";
+import type { PortalOrnamentManager } from "../../managers/entity/portalOrnamentManager.ts";
+import type { ScoutHistoryManager } from "../../managers/entity/scoutHistoryManager.ts";
 import { createInteractionGestureState } from "../interaction/state/interactionGestureState.ts";
 import { createPinchGestureHandlers } from "../interaction/gesture/pinchGestureHandlers.ts";
 import { createTouchZoomHandlers } from "../interaction/gesture/touchZoomHandlers.ts";
@@ -23,11 +23,11 @@ export function setUpInteractionHandlers(
   viewer: Cesium.Viewer,
   container: HTMLElement,
   portalDetailPaneController: PortalDetailPaneController,
-  portalEntityManager: PortalEntityManager,
-  portalLabelEntityManager: PortalLabelEntityManager,
-  portalOrnamentEntityManager: PortalOrnamentEntityManager,
-  portalHistoryEntityManager: PortalHistoryEntityManager,
-  scoutHistoryEntityManager: ScoutHistoryEntityManager,
+  portalManager: PortalManager,
+  portalLabelManager: PortalLabelManager,
+  portalOrnamentManager: PortalOrnamentManager,
+  portalHistoryManager: PortalHistoryManager,
+  scoutHistoryManager: ScoutHistoryManager,
   portalDetailState: PortalDetailState,
 ): void {
   const handler = viewer.screenSpaceEventHandler;
@@ -51,11 +51,11 @@ export function setUpInteractionHandlers(
       viewer,
       container,
       portalDetailPaneController,
-      portalEntityManager,
-      portalLabelEntityManager,
-      portalOrnamentEntityManager,
-      portalHistoryEntityManager,
-      scoutHistoryEntityManager,
+      portalManager,
+      portalLabelManager,
+      portalOrnamentManager,
+      portalHistoryManager,
+      scoutHistoryManager,
       interfaceState: portalDetailState,
       selectionState: portalSelectionState,
       gestureState: gestureState,

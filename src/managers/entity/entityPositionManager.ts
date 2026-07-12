@@ -1,12 +1,11 @@
 /**
- * Resolves shared terrain-aware positions for map entities.
+ * Manages shared terrain-aware positions for map entities.
  */
 
 import * as Cesium from "cesium";
 import { logManager } from "../system/logManager";
-import type { LoadingProgressManager } from "../system/loadingProgressManager.ts";
+import type { LoadingProgressManager } from "../system/loadingProgressManager";
 import { settingsManager } from "../system/settingsManager";
-import { Cartesian3 } from "cesium";
 
 const LOG_TAG = "EntityPositionManager";
 
@@ -44,13 +43,8 @@ export class EntityPositionManager {
     private readonly viewer: Cesium.Viewer,
     private readonly sceneEventManager: LoadingProgressManager,
   ) {
-    viewer.camera.moveStart.addEventListener(() => {
-      this.clearSamplingWork();
-    });
-
-    viewer.camera.moveEnd.addEventListener(() => {
-      this.newSamplingWork();
-    });
+    viewer.camera.moveStart.addEventListener(this.handleCameraMoveStart);
+    viewer.camera.moveEnd.addEventListener(this.handleCameraMoveEnd);
   }
 
   public async getEntityPosition(data: EntityData): Promise<EntityPosition> {
@@ -61,7 +55,7 @@ export class EntityPositionManager {
   public invalidateEntityPositions(): void {
     this.entityPositions.forEach((entityPosition) => {
       entityPosition.isFallbackPosition = true;
-    });
+    },);
   }
 
   public clearSamplingWork(): void {
@@ -89,19 +83,22 @@ export class EntityPositionManager {
     }
   }
 
-  public setOnPositionChangedCallback(data: EntityData, callback: EntityPositionCallback): void {
+  public addPositionChangedCallback(data: EntityData, callback: EntityPositionCallback): void {
     const key = getEntityPositionKey(data.latE6, data.lngE6);
     const callbacks = this.entityPositions.get(key)?.positionCallbacks;
     if (!callbacks) return;
     callbacks.add(callback);
   }
 
-  public unsetOnPositionChangedCallback(data: EntityData, callback: EntityPositionCallback): void {
+  public removePositionChangedCallback(data: EntityData, callback: EntityPositionCallback): void {
     const key = getEntityPositionKey(data.latE6, data.lngE6);
     const callbacks = this.entityPositions.get(key)?.positionCallbacks;
     if (!callbacks) return;
     callbacks.delete(callback);
   }
+
+  private readonly handleCameraMoveStart = (): void => this.clearSamplingWork();
+  private readonly handleCameraMoveEnd = (): void => this.newSamplingWork();
 
   private registerEntityPosition(data: EntityData): EntityPosition {
     const key = getEntityPositionKey(data.latE6, data.lngE6);
@@ -126,7 +123,7 @@ export class EntityPositionManager {
   private populateSamplingQueue(): void {
     this.entityPositions.forEach((entityPosition, key) => {
       if (isEntityPositionInView(this.viewer, entityPosition)) this.entityPositionsSamplingQueue.add(key);
-    });
+    },);
   }
 
   private scheduleSamplingWork(): void {
@@ -137,7 +134,7 @@ export class EntityPositionManager {
     this.samplingScheduledTimeoutId = window.setTimeout(() => {
       this.samplingScheduled = false;
       this.flushSamplingQueue();
-    }, getSamplingBatchDelayMs());
+    }, getSamplingBatchDelayMs(),);
   }
 
   private flushSamplingQueue(): void {
@@ -167,12 +164,12 @@ export class EntityPositionManager {
         height = this.viewer.scene.globe.getHeight(
           Cesium.Cartographic.fromDegrees(
             entityPosition.lngE6 / 1e6,
-            entityPosition.latE6 / 1e6
+            entityPosition.latE6 / 1e6,
           ),
         );
       }
 
-      let position: Cartesian3;
+      let position: Cesium.Cartesian3;
       let isFallbackPosition: boolean;
       if (height === undefined && !entityPosition.isFallbackPosition) {
         // Use last position if it's sampled before but failed to sample this time
@@ -183,7 +180,7 @@ export class EntityPositionManager {
           entityPosition.lngE6 / 1e6,
           entityPosition.latE6 / 1e6,
           height ?? 0,
-        ])[0];
+        ],)[0];
         isFallbackPosition = height === undefined;
       }
 
@@ -192,7 +189,7 @@ export class EntityPositionManager {
       entityPosition.positionCallbacks.forEach((callback) => callback(entityPosition));
 
       this.entityPositionsNowSampling.delete(key);
-    });
+    },);
 
     this.logQueueStatus();
 
@@ -215,7 +212,7 @@ export class EntityPositionManager {
     this.samplingScheduledTimeoutId = window.setTimeout(() => {
       this.samplingScheduled = false;
       this.flushSamplingQueue();
-    }, getSamplingBatchDelayMs());
+    }, getSamplingBatchDelayMs(),);
   }
 
   private logQueueStatus(): void {
@@ -262,8 +259,8 @@ function getGoogleHeight(scene: Cesium.Scene, cartographic: Cesium.Cartographic)
 
 function isEntityPositionInView(viewer: Cesium.Viewer, entityPosition: EntityPosition): boolean {
   // Count all entities as in view if the horizon is visible
-  const cameraPith = Cesium.Math.toDegrees(viewer.camera.pitch);
-  if (cameraPith > CAMERA_PITCH_THRESHOLD_DEGREES) return true;
+  const cameraPitch = Cesium.Math.toDegrees(viewer.camera.pitch);
+  if (cameraPitch > CAMERA_PITCH_THRESHOLD_DEGREES) return true;
 
   // Count all entities as in view if the view rectangle is not defined
   const viewRectangle = viewer.camera.computeViewRectangle();

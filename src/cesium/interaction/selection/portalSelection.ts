@@ -6,11 +6,11 @@ import * as Cesium from "cesium";
 import PortalDetailBar from "../../../components/buttons/PortalDetailBar/PortalDetailBar";
 import type { PortalDetailPaneController } from "../../../controllers/PortalDetailPaneController.tsx";
 import type { PortalDetailState } from "../../setup/mountCoreControllersAndUI.ts";
-import { isPortalPrimitiveId, type PortalEntityManager } from "../../../managers/entity/portalEntityManager";
-import type { PortalHistoryEntityManager } from "../../../managers/entity/portalHistoryEntityManager";
-import type { PortalLabelEntityManager } from "../../../managers/entity/portalLabelEntityManager.ts";
-import type { PortalOrnamentEntityManager } from "../../../managers/entity/portalOrnamentEntityManager.ts";
-import type { ScoutHistoryEntityManager } from "../../../managers/entity/scoutHistoryEntityManager";
+import { isPortalPrimitiveId, type PortalManager } from "../../../managers/entity/portalManager";
+import type { PortalHistoryManager } from "../../../managers/entity/portalHistoryManager";
+import type { PortalLabelManager } from "../../../managers/entity/portalLabelManager.ts";
+import type { PortalOrnamentManager } from "../../../managers/entity/portalOrnamentManager.ts";
+import type { ScoutHistoryManager } from "../../../managers/entity/scoutHistoryManager";
 import type { InteractionGestureState } from "../state/interactionGestureState";
 import type { PortalData } from "../../../types/iitc/portal.ts";
 import { restoreSceneAfterPick } from "../picking/restoreSceneAfterPick.ts";
@@ -28,11 +28,11 @@ interface HandlePortalSelectionOptions {
   viewer: Cesium.Viewer;
   container: HTMLElement;
   portalDetailPaneController: PortalDetailPaneController;
-  portalEntityManager: PortalEntityManager;
-  portalLabelEntityManager: PortalLabelEntityManager;
-  portalOrnamentEntityManager: PortalOrnamentEntityManager;
-  portalHistoryEntityManager: PortalHistoryEntityManager;
-  scoutHistoryEntityManager: ScoutHistoryEntityManager;
+  portalManager: PortalManager;
+  portalLabelManager: PortalLabelManager;
+  portalOrnamentManager: PortalOrnamentManager;
+  portalHistoryManager: PortalHistoryManager;
+  scoutHistoryManager: ScoutHistoryManager;
   interfaceState: PortalDetailState;
   selectionState: PortalSelectionState;
   gestureState: InteractionGestureState;
@@ -44,11 +44,11 @@ export function handlePortalSelection({
   viewer,
   container,
   portalDetailPaneController,
-  portalEntityManager,
-  portalLabelEntityManager,
-  portalOrnamentEntityManager,
-  portalHistoryEntityManager,
-  scoutHistoryEntityManager,
+  portalManager,
+  portalLabelManager,
+  portalOrnamentManager,
+  portalHistoryManager,
+  scoutHistoryManager,
   interfaceState,
   selectionState,
   gestureState,
@@ -73,10 +73,10 @@ export function handlePortalSelection({
   };
 
   const updatePortalDecorations = (data: PortalData) => {
-    portalLabelEntityManager.addOrUpdateLabel(data).then();
-    portalOrnamentEntityManager.addOrUpdateOrnament(data).then();
-    portalHistoryEntityManager.addOrUpdateHistoryHalo(data).then();
-    scoutHistoryEntityManager.addOrUpdateScoutControlHalo(data).then();
+    portalLabelManager.addOrUpdateLabel(data).then();
+    portalOrnamentManager.addOrUpdateOrnament(data).then();
+    portalHistoryManager.addOrUpdateHistoryHalo(data).then();
+    scoutHistoryManager.addOrUpdateScoutControlHalo(data).then();
   };
 
   const displayNoPortalDetail = () => {
@@ -104,13 +104,13 @@ export function handlePortalSelection({
     restoreSceneAfterPick(viewer.scene);
 
     const portalGuid = getPickedPortalGuid(pickedObject);
-    const portalEntity = portalGuid ? portalEntityManager.getPortalEntity(portalGuid) : undefined;
+    const portalEntity = portalGuid ? portalManager.getPortalEntity(portalGuid) : undefined;
 
     if (portalGuid && portalEntity) {
-      const staleData: PortalData | undefined = portalEntityManager.getPortalData(portalGuid);
+      const staleData: PortalData | undefined = portalManager.getPortalData(portalGuid);
       let freshData: PortalData | undefined = undefined;
 
-      portalEntityManager.postponeLayerMove(portalGuid);
+      portalManager.postponeLayerMove(portalGuid);
 
       if (staleData) {
         window.setTimeout(() => {
@@ -118,24 +118,24 @@ export function handlePortalSelection({
           if (shouldDisplayPortalSelection(selectionState, gestureState, request)) {
             displayPortalDetail(portalEntity, staleData);
           }
-          portalEntityManager.releasePostponedLayerMove(portalGuid);
+          portalManager.releasePostponedLayerMove(portalGuid);
         }, doubleTapThreshold);
       }
 
-      portalEntityManager.requestPortalDetails(portalGuid)
+      portalManager.requestPortalDetails(portalGuid)
         .then(() => {
           window.setTimeout(() => {
             if (shouldDisplayPortalSelection(selectionState, gestureState, request)) {
-              freshData = portalEntityManager.getPortalData(portalGuid);
+              freshData = portalManager.getPortalData(portalGuid);
               if (freshData) {
                 displayPortalDetail(portalEntity, freshData);
                 updatePortalDecorations(freshData);
               }
             }
-            portalEntityManager.releasePostponedLayerMove(portalGuid);
+            portalManager.releasePostponedLayerMove(portalGuid);
           }, Math.max(0, displayPortalDetailAfter - performance.now()));
         })
-        .catch(() => portalEntityManager.releasePostponedLayerMove(portalGuid));
+        .catch(() => portalManager.releasePostponedLayerMove(portalGuid));
     } else {
       window.setTimeout(() => {
         if (shouldDisplayPortalSelection(selectionState, gestureState, request)) {

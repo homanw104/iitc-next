@@ -2,11 +2,11 @@ import type { Viewer } from "cesium";
 import CommPane from "../components/panes/CommPane/CommPane.tsx";
 import type { PortalDetailState } from "../cesium/setup/mountCoreControllersAndUI.ts";
 import type { CommManager } from "../managers/comm/commManager";
-import type { PortalEntityManager } from "../managers/entity/portalEntityManager";
-import type { PortalHistoryEntityManager } from "../managers/entity/portalHistoryEntityManager";
-import type { PortalLabelEntityManager } from "../managers/entity/portalLabelEntityManager.ts";
-import type { PortalOrnamentEntityManager } from "../managers/entity/portalOrnamentEntityManager.ts";
-import type { ScoutHistoryEntityManager } from "../managers/entity/scoutHistoryEntityManager";
+import type { PortalManager } from "../managers/entity/portalManager";
+import type { PortalHistoryManager } from "../managers/entity/portalHistoryManager";
+import type { PortalLabelManager } from "../managers/entity/portalLabelManager.ts";
+import type { PortalOrnamentManager } from "../managers/entity/portalOrnamentManager.ts";
+import type { ScoutHistoryManager } from "../managers/entity/scoutHistoryManager";
 import { logManager } from "../managers/system/logManager";
 import type { TileRequestManager } from "../managers/tiles/tileRequestManager.ts";
 import type { Channel } from "../types/common/common.ts";
@@ -19,11 +19,11 @@ export class CommPaneController {
   private readonly viewer: Viewer;
   private readonly commManager: CommManager;
   private readonly tileRequestManager: TileRequestManager;
-  private readonly portalEntityManager: PortalEntityManager;
-  private readonly portalLabelEntityManager: PortalLabelEntityManager;
-  private readonly portalOrnamentEntityManager: PortalOrnamentEntityManager;
-  private readonly portalHistoryEntityManager: PortalHistoryEntityManager;
-  private readonly scoutHistoryEntityManager: ScoutHistoryEntityManager;
+  private readonly portalManager: PortalManager;
+  private readonly portalLabelManager: PortalLabelManager;
+  private readonly portalOrnamentManager: PortalOrnamentManager;
+  private readonly portalHistoryManager: PortalHistoryManager;
+  private readonly scoutHistoryManager: ScoutHistoryManager;
   private readonly portalDetailPaneController: PortalDetailPaneController;
   private readonly portalDetailState: PortalDetailState;
 
@@ -46,11 +46,11 @@ export class CommPaneController {
     container: HTMLElement,
     commManager: CommManager,
     tileRequestManager: TileRequestManager,
-    portalEntityManager: PortalEntityManager,
-    portalLabelEntityManager: PortalLabelEntityManager,
-    portalOrnamentEntityManager: PortalOrnamentEntityManager,
-    portalHistoryEntityManager: PortalHistoryEntityManager,
-    scoutHistoryEntityManager: ScoutHistoryEntityManager,
+    portalManager: PortalManager,
+    portalLabelManager: PortalLabelManager,
+    portalOrnamentManager: PortalOrnamentManager,
+    portalHistoryManager: PortalHistoryManager,
+    scoutHistoryManager: ScoutHistoryManager,
     portalDetailPaneController: PortalDetailPaneController,
     portalDetailState: PortalDetailState
   ) {
@@ -58,11 +58,11 @@ export class CommPaneController {
     this.container = container;
     this.commManager = commManager;
     this.tileRequestManager = tileRequestManager;
-    this.portalEntityManager = portalEntityManager;
-    this.portalLabelEntityManager = portalLabelEntityManager;
-    this.portalOrnamentEntityManager = portalOrnamentEntityManager;
-    this.portalHistoryEntityManager = portalHistoryEntityManager;
-    this.scoutHistoryEntityManager = scoutHistoryEntityManager;
+    this.portalManager = portalManager;
+    this.portalLabelManager = portalLabelManager;
+    this.portalOrnamentManager = portalOrnamentManager;
+    this.portalHistoryManager = portalHistoryManager;
+    this.scoutHistoryManager = scoutHistoryManager;
     this.portalDetailPaneController = portalDetailPaneController;
     this.portalDetailState = portalDetailState;
 
@@ -179,11 +179,11 @@ export class CommPaneController {
         viewer={this.viewer}
         commManager={this.commManager}
         tileRequestManager={this.tileRequestManager}
-        portalEntityManager={this.portalEntityManager}
-        portalLabelEntityManager={this.portalLabelEntityManager}
-        portalOrnamentEntityManager={this.portalOrnamentEntityManager}
-        portalHistoryEntityManager={this.portalHistoryEntityManager}
-        scoutHistoryEntityManager={this.scoutHistoryEntityManager}
+        portalManager={this.portalManager}
+        portalLabelManager={this.portalLabelManager}
+        portalOrnamentManager={this.portalOrnamentManager}
+        portalHistoryManager={this.portalHistoryManager}
+        scoutHistoryManager={this.scoutHistoryManager}
         portalDetailPaneController={this.portalDetailPaneController}
         portalDetailState={this.portalDetailState}
         container={this.container}

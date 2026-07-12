@@ -4,16 +4,16 @@
 
 import type * as Cesium from "cesium";
 import { CommManager } from "../../managers/comm/commManager.ts";
-import { DebugTileEntityManager } from "../../managers/entity/debugTileEntityManager.ts";
+import { DebugTileManager } from "../../managers/entity/debugTileManager.ts";
 import { EntityPositionManager } from "../../managers/entity/entityPositionManager.ts";
 import { EntityTranslucencyManager } from "../../managers/entity/entityTranslucencyManager.ts";
-import { FieldEntityManager } from "../../managers/entity/fieldEntityManager.ts";
-import { LinkEntityManager } from "../../managers/entity/linkEntityManager.ts";
-import { PortalEntityManager } from "../../managers/entity/portalEntityManager.ts";
-import { PortalHistoryEntityManager } from "../../managers/entity/portalHistoryEntityManager.ts";
-import { PortalLabelEntityManager } from "../../managers/entity/portalLabelEntityManager.ts";
-import { PortalOrnamentEntityManager } from "../../managers/entity/portalOrnamentEntityManager.ts";
-import { ScoutHistoryEntityManager } from "../../managers/entity/scoutHistoryEntityManager.ts";
+import { FieldManager } from "../../managers/entity/fieldManager.ts";
+import { LinkManager } from "../../managers/entity/linkManager.ts";
+import { PortalManager } from "../../managers/entity/portalManager.ts";
+import { PortalHistoryManager } from "../../managers/entity/portalHistoryManager.ts";
+import { PortalLabelManager } from "../../managers/entity/portalLabelManager.ts";
+import { PortalOrnamentManager } from "../../managers/entity/portalOrnamentManager.ts";
+import { ScoutHistoryManager } from "../../managers/entity/scoutHistoryManager.ts";
 import { RedeemManager } from "../../managers/game/redeemManager.ts";
 import { ScoreManager } from "../../managers/game/scoreManager.ts";
 import { LayerManager } from "../../managers/layer/layerManager.ts";
@@ -26,14 +26,14 @@ export interface CoreManagers {
   loadingProgressManager: LoadingProgressManager;
   entityPositionManager: EntityPositionManager;
   entityTranslucencyManager: EntityTranslucencyManager;
-  portalEntityManager: PortalEntityManager;
-  portalLabelEntityManager: PortalLabelEntityManager;
-  portalOrnamentEntityManager: PortalOrnamentEntityManager;
-  portalHistoryEntityManager: PortalHistoryEntityManager;
-  scoutHistoryEntityManager: ScoutHistoryEntityManager;
-  linkEntityManager: LinkEntityManager;
-  fieldEntityManager: FieldEntityManager;
-  debugTileEntityManager: DebugTileEntityManager;
+  portalManager: PortalManager;
+  portalLabelManager: PortalLabelManager;
+  portalOrnamentManager: PortalOrnamentManager;
+  portalHistoryManager: PortalHistoryManager;
+  scoutHistoryManager: ScoutHistoryManager;
+  linkManager: LinkManager;
+  fieldManager: FieldManager;
+  debugTileManager: DebugTileManager;
   tileRequestManager: TileRequestManager;
   commManager: CommManager;
   scoreManager: ScoreManager;
@@ -46,15 +46,15 @@ export function createCoreManagers(viewer: Cesium.Viewer, container: HTMLElement
   const loadingProgressManager = new LoadingProgressManager(viewer);
   const entityPositionManager = new EntityPositionManager(viewer, loadingProgressManager);
   const entityTranslucencyManager = new EntityTranslucencyManager(viewer);
-  const portalEntityManager = new PortalEntityManager(viewer, layerManager, entityPositionManager, entityTranslucencyManager);
-  const portalLabelEntityManager = new PortalLabelEntityManager(viewer, layerManager, entityPositionManager);
-  const portalOrnamentEntityManager = new PortalOrnamentEntityManager(viewer, layerManager, entityPositionManager, entityTranslucencyManager);
-  const portalHistoryEntityManager = new PortalHistoryEntityManager(viewer, layerManager, entityPositionManager, entityTranslucencyManager);
-  const scoutHistoryEntityManager = new ScoutHistoryEntityManager(viewer, layerManager, entityPositionManager, entityTranslucencyManager);
-  const linkEntityManager = new LinkEntityManager(layerManager, portalEntityManager);
-  const fieldEntityManager = new FieldEntityManager(layerManager, portalEntityManager);
-  const debugTileEntityManager = new DebugTileEntityManager(viewer, layerManager);
-  const tileRequestManager = new TileRequestManager(viewer, portalEntityManager, portalLabelEntityManager, portalOrnamentEntityManager, portalHistoryEntityManager, scoutHistoryEntityManager, linkEntityManager, fieldEntityManager);
+  const portalManager = new PortalManager(viewer, layerManager, entityPositionManager, entityTranslucencyManager);
+  const portalLabelManager = new PortalLabelManager(viewer, layerManager, entityPositionManager);
+  const portalOrnamentManager = new PortalOrnamentManager(viewer, layerManager, entityPositionManager, entityTranslucencyManager);
+  const portalHistoryManager = new PortalHistoryManager(viewer, layerManager, entityPositionManager, entityTranslucencyManager);
+  const scoutHistoryManager = new ScoutHistoryManager(viewer, layerManager, entityPositionManager, entityTranslucencyManager);
+  const linkManager = new LinkManager(layerManager, portalManager);
+  const fieldManager = new FieldManager(layerManager, portalManager);
+  const debugTileManager = new DebugTileManager(viewer, layerManager);
+  const tileRequestManager = new TileRequestManager(viewer, portalManager, portalLabelManager, portalOrnamentManager, portalHistoryManager, scoutHistoryManager, linkManager, fieldManager);
   const commManager = new CommManager(viewer);
   const scoreManager = new ScoreManager();
   const redeemManager = new RedeemManager();
@@ -65,14 +65,14 @@ export function createCoreManagers(viewer: Cesium.Viewer, container: HTMLElement
     loadingProgressManager,
     entityPositionManager,
     entityTranslucencyManager,
-    portalEntityManager,
-    portalLabelEntityManager,
-    portalOrnamentEntityManager,
-    portalHistoryEntityManager,
-    scoutHistoryEntityManager,
-    linkEntityManager,
-    fieldEntityManager,
-    debugTileEntityManager,
+    portalManager,
+    portalLabelManager,
+    portalOrnamentManager,
+    portalHistoryManager,
+    scoutHistoryManager,
+    linkManager,
+    fieldManager,
+    debugTileManager,
     tileRequestManager,
     commManager,
     scoreManager,

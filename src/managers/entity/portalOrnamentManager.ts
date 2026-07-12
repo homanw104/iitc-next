@@ -1,9 +1,9 @@
 /**
- * Manage portal ornament billboard primitives.
+ * Manages portal ornament billboard primitives.
  */
 
 import * as Cesium from "cesium";
-import type { PortalData } from "../../types/iitc/portal.ts";
+import type { PortalData } from "../../types/iitc/portal";
 import type { LayerManager } from "../layer/layerManager";
 import type { EntityPosition, EntityPositionCallback, EntityPositionManager } from "./entityPositionManager";
 import type { EntityTranslucencyManager, TranslucencyByDistanceCallback } from "./entityTranslucencyManager";
@@ -14,8 +14,7 @@ import {
   createPortalPrimitiveId,
   getPortalDisableDepthTestDistance,
   type PortalPrimitiveId,
-} from "./portalEntityManager.ts";
-import { getPortalOrnamentEntityLayerId } from "./portalEntityLayers";
+} from "./portalManager";
 
 const AP1_ORNAMENT_SIZE = 16;
 const AP1_ORNAMENT_HOLLOW_SIZE = 8;
@@ -26,7 +25,7 @@ const ORNAMENT_IMAGE_ID_PREFIX = "portal-ornament-";
 
 const ornamentImageCache = new Map<string, HTMLCanvasElement>();
 
-interface PortalOrnament {
+interface Ornament {
   data: PortalData;
   primitiveId: PortalPrimitiveId;
   billboard: Cesium.Billboard;
@@ -35,35 +34,46 @@ interface PortalOrnament {
   currentLayerId: string;
 }
 
-export class PortalOrnamentEntityManager {
-  private ornaments: Map<string, PortalOrnament> = new Map();
-  private ornamentsPendingCreation: Set<string> = new Set();
+export class PortalOrnamentManager {
+  private readonly ornaments: Map<string, Ornament> = new Map();
+  private readonly ornamentsPendingCreation: Set<string> = new Set();
   private readonly currentTranslucencyByDistance = new Cesium.NearFarScalar();
   private readonly translucencyByDistanceCallback: TranslucencyByDistanceCallback;
 
   constructor(
-    private viewer: Cesium.Viewer,
-    private layerManager: LayerManager,
-    private entityPositionManager: EntityPositionManager,
-    entityTranslucencyManager: EntityTranslucencyManager
+    private readonly viewer: Cesium.Viewer,
+    private readonly layerManager: LayerManager,
+    private readonly entityPositionManager: EntityPositionManager,
+    entityTranslucencyManager: EntityTranslucencyManager,
   ) {
     this.translucencyByDistanceCallback = (translucencyByDistance) => {
       Cesium.NearFarScalar.clone(translucencyByDistance, this.currentTranslucencyByDistance);
       this.ornaments.forEach((ornament) => {
         ornament.occlusionBillboard.translucencyByDistance = this.currentTranslucencyByDistance;
-      });
+      },);
       if (this.ornaments.size > 0) this.viewer.scene.requestRender();
     };
-    entityTranslucencyManager.setOnTranslucencyByDistanceChangedCallback(this.translucencyByDistanceCallback);
+    entityTranslucencyManager.addTranslucencyByDistanceChangedCallback(this.translucencyByDistanceCallback);
   }
 
   public async addOrUpdateOrnaments(portals: PortalData[]): Promise<void> {
-    await Promise.all(portals.map((portal) => this.addOrUpdateOrnamentPrimitive(portal)));
+    await Promise.all(portals.map((portal) => this.addOrUpdateOrnament(portal)));
     this.viewer.scene.requestRender();
   }
 
   public async addOrUpdateOrnament(data: PortalData): Promise<void> {
-    await this.addOrUpdateOrnamentPrimitive(data);
+    if (!data.ornaments?.length) {
+      this.removeOrnamentPrimitive(data.guid);
+      this.viewer.scene.requestRender();
+      return;
+    }
+
+    const existing = this.ornaments.get(data.guid);
+    if (existing) {
+      await this.updateExistingOrnament(existing, data);
+    } else {
+      await this.createAndStoreOrnament(data);
+    }
     this.viewer.scene.requestRender();
   }
 
@@ -75,22 +85,8 @@ export class PortalOrnamentEntityManager {
     this.removeOrnamentPrimitivesInView(viewRect);
   }
 
-  private async addOrUpdateOrnamentPrimitive(data: PortalData): Promise<void> {
-    if (!data.ornaments?.length) {
-      this.removeOrnamentPrimitive(data.guid);
-      return;
-    }
-
-    const existing = this.ornaments.get(data.guid);
-    if (existing) {
-      await this.updateExistingOrnament(existing, data);
-    } else {
-      await this.createAndStoreOrnament(data);
-    }
-  }
-
-  private async updateExistingOrnament(ornament: PortalOrnament, data: PortalData): Promise<void> {
-    this.moveOrnamentToLayer(ornament, getPortalOrnamentEntityLayerId(data));
+  private async updateExistingOrnament(ornament: Ornament, data: PortalData): Promise<void> {
+    this.moveOrnamentToLayer(ornament, getOrnamentLayerId(data));
     await this.updateOrnamentPrimitives(ornament, data);
     this.updateOrnamentPositionSubscription(ornament, data);
     ornament.data = data;
@@ -103,7 +99,7 @@ export class PortalOrnamentEntityManager {
     try {
       const primitiveId = createPortalPrimitiveId(data.guid);
       const { billboard, occlusionBillboard } = await this.createOrnamentPrimitives(data, primitiveId);
-      const ornament: PortalOrnament = {
+      const ornament: Ornament = {
         data,
         primitiveId,
         billboard,
@@ -111,9 +107,9 @@ export class PortalOrnamentEntityManager {
         positionCallback: (entityPosition: EntityPosition) => {
           applyOrnamentPosition(ornament.billboard, ornament.occlusionBillboard, entityPosition);
         },
-        currentLayerId: getPortalOrnamentEntityLayerId(data),
+        currentLayerId: getOrnamentLayerId(data),
       };
-      this.entityPositionManager.setOnPositionChangedCallback(data, ornament.positionCallback);
+      this.entityPositionManager.addPositionChangedCallback(data, ornament.positionCallback);
       this.ornaments.set(data.guid, ornament);
     } finally {
       this.ornamentsPendingCreation.delete(data.guid);
@@ -124,7 +120,7 @@ export class PortalOrnamentEntityManager {
     billboard: Cesium.Billboard;
     occlusionBillboard: Cesium.Billboard
   }> {
-    const layerId = getPortalOrnamentEntityLayerId(data);
+    const layerId = getOrnamentLayerId(data);
     const billboards = this.getOrnamentBillboards(layerId);
     const entityPosition = await this.entityPositionManager.getEntityPosition(data);
 
@@ -141,7 +137,7 @@ export class PortalOrnamentEntityManager {
     return { billboard, occlusionBillboard };
   }
 
-  private async updateOrnamentPrimitives(ornament: PortalOrnament, data: PortalData): Promise<void> {
+  private async updateOrnamentPrimitives(ornament: Ornament, data: PortalData): Promise<void> {
     const entityPosition = await this.entityPositionManager.getEntityPosition(data);
 
     applyOrnamentPosition(ornament.billboard, ornament.occlusionBillboard, entityPosition);
@@ -149,11 +145,11 @@ export class PortalOrnamentEntityManager {
     setOrnamentBillboardImage(ornament.occlusionBillboard, data);
   }
 
-  private updateOrnamentPositionSubscription(ornament: PortalOrnament, data: PortalData): void {
+  private updateOrnamentPositionSubscription(ornament: Ornament, data: PortalData): void {
     if (ornament.data.latE6 === data.latE6 && ornament.data.lngE6 === data.lngE6) return;
 
-    this.entityPositionManager.unsetOnPositionChangedCallback(ornament.data, ornament.positionCallback);
-    this.entityPositionManager.setOnPositionChangedCallback(data, ornament.positionCallback);
+    this.entityPositionManager.removePositionChangedCallback(ornament.data, ornament.positionCallback);
+    this.entityPositionManager.addPositionChangedCallback(data, ornament.positionCallback);
   }
 
   private removeOrnamentPrimitive(guid: string): boolean {
@@ -168,7 +164,7 @@ export class PortalOrnamentEntityManager {
     billboards.remove(ornamentInfo.billboard);
     billboards.remove(ornamentInfo.occlusionBillboard);
 
-    this.entityPositionManager.unsetOnPositionChangedCallback(ornamentInfo.data, ornamentInfo.positionCallback);
+    this.entityPositionManager.removePositionChangedCallback(ornamentInfo.data, ornamentInfo.positionCallback);
     this.ornaments.delete(guid);
     this.ornamentsPendingCreation.delete(guid);
     return true;
@@ -184,14 +180,14 @@ export class PortalOrnamentEntityManager {
           toRemove.push(guid);
         }
       }
-    });
+    },);
     if (toRemove.length === 0) return;
 
-    toRemove.forEach(guid => this.removeOrnamentPrimitive(guid));
+    toRemove.forEach((guid) => this.removeOrnamentPrimitive(guid));
     this.viewer.scene.requestRender();
   }
 
-  private moveOrnamentToLayer(ornamentInfo: PortalOrnament, newLayerId: string): void {
+  private moveOrnamentToLayer(ornamentInfo: Ornament, newLayerId: string): void {
     if (ornamentInfo.currentLayerId === newLayerId) return;
 
     const billboardPosition = Cesium.Cartesian3.clone(ornamentInfo.billboard.position);
@@ -226,6 +222,10 @@ export class PortalOrnamentEntityManager {
   }
 }
 
+function getOrnamentLayerId(data: PortalData): string {
+  return `portals-ornament-${data.team.toLowerCase()}`;
+}
+
 function applyOrnamentPosition(
   billboard: Cesium.Billboard,
   occlusionBillboard: Cesium.Billboard,
@@ -255,7 +255,7 @@ function addOrnamentBillboard(
     horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
     verticalOrigin: Cesium.VerticalOrigin.CENTER,
     scaleByDistance: createPortalNearFarScalar(),
-  });
+  },);
 }
 
 function addOrnamentOcclusionBillboard(
@@ -278,7 +278,7 @@ function addOrnamentOcclusionBillboard(
     verticalOrigin: Cesium.VerticalOrigin.CENTER,
     scaleByDistance: createPortalNearFarScalar(),
     translucencyByDistance,
-  });
+  },);
 }
 
 function setOrnamentBillboardImage(billboard: Cesium.Billboard, data: PortalData): void {

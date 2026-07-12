@@ -1,48 +1,48 @@
 /**
- * Manage portal label primitives.
+ * Manages portal label primitives.
  */
 
 import * as Cesium from "cesium";
-import type { PortalData } from "../../types/iitc/portal.ts";
+import type { PortalData } from "../../types/iitc/portal";
 import type { LayerManager } from "../layer/layerManager";
 import type { EntityPosition, EntityPositionCallback, EntityPositionManager } from "./entityPositionManager";
+import { createPortalPrimitiveId } from "./portalManager";
+import { PortalLabelCameraMoveTracker } from "./portalLabelCamera";
 import {
-  PORTAL_LABEL_ENTITY_DISABLE_DEPTH_TEST_DISTANCE,
-  PORTAL_LABEL_ENTITY_FONT,
-  PORTAL_LABEL_ENTITY_INITIAL_OPACITY,
-  PORTAL_LABEL_ENTITY_OUTLINE_WIDTH,
-  createPortalLabelEntityPixelOffset,
-  createPortalLabelEntityPixelOffsetScaleByDistance,
+  PORTAL_LABEL_DISABLE_DEPTH_TEST_DISTANCE,
+  PORTAL_LABEL_FONT,
+  PORTAL_LABEL_INITIAL_OPACITY,
+  PORTAL_LABEL_OUTLINE_WIDTH,
+  createPortalLabelPixelOffset,
+  createPortalLabelPixelOffsetScaleByDistance,
   getPortalLabelLinkCount,
-  getPortalLabelEntityTextLayout,
-} from "./portalLabelEntityLayout";
-import { getPortalLabelEntityLayerId } from "./portalEntityLayers";
-import { PortalLabelEntityCameraMoveTracker } from "./portalLabelEntityCamera";
+  getPortalLabelTextLayout,
+} from "./portalLabelLayout";
 import {
-  didPortalLabelEntityFadeChange,
-  isPortalLabelEntityFadeTargetVisible,
-  isPortalLabelEntityFadeComplete,
-  isPortalLabelEntityFadingOut,
-  setPortalLabelEntityTargetVisibility,
-  updatePortalLabelEntityFade,
-} from "./portalLabelEntityFade";
-import { getNonOverlappingPortalLabelEntityGuids } from "./portalLabelEntityOverlap";
-import type { PortalLabel, PortalLabelTextLayout } from "./portalLabelEntityTypes";
-import { createPortalPrimitiveId } from "./portalEntityManager.ts";
+  didPortalLabelFadeChange,
+  isPortalLabelFadeTargetVisible,
+  isPortalLabelFadeComplete,
+  isPortalLabelFadingOut,
+  setPortalLabelTargetVisibility,
+  updatePortalLabelFade,
+} from "./portalLabelFade";
+import { getNonOverlappingPortalLabelGuids } from "./portalLabelOverlap";
+import type { PortalLabel, PortalLabelTextLayout } from "./portalLabelTypes";
 import {
-  PORTAL_LABEL_ENTITY_VISIBILITY_BATCH_DELAY_MS,
-  PORTAL_LABEL_ENTITY_VISIBILITY_BATCH_SIZE,
-  takePortalLabelEntityGuidBatch,
-} from "./portalLabelEntityVisibility";
+  PORTAL_LABEL_VISIBILITY_BATCH_DELAY_MS,
+  PORTAL_LABEL_VISIBILITY_BATCH_SIZE,
+  takePortalLabelGuidBatch,
+} from "./portalLabelVisibility";
 
-export class PortalLabelEntityManager {
-  private labels: Map<string, PortalLabel> = new Map();
-  private labelsPendingCreation: Set<string> = new Set();
-  private visibilityQueuedGuids: Set<string> = new Set();
+export class PortalLabelManager {
+  private readonly labels: Map<string, PortalLabel> = new Map();
+  private readonly labelsPendingCreation: Set<string> = new Set();
+  private readonly visibilityQueuedGuids: Set<string> = new Set();
+  private readonly fadingLabelGuids: Set<string> = new Set();
+  private readonly cameraMoveTracker: PortalLabelCameraMoveTracker;
   private visibilityUpdateScheduled = false;
   private overlapVisibleGuids: Set<string> = new Set();
   private overlapDirty = true;
-  private fadingLabelGuids: Set<string> = new Set();
   private fadeFrame: number | undefined;
   private pendingOverlapRevealGuids: Set<string> | undefined;
   private pendingOverlapRevealGeneration: number | undefined;
@@ -50,14 +50,13 @@ export class PortalLabelEntityManager {
   private deferredVisibilityUpdateDepth = 0;
   private overlapRefreshGeneration = 0;
   private hasPositionSettledVisibilityUpdate = false;
-  private cameraMoveTracker: PortalLabelEntityCameraMoveTracker;
 
   constructor(
-    private viewer: Cesium.Viewer,
-    private layerManager: LayerManager,
-    private entityPositionManager: EntityPositionManager
+    private readonly viewer: Cesium.Viewer,
+    private readonly layerManager: LayerManager,
+    private readonly entityPositionManager: EntityPositionManager,
   ) {
-    this.cameraMoveTracker = new PortalLabelEntityCameraMoveTracker(
+    this.cameraMoveTracker = new PortalLabelCameraMoveTracker(
       this.viewer,
       () => this.overlapRefreshGeneration++,
       () => this.queueAllVisibilityUpdates(),
@@ -67,7 +66,7 @@ export class PortalLabelEntityManager {
   public async addOrUpdateLabels(portals: PortalData[]): Promise<void> {
     await this.deferVisibilityUpdates(async () => {
       await Promise.all(portals.map((portalData) => this.addOrUpdateLabel(portalData)));
-    });
+    },);
   }
 
   public async addOrUpdateLabel(data: PortalData): Promise<void> {
@@ -80,15 +79,15 @@ export class PortalLabelEntityManager {
   }
 
   public removeLabelsInView(viewRect: Cesium.Rectangle): void {
-    this.removeLabelEntitiesInView(viewRect);
+    this.removeLabelPrimitivesInView(viewRect);
   }
 
   private async updateExistingLabel(label: PortalLabel, data: PortalData): Promise<void> {
     const title = data.title || "";
-    const layout = getPortalLabelEntityTextLayout(title);
+    const layout = getPortalLabelTextLayout(title);
     const entityPosition = await this.entityPositionManager.getEntityPosition(data);
-    this.moveLabelToLayer(label, getPortalLabelEntityLayerId(data));
-    this.updateLabelEntity(label, layout, entityPosition);
+    this.moveLabelToLayer(label, getPortalLabelLayerId(data));
+    this.updateLabel(label, layout, entityPosition);
     this.updateLabelPositionSubscription(label, data);
     label.wrappedText = layout.wrappedText;
     label.screenBoxWidth = layout.screenBoxWidth;
@@ -104,11 +103,12 @@ export class PortalLabelEntityManager {
     this.labelsPendingCreation.add(data.guid);
     try {
       const title = data.title || "";
-      const layout = getPortalLabelEntityTextLayout(title);
+      const layout = getPortalLabelTextLayout(title);
       const entityPosition = await this.entityPositionManager.getEntityPosition(data);
 
       const label: PortalLabel = {
         data,
+        primitive: undefined,
         primitiveId: createPortalPrimitiveId(data.guid),
         position: Cesium.Cartesian3.clone(entityPosition.position),
         positionCallback: this.createLabelPositionCallback(data.guid),
@@ -116,16 +116,16 @@ export class PortalLabelEntityManager {
         screenBoxWidth: layout.screenBoxWidth,
         screenBoxHeight: layout.screenBoxHeight,
         isFallbackPosition: entityPosition.isFallbackPosition,
-        currentOpacity: PORTAL_LABEL_ENTITY_INITIAL_OPACITY,
-        fadeStartOpacity: PORTAL_LABEL_ENTITY_INITIAL_OPACITY,
-        fadeTargetOpacity: PORTAL_LABEL_ENTITY_INITIAL_OPACITY,
+        currentOpacity: PORTAL_LABEL_INITIAL_OPACITY,
+        fadeStartOpacity: PORTAL_LABEL_INITIAL_OPACITY,
+        fadeTargetOpacity: PORTAL_LABEL_INITIAL_OPACITY,
         fadeStartTime: 0,
         firstShownAt: undefined,
         linkCount: getPortalLabelLinkCount(data),
-        currentLayerId: getPortalLabelEntityLayerId(data),
+        currentLayerId: getPortalLabelLayerId(data),
       };
       this.labels.set(data.guid, label);
-      this.entityPositionManager.setOnPositionChangedCallback(data, label.positionCallback);
+      this.entityPositionManager.addPositionChangedCallback(data, label.positionCallback);
       this.queueVisibilityUpdate(data.guid, true);
     } finally {
       this.labelsPendingCreation.delete(data.guid);
@@ -141,19 +141,19 @@ export class PortalLabelEntityManager {
       position: label.position,
       show,
       text: label.wrappedText,
-      font: PORTAL_LABEL_ENTITY_FONT,
+      font: PORTAL_LABEL_FONT,
       style: Cesium.LabelStyle.FILL_AND_OUTLINE,
       fillColor: Cesium.Color.WHITE.withAlpha(label.currentOpacity),
       outlineColor: Cesium.Color.BLACK.withAlpha(label.currentOpacity),
-      outlineWidth: PORTAL_LABEL_ENTITY_OUTLINE_WIDTH,
+      outlineWidth: PORTAL_LABEL_OUTLINE_WIDTH,
       showBackground: false,
       heightReference: Cesium.HeightReference.NONE,
-      disableDepthTestDistance: PORTAL_LABEL_ENTITY_DISABLE_DEPTH_TEST_DISTANCE,
+      disableDepthTestDistance: PORTAL_LABEL_DISABLE_DEPTH_TEST_DISTANCE,
       horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
       verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-      pixelOffset: createPortalLabelEntityPixelOffset(),
-      pixelOffsetScaleByDistance: createPortalLabelEntityPixelOffsetScaleByDistance(),
-    });
+      pixelOffset: createPortalLabelPixelOffset(),
+      pixelOffsetScaleByDistance: createPortalLabelPixelOffsetScaleByDistance(),
+    },);
   }
 
   private createLabelPositionCallback(guid: string): EntityPositionCallback {
@@ -162,13 +162,13 @@ export class PortalLabelEntityManager {
       if (!label) return;
 
       const title = label.data.title || "";
-      const layout = getPortalLabelEntityTextLayout(title);
-      this.updateLabelEntity(label, layout, entityPosition);
-      this.queueVisibilityUpdateAfterEntityPositionsSettle();
+      const layout = getPortalLabelTextLayout(title);
+      this.updateLabel(label, layout, entityPosition);
+      this.queueVisibilityUpdateAfterPositionsSettle();
     };
   }
 
-  private updateLabelEntity(label: PortalLabel, layout: PortalLabelTextLayout, entityPosition: EntityPosition): void {
+  private updateLabel(label: PortalLabel, layout: PortalLabelTextLayout, entityPosition: EntityPosition): void {
     Cesium.Cartesian3.clone(entityPosition.position, label.position);
     label.isFallbackPosition = entityPosition.isFallbackPosition;
     if (label.isFallbackPosition) this.setLabelTargetVisibility(label, false);
@@ -182,15 +182,15 @@ export class PortalLabelEntityManager {
   private updateLabelPositionSubscription(label: PortalLabel, data: PortalData): void {
     if (label.data.latE6 === data.latE6 && label.data.lngE6 === data.lngE6) return;
 
-    this.entityPositionManager.unsetOnPositionChangedCallback(label.data, label.positionCallback);
-    this.entityPositionManager.setOnPositionChangedCallback(data, label.positionCallback);
+    this.entityPositionManager.removePositionChangedCallback(label.data, label.positionCallback);
+    this.entityPositionManager.addPositionChangedCallback(data, label.positionCallback);
   }
 
-  private removeLabelEntity(guid: string): void {
+  private removeLabel(guid: string): void {
     const labelInfo = this.labels.get(guid);
     if (labelInfo) {
       this.removeLabelPrimitive(labelInfo);
-      this.entityPositionManager.unsetOnPositionChangedCallback(labelInfo.data, labelInfo.positionCallback);
+      this.entityPositionManager.removePositionChangedCallback(labelInfo.data, labelInfo.positionCallback);
       this.labels.delete(guid);
       this.overlapVisibleGuids.delete(guid);
       this.queueAllVisibilityUpdates();
@@ -200,7 +200,7 @@ export class PortalLabelEntityManager {
     this.fadingLabelGuids.delete(guid);
   }
 
-  private removeLabelEntitiesInView(viewRect: Cesium.Rectangle): void {
+  private removeLabelPrimitivesInView(viewRect: Cesium.Rectangle): void {
     const toRemove: string[] = [];
     this.labels.forEach((portalLabel, guid) => {
       const position = portalLabel.position;
@@ -210,10 +210,10 @@ export class PortalLabelEntityManager {
           toRemove.push(guid);
         }
       }
-    });
+    },);
     if (toRemove.length === 0) return;
 
-    toRemove.forEach(guid => this.removeLabelEntity(guid));
+    toRemove.forEach((guid) => this.removeLabel(guid));
   }
 
   private moveLabelToLayer(label: PortalLabel, newLayerId: string): void {
@@ -246,7 +246,7 @@ export class PortalLabelEntityManager {
     this.scheduleVisibilityUpdates();
   }
 
-  private queueVisibilityUpdateAfterEntityPositionsSettle(): void {
+  private queueVisibilityUpdateAfterPositionsSettle(): void {
     this.overlapDirty = true;
 
     if (this.deferredVisibilityUpdateDepth > 0) {
@@ -267,7 +267,7 @@ export class PortalLabelEntityManager {
 
       this.cameraMoveTracker.captureSnapshot();
       this.scheduleVisibilityUpdates();
-    });
+    },);
   }
 
   private async deferVisibilityUpdates(callback: () => Promise<void>): Promise<void> {
@@ -298,7 +298,7 @@ export class PortalLabelEntityManager {
     let changed = false;
     if (this.overlapDirty) changed = await this.refreshLabelOverlaps(time);
 
-    const guids = takePortalLabelEntityGuidBatch(this.visibilityQueuedGuids, PORTAL_LABEL_ENTITY_VISIBILITY_BATCH_SIZE);
+    const guids = takePortalLabelGuidBatch(this.visibilityQueuedGuids, PORTAL_LABEL_VISIBILITY_BATCH_SIZE);
     if (guids.length === 0) {
       if (changed) this.viewer.scene.requestRender();
       return;
@@ -315,10 +315,10 @@ export class PortalLabelEntityManager {
 
       if (this.shouldWaitForRejectedOverlapFade(guid, label)) return;
       if (this.setLabelTargetVisibility(label, true)) changed = true;
-    });
+    },);
 
     if (changed) this.viewer.scene.requestRender();
-    if (this.visibilityQueuedGuids.size > 0) this.scheduleVisibilityUpdates(PORTAL_LABEL_ENTITY_VISIBILITY_BATCH_DELAY_MS);
+    if (this.visibilityQueuedGuids.size > 0) this.scheduleVisibilityUpdates(PORTAL_LABEL_VISIBILITY_BATCH_DELAY_MS);
   }
 
   private async refreshLabelOverlaps(time: Cesium.JulianDate): Promise<boolean> {
@@ -326,7 +326,7 @@ export class PortalLabelEntityManager {
     this.overlapDirty = false;
     this.clearPendingOverlapReveal();
 
-    const nextOverlapVisibleGuids = await getNonOverlappingPortalLabelEntityGuids(
+    const nextOverlapVisibleGuids = await getNonOverlappingPortalLabelGuids(
       this.viewer,
       this.labels,
       time,
@@ -358,8 +358,8 @@ export class PortalLabelEntityManager {
 
       this.visibilityQueuedGuids.delete(guid);
       if (this.setLabelTargetVisibility(label, false)) changed = true;
-      if (isPortalLabelEntityFadingOut(label)) hasLabelsFadingOut = true;
-    });
+      if (isPortalLabelFadingOut(label)) hasLabelsFadingOut = true;
+    },);
 
     return { changed, hasLabelsFadingOut };
   }
@@ -373,7 +373,7 @@ export class PortalLabelEntityManager {
 
       this.visibilityQueuedGuids.delete(guid);
       if (this.setLabelTargetVisibility(label, true)) changed = true;
-    });
+    },);
 
     return changed;
   }
@@ -407,13 +407,13 @@ export class PortalLabelEntityManager {
 
   private shouldWaitForRejectedOverlapFade(guid: string, label: PortalLabel): boolean {
     return this.pendingOverlapRevealGuids?.has(guid) === true &&
-      !isPortalLabelEntityFadeTargetVisible(label);
+      !isPortalLabelFadeTargetVisible(label);
   }
 
   private setLabelTargetVisibility(label: PortalLabel, visible: boolean): boolean {
     const shouldShow = visible && !label.isFallbackPosition;
     if (shouldShow) this.ensureLabelPrimitive(label);
-    if (!setPortalLabelEntityTargetVisibility(label, shouldShow)) return false;
+    if (!setPortalLabelTargetVisibility(label, shouldShow)) return false;
 
     this.fadingLabelGuids.add(label.data.guid);
     this.scheduleLabelFade();
@@ -425,7 +425,7 @@ export class PortalLabelEntityManager {
 
     this.fadeFrame = window.requestAnimationFrame((timestamp) => {
       this.updateLabelFades(timestamp);
-    });
+    },);
   }
 
   private updateLabelFades(timestamp: number): void {
@@ -439,13 +439,13 @@ export class PortalLabelEntityManager {
         return;
       }
 
-      const result = updatePortalLabelEntityFade(label, timestamp);
-      if (didPortalLabelEntityFadeChange(result)) changed = true;
-      if (isPortalLabelEntityFadeComplete(result)) {
+      const result = updatePortalLabelFade(label, timestamp);
+      if (didPortalLabelFadeChange(result)) changed = true;
+      if (isPortalLabelFadeComplete(result)) {
         this.fadingLabelGuids.delete(guid);
-        if (!isPortalLabelEntityFadeTargetVisible(label) && this.removeLabelPrimitive(label)) changed = true;
+        if (!isPortalLabelFadeTargetVisible(label) && this.removeLabelPrimitive(label)) changed = true;
       }
-    });
+    },);
 
     if (!this.hasAnyLabelFadingOut() && this.revealPendingAcceptedOverlapLabels()) changed = true;
     if (changed) this.viewer.scene.requestRender();
@@ -455,7 +455,7 @@ export class PortalLabelEntityManager {
   private hasAnyLabelFadingOut(): boolean {
     for (const guid of this.fadingLabelGuids) {
       const label = this.labels.get(guid);
-      if (label && isPortalLabelEntityFadingOut(label)) return true;
+      if (label && isPortalLabelFadingOut(label)) return true;
     }
 
     return false;
@@ -473,4 +473,11 @@ export class PortalLabelEntityManager {
     label.primitive = undefined;
     return removed;
   }
+}
+
+function getPortalLabelLayerId(data: PortalData): string {
+  const team = data.team.toLowerCase();
+  const level = data.level ?? 0;
+  if (data.isPlaceholder === true || level === 0) return `portals-label-placeholder-${team}`;
+  else return `portals-label-l${level}-${team}`;
 }

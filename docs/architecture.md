@@ -75,13 +75,13 @@ decoration managers own their records and Cesium representations.
 `src/managers/entity/` is a historical directory name. Its managers now use a
 mixture of the remaining Cesium entities and direct primitives:
 
-* `portalEntityManager.ts` owns portal records, selectable entities, point
+* `portalManager.ts` owns portal records, selectable entities, point
   primitives, portal positions, and portal detail refreshes.
 * The portal label, ornament, history, and scout-control managers own the
   corresponding label, billboard, and point primitives.
 * Link and field managers build primitive geometry by layer and replace it when
   refreshed data is ready.
-* `debugTileEntityManager.ts` renders tile diagnostics in overlay layers.
+* `debugTileManager.ts` renders tile diagnostics in overlay layers.
 * `entityPositionManager.ts` centralizes terrain-backed positions and notifies
   consumers through callbacks.
 * `entityTranslucencyManager.ts` computes camera-dependent translucency once and
@@ -92,7 +92,7 @@ should not depend on a manager's internal Cesium primitive records.
 
 ### Field coverage rendering
 
-`fieldEntityManager.ts` retains the original field records and coordinates field
+`fieldManager.ts` retains the original field records and coordinates field
 layer replacement. Rendering those triangles directly makes nested fields
 expensive because Cesium's classification pipeline processes every covered
 shadow volume, including areas already covered by other fields.
@@ -116,19 +116,7 @@ color. `LayerGroundPrimitives.replaceGroundPrimitivesWhenReady` treats the depth
 primitives as one managed replacement and reveals them only after every child is
 ready.
 
-Fallback selection emits a warning tagged `FieldEntityManager`. The current
-choice is also available without enabling debug logging:
-
-```ts
-iitc.fieldEntityManager.getRenderingMode();
-// "coverage", "overlap-fallback", or "none"
-```
-
-For an Android debug build, connect the device over USB, open
-`chrome://inspect/#devices` in desktop Chrome, and inspect the IITC Next
-WebView. Debug builds enable WebView debugging in `MainActivity`; the warning
-and the expression above are then available in the WebView console. Release
-builds intentionally do not expose remote WebView debugging.
+Fallback selection emits a warning tagged `FieldManager`.
 
 ### Layer model
 
@@ -171,7 +159,7 @@ exist.
 ### Portal primitive picking
 
 Portal points and their visual decorations use the same pick-ID contract,
-exported by `portalEntityManager.ts`:
+exported by `portalManager.ts`:
 
 ```ts
 interface PortalPrimitiveId {

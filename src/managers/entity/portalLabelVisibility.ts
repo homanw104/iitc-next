@@ -9,15 +9,15 @@
  */
 
 import * as Cesium from "cesium";
-import { logManager } from "../system/logManager.ts";
+import { logManager } from "../system/logManager";
 
-export const PORTAL_LABEL_ENTITY_VISIBILITY_BATCH_SIZE = 16;
-export const PORTAL_LABEL_ENTITY_VISIBILITY_BATCH_DELAY_MS = 10;
-export const PORTAL_LABEL_ENTITY_VISIBILITY_EPSILON_METERS = 25;
-export const PORTAL_LABEL_ENTITY_VISIBILITY_DISTANCE_EPSILON_FACTOR = 0.02;
-export const PORTAL_LABEL_ENTITY_VISIBILITY_MAX_EPSILON_METERS = 300;
+export const PORTAL_LABEL_VISIBILITY_BATCH_SIZE = 16;
+export const PORTAL_LABEL_VISIBILITY_BATCH_DELAY_MS = 10;
+const PORTAL_LABEL_VISIBILITY_EPSILON_METERS = 25;
+const PORTAL_LABEL_VISIBILITY_DISTANCE_EPSILON_FACTOR = 0.02;
+const PORTAL_LABEL_VISIBILITY_MAX_EPSILON_METERS = 300;
 
-const LOG_TAG = "PortalLabelEntityManager";
+const LOG_TAG = "PortalLabelManager";
 const RAY_TARGET_HEIGHT_OFFSET_METERS = 5;
 
 const terrainPickScratch = new Cesium.Cartesian3();
@@ -26,7 +26,7 @@ const rayTargetScratch = new Cesium.Cartesian3();
 const rayDirectionScratch = new Cesium.Cartesian3();
 const visibilityRayScratch = new Cesium.Ray();
 
-export function isPortalLabelEntityPositionVisible(
+export function isPortalLabelPositionVisible(
   viewer: Cesium.Viewer,
   labelPosition: Cesium.Cartesian3,
   windowPosition?: Cesium.Cartesian2,
@@ -48,7 +48,7 @@ export function isPortalLabelEntityPositionVisible(
   return isPositionVisibleAgainstTerrain(viewer, targetPosition);
 }
 
-export function takePortalLabelEntityGuidBatch(queuedGuids: Set<string>, limit: number): string[] {
+export function takePortalLabelGuidBatch(queuedGuids: Set<string>, limit: number): string[] {
   const batch: string[] = [];
 
   for (const guid of queuedGuids) {
@@ -129,9 +129,9 @@ function pickRenderedDepthPosition(scene: Cesium.Scene, windowPosition: Cesium.C
 
 function getVisibilityEpsilonMeters(targetDistance: number): number {
   return Cesium.Math.clamp(
-    targetDistance * PORTAL_LABEL_ENTITY_VISIBILITY_DISTANCE_EPSILON_FACTOR,
-    PORTAL_LABEL_ENTITY_VISIBILITY_EPSILON_METERS,
-    PORTAL_LABEL_ENTITY_VISIBILITY_MAX_EPSILON_METERS,
+    targetDistance * PORTAL_LABEL_VISIBILITY_DISTANCE_EPSILON_FACTOR,
+    PORTAL_LABEL_VISIBILITY_EPSILON_METERS,
+    PORTAL_LABEL_VISIBILITY_MAX_EPSILON_METERS,
   );
 }
 

@@ -7,13 +7,13 @@ import type { FieldData } from "../../types/iitc/field.ts";
 import type { LinkData } from "../../types/iitc/link.ts";
 import type { PortalData } from "../../types/iitc/portal.ts";
 import type { TileResponse } from "../../types/api/getEntities.ts";
-import type { FieldEntityManager } from "../entity/fieldEntityManager";
-import type { LinkEntityManager } from "../entity/linkEntityManager";
-import type { PortalEntityManager } from "../entity/portalEntityManager";
-import type { PortalHistoryEntityManager } from "../entity/portalHistoryEntityManager";
-import type { PortalLabelEntityManager } from "../entity/portalLabelEntityManager";
-import type { PortalOrnamentEntityManager } from "../entity/portalOrnamentEntityManager";
-import type { ScoutHistoryEntityManager } from "../entity/scoutHistoryEntityManager";
+import type { FieldManager } from "../entity/fieldManager";
+import type { LinkManager } from "../entity/linkManager";
+import type { PortalManager } from "../entity/portalManager";
+import type { PortalHistoryManager } from "../entity/portalHistoryManager";
+import type { PortalLabelManager } from "../entity/portalLabelManager";
+import type { PortalOrnamentManager } from "../entity/portalOrnamentManager";
+import type { ScoutHistoryManager } from "../entity/scoutHistoryManager";
 import { logManager } from "../system/logManager";
 import { parseTileEntities } from "./tileRequestEntityParser";
 import type { TileRequestQueue } from "./tileRequestQueue";
@@ -24,23 +24,23 @@ const PORTAL_HYDRATION_BATCH_SIZE = 64;
 export class TileEntityHydrator {
   constructor(
     private readonly viewer: Cesium.Viewer,
-    private readonly portalEntityManager: PortalEntityManager,
-    private readonly portalLabelEntityManager: PortalLabelEntityManager,
-    private readonly portalOrnamentEntityManager: PortalOrnamentEntityManager,
-    private readonly portalHistoryEntityManager: PortalHistoryEntityManager,
-    private readonly scoutHistoryEntityManager: ScoutHistoryEntityManager,
-    private readonly linkEntityManager: LinkEntityManager,
-    private readonly fieldEntityManager: FieldEntityManager,
+    private readonly portalManager: PortalManager,
+    private readonly portalLabelManager: PortalLabelManager,
+    private readonly portalOrnamentManager: PortalOrnamentManager,
+    private readonly portalHistoryManager: PortalHistoryManager,
+    private readonly scoutHistoryManager: ScoutHistoryManager,
+    private readonly linkManager: LinkManager,
+    private readonly fieldManager: FieldManager,
   ) {}
 
   public removeEntitiesInView(viewRect: Cesium.Rectangle): void {
-    this.portalEntityManager.removePortalsInView(viewRect);
-    this.portalLabelEntityManager.removeLabelsInView(viewRect);
-    this.portalOrnamentEntityManager.removeOrnamentsInView(viewRect);
-    this.portalHistoryEntityManager.removeHistoryHalosInView(viewRect);
-    this.scoutHistoryEntityManager.removeScoutControlHalosInView(viewRect);
-    this.linkEntityManager.removeLinksInView(viewRect);
-    this.fieldEntityManager.removeFieldsInView(viewRect);
+    this.portalManager.removePortalsInView(viewRect);
+    this.portalLabelManager.removeLabelsInView(viewRect);
+    this.portalOrnamentManager.removeOrnamentsInView(viewRect);
+    this.portalHistoryManager.removeHistoryHalosInView(viewRect);
+    this.scoutHistoryManager.removeScoutControlHalosInView(viewRect);
+    this.linkManager.removeLinksInView(viewRect);
+    this.fieldManager.removeFieldsInView(viewRect);
     logManager.debug(LOG_TAG, "Removed entities from current view");
   }
 
@@ -116,15 +116,15 @@ export class TileEntityHydrator {
     const portals = Array.from(portalsToHydrate.values());
     await hydrateInBatches(portals, PORTAL_HYDRATION_BATCH_SIZE, async (batch) => {
       await Promise.all([
-        this.portalEntityManager.addOrUpdatePortals(batch),
-        this.portalLabelEntityManager.addOrUpdateLabels(batch),
-        this.portalOrnamentEntityManager.addOrUpdateOrnaments(batch),
-        this.portalHistoryEntityManager.addOrUpdateHistoryHalos(batch),
-        this.scoutHistoryEntityManager.addOrUpdateScoutControlHalos(batch),
+        this.portalManager.addOrUpdatePortals(batch),
+        this.portalLabelManager.addOrUpdateLabels(batch),
+        this.portalOrnamentManager.addOrUpdateOrnaments(batch),
+        this.portalHistoryManager.addOrUpdateHistoryHalos(batch),
+        this.scoutHistoryManager.addOrUpdateScoutControlHalos(batch),
       ]);
     });
-    await this.linkEntityManager.addOrUpdateLinks(Array.from(linksToHydrate.values()));
-    await this.fieldEntityManager.addOrUpdateFields(Array.from(fieldsToHydrate.values()));
+    await this.linkManager.addOrUpdateLinks(Array.from(linksToHydrate.values()));
+    await this.fieldManager.addOrUpdateFields(Array.from(fieldsToHydrate.values()));
 
     logManager.debug(LOG_TAG, `Processed ${entitiesFound} entities`);
     this.viewer.scene.requestRender();

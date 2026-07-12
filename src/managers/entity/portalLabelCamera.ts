@@ -17,22 +17,22 @@ const LABEL_CAMERA_MOVE_MIN_ANGLE_RADIANS = Cesium.Math.toRadians(0.5);
 
 const cameraCartographicScratch = new Cesium.Cartographic();
 
-export class PortalLabelEntityCameraMoveTracker {
+export class PortalLabelCameraMoveTracker {
+  private readonly lastCameraPosition = new Cesium.Cartesian3();
+  private readonly lastCameraDirection = new Cesium.Cartesian3();
+  private readonly lastCameraUp = new Cesium.Cartesian3();
   private isMoving = false;
   private lastVisibilityUpdate = 0;
   private hasCameraSnapshot = false;
-  private lastCameraPosition = new Cesium.Cartesian3();
-  private lastCameraDirection = new Cesium.Cartesian3();
-  private lastCameraUp = new Cesium.Cartesian3();
 
   constructor(
-    private viewer: Cesium.Viewer,
-    private onMoveStarted: () => void,
-    private onVisibilityUpdateNeeded: () => void,
+    private readonly viewer: Cesium.Viewer,
+    private readonly onMoveStarted: () => void,
+    private readonly onVisibilityUpdateNeeded: () => void,
   ) {
-    this.viewer.camera.moveStart.addEventListener(() => this.handleMoveStart());
-    this.viewer.camera.moveEnd.addEventListener(() => this.handleMoveEnd());
-    this.viewer.scene.preRender.addEventListener(() => this.handlePreRender());
+    this.viewer.camera.moveStart.addEventListener(this.handleMoveStart);
+    this.viewer.camera.moveEnd.addEventListener(this.handleMoveEnd);
+    this.viewer.scene.preRender.addEventListener(this.handlePreRender);
   }
 
   public captureSnapshot(): void {
@@ -46,17 +46,17 @@ export class PortalLabelEntityCameraMoveTracker {
     return this.isMoving;
   }
 
-  private handleMoveStart(): void {
+  private readonly handleMoveStart = (): void => {
     this.isMoving = true;
     this.lastVisibilityUpdate = performance.now();
     this.onMoveStarted();
-  }
+  };
 
-  private handleMoveEnd(): void {
+  private readonly handleMoveEnd = (): void => {
     this.isMoving = false;
-  }
+  };
 
-  private handlePreRender(): void {
+  private readonly handlePreRender = (): void => {
     if (!this.isMoving) return;
 
     const now = performance.now();
@@ -65,7 +65,7 @@ export class PortalLabelEntityCameraMoveTracker {
 
     this.lastVisibilityUpdate = now;
     this.onVisibilityUpdateNeeded();
-  }
+  };
 
   private hasCameraMovedEnoughForVisibility(): boolean {
     if (!this.hasCameraSnapshot) return true;

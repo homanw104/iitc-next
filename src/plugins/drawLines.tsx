@@ -10,7 +10,7 @@ import { pickGestureSurfacePosition as pickSceneSurfacePosition } from "../cesiu
 import { restoreSceneAfterPick } from "../cesium/interaction/picking/restoreSceneAfterPick.ts";
 import type { LayerGroundPrimitives } from "../managers/layer/layerGroundPrimitives";
 import type { LayerOverlay } from "../managers/layer/layerOverlay";
-import { isPortalPrimitiveId } from "../managers/entity/portalEntityManager.ts";
+import { isPortalPrimitiveId } from "../managers/entity/portalManager.ts";
 import type { IITCCore } from "../types/iitc/iitc.ts";
 import { h } from "../utils/dom.ts";
 import { safeLocalStorage } from "../utils/storage.ts";
@@ -89,7 +89,7 @@ class DrawLinesPlugin implements DrawLinesReader, DrawLinesAppearanceController 
   private logManager!: NonNullable<IITCCore["logManager"]>;
   private interfaceManager!: NonNullable<IITCCore["interfaceManager"]>;
   private layerManager!: NonNullable<IITCCore["layerManager"]>;
-  private portalEntityManager!: NonNullable<IITCCore["portalEntityManager"]>;
+  private portalManager!: NonNullable<IITCCore["portalManager"]>;
 
   private isDrawing: boolean = false;
   private isDeleting: boolean = false;
@@ -132,15 +132,15 @@ class DrawLinesPlugin implements DrawLinesReader, DrawLinesAppearanceController 
     this.logManager = iitc.logManager!;
     this.interfaceManager = iitc.interfaceManager!;
     this.layerManager = iitc.layerManager!;
-    this.portalEntityManager = iitc.portalEntityManager!;
+    this.portalManager = iitc.portalManager!;
 
-    if (!this.viewer || !this.logManager || !this.interfaceManager || !this.layerManager || !this.portalEntityManager) {
+    if (!this.viewer || !this.logManager || !this.interfaceManager || !this.layerManager || !this.portalManager) {
       console.warn(`[WARN]IITC Next core components missing`, {
         viewer: !!this.viewer,
         logManager: !!this.logManager,
         interfaceManager: !!this.interfaceManager,
         layerManager: !!this.layerManager,
-        portalEntityManager: !!this.portalEntityManager,
+        portalManager: !!this.portalManager,
       });
       return;
     }
@@ -735,7 +735,7 @@ class DrawLinesPlugin implements DrawLinesReader, DrawLinesAppearanceController 
     const picked = this.viewer.scene.pick(position);
     const pickedId = picked?.id;
     if (snap && isPortalPrimitiveId(pickedId)) {
-      return this.portalEntityManager.getPortalPosition(pickedId.guid);
+      return this.portalManager.getPortalPosition(pickedId.guid);
     }
     if (snap && this.isLineMarkerPrimitiveId(pickedId)) {
       return this.getLineMarkerPosition(pickedId);

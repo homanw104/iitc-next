@@ -46,29 +46,29 @@ class DoneLinesPlugin {
   public description = "Highlight draw lines that match existing map links.";
 
   private logManager!: NonNullable<IITCCore["logManager"]>;
-  private linkEntityManager!: NonNullable<IITCCore["linkEntityManager"]>;
+  private linkManager!: NonNullable<IITCCore["linkManager"]>;
   private drawLinesReader!: DrawLinesReader;
   private drawLinesAppearanceController!: DrawLinesAppearanceController;
 
   private updateFrame: number | undefined;
-  private linksChangedListener = () => this.scheduleUpdate();
+  private linksChangedCallback = () => this.scheduleUpdate();
   private drawLinesChangedListener = () => this.scheduleUpdate();
 
   public init() {
     const iitc: IITCCore = safeWindow.iitc;
     this.logManager = iitc.logManager!;
-    this.linkEntityManager = iitc.linkEntityManager!;
+    this.linkManager = iitc.linkManager!;
     const drawLinesPlugin = iitc.pluginManager?.getPlugin(DRAW_LINES_PLUGIN_ID);
 
     if (
       !this.logManager ||
-      !this.linkEntityManager ||
+      !this.linkManager ||
       !isDrawLinesReader(drawLinesPlugin) ||
       !isDrawLinesAppearanceController(drawLinesPlugin)
     ) {
       console.warn(`[WARN][${LOG_TAG}] IITC Next core components missing`, {
         logManager: !!this.logManager,
-        linkEntityManager: !!this.linkEntityManager,
+        linkManager: !!this.linkManager,
         drawLinesReader: isDrawLinesReader(drawLinesPlugin),
         drawLinesAppearanceController: isDrawLinesAppearanceController(drawLinesPlugin),
       });
@@ -78,7 +78,7 @@ class DoneLinesPlugin {
     this.drawLinesAppearanceController = drawLinesPlugin;
 
     try {
-      this.linkEntityManager.addLinksChangedListener(this.linksChangedListener);
+      this.linkManager.addLinksChangedCallback(this.linksChangedCallback);
       this.drawLinesReader.addDrawLinesChangedListener(this.drawLinesChangedListener);
       this.scheduleUpdate();
     } catch (e) {
@@ -90,7 +90,7 @@ class DoneLinesPlugin {
     try {
       if (this.updateFrame !== undefined) window.cancelAnimationFrame(this.updateFrame);
       this.updateFrame = undefined;
-      this.linkEntityManager?.removeLinksChangedListener(this.linksChangedListener);
+      this.linkManager?.removeLinksChangedCallback(this.linksChangedCallback);
       this.drawLinesReader?.removeDrawLinesChangedListener(this.drawLinesChangedListener);
       this.drawLinesAppearanceController?.clearAppearanceOverrides(DONE_LINES_PLUGIN_ID);
     } catch (e) {
@@ -144,7 +144,7 @@ class DoneLinesPlugin {
   private getLinkSegments(): Segment[] {
     const segments: Segment[] = [];
 
-    this.linkEntityManager.forEachLinkData(link => {
+    this.linkManager.forEachLinkData(link => {
       const segment = this.getLinkSegment(link);
       segments.push(segment);
     });

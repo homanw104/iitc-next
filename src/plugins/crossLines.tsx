@@ -40,26 +40,26 @@ class CrossLinesPlugin {
 
   private logManager!: NonNullable<IITCCore["logManager"]>;
   private layerManager!: NonNullable<IITCCore["layerManager"]>;
-  private linkEntityManager!: NonNullable<IITCCore["linkEntityManager"]>;
+  private linkManager!: NonNullable<IITCCore["linkManager"]>;
   private drawLinesReader!: DrawLinesReader;
 
   private highlightLayer: LayerGroundPrimitives | undefined;
   private updateFrame: number | undefined;
-  private linksChangedListener = () => this.scheduleUpdate();
+  private linksChangedCallback = () => this.scheduleUpdate();
   private drawLinesChangedListener = () => this.scheduleUpdate();
 
   public init() {
     const iitc: IITCCore = safeWindow.iitc;
     this.logManager = iitc.logManager!;
     this.layerManager = iitc.layerManager!;
-    this.linkEntityManager = iitc.linkEntityManager!;
+    this.linkManager = iitc.linkManager!;
     const drawLinesPlugin = iitc.pluginManager?.getPlugin(DRAW_LINES_PLUGIN_ID);
 
-    if (!this.logManager || !this.layerManager || !this.linkEntityManager || !isDrawLinesReader(drawLinesPlugin)) {
+    if (!this.logManager || !this.layerManager || !this.linkManager || !isDrawLinesReader(drawLinesPlugin)) {
       console.warn(`[WARN][${LOG_TAG}] IITC Next core components missing`, {
         logManager: !!this.logManager,
         layerManager: !!this.layerManager,
-        linkEntityManager: !!this.linkEntityManager,
+        linkManager: !!this.linkManager,
         drawLinesReader: isDrawLinesReader(drawLinesPlugin),
       });
       return;
@@ -68,7 +68,7 @@ class CrossLinesPlugin {
 
     try {
       this.highlightLayer = this.layerManager.getOrCreateGroundPrimitiveLayer(CROSS_LINES_LAYER_NAME, CROSS_LINES_PRIMITIVE_Z_INDEX);
-      this.linkEntityManager.addLinksChangedListener(this.linksChangedListener);
+      this.linkManager.addLinksChangedCallback(this.linksChangedCallback);
       this.drawLinesReader.addDrawLinesChangedListener(this.drawLinesChangedListener);
       this.scheduleUpdate();
     } catch (e) {
@@ -80,7 +80,7 @@ class CrossLinesPlugin {
     try {
       if (this.updateFrame !== undefined) window.cancelAnimationFrame(this.updateFrame);
       this.updateFrame = undefined;
-      this.linkEntityManager?.removeLinksChangedListener(this.linksChangedListener);
+      this.linkManager?.removeLinksChangedCallback(this.linksChangedCallback);
       this.drawLinesReader?.removeDrawLinesChangedListener(this.drawLinesChangedListener);
       this.layerManager.removeGroundPrimitiveLayer(CROSS_LINES_LAYER_NAME);
       this.highlightLayer = undefined;
@@ -108,7 +108,7 @@ class CrossLinesPlugin {
     }
 
     const geometryInstances: Cesium.GeometryInstance[] = [];
-    this.linkEntityManager.forEachLinkData(link => {
+    this.linkManager.forEachLinkData(link => {
       const linkSegment = this.getLinkSegment(link);
 
       const isCrossed = drawLineSegments.some(drawLine => this.segmentsIntersect(drawLine[0], drawLine[1], linkSegment[0], linkSegment[1]));

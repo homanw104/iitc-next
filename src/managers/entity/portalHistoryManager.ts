@@ -1,9 +1,9 @@
 /**
- * Manage portal history halo point primitives.
+ * Manages portal history halo point primitives.
  */
 
 import * as Cesium from "cesium";
-import type { PortalData } from "../../types/iitc/portal.ts";
+import type { PortalData } from "../../types/iitc/portal";
 import type { LayerManager } from "../layer/layerManager";
 import type { EntityPosition, EntityPositionCallback, EntityPositionManager } from "./entityPositionManager";
 import type { EntityTranslucencyManager, TranslucencyByDistanceCallback } from "./entityTranslucencyManager";
@@ -16,10 +16,10 @@ import {
   createPortalPrimitiveId,
   getPortalDisableDepthTestDistance,
   type PortalPrimitiveId,
-} from "./portalEntityManager.ts";
+} from "./portalManager";
 
-const PRIMITIVE_LAYER_NAME = "history-visited-captured";
-const PRIMITIVE_LAYER_NAME_REVERSE = "history-visited-captured-reverse";
+const PORTAL_HISTORY_LAYER_ID = "history-visited-captured";
+const PORTAL_HISTORY_REVERSE_LAYER_ID = "history-visited-captured-reverse";
 const HALO_POINT_PIXEL_SIZE = PORTAL_POINT_PIXEL_SIZE + PORTAL_POINT_OUTLINE_WIDTH;
 const HALO_POINT_OUTLINE_WIDTH = 4;
 const HALO_POINT_ALPHA = 1.0;
@@ -31,47 +31,54 @@ type PortalHistoryState = "none" | "visited" | "captured";
 interface PortalHistoryHalo {
   data: PortalData;
   primitiveId: PortalPrimitiveId;
-  pointPrimitive?: Cesium.PointPrimitive;
-  occlusionPointPrimitive?: Cesium.PointPrimitive;
-  reversePointPrimitive?: Cesium.PointPrimitive;
-  reverseOcclusionPointPrimitive?: Cesium.PointPrimitive;
+  pointPrimitive: Cesium.PointPrimitive | undefined;
+  occlusionPointPrimitive: Cesium.PointPrimitive | undefined;
+  reversePointPrimitive: Cesium.PointPrimitive | undefined;
+  reverseOcclusionPointPrimitive: Cesium.PointPrimitive | undefined;
   positionCallback: EntityPositionCallback;
 }
 
-export class PortalHistoryEntityManager {
-  private historyHalos: Map<string, PortalHistoryHalo> = new Map();
-  private historyHalosPendingCreation: Set<string> = new Set();
+export class PortalHistoryManager {
+  private readonly portalHistoryHalos: Map<string, PortalHistoryHalo> = new Map();
+  private readonly portalHistoryHalosPendingCreation: Set<string> = new Set();
   private readonly currentTranslucencyByDistance = new Cesium.NearFarScalar();
   private readonly translucencyByDistanceCallback: TranslucencyByDistanceCallback;
 
   constructor(
-    private viewer: Cesium.Viewer,
-    private layerManager: LayerManager,
-    private entityPositionManager: EntityPositionManager,
-    entityTranslucencyManager: EntityTranslucencyManager
+    private readonly viewer: Cesium.Viewer,
+    private readonly layerManager: LayerManager,
+    private readonly entityPositionManager: EntityPositionManager,
+    entityTranslucencyManager: EntityTranslucencyManager,
   ) {
     this.translucencyByDistanceCallback = (translucencyByDistance) => {
       Cesium.NearFarScalar.clone(translucencyByDistance, this.currentTranslucencyByDistance);
-      this.historyHalos.forEach((historyHalo) => {
-        if (historyHalo.occlusionPointPrimitive) {
-          historyHalo.occlusionPointPrimitive.translucencyByDistance = this.currentTranslucencyByDistance;
+      this.portalHistoryHalos.forEach((portalHistoryHalo) => {
+        if (portalHistoryHalo.occlusionPointPrimitive) {
+          portalHistoryHalo.occlusionPointPrimitive.translucencyByDistance = this.currentTranslucencyByDistance;
         }
-        if (historyHalo.reverseOcclusionPointPrimitive) {
-          historyHalo.reverseOcclusionPointPrimitive.translucencyByDistance = this.currentTranslucencyByDistance;
+        if (portalHistoryHalo.reverseOcclusionPointPrimitive) {
+          portalHistoryHalo.reverseOcclusionPointPrimitive.translucencyByDistance = this.currentTranslucencyByDistance;
         }
-      });
-      if (this.historyHalos.size > 0) this.viewer.scene.requestRender();
+      },);
+      if (this.portalHistoryHalos.size > 0) this.viewer.scene.requestRender();
     };
-    entityTranslucencyManager.setOnTranslucencyByDistanceChangedCallback(this.translucencyByDistanceCallback);
+    entityTranslucencyManager.addTranslucencyByDistanceChangedCallback(this.translucencyByDistanceCallback);
   }
 
   public async addOrUpdateHistoryHalos(portals: PortalData[]): Promise<void> {
-    await Promise.all(portals.map((portal) => this.addOrUpdateHistoryHaloPrimitive(portal)));
+    await Promise.all(portals.map((portal) => this.addOrUpdateHistoryHalo(portal)));
     this.viewer.scene.requestRender();
   }
 
   public async addOrUpdateHistoryHalo(data: PortalData): Promise<void> {
-    await this.addOrUpdateHistoryHaloPrimitive(data);
+    const existing = this.portalHistoryHalos.get(data.guid);
+    if (existing) {
+      await this.updateHistoryHaloPrimitives(existing, data);
+      this.updatePortalHistoryHaloPositionSubscription(existing, data);
+      existing.data = data;
+    } else {
+      await this.createAndStoreHistoryHalo(data);
+    }
     this.viewer.scene.requestRender();
   }
 
@@ -83,21 +90,10 @@ export class PortalHistoryEntityManager {
     this.removeHistoryHaloPrimitivesInView(viewRect);
   }
 
-  private async addOrUpdateHistoryHaloPrimitive(data: PortalData): Promise<void> {
-    const existing = this.historyHalos.get(data.guid);
-    if (existing) {
-      await this.updateHistoryHaloPrimitives(existing, data);
-      this.updateHistoryHaloPositionSubscription(existing, data);
-      existing.data = data;
-    } else {
-      await this.createAndStoreHistoryHalo(data);
-    }
-  }
-
   private async createAndStoreHistoryHalo(data: PortalData): Promise<void> {
-    if (this.historyHalosPendingCreation.has(data.guid)) return;
+    if (this.portalHistoryHalosPendingCreation.has(data.guid)) return;
 
-    this.historyHalosPendingCreation.add(data.guid);
+    this.portalHistoryHalosPendingCreation.add(data.guid);
     try {
       const primitiveId = createPortalPrimitiveId(data.guid);
       const {
@@ -107,7 +103,7 @@ export class PortalHistoryEntityManager {
         reverseOcclusionPointPrimitive,
       } = await this.createHistoryHaloPrimitives(data, primitiveId);
 
-      const historyHalo: PortalHistoryHalo = {
+      const portalHistoryHalo: PortalHistoryHalo = {
         data,
         primitiveId,
         pointPrimitive,
@@ -115,13 +111,13 @@ export class PortalHistoryEntityManager {
         reversePointPrimitive,
         reverseOcclusionPointPrimitive,
         positionCallback: (entityPosition: EntityPosition) => {
-          applyHistoryHaloPosition(historyHalo, entityPosition);
+          applyHistoryHaloPosition(portalHistoryHalo, entityPosition);
         },
       };
-      this.entityPositionManager.setOnPositionChangedCallback(data, historyHalo.positionCallback);
-      this.historyHalos.set(data.guid, historyHalo);
+      this.entityPositionManager.addPositionChangedCallback(data, portalHistoryHalo.positionCallback);
+      this.portalHistoryHalos.set(data.guid, portalHistoryHalo);
     } finally {
-      this.historyHalosPendingCreation.delete(data.guid);
+      this.portalHistoryHalosPendingCreation.delete(data.guid);
     }
   }
 
@@ -131,15 +127,15 @@ export class PortalHistoryEntityManager {
     reversePointPrimitive: Cesium.PointPrimitive | undefined;
     reverseOcclusionPointPrimitive: Cesium.PointPrimitive | undefined;
   }> {
-    const pointPrimitives = this.layerManager.getOrCreatePrimitiveLayer(PRIMITIVE_LAYER_NAME).pointPrimitives;
-    const reversePointPrimitives = this.layerManager.getOrCreatePrimitiveLayer(PRIMITIVE_LAYER_NAME_REVERSE).pointPrimitives;
+    const pointPrimitives = this.layerManager.getOrCreatePrimitiveLayer(PORTAL_HISTORY_LAYER_ID).pointPrimitives;
+    const reversePointPrimitives = this.layerManager.getOrCreatePrimitiveLayer(PORTAL_HISTORY_REVERSE_LAYER_ID).pointPrimitives;
     const portalHistoryState = getPortalHistoryState(data);
     const entityPosition = await this.entityPositionManager.getEntityPosition(data);
 
-    let pointPrimitive: Cesium.PointPrimitive | undefined = undefined;
-    let occlusionPointPrimitive: Cesium.PointPrimitive | undefined = undefined;
-    let reversePointPrimitive: Cesium.PointPrimitive | undefined = undefined;
-    let reverseOcclusionPointPrimitive: Cesium.PointPrimitive | undefined = undefined;
+    let pointPrimitive: Cesium.PointPrimitive | undefined;
+    let occlusionPointPrimitive: Cesium.PointPrimitive | undefined;
+    let reversePointPrimitive: Cesium.PointPrimitive | undefined;
+    let reverseOcclusionPointPrimitive: Cesium.PointPrimitive | undefined;
 
     if (portalHistoryState === "visited" || portalHistoryState === "captured") {
       const color = portalHistoryState === "visited" ? VISITED_COLOR : CAPTURED_COLOR;
@@ -194,28 +190,28 @@ export class PortalHistoryEntityManager {
     portalHistoryHalo.reverseOcclusionPointPrimitive = reverseOcclusionPointPrimitive;
   }
 
-  private updateHistoryHaloPositionSubscription(historyHalo: PortalHistoryHalo, data: PortalData): void {
-    this.entityPositionManager.unsetOnPositionChangedCallback(historyHalo.data, historyHalo.positionCallback);
-    this.entityPositionManager.setOnPositionChangedCallback(data, historyHalo.positionCallback);
+  private updatePortalHistoryHaloPositionSubscription(portalHistoryHalo: PortalHistoryHalo, data: PortalData): void {
+    this.entityPositionManager.removePositionChangedCallback(portalHistoryHalo.data, portalHistoryHalo.positionCallback);
+    this.entityPositionManager.addPositionChangedCallback(data, portalHistoryHalo.positionCallback);
   }
 
   private removeHistoryHaloPrimitive(guid: string): boolean {
-    const portalHistoryHalo = this.historyHalos.get(guid);
+    const portalHistoryHalo = this.portalHistoryHalos.get(guid);
     if (!portalHistoryHalo) {
-      this.historyHalosPendingCreation.delete(guid);
+      this.portalHistoryHalosPendingCreation.delete(guid);
       return false;
     }
 
     this.removeHistoryHaloPrimitiveGroup(portalHistoryHalo);
-    this.entityPositionManager.unsetOnPositionChangedCallback(portalHistoryHalo.data, portalHistoryHalo.positionCallback);
-    this.historyHalos.delete(guid);
-    this.historyHalosPendingCreation.delete(guid);
+    this.entityPositionManager.removePositionChangedCallback(portalHistoryHalo.data, portalHistoryHalo.positionCallback);
+    this.portalHistoryHalos.delete(guid);
+    this.portalHistoryHalosPendingCreation.delete(guid);
     return true;
   }
 
   private removeHistoryHaloPrimitiveGroup(portalHistoryHalo: PortalHistoryHalo): void {
-    const pointPrimitives = this.layerManager.getOrCreatePrimitiveLayer(PRIMITIVE_LAYER_NAME).pointPrimitives;
-    const reversePointPrimitives = this.layerManager.getOrCreatePrimitiveLayer(PRIMITIVE_LAYER_NAME_REVERSE).pointPrimitives;
+    const pointPrimitives = this.layerManager.getOrCreatePrimitiveLayer(PORTAL_HISTORY_LAYER_ID).pointPrimitives;
+    const reversePointPrimitives = this.layerManager.getOrCreatePrimitiveLayer(PORTAL_HISTORY_REVERSE_LAYER_ID).pointPrimitives;
 
     if (portalHistoryHalo.pointPrimitive) pointPrimitives.remove(portalHistoryHalo.pointPrimitive);
     if (portalHistoryHalo.occlusionPointPrimitive) pointPrimitives.remove(portalHistoryHalo.occlusionPointPrimitive);
@@ -230,7 +226,7 @@ export class PortalHistoryEntityManager {
 
   private removeHistoryHaloPrimitivesInView(viewRect: Cesium.Rectangle): void {
     const toRemove: string[] = [];
-    this.historyHalos.forEach((info, guid) => {
+    this.portalHistoryHalos.forEach((info, guid) => {
       const position = info.pointPrimitive?.position
         ?? info.occlusionPointPrimitive?.position
         ?? info.reversePointPrimitive?.position
@@ -241,10 +237,10 @@ export class PortalHistoryEntityManager {
           toRemove.push(guid);
         }
       }
-    });
+    },);
     if (toRemove.length === 0) return;
 
-    toRemove.forEach(guid => this.removeHistoryHaloPrimitive(guid));
+    toRemove.forEach((guid) => this.removeHistoryHaloPrimitive(guid));
     this.viewer.scene.requestRender();
   }
 }
@@ -291,7 +287,7 @@ function addHistoryHaloPointPrimitive(
     scaleByDistance: createPortalNearFarScalar(),
     translucencyByDistance: fadeByDistance ? createPortalNearFarScalar() : undefined,
     disableDepthTestDistance: getPortalDisableDepthTestDistance(),
-  });
+  },);
 }
 
 function addHistoryHaloOcclusionPointPrimitive(
@@ -312,11 +308,11 @@ function addHistoryHaloOcclusionPointPrimitive(
     scaleByDistance: createPortalNearFarScalar(),
     translucencyByDistance,
     disableDepthTestDistance: PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
-  });
+  },);
 }
 
 function getPortalHistoryState(data: PortalData): PortalHistoryState {
   if (data.history?.captured) return "captured";
-  if (data.history?.visited) return "visited";
-  return "none";
+  else if (data.history?.visited) return "visited";
+  else return "none";
 }
