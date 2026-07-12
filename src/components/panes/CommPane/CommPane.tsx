@@ -134,7 +134,7 @@ const CommPane = ({
         className="comm-tabs"
         style={{
           display: "flex",
-          alignItems: "center",
+          alignItems: "flex-start",
           justifyContent: "space-between",
           borderBottom: "1px solid #555",
         }}

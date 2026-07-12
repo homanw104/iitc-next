@@ -9,7 +9,7 @@ const CommCloseButton = ({ onRef, onClick }: {
     onclick={() => onClick()}
     type="button"
     style={{
-      padding: "0px",
+      padding: "4px",
       border: "none",
       backgroundColor: "rgba(0, 0, 0, 0)",
       color: "white",
