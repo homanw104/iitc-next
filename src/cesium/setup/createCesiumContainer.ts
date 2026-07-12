@@ -64,6 +64,10 @@ export function createCesiumContainer(): HTMLDivElement {
       top: calc(var(--iitc-system-top-inset, 0px) + 6px) !important;
       right: calc(var(--iitc-system-right-inset, 0px) + 11px) !important;
     }
+    
+    #cesium-container .cesium-credit-expand-link {
+      white-space: nowrap;
+    }
   `;
 
   return container;
