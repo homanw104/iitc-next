@@ -1,6 +1,5 @@
 import type { Viewer } from "cesium";
 import CommPane from "../components/panes/CommPane/CommPane.tsx";
-import type { PortalDetailState } from "../cesium/setup/mountCoreControllersAndUI.ts";
 import type { CommManager } from "../managers/comm/commManager";
 import type { PortalManager } from "../managers/entity/portalManager";
 import type { PortalHistoryManager } from "../managers/entity/portalHistoryManager";
@@ -12,25 +11,15 @@ import type { TileRequestManager } from "../managers/tiles/tileRequestManager.ts
 import type { Channel } from "../types/common/common.ts";
 import { h } from "../utils/dom";
 import type { PortalDetailPaneController } from "./PortalDetailPaneController.tsx";
+import type { PortalDetailState, RegisterActivePaneCloseCallback } from "../cesium/setup/mountCoreControllersAndUI.ts";
 
 const LOG_TAG = "CommPaneController";
 
 export class CommPaneController {
-  private readonly viewer: Viewer;
-  private readonly commManager: CommManager;
-  private readonly tileRequestManager: TileRequestManager;
-  private readonly portalManager: PortalManager;
-  private readonly portalLabelManager: PortalLabelManager;
-  private readonly portalOrnamentManager: PortalOrnamentManager;
-  private readonly portalHistoryManager: PortalHistoryManager;
-  private readonly scoutHistoryManager: ScoutHistoryManager;
-  private readonly portalDetailPaneController: PortalDetailPaneController;
-  private readonly portalDetailState: PortalDetailState;
-
-  private readonly container: HTMLElement;
   private pane: HTMLElement | null = null;
   private loadingDiv: HTMLElement | null = null;
   private messageDivs: HTMLElement | null = null;
+  private unregisterActivePaneCloseCallback: (() => void) | null = null;
 
   private currentChannel: Channel = "all";
   private isFetchingNew = false;
@@ -42,30 +31,19 @@ export class CommPaneController {
   private previousScrollTops: Map<string, number> = new Map([]);
 
   constructor(
-    viewer: Viewer,
-    container: HTMLElement,
-    commManager: CommManager,
-    tileRequestManager: TileRequestManager,
-    portalManager: PortalManager,
-    portalLabelManager: PortalLabelManager,
-    portalOrnamentManager: PortalOrnamentManager,
-    portalHistoryManager: PortalHistoryManager,
-    scoutHistoryManager: ScoutHistoryManager,
-    portalDetailPaneController: PortalDetailPaneController,
-    portalDetailState: PortalDetailState,
+    private readonly viewer: Viewer,
+    private readonly container: HTMLElement,
+    private readonly commManager: CommManager,
+    private readonly tileRequestManager: TileRequestManager,
+    private readonly portalManager: PortalManager,
+    private readonly portalLabelManager: PortalLabelManager,
+    private readonly portalOrnamentManager: PortalOrnamentManager,
+    private readonly portalHistoryManager: PortalHistoryManager,
+    private readonly scoutHistoryManager: ScoutHistoryManager,
+    private readonly portalDetailPaneController: PortalDetailPaneController,
+    private readonly portalDetailState: PortalDetailState,
+    private readonly registerActivePaneCloseCallback: RegisterActivePaneCloseCallback,
   ) {
-    this.viewer = viewer;
-    this.container = container;
-    this.commManager = commManager;
-    this.tileRequestManager = tileRequestManager;
-    this.portalManager = portalManager;
-    this.portalLabelManager = portalLabelManager;
-    this.portalOrnamentManager = portalOrnamentManager;
-    this.portalHistoryManager = portalHistoryManager;
-    this.scoutHistoryManager = scoutHistoryManager;
-    this.portalDetailPaneController = portalDetailPaneController;
-    this.portalDetailState = portalDetailState;
-
     this.refreshData().then(() => this.renderPane());
     this.renderPane();
 
@@ -112,6 +90,8 @@ export class CommPaneController {
   }
 
   private closePane(): void {
+    this.unregisterActivePaneCloseCallback?.();
+    this.unregisterActivePaneCloseCallback = null;
     if (this.pane) {
       this.pane.remove();
       this.pane = null;
@@ -122,6 +102,7 @@ export class CommPaneController {
   private showPane(): void {
     this.pane = this.createPaneEl();
     this.container.appendChild(this.pane);
+    this.unregisterActivePaneCloseCallback = this.registerActivePaneCloseCallback(() => this.closePane());
     if (this.messageDivs) this.messageDivs.scrollTop =
       this.previousScrollTops.get(this.currentChannel) ||
       this.messageDivs.scrollHeight;

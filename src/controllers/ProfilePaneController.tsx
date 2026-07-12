@@ -11,21 +11,21 @@ import type { RedeemManager } from "../managers/game/redeemManager";
 import type { ScoreManager } from "../managers/game/scoreManager";
 import type { TileRequestManager } from "../managers/tiles/tileRequestManager.ts";
 import type { RedeemResponse } from "../types/api/redeemReward.ts";
+import type { RegisterActivePaneCloseCallback } from "../cesium/setup/mountCoreControllersAndUI.ts";
 
 export class ProfilePaneController {
   private activePane: HTMLElement | null = null;
   private redeemResultPane: HTMLElement | null = null;
-  private readonly container: HTMLElement;
-  private readonly scoreManager: ScoreManager;
-  private readonly redeemManager: RedeemManager;
-  private readonly tileRequestManager: TileRequestManager;
+  private unregisterActivePaneCloseCallback: (() => void) | null = null;
+  private unregisterRedeemResultPaneCloseCallback: (() => void) | null = null;
 
-  constructor(container: HTMLElement, scoreManager: ScoreManager, redeemManager: RedeemManager, tileRequestManager: TileRequestManager) {
-    this.container = container;
-    this.scoreManager = scoreManager;
-    this.redeemManager = redeemManager;
-    this.tileRequestManager = tileRequestManager;
-  }
+  constructor(
+    private readonly container: HTMLElement,
+    private readonly scoreManager: ScoreManager,
+    private readonly redeemManager: RedeemManager,
+    private readonly tileRequestManager: TileRequestManager,
+    private readonly registerActivePaneCloseCallback: RegisterActivePaneCloseCallback,
+  ) {}
 
   public toggleGameDetailPane() {
     if (this.activePane) {
@@ -36,6 +36,8 @@ export class ProfilePaneController {
   }
 
   private closeActivePane() {
+    this.unregisterActivePaneCloseCallback?.();
+    this.unregisterActivePaneCloseCallback = null;
     if (this.activePane) {
       this.activePane.remove();
       this.activePane = null;
@@ -43,6 +45,8 @@ export class ProfilePaneController {
   }
 
   private closeRedeemResultPane() {
+    this.unregisterRedeemResultPaneCloseCallback?.();
+    this.unregisterRedeemResultPaneCloseCallback = null;
     if (this.redeemResultPane) {
       this.redeemResultPane.remove();
       this.redeemResultPane = null;
@@ -52,6 +56,7 @@ export class ProfilePaneController {
   private showPane(container: HTMLElement, paneFactory: () => HTMLElement) {
     this.closeActivePane();
     this.activePane = container.appendChild(paneFactory());
+    this.unregisterActivePaneCloseCallback = this.registerActivePaneCloseCallback(() => this.closeActivePane());
   }
 
   private showGameDetailPane(container: HTMLElement) {
@@ -134,5 +139,6 @@ export class ProfilePaneController {
   private showRedeemResultPane(container: HTMLElement, result: RedeemResponse) {
     this.closeRedeemResultPane();
     this.redeemResultPane = container.appendChild(RedeemResultPane({ result, onClose: () => this.closeRedeemResultPane() }));
+    this.unregisterRedeemResultPaneCloseCallback = this.registerActivePaneCloseCallback(() => this.closeRedeemResultPane());
   }
 }

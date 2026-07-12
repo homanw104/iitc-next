@@ -1,16 +1,17 @@
 import LayerChooserPane from "../components/panes/LayerChooserPane/LayerChooserPane";
+import type { RegisterActivePaneCloseCallback } from "../cesium/setup/mountCoreControllersAndUI.ts";
 import type { LayerManager } from "../managers/layer/layerManager";
 
 export class LayerChooserPaneController {
-  private readonly container: HTMLElement;
-  private readonly layerManager: LayerManager;
   private layerChooserPane: HTMLElement | null = null;
   private lastScrollTop: number = 0;
+  private unregisterActivePaneCloseCallback: (() => void) | null = null;
 
-  constructor(container: HTMLElement, layerManager: LayerManager) {
-    this.container = container;
-    this.layerManager = layerManager;
-  }
+  constructor(
+    private readonly container: HTMLElement,
+    private readonly layerManager: LayerManager,
+    private readonly registerActivePaneCloseCallback: RegisterActivePaneCloseCallback,
+  ) {}
 
   public togglePane(): void {
     if (this.layerChooserPane) {
@@ -21,6 +22,8 @@ export class LayerChooserPaneController {
   }
 
   private closePane(): void {
+    this.unregisterActivePaneCloseCallback?.();
+    this.unregisterActivePaneCloseCallback = null;
     if (this.layerChooserPane) {
       this.lastScrollTop = this.layerChooserPane.scrollTop;
       this.layerChooserPane.remove();
@@ -34,6 +37,7 @@ export class LayerChooserPaneController {
       layerManager: this.layerManager,
       onToggle: this.onToggleCheckbox,
     }));
+    this.unregisterActivePaneCloseCallback = this.registerActivePaneCloseCallback(() => this.closePane());
     this.layerChooserPane.scrollTop = this.lastScrollTop;
   }
 

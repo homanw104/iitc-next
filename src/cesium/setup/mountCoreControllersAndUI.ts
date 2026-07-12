@@ -18,6 +18,8 @@ import { logManager } from "../../managers/system/logManager.ts";
 import type { PortalData } from "../../types/iitc/portal.ts";
 import type { CoreManagers } from "./createCoreManagers.ts";
 
+export type RegisterActivePaneCloseCallback = (closePane: () => void) => () => void;
+
 export interface PortalDetailState {
   lastLogMsg: string;
   lastPortalData: PortalData | null;
@@ -30,6 +32,18 @@ export interface CoreControllers {
 }
 
 export function mountCoreControllersAndUI(viewer: Cesium.Viewer, container: HTMLElement, managers: CoreManagers): CoreControllers {
+  let activePaneCloseCallback: (() => void) | null = null;
+
+  const registerActivePaneCloseCallback: RegisterActivePaneCloseCallback = (closePane) => {
+    activePaneCloseCallback?.();
+    activePaneCloseCallback = closePane;
+    return () => { if (activePaneCloseCallback === closePane) activePaneCloseCallback = null; };
+  };
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") activePaneCloseCallback?.();
+  });
+
   const portalDetailState: PortalDetailState = {
     lastLogMsg: "Loading...",
     lastPortalData: null,
@@ -37,9 +51,22 @@ export function mountCoreControllersAndUI(viewer: Cesium.Viewer, container: HTML
   };
 
   const softRefreshButtonController = new SoftRefreshButtonController(managers.tileRequestManager);
-  const layerChooserPaneController = new LayerChooserPaneController(container, managers.layerManager);
-  const portalDetailPaneController = new PortalDetailPaneController(container);
-  const gameDetailPaneController = new ProfilePaneController(container, managers.scoreManager, managers.redeemManager, managers.tileRequestManager);
+  const layerChooserPaneController = new LayerChooserPaneController(
+    container,
+    managers.layerManager,
+    registerActivePaneCloseCallback,
+  );
+  const portalDetailPaneController = new PortalDetailPaneController(
+    container,
+    registerActivePaneCloseCallback,
+  );
+  const gameDetailPaneController = new ProfilePaneController(
+    container,
+    managers.scoreManager,
+    managers.redeemManager,
+    managers.tileRequestManager,
+    registerActivePaneCloseCallback,
+  );
   const commDetailPaneController = new CommPaneController(
     viewer,
     container,
@@ -52,6 +79,7 @@ export function mountCoreControllersAndUI(viewer: Cesium.Viewer, container: HTML
     managers.scoutHistoryManager,
     portalDetailPaneController,
     portalDetailState,
+    registerActivePaneCloseCallback,
   );
 
   portalDetailState.portalDetailBar = container.appendChild(PortalDetailBar({ portalDetailPaneController: portalDetailPaneController }));

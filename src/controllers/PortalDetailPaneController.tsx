@@ -1,25 +1,30 @@
 import PortalDetailPane from "../components/panes/PortalDetailPane/PortalDetailPane";
 import type { PortalData } from "../types/iitc/portal.ts";
+import type { RegisterActivePaneCloseCallback } from "../cesium/setup/mountCoreControllersAndUI.ts";
 
 export class PortalDetailPaneController {
-  private readonly container: HTMLElement;
   private detailPane: HTMLElement | null = null;
   private detailBarTitleEl: HTMLElement | null = null;
   private detailBarLevelEl: HTMLElement | null = null;
+  private unregisterActivePaneCloseCallback: (() => void) | null = null;
 
-  constructor(container: HTMLElement) {
-    this.container = container;
-  }
+  constructor(
+    private container: HTMLElement,
+    private registerActivePaneCloseCallback: RegisterActivePaneCloseCallback,
+  ) {}
 
   public toggleDetailPane = (data?: PortalData): void => {
     if (this.detailPane) {
       this.removeDetailPane();
     } else if (data) {
       this.detailPane = this.container.appendChild(PortalDetailPane({ data, onCopy: this.copyIntelLink }));
+      this.unregisterActivePaneCloseCallback = this.registerActivePaneCloseCallback(() => this.removeDetailPane());
     }
   };
 
   public removeDetailPane = () => {
+    this.unregisterActivePaneCloseCallback?.();
+    this.unregisterActivePaneCloseCallback = null;
     if (this.detailPane) {
       this.detailPane.remove();
       this.detailPane = null;
@@ -30,6 +35,7 @@ export class PortalDetailPaneController {
     if (this.detailPane) {
       this.removeDetailPane();
       this.detailPane = this.container.appendChild(PortalDetailPane({ data, onCopy: this.copyIntelLink }));
+      this.unregisterActivePaneCloseCallback = this.registerActivePaneCloseCallback(() => this.removeDetailPane());
     }
   };
 
