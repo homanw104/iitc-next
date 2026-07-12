@@ -14,7 +14,7 @@ interface PrimitiveReplacement {
   pending?: ReplaceablePrimitive;
 }
 
-export class LayerGroundPrimitives {
+export class GroundPrimitivesLayer {
   public readonly collection: Cesium.PrimitiveCollection;
   public zIndex: number;
 

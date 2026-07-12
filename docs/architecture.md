@@ -115,7 +115,7 @@ Regions at one depth share a `GroundPrimitive`, but different depths must remain
 in separate primitives. Cesium classification shadow volumes can overlap even
 when their visible surface polygons do not; combining different per-instance
 alphas in one classification primitive can therefore display the wrong depth
-color. `LayerGroundPrimitives.replaceGroundPrimitivesWhenReady` treats the depth
+color. `GroundPrimitivesLayer.replaceGroundPrimitivesWhenReady` treats the depth
 primitives as one managed replacement and reveals them only after every child is
 ready.
 
@@ -128,13 +128,13 @@ registration, and render ordering across four layer backends:
 
 * **Data sources** hold compatibility or plugin features that still use Cesium
   entities.
-* **Primitive layers** (`LayerPrimitives`) hold normally rendered billboard and
+* **Primitive layers** (`PrimitivesLayer`) hold normally rendered billboard and
   point collections, plus other direct primitives.
-* **Overlay layers** (`LayerOverlay`) hold labels, billboards, points, and
+* **Overlay layers** (`OverlayLayer`) hold labels, billboards, points, and
   primitives that must render above normal scene content. Their collection
   update hook rewrites only color-render commands into Cesium's overlay pass and
   disables depth testing; pick passes retain Cesium's normal commands.
-* **Ground primitive layers** (`LayerGroundPrimitives`) hold terrain-clamped
+* **Ground primitive layers** (`GroundPrimitivesLayer`) hold terrain-clamped
   geometry. `AsyncPrimitiveReplacer` keeps active geometry visible until a
   replacement primitive or atomic primitive group is ready, avoiding blank and
   partially updated refresh frames.

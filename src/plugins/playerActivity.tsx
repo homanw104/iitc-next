@@ -8,8 +8,8 @@
 import * as Cesium from "cesium";
 import { restoreSceneAfterPick } from "../cesium/interaction/picking/restoreSceneAfterPick.ts";
 import type { EntityPosition, EntityPositionCallback } from "../managers/entity/entityPositionManager";
-import type { LayerGroundPrimitives } from "../managers/layer/layerGroundPrimitives";
-import type { LayerOverlay } from "../managers/layer/layerOverlay";
+import type { GroundPrimitivesLayer } from "../managers/layer/groundPrimitivesLayer";
+import type { OverlayLayer } from "../managers/layer/overlayLayer";
 import type { IITCCore } from "../types/iitc/iitc.ts";
 import type { Team } from "../types/common/common.ts";
 import type { PlextMark } from "../types/api/getPlexts.ts";
@@ -121,10 +121,10 @@ class PlayerActivityPlugin {
   private commManager!: NonNullable<IITCCore["commManager"]>;
   private entityPositionManager!: NonNullable<IITCCore["entityPositionManager"]>;
 
-  private overlayLayerEnl!: LayerOverlay;
-  private overlayLayerRes!: LayerOverlay;
-  private pathLayerEnl!: LayerGroundPrimitives;
-  private pathLayerRes!: LayerGroundPrimitives;
+  private overlayLayerEnl!: OverlayLayer;
+  private overlayLayerRes!: OverlayLayer;
+  private pathLayerEnl!: GroundPrimitivesLayer;
+  private pathLayerRes!: GroundPrimitivesLayer;
   private playerActivities: Map<string, PlayerActivity> = new Map();
   private playerLocations: Map<string, PlayerLocation> = new Map();
   private playerLocationClusters: PlayerLocationCluster[] = [];
@@ -509,7 +509,7 @@ class PlayerActivityPlugin {
   }
 
   private createPlayerLocationPrimitive(
-    layer: LayerOverlay,
+    layer: OverlayLayer,
     layerName: string,
     lastEntityPosition: EntityPosition,
     lastActivityData: PlayerActivityData,
@@ -557,7 +557,7 @@ class PlayerActivityPlugin {
 
   private updatePlayerLocationPrimitive(
     primitive: PlayerLocation,
-    layer: LayerOverlay,
+    layer: OverlayLayer,
     layerName: string,
     lastEntityPosition: EntityPosition,
     lastActivityData: PlayerActivityData,
@@ -805,12 +805,12 @@ class PlayerActivityPlugin {
     return this.playerLocationBillboardImage;
   }
 
-  private getPlayerActivityOverlayLayer(team: Team): LayerOverlay | undefined {
+  private getPlayerActivityOverlayLayer(team: Team): OverlayLayer | undefined {
     if (team === "ENLIGHTENED") return this.overlayLayerEnl;
     if (team === "RESISTANCE") return this.overlayLayerRes;
   }
 
-  private getPlayerActivityOverlayLayerByName(name: string): LayerOverlay | undefined {
+  private getPlayerActivityOverlayLayerByName(name: string): OverlayLayer | undefined {
     if (name === PLAYER_ACTIVITY_ENL_LAYER_NAME) return this.overlayLayerEnl;
     if (name === PLAYER_ACTIVITY_RES_LAYER_NAME) return this.overlayLayerRes;
   }
@@ -844,7 +844,7 @@ class PlayerActivityPlugin {
     });
   }
 
-  private rebuildPlayerPathLayer(layerName: string, layer: LayerGroundPrimitives): void {
+  private rebuildPlayerPathLayer(layerName: string, layer: GroundPrimitivesLayer): void {
     const geometryInstances: Cesium.GeometryInstance[] = [];
     this.playerPaths.forEach(path => {
       if (path.currentLayerName !== layerName) return;

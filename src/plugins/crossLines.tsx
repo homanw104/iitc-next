@@ -7,7 +7,7 @@
 
 import "../types/iitc/iitc.ts";
 import * as Cesium from "cesium";
-import type { LayerGroundPrimitives } from "../managers/layer/layerGroundPrimitives";
+import type { GroundPrimitivesLayer } from "../managers/layer/groundPrimitivesLayer";
 import type { IITCCore } from "../types/iitc/iitc.ts";
 import type { LinkData } from "../types/iitc/link.ts";
 import { safeWindow } from "../utils/window";
@@ -43,7 +43,7 @@ class CrossLinesPlugin {
   private linkManager!: NonNullable<IITCCore["linkManager"]>;
   private drawLinesReader!: DrawLinesReader;
 
-  private highlightLayer: LayerGroundPrimitives | undefined;
+  private highlightLayer: GroundPrimitivesLayer | undefined;
   private updateFrame: number | undefined;
   private linksChangedCallback = () => this.scheduleUpdate();
   private drawLinesChangedListener = () => this.scheduleUpdate();

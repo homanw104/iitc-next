@@ -34,7 +34,7 @@ type CesiumWithPrivateRenderer = typeof Cesium & {
   };
 };
 
-export class LayerOverlay {
+export class OverlayLayer {
   public readonly collection: Cesium.PrimitiveCollection;
   public readonly labels: Cesium.LabelCollection;
   public readonly billboards: Cesium.BillboardCollection;

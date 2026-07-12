@@ -4,7 +4,7 @@
 
 import * as Cesium from "cesium";
 
-export class LayerPrimitives {
+export class PrimitivesLayer {
   public readonly collection: Cesium.PrimitiveCollection;
   public readonly billboards: Cesium.BillboardCollection;
   public readonly pointPrimitives: Cesium.PointPrimitiveCollection;

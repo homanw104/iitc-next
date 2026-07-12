@@ -17,9 +17,9 @@ import {
   normalizeMutuallyExclusiveFilters,
   setPortalChildFilters,
 } from "./layerFilters";
-import { LayerOverlay } from "./layerOverlay";
-import { LayerPrimitives } from "./layerPrimitives";
-import { LayerGroundPrimitives } from "./layerGroundPrimitives";
+import { OverlayLayer } from "./overlayLayer";
+import { PrimitivesLayer } from "./primitivesLayer";
+import { GroundPrimitivesLayer } from "./groundPrimitivesLayer";
 
 const LOG_TAG = "LayerManager";
 
@@ -31,13 +31,13 @@ export class LayerManager {
   private dataSources: Map<string, Cesium.DataSource> = new Map();
 
   // Primitive-backed layers with overlay hooks, used by labels, etc., named by layer visibility id.
-  private overlayLayers: Map<string, LayerOverlay> = new Map();
+  private overlayLayers: Map<string, OverlayLayer> = new Map();
 
   // Primitive-backed layers use by portals, links, etc., named by layer visibility id.
-  private primitiveLayers: Map<string, LayerPrimitives> = new Map();
+  private primitiveLayers: Map<string, PrimitivesLayer> = new Map();
 
   // Ground primitive-backed layers for clamped geometry, named by layer visibility id.
-  private groundPrimitiveLayers: Map<string, LayerGroundPrimitives> = new Map();
+  private groundPrimitiveLayers: Map<string, GroundPrimitivesLayer> = new Map();
 
   // Fine-grained layer visibility state, such as "portals-l8-enlightened".
   private layerVisibility: Map<string, boolean> = new Map();
@@ -95,12 +95,12 @@ export class LayerManager {
     return source;
   }
 
-  public getOrCreateOverlayLayer(name: string, zIndex?: number): LayerOverlay {
+  public getOrCreateOverlayLayer(name: string, zIndex?: number): OverlayLayer {
     this.registerPluginFilterIfNeeded(name);
 
     let layer = this.overlayLayers.get(name);
     if (!layer) {
-      layer = new LayerOverlay(
+      layer = new OverlayLayer(
         this.viewer,
         this.getLayerVisibility(name),
         zIndex ?? LayerManager.DEFAULT_OVERLAY_Z_INDEX,
@@ -114,12 +114,12 @@ export class LayerManager {
     return layer;
   }
 
-  public getOrCreatePrimitiveLayer(name: string, zIndex?: number): LayerPrimitives {
+  public getOrCreatePrimitiveLayer(name: string, zIndex?: number): PrimitivesLayer {
     this.registerPluginFilterIfNeeded(name);
 
     let layer = this.primitiveLayers.get(name);
     if (!layer) {
-      layer = new LayerPrimitives(
+      layer = new PrimitivesLayer(
         this.viewer,
         this.getLayerVisibility(name),
         zIndex ?? LayerManager.DEFAULT_PRIMITIVE_Z_INDEX,
@@ -133,12 +133,12 @@ export class LayerManager {
     return layer;
   }
 
-  public getOrCreateGroundPrimitiveLayer(name: string, zIndex?: number): LayerGroundPrimitives {
+  public getOrCreateGroundPrimitiveLayer(name: string, zIndex?: number): GroundPrimitivesLayer {
     this.registerPluginFilterIfNeeded(name);
 
     let layer = this.groundPrimitiveLayers.get(name);
     if (!layer) {
-      layer = new LayerGroundPrimitives(
+      layer = new GroundPrimitivesLayer(
         this.viewer,
         this.getLayerVisibility(name),
         zIndex ?? LayerManager.DEFAULT_PRIMITIVE_Z_INDEX,

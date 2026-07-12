@@ -8,8 +8,8 @@ import "../types/iitc/iitc.ts";
 import * as Cesium from "cesium";
 import { pickGestureSurfacePosition as pickSceneSurfacePosition } from "../cesium/interaction/camera/cameraGestures";
 import { restoreSceneAfterPick } from "../cesium/interaction/picking/restoreSceneAfterPick.ts";
-import type { LayerGroundPrimitives } from "../managers/layer/layerGroundPrimitives";
-import type { LayerOverlay } from "../managers/layer/layerOverlay";
+import type { GroundPrimitivesLayer } from "../managers/layer/groundPrimitivesLayer";
+import type { OverlayLayer } from "../managers/layer/overlayLayer";
 import { isPortalPrimitiveId } from "../managers/entity/portalManager.ts";
 import type { IITCCore } from "../types/iitc/iitc.ts";
 import { h } from "../utils/dom.ts";
@@ -111,8 +111,8 @@ class DrawLinesPlugin implements DrawLinesReader, DrawLinesAppearanceController 
   private lineStartMarkerBillboard: Cesium.Billboard | undefined;
   private lineEndMarkerBillboard: Cesium.Billboard | undefined;
   private lineMarkerRemovalTimeout: number | undefined;
-  private linesLayer: LayerGroundPrimitives | undefined;
-  private lineMarkersLayer: LayerOverlay | undefined;
+  private linesLayer: GroundPrimitivesLayer | undefined;
+  private lineMarkersLayer: OverlayLayer | undefined;
   private lines: Map<string, DrawLine> = new Map();
   private appearanceOverrides: Map<string, Map<string, DrawLineAppearanceOverride>> = new Map();
   private linePrimitiveKeys: Set<string> = new Set();
@@ -593,7 +593,7 @@ class DrawLinesPlugin implements DrawLinesReader, DrawLinesAppearanceController 
     ));
   }
 
-  private initializePreviewTerrainHeights(linesLayer: LayerGroundPrimitives): void {
+  private initializePreviewTerrainHeights(linesLayer: GroundPrimitivesLayer): void {
     this.previewTerrainHeightsReady = false;
     void Cesium.GroundPolylinePrimitive.initializeTerrainHeights().then(() => {
       if (this.linesLayer !== linesLayer) return;
