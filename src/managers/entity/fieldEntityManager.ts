@@ -10,23 +10,36 @@ import type { PortalEntityManager } from "./portalEntityManager";
 import { getTeamColor } from "../../utils/color";
 import { TEAMS } from "../../types/common/common.ts";
 import { settingsManager } from "../system/settingsManager.ts";
+import { logManager } from "../system/logManager.ts";
+import type {
+  FieldCoverageLayerInput,
+  FieldCoverageMultiPolygon,
+  FieldCoveragePolygon,
+  FieldCoverageRing,
+  FieldCoverageResponse,
+} from "./fieldCoverage.ts";
+import { createFieldCoverageWorker } from "./fieldCoverageWorker.ts";
+import { createOverlapAwareFieldBatches } from "./fieldOverlapBatching.ts";
 
 const FIELD_ALPHA = 0.2;
 const FIELD_PRIMITIVE_Z_INDEX = 0;
 const FIELD_PRIMITIVE_KEY = "fields";
+const LOG_TAG = "FieldEntityManager";
 
 interface Field {
   data: FieldData;
   positions: Cesium.Cartesian3[];
-  unitPositions: Cesium.Cartesian3[];
-  sphericalArea: number;
 }
 
 export type FieldsChangedCallback = () => void;
+export type FieldRenderingMode = "none" | "coverage" | "overlap-fallback";
 
 export class FieldEntityManager {
   private fields: Map<string, Field> = new Map();
   private fieldsChangedCallbacks: Set<FieldsChangedCallback> = new Set();
+  private fieldCoverageWorker?: Worker;
+  private fieldCoverageGeneration = 0;
+  private renderingMode: FieldRenderingMode = "none";
 
   constructor(
     private layerManager: LayerManager,
@@ -85,17 +98,13 @@ export class FieldEntityManager {
     if (existing && data.timestamp <= existing.data.timestamp) return;
 
     const positions = createFieldPositions(data);
-    const unitPositions = createFieldUnitPositions(data);
-    const sphericalArea = getSphericalTriangleArea(unitPositions);
     if (existing) {
       existing.data = data;
       existing.positions = positions;
-      existing.unitPositions = unitPositions;
-      existing.sphericalArea = sphericalArea;
       return;
     }
 
-    this.fields.set(data.guid, { data, positions, unitPositions, sphericalArea });
+    this.fields.set(data.guid, { data, positions });
   }
 
   private removeFieldPrimitivesInView(viewRect: Cesium.Rectangle): void {
@@ -112,22 +121,103 @@ export class FieldEntityManager {
   }
 
   private rebuildLayers(): void {
+    this.clearFieldCoverageWorker();
+    const generation = ++this.fieldCoverageGeneration;
+    const layers: FieldCoverageLayerInput[] = [];
+
     TEAMS.forEach((team) => {
-      this.rebuildLayer(`fields-${team.toLowerCase()}`);
+      const layerId = `fields-${team.toLowerCase()}`;
+      const fields = this.getFieldsInLayer(layerId);
+      if (fields.length === 0) {
+        this.layerManager.getOrCreateGroundPrimitiveLayer(layerId, FIELD_PRIMITIVE_Z_INDEX)
+          .removeManagedPrimitive(FIELD_PRIMITIVE_KEY);
+      } else {
+        layers.push({
+          layerId,
+          fields: fields.map(field => ({
+            guid: field.data.guid,
+            points: field.data.points,
+          })),
+        });
+      }
     });
+
+    if (layers.length === 0) {
+      this.renderingMode = "none";
+      return;
+    }
+
+    try {
+      this.fieldCoverageWorker = createFieldCoverageWorker();
+    } catch (error) {
+      this.rebuildLayersWithOverlapBatches("the coverage worker could not be created", error);
+      return;
+    }
+    this.fieldCoverageWorker.addEventListener("message", this.handleFieldCoverageMessage);
+    this.fieldCoverageWorker.addEventListener("error", this.handleFieldCoverageError);
+    this.fieldCoverageWorker.postMessage({ generation, layers });
   }
 
-  private rebuildLayer(layerId: string): void {
-    const layer = this.layerManager.getOrCreateGroundPrimitiveLayer(layerId, FIELD_PRIMITIVE_Z_INDEX);
+  private getFieldsInLayer(layerId: string): Field[] {
+    return Array.from(this.fields.values()).filter(field => getFieldLayerId(field.data) === layerId);
+  }
 
-    const fields = Array.from(this.fields.values())
-      .filter(field => getFieldLayerId(field.data) === layerId);
+  private rebuildLayer(layerId: string, coverageByDepth?: FieldCoverageMultiPolygon[]): void {
+    const layer = this.layerManager.getOrCreateGroundPrimitiveLayer(layerId, FIELD_PRIMITIVE_Z_INDEX);
+    const fields = this.getFieldsInLayer(layerId);
 
     if (fields.length === 0) {
       layer.removeManagedPrimitive(FIELD_PRIMITIVE_KEY);
     } else {
-      layer.replacePrimitiveWhenReady(FIELD_PRIMITIVE_KEY, createFieldPrimitiveGroup(fields));
+      layer.replaceGroundPrimitivesWhenReady(FIELD_PRIMITIVE_KEY, createFieldPrimitives(fields, coverageByDepth));
     }
+  }
+
+  private handleFieldCoverageMessage = (event: MessageEvent<FieldCoverageResponse>): void => {
+    if (event.data.generation !== this.fieldCoverageGeneration) return;
+
+    this.clearFieldCoverageWorker();
+    if ("error" in event.data) {
+      this.rebuildLayersWithOverlapBatches("coverage preprocessing failed", event.data.error);
+      return;
+    }
+
+    if (event.data.layers.some(layer => !layer.coverageByDepth.some(coverage => coverage.length > 0))) {
+      this.rebuildLayersWithOverlapBatches("coverage preprocessing returned no geometry");
+      return;
+    }
+
+    try {
+      event.data.layers.forEach(layer => this.rebuildLayer(layer.layerId, layer.coverageByDepth));
+    } catch (error) {
+      this.rebuildLayersWithOverlapBatches("coverage geometry could not be created", error);
+      return;
+    }
+
+    this.renderingMode = "coverage";
+    logManager.debug(LOG_TAG, "Using fragmented field coverage");
+  };
+
+  private handleFieldCoverageError = (event: ErrorEvent): void => {
+    this.clearFieldCoverageWorker();
+    this.rebuildLayersWithOverlapBatches("the coverage worker failed", event.error ?? event.message);
+  };
+
+  private rebuildLayersWithOverlapBatches(reason: string, error?: unknown): void {
+    this.renderingMode = "overlap-fallback";
+    if (error === undefined) {
+      logManager.warn(LOG_TAG, `Using overlap-aware field fallback because ${reason}.`);
+    } else {
+      logManager.warn(LOG_TAG, `Using overlap-aware field fallback because ${reason}.`, error);
+    }
+    TEAMS.forEach(team => this.rebuildLayer(`fields-${team.toLowerCase()}`));
+  }
+
+  private clearFieldCoverageWorker(): void {
+    this.fieldCoverageWorker?.removeEventListener("message", this.handleFieldCoverageMessage);
+    this.fieldCoverageWorker?.removeEventListener("error", this.handleFieldCoverageError);
+    this.fieldCoverageWorker?.terminate();
+    this.fieldCoverageWorker = undefined;
   }
 
   private notifyFieldsChanged(): void {
@@ -147,221 +237,87 @@ function createFieldGeometryInstance(field: Field): Cesium.GeometryInstance {
   });
 }
 
-function createFieldPrimitiveGroup(fields: Field[]): FieldPrimitiveGroup {
+function createFieldCoverageGeometryInstance(
+  polygon: FieldCoveragePolygon,
+  field: Field,
+  depth: number,
+): Cesium.GeometryInstance | undefined {
+  const hierarchy = createPolygonHierarchy(polygon);
+  if (!hierarchy) return undefined;
+
+  const alpha = 1 - (1 - FIELD_ALPHA) ** depth;
+  return new Cesium.GeometryInstance({
+    geometry: new Cesium.PolygonGeometry({
+      polygonHierarchy: hierarchy,
+      vertexFormat: Cesium.PerInstanceColorAppearance.VERTEX_FORMAT,
+    }),
+    attributes: {
+      color: Cesium.ColorGeometryInstanceAttribute.fromColor(getTeamColor(field.data.team).withAlpha(alpha)),
+    },
+  });
+}
+
+function createFieldPrimitives(
+  fields: Field[],
+  coverageByDepth?: FieldCoverageMultiPolygon[],
+): Cesium.GroundPrimitive[] {
   const appearance = new Cesium.PerInstanceColorAppearance({
     flat: true,
     translucent: true,
   });
   const classificationType = getFieldClassificationType();
 
-  const primitives = createNonOverlappingFieldBatches(fields).map(batch =>
-    new Cesium.GroundPrimitive({
-      geometryInstances: batch.map(field => createFieldGeometryInstance(field)),
-      appearance,
-      allowPicking: false,
-      asynchronous: true,
-      classificationType,
-    })
-  );
+  // Different depths need separate classification passes, or a shadow volume can supply the wrong alpha.
+  const geometryInstanceBatches = coverageByDepth
+    ? createFieldCoverageGeometryInstanceBatches(fields, coverageByDepth)
+    : createOverlapAwareFieldBatches(fields).map(batch =>
+      batch.map(field => createFieldGeometryInstance(field))
+    );
+  if (geometryInstanceBatches.length === 0) throw new Error("Field geometry is empty.");
 
-  return new FieldPrimitiveGroup(primitives);
+  return geometryInstanceBatches.map(geometryInstances => new Cesium.GroundPrimitive({
+    geometryInstances,
+    appearance,
+    allowPicking: false,
+    asynchronous: true,
+    classificationType,
+  }));
 }
 
-function createNonOverlappingFieldBatches(fields: Field[]): Field[][] {
-  // A classification primitive shades overlapping instances only once, so true overlaps need separate draw passes.
-  const sortedFields = [...fields].sort((first, second) =>
-    second.sphericalArea - first.sphericalArea || first.data.guid.localeCompare(second.data.guid)
-  );
-  const batches: Field[][] = [];
+function createFieldCoverageGeometryInstanceBatches(
+  fields: Field[],
+  coverageByDepth: FieldCoverageMultiPolygon[],
+): Cesium.GeometryInstance[][] {
+  const field = fields[0];
+  if (!field) return [];
 
-  sortedFields.forEach((field) => {
-    const availableBatch = batches.find(batch =>
-      batch.every(existing => !doSphericalTrianglesOverlap(field.unitPositions, existing.unitPositions))
-    );
+  return coverageByDepth.map((coverage, index) =>
+    coverage.flatMap((polygon) => {
+      const instance = createFieldCoverageGeometryInstance(polygon, field, index + 1);
+      return instance ? [instance] : [];
+    })
+  ).filter(instances => instances.length > 0);
+}
 
-    if (availableBatch) {
-      availableBatch.push(field);
-    } else {
-      batches.push([field]);
-    }
-  });
+function createPolygonHierarchy(polygon: FieldCoveragePolygon): Cesium.PolygonHierarchy | undefined {
+  const [outerRing, ...holeRings] = polygon;
+  const positions = createRingPositions(outerRing);
+  if (positions.length < 3) return undefined;
 
-  return batches;
+  const holes = holeRings
+    .map(createRingPositions)
+    .filter(holePositions => holePositions.length >= 3)
+    .map(holePositions => new Cesium.PolygonHierarchy(holePositions));
+  return new Cesium.PolygonHierarchy(positions, holes);
+}
+
+function createRingPositions(ring: FieldCoverageRing): Cesium.Cartesian3[] {
+  return ring.slice(0, -1)
+    .map(([longitude, latitude]) => Cesium.Cartesian3.fromDegrees(longitude, latitude));
 }
 
 function createFieldPositions(data: FieldData): Cesium.Cartesian3[] {
   return data.points.map(point => Cesium.Cartesian3.fromDegrees(point.lngE6 / 1e6, point.latE6 / 1e6));
-}
-
-function createFieldUnitPositions(data: FieldData): Cesium.Cartesian3[] {
-  return data.points.map((point) => {
-    const longitude = Cesium.Math.toRadians(point.lngE6 / 1e6);
-    const latitude = Cesium.Math.toRadians(point.latE6 / 1e6);
-    const cosLatitude = Math.cos(latitude);
-    return new Cesium.Cartesian3(
-      cosLatitude * Math.cos(longitude),
-      cosLatitude * Math.sin(longitude),
-      Math.sin(latitude),
-    );
-  });
-}
-
-function getSphericalTriangleArea(positions: Cesium.Cartesian3[]): number {
-  if (positions.length !== 3) return 0;
-
-  const [first, second, third] = positions;
-  const determinant = dot(first, cross(second, third));
-  const denominator = 1 + dot(first, second) + dot(second, third) + dot(third, first);
-  return 2 * Math.atan2(Math.abs(determinant), denominator);
-}
-
-function doSphericalTrianglesOverlap(
-  first: Cesium.Cartesian3[],
-  second: Cesium.Cartesian3[],
-): boolean {
-  if (first.length !== 3 || second.length !== 3) return true;
-  if (haveSameVertices(first, second)) return true;
-
-  if (first.some(position => isStrictlyInsideSphericalTriangle(position, second))) return true;
-  if (second.some(position => isStrictlyInsideSphericalTriangle(position, first))) return true;
-
-  for (let firstIndex = 0; firstIndex < 3; firstIndex += 1) {
-    const firstStart = first[firstIndex];
-    const firstEnd = first[(firstIndex + 1) % 3];
-    for (let secondIndex = 0; secondIndex < 3; secondIndex += 1) {
-      const secondStart = second[secondIndex];
-      const secondEnd = second[(secondIndex + 1) % 3];
-      if (doGreatCircleArcsProperlyIntersect(firstStart, firstEnd, secondStart, secondEnd)) return true;
-    }
-  }
-
-  return false;
-}
-
-const SPHERICAL_GEOMETRY_EPSILON = 1e-12;
-
-function haveSameVertices(first: Cesium.Cartesian3[], second: Cesium.Cartesian3[]): boolean {
-  return first.every(firstPosition =>
-    second.some(secondPosition => isSamePosition(firstPosition, secondPosition))
-  );
-}
-
-function isSamePosition(first: Cesium.Cartesian3, second: Cesium.Cartesian3): boolean {
-  return dot(first, second) >= 1 - SPHERICAL_GEOMETRY_EPSILON;
-}
-
-function isStrictlyInsideSphericalTriangle(
-  position: Cesium.Cartesian3,
-  triangle: Cesium.Cartesian3[],
-): boolean {
-  for (let index = 0; index < 3; index += 1) {
-    const start = triangle[index];
-    const end = triangle[(index + 1) % 3];
-    const opposite = triangle[(index + 2) % 3];
-    const normal = normalizedCross(start, end);
-    if (!normal) return false;
-
-    const oppositeSide = dot(normal, opposite);
-    const positionSide = dot(normal, position) * Math.sign(oppositeSide);
-    if (Math.abs(oppositeSide) <= SPHERICAL_GEOMETRY_EPSILON
-      || positionSide <= SPHERICAL_GEOMETRY_EPSILON) return false;
-  }
-
-  return true;
-}
-
-function doGreatCircleArcsProperlyIntersect(
-  firstStart: Cesium.Cartesian3,
-  firstEnd: Cesium.Cartesian3,
-  secondStart: Cesium.Cartesian3,
-  secondEnd: Cesium.Cartesian3,
-): boolean {
-  if (isSamePosition(firstStart, secondStart)
-    || isSamePosition(firstStart, secondEnd)
-    || isSamePosition(firstEnd, secondStart)
-    || isSamePosition(firstEnd, secondEnd)) return false;
-
-  const firstNormal = normalizedCross(firstStart, firstEnd);
-  const secondNormal = normalizedCross(secondStart, secondEnd);
-  if (!firstNormal || !secondNormal) return false;
-
-  const intersection = normalizedCross(firstNormal, secondNormal);
-  if (!intersection) return false;
-  const oppositeIntersection = negate(intersection);
-
-  return isInsideGreatCircleArc(intersection, firstStart, firstEnd, firstNormal)
-    && isInsideGreatCircleArc(intersection, secondStart, secondEnd, secondNormal)
-    || isInsideGreatCircleArc(oppositeIntersection, firstStart, firstEnd, firstNormal)
-    && isInsideGreatCircleArc(oppositeIntersection, secondStart, secondEnd, secondNormal);
-}
-
-function isInsideGreatCircleArc(
-  position: Cesium.Cartesian3,
-  start: Cesium.Cartesian3,
-  end: Cesium.Cartesian3,
-  normal: Cesium.Cartesian3,
-): boolean {
-  return dot(cross(start, position), normal) > SPHERICAL_GEOMETRY_EPSILON
-    && dot(cross(position, end), normal) > SPHERICAL_GEOMETRY_EPSILON;
-}
-
-function normalizedCross(first: Cesium.Cartesian3, second: Cesium.Cartesian3): Cesium.Cartesian3 | undefined {
-  const result = cross(first, second);
-  const magnitude = Math.hypot(result.x, result.y, result.z);
-  if (magnitude <= SPHERICAL_GEOMETRY_EPSILON) return undefined;
-
-  result.x /= magnitude;
-  result.y /= magnitude;
-  result.z /= magnitude;
-  return result;
-}
-
-function cross(first: Cesium.Cartesian3, second: Cesium.Cartesian3): Cesium.Cartesian3 {
-  return new Cesium.Cartesian3(
-    first.y * second.z - first.z * second.y,
-    first.z * second.x - first.x * second.z,
-    first.x * second.y - first.y * second.x,
-  );
-}
-
-function dot(first: Cesium.Cartesian3, second: Cesium.Cartesian3): number {
-  return first.x * second.x + first.y * second.y + first.z * second.z;
-}
-
-function negate(position: Cesium.Cartesian3): Cesium.Cartesian3 {
-  return new Cesium.Cartesian3(-position.x, -position.y, -position.z);
-}
-
-interface UpdatableGroundPrimitive {
-  update(frameState: unknown): void;
-}
-
-class FieldPrimitiveGroup {
-  public show = true;
-  private isDestroyedValue = false;
-
-  constructor(private readonly primitives: Cesium.GroundPrimitive[]) {}
-
-  public get ready(): boolean {
-    return this.primitives.every(primitive => primitive.ready);
-  }
-
-  public update(frameState: unknown): void {
-    this.primitives.forEach((primitive) => {
-      primitive.show = this.show;
-      (primitive as unknown as UpdatableGroundPrimitive).update(frameState);
-    });
-  }
-
-  public isDestroyed(): boolean {
-    return this.isDestroyedValue;
-  }
-
-  public destroy(): void {
-    if (this.isDestroyedValue) return;
-    this.isDestroyedValue = true;
-    this.primitives.forEach(primitive => primitive.destroy());
-  }
 }
 
 function isFieldInView(field: Field, viewRect: Cesium.Rectangle): boolean {

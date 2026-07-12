@@ -34,6 +34,7 @@
     "@capacitor/cli": "^8.4.1",
     "@capacitor/core": "^8.4.1",
     "@capacitor/preferences": "^8.0.1",
-    "cesium": "^1.143.0"
+    "cesium": "^1.143.0",
+    "polygon-clipping": "^0.15.7"
   }
 }

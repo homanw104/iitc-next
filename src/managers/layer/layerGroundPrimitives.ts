@@ -1,5 +1,5 @@
 /**
- * Manages ground primitive layers and swaps asynchronously built geometry without blank render frames.
+ * Manages ground primitive layers and atomically swaps asynchronously built geometry.
  */
 
 import * as Cesium from "cesium";
@@ -60,6 +60,10 @@ export class LayerGroundPrimitives {
     this.primitiveReplacer.replace(key, primitive);
   }
 
+  public replaceGroundPrimitivesWhenReady(key: string, primitives: Cesium.GroundPrimitive[]): void {
+    this.primitiveReplacer.replace(key, new GroundPrimitiveGroup(primitives));
+  }
+
   public removeManagedPrimitive(key: string): boolean {
     return this.primitiveReplacer.remove(key);
   }
@@ -78,6 +82,38 @@ export class LayerGroundPrimitives {
     this.isDestroyed = true;
     this.primitiveReplacer.destroy();
     this.viewer.scene.groundPrimitives.remove(this.collection);
+  }
+}
+
+interface UpdatablePrimitive {
+  update(frameState: unknown): void;
+}
+
+class GroundPrimitiveGroup implements ReplaceablePrimitive {
+  public show = true;
+  private isDestroyedValue = false;
+
+  constructor(private readonly primitives: Cesium.GroundPrimitive[]) {}
+
+  public get ready(): boolean {
+    return this.primitives.every(primitive => primitive.ready);
+  }
+
+  public update(frameState: unknown): void {
+    this.primitives.forEach((primitive) => {
+      primitive.show = this.show;
+      (primitive as unknown as UpdatablePrimitive).update(frameState);
+    });
+  }
+
+  public isDestroyed(): boolean {
+    return this.isDestroyedValue;
+  }
+
+  public destroy(): void {
+    if (this.isDestroyedValue) return;
+    this.isDestroyedValue = true;
+    this.primitives.forEach(primitive => primitive.destroy());
   }
 }
 

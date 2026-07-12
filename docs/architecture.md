@@ -90,6 +90,46 @@ mixture of the remaining Cesium entities and direct primitives:
 Managers should expose domain data or focused read APIs to plugins. Consumers
 should not depend on a manager's internal Cesium primitive records.
 
+### Field coverage rendering
+
+`fieldEntityManager.ts` retains the original field records and coordinates field
+layer replacement. Rendering those triangles directly makes nested fields
+expensive because Cesium's classification pipeline processes every covered
+shadow volume, including areas already covered by other fields.
+
+`fieldCoverageWorker.ts` preprocesses each team's fields away from the render
+thread. It incrementally partitions their unwrapped longitude/latitude polygons
+into mutually disjoint regions for exact coverage depths. A depth of `n` receives
+the cumulative alpha `1 - (1 - FIELD_ALPHA) ** n`, preserving the darker visual
+appearance of multi-fields without classifying the same surface once per source
+field. A generation number discards stale results when newer tile data starts a
+replacement, and worker or clipping failures fall back to spherical
+overlap-aware field batches. `fieldOverlapBatching.ts` owns that fallback and
+prepares its spherical vectors lazily, so it adds no geometry work or retained
+positions to the normal coverage path.
+
+Regions at one depth share a `GroundPrimitive`, but different depths must remain
+in separate primitives. Cesium classification shadow volumes can overlap even
+when their visible surface polygons do not; combining different per-instance
+alphas in one classification primitive can therefore display the wrong depth
+color. `LayerGroundPrimitives.replaceGroundPrimitivesWhenReady` treats the depth
+primitives as one managed replacement and reveals them only after every child is
+ready.
+
+Fallback selection emits a warning tagged `FieldEntityManager`. The current
+choice is also available without enabling debug logging:
+
+```ts
+iitc.fieldEntityManager.getRenderingMode();
+// "coverage", "overlap-fallback", or "none"
+```
+
+For an Android debug build, connect the device over USB, open
+`chrome://inspect/#devices` in desktop Chrome, and inspect the IITC Next
+WebView. Debug builds enable WebView debugging in `MainActivity`; the warning
+and the expression above are then available in the WebView console. Release
+builds intentionally do not expose remote WebView debugging.
+
 ### Layer model
 
 `LayerManager` owns visibility filters, persisted filter state, plugin layer
@@ -104,8 +144,9 @@ registration, and render ordering across four layer backends:
   update hook rewrites only color-render commands into Cesium's overlay pass and
   disables depth testing; pick passes retain Cesium's normal commands.
 * **Ground primitive layers** (`LayerGroundPrimitives`) hold terrain-clamped
-  geometry. `AsyncPrimitiveReplacer` keeps the active geometry visible until a
-  replacement primitive is ready, avoiding blank refresh frames.
+  geometry. `AsyncPrimitiveReplacer` keeps active geometry visible until a
+  replacement primitive or atomic primitive group is ready, avoiding blank and
+  partially updated refresh frames.
 
 Layer wrappers own collection lifetime and call `requestRender` after visible
 state changes. `LayerManager` owns relative ordering between wrappers.
