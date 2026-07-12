@@ -13,6 +13,7 @@ import type { PortalOrnamentManager } from "../../managers/entity/portalOrnament
 import type { ScoutHistoryManager } from "../../managers/entity/scoutHistoryManager.ts";
 import { createInteractionGestureState } from "../interaction/state/interactionGestureState.ts";
 import { createPinchGestureHandlers } from "../interaction/gesture/pinchGestureHandlers.ts";
+import { createTrackpadPinchHandlers } from "../interaction/gesture/trackpadPinchHandlers.ts";
 import { createTouchZoomHandlers } from "../interaction/gesture/touchZoomHandlers.ts";
 import { handlePortalSelection } from "../interaction/selection/portalSelection.ts";
 import type { PortalSelectionState } from "../interaction/selection/portalSelection.ts";
@@ -39,6 +40,7 @@ export function setUpInteractionHandlers(
   };
   const touchZoomHandlers = createTouchZoomHandlers(viewer, controller, gestureState, DOUBLE_TAP_THRESHOLD);
   const pinchGestureHandlers = createPinchGestureHandlers(viewer, handler, controller, gestureState, DOUBLE_TAP_THRESHOLD);
+  const trackpadPinchHandlers = createTrackpadPinchHandlers(viewer, controller, gestureState);
 
   // Remove default callbacks
   handler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_CLICK);
@@ -71,4 +73,6 @@ export function setUpInteractionHandlers(
   // @ts-expect-error - Cesium type definitions for PINCH_MOVE are incorrect
   handler.setInputAction(pinchGestureHandlers.handlePinchMove, ScreenSpaceEventType.PINCH_MOVE);
   handler.setInputAction(pinchGestureHandlers.handlePinchEnd, ScreenSpaceEventType.PINCH_END);
+
+  viewer.scene.canvas.addEventListener("wheel", trackpadPinchHandlers.handleWheel, { passive: false });
 }
