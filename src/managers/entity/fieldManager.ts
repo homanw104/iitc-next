@@ -128,7 +128,7 @@ export class FieldManager {
       const fields = this.getFieldsInLayer(layerId);
       if (fields.length === 0) {
         this.layerManager.getOrCreateGroundPrimitiveLayer(layerId, FIELD_PRIMITIVE_Z_INDEX)
-          .removeManagedPrimitive(FIELD_PRIMITIVE_KEY);
+          .removePrimitiveByKey(FIELD_PRIMITIVE_KEY);
       } else {
         layers.push({
           layerId,
@@ -162,9 +162,9 @@ export class FieldManager {
     const fields = this.getFieldsInLayer(layerId);
 
     if (fields.length === 0) {
-      layer.removeManagedPrimitive(FIELD_PRIMITIVE_KEY);
+      layer.removePrimitiveByKey(FIELD_PRIMITIVE_KEY);
     } else {
-      layer.replaceGroundPrimitivesWhenReady(FIELD_PRIMITIVE_KEY, createFieldPrimitives(fields, coverageByDepth));
+      layer.replaceGroundPrimitives(FIELD_PRIMITIVE_KEY, createFieldPrimitives(fields, coverageByDepth));
     }
   }
 

@@ -879,7 +879,7 @@ class DrawLinesPlugin implements DrawLinesReader, DrawLinesAppearanceController 
     groups.forEach((group, appearanceKey) => {
       const primitiveKey = `${LINES_PRIMITIVE_KEY}:${appearanceKey}`;
       nextPrimitiveKeys.add(primitiveKey);
-      linesLayer.replacePrimitiveWhenReady(primitiveKey, createLinePrimitive(
+      linesLayer.replacePrimitive(primitiveKey, createLinePrimitive(
         group.geometryInstances,
         createPolylineAppearance(group.appearance),
         true,
@@ -887,7 +887,7 @@ class DrawLinesPlugin implements DrawLinesReader, DrawLinesAppearanceController 
     });
 
     this.linePrimitiveKeys.forEach(key => {
-      if (!nextPrimitiveKeys.has(key)) linesLayer.removeManagedPrimitive(key);
+      if (!nextPrimitiveKeys.has(key)) linesLayer.removePrimitiveByKey(key);
     });
     this.linePrimitiveKeys = nextPrimitiveKeys;
   }

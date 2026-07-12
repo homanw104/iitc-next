@@ -103,7 +103,7 @@ class CrossLinesPlugin {
 
     const drawLineSegments = this.getDrawLineSegments();
     if (drawLineSegments.length === 0) {
-      this.highlightLayer.removeManagedPrimitive(CROSS_LINES_PRIMITIVE_KEY);
+      this.highlightLayer.removePrimitiveByKey(CROSS_LINES_PRIMITIVE_KEY);
       return;
     }
 
@@ -129,9 +129,9 @@ class CrossLinesPlugin {
     });
 
     if (geometryInstances.length === 0) {
-      this.highlightLayer.removeManagedPrimitive(CROSS_LINES_PRIMITIVE_KEY);
+      this.highlightLayer.removePrimitiveByKey(CROSS_LINES_PRIMITIVE_KEY);
     } else {
-      this.highlightLayer.replacePrimitiveWhenReady(CROSS_LINES_PRIMITIVE_KEY, new Cesium.GroundPolylinePrimitive({
+      this.highlightLayer.replacePrimitive(CROSS_LINES_PRIMITIVE_KEY, new Cesium.GroundPolylinePrimitive({
         geometryInstances,
         appearance: new Cesium.PolylineMaterialAppearance({
           material: Cesium.Material.fromType(Cesium.Material.PolylineDashType, {

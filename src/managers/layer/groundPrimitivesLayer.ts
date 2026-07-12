@@ -56,16 +56,16 @@ export class GroundPrimitivesLayer {
     return removed;
   }
 
-  public replacePrimitiveWhenReady(key: string, primitive: ReplaceablePrimitive): void {
+  public removePrimitiveByKey(key: string): boolean {
+    return this.primitiveReplacer.remove(key);
+  }
+
+  public replacePrimitive(key: string, primitive: ReplaceablePrimitive): void {
     this.primitiveReplacer.replace(key, primitive);
   }
 
-  public replaceGroundPrimitivesWhenReady(key: string, primitives: Cesium.GroundPrimitive[]): void {
+  public replaceGroundPrimitives(key: string, primitives: Cesium.GroundPrimitive[]): void {
     this.primitiveReplacer.replace(key, new GroundPrimitiveGroup(primitives));
-  }
-
-  public removeManagedPrimitive(key: string): boolean {
-    return this.primitiveReplacer.remove(key);
   }
 
   public raiseToTop(): void {
@@ -93,7 +93,9 @@ class GroundPrimitiveGroup implements ReplaceablePrimitive {
   public show = true;
   private isDestroyedValue = false;
 
-  constructor(private readonly primitives: Cesium.GroundPrimitive[]) {}
+  constructor(
+    private readonly primitives: Cesium.GroundPrimitive[],
+  ) {}
 
   public get ready(): boolean {
     return this.primitives.every(primitive => primitive.ready);

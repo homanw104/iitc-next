@@ -123,9 +123,9 @@ export class LinkManager {
       .map((link) => createLinkGeometryInstance(link));
 
     if (geometryInstances.length === 0) {
-      layer.removeManagedPrimitive(LINK_PRIMITIVE_KEY);
+      layer.removePrimitiveByKey(LINK_PRIMITIVE_KEY);
     } else {
-      layer.replacePrimitiveWhenReady(LINK_PRIMITIVE_KEY, new Cesium.GroundPolylinePrimitive({
+      layer.replacePrimitive(LINK_PRIMITIVE_KEY, new Cesium.GroundPolylinePrimitive({
         geometryInstances,
         appearance: new Cesium.PolylineColorAppearance({ translucent: true }),
         allowPicking: false,

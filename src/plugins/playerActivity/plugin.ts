@@ -857,9 +857,9 @@ class PlayerActivityPlugin {
     });
 
     if (geometryInstances.length === 0) {
-      layer.removeManagedPrimitive(ACTIVITY_PATH_PRIMITIVE_KEY);
+      layer.removePrimitiveByKey(ACTIVITY_PATH_PRIMITIVE_KEY);
     } else {
-      layer.replacePrimitiveWhenReady(ACTIVITY_PATH_PRIMITIVE_KEY, new Cesium.GroundPolylinePrimitive({
+      layer.replacePrimitive(ACTIVITY_PATH_PRIMITIVE_KEY, new Cesium.GroundPolylinePrimitive({
         geometryInstances,
         appearance: new Cesium.PolylineMaterialAppearance({
           material: Cesium.Material.fromType(Cesium.Material.PolylineDashType, {

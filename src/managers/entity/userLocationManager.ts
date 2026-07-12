@@ -67,13 +67,13 @@ export class UserLocationManager {
       USER_LOCATION_RANGE_Z_INDEX,
     );
     if (!Number.isFinite(accuracy) || accuracy <= 0) {
-      rangeLayer.removeManagedPrimitive(ACCURACY_AREA_KEY);
-      rangeLayer.removeManagedPrimitive(ACCURACY_RING_KEY);
+      rangeLayer.removePrimitiveByKey(ACCURACY_AREA_KEY);
+      rangeLayer.removePrimitiveByKey(ACCURACY_RING_KEY);
       return;
     }
 
-    rangeLayer.replacePrimitiveWhenReady(ACCURACY_AREA_KEY, createAccuracyArea(center, accuracy));
-    rangeLayer.replacePrimitiveWhenReady(ACCURACY_RING_KEY, createAccuracyRing(center, accuracy));
+    rangeLayer.replacePrimitive(ACCURACY_AREA_KEY, createAccuracyArea(center, accuracy));
+    rangeLayer.replacePrimitive(ACCURACY_RING_KEY, createAccuracyRing(center, accuracy));
   }
 
   private filterChangedCallback: FilterChangedCallback = (name) => {
