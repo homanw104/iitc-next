@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.4.0
+
+* Huge improvements in performance
+* Added touchpad zoom gesture support
+* Added user location layer
+* Improved label text readability
+* Other minor improvements
+
 ## 2.3.0
 
 * Added new map tiles options
