@@ -5,11 +5,11 @@
  * safeWindow is provided for access to the IITC Next core components.
  */
 
-import "../types/iitc/iitc.ts";
+import "../../types/iitc/iitc.ts";
 import * as Cesium from "cesium";
-import type { IITCCore } from "../types/iitc/iitc.ts";
-import type { LinkData } from "../types/iitc/link.ts";
-import { safeWindow } from "../utils/window";
+import type { IITCCore } from "../../types/iitc/iitc.ts";
+import type { LinkData } from "../../types/iitc/link.ts";
+import { safeWindow } from "../../utils/window";
 import {
   DRAW_LINES_PLUGIN_ID,
   isDrawLinesAppearanceController,
@@ -17,7 +17,7 @@ import {
   type DrawLineAppearanceOverride,
   type DrawLinesAppearanceController,
   type DrawLinesReader,
-} from "./drawLines/api";
+} from "../drawLines/api";
 
 const LOG_TAG = "DoneLinesPlugin";
 const DONE_LINES_PLUGIN_ID = "done-lines";

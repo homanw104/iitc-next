@@ -6,16 +6,20 @@
  */
 
 import * as Cesium from "cesium";
-import { restoreSceneAfterPick } from "../cesium/interaction/picking/restoreSceneAfterPick.ts";
-import type { EntityPosition, EntityPositionCallback } from "../managers/entity/entityPositionManager";
-import type { GroundPrimitivesLayer } from "../managers/layer/groundPrimitivesLayer";
-import type { OverlayLayer } from "../managers/layer/overlayLayer";
-import type { IITCCore } from "../types/iitc/iitc.ts";
-import type { Team } from "../types/common/common.ts";
-import type { PlextMark } from "../types/api/getPlexts.ts";
-import { getTeamColor } from "../utils/color";
-import { h } from "../utils/dom.ts";
-import { safeWindow } from "../utils/window";
+import { restoreSceneAfterPick } from "../../cesium/interaction/picking/restoreSceneAfterPick.ts";
+import type { EntityPosition, EntityPositionCallback } from "../../managers/entity/entityPositionManager";
+import type { GroundPrimitivesLayer } from "../../managers/layer/groundPrimitivesLayer";
+import type { OverlayLayer } from "../../managers/layer/overlayLayer";
+import type { PlextMark } from "../../types/api/getPlexts.ts";
+import type { Team } from "../../types/common/common.ts";
+import type { IITCCore } from "../../types/iitc/iitc.ts";
+import { getTeamColor } from "../../utils/color";
+import { safeWindow } from "../../utils/window";
+import { PlayerActivityTooltipElement } from "./PlayerActivityTooltipElement";
+import {
+  PlayerActivityTooltipTable,
+  type PlayerActivityTooltip,
+} from "./PlayerActivityTooltipTable";
 
 const LOG_TAG = "PlayerActivityPlugin";
 const PLAYER_ACTIVITY_ENL_LAYER_NAME = "Player Activity Enl";
@@ -101,12 +105,6 @@ interface PlayerPath {
 interface PlayerActivity {
   data: PlayerActivityData;
   positionCallback: EntityPositionCallback;
-}
-
-interface PlayerActivityTooltip {
-  title: string;
-  activities: PlayerActivityData[];
-  rowLabel: "name" | "portalName";
 }
 
 class PlayerActivityPlugin {
@@ -296,7 +294,7 @@ class PlayerActivityPlugin {
     this.pendingHoverPosition = undefined;
   }
 
-  private getPickedPlayerActivityTooltip(position: Cesium.Cartesian2): PlayerActivityTooltip | undefined {
+  private getPickedPlayerActivityTooltip(position: Cesium.Cartesian2): PlayerActivityTooltip<PlayerActivityData> | undefined {
     const pickedObject = this.viewer.scene.pick(position) as { id?: unknown } | undefined;
     const id = pickedObject?.id;
 
@@ -306,7 +304,7 @@ class PlayerActivityPlugin {
     return undefined;
   }
 
-  private getClusteredPlayerActivityTooltip(ids: unknown[]): PlayerActivityTooltip | undefined {
+  private getClusteredPlayerActivityTooltip(ids: unknown[]): PlayerActivityTooltip<PlayerActivityData> | undefined {
     if (!this.isPlayerLocationPrimitiveId(ids[0])) return undefined;
 
     const activities = ids
@@ -323,7 +321,7 @@ class PlayerActivityPlugin {
     };
   }
 
-  private getSinglePlayerActivityTooltip(id: PlayerLocationPrimitiveId): PlayerActivityTooltip | undefined {
+  private getSinglePlayerActivityTooltip(id: PlayerLocationPrimitiveId): PlayerActivityTooltip<PlayerActivityData> | undefined {
     const activities = [...id.activities]
       .sort(comparePlayerActivityTimestampDescending);
     const latestActivity = activities[0];
@@ -878,44 +876,6 @@ class PlayerActivityPlugin {
   }
 }
 
-const PlayerActivityTooltipElement = (): HTMLElement => {
-  return (
-    <div id="cesium-rich-tooltip" style={{
-      display: "none",
-      position: "absolute",
-      backgroundColor: "rgba(42, 42, 42, 0.9)",
-      border: "1px solid #555",
-      padding: "4px",
-      color: "white",
-      zIndex: "10500",
-    }} />
-  ) as HTMLElement;
-};
-
-const PlayerActivityTooltipTable = ({tooltip}: {
-  tooltip: PlayerActivityTooltip;
-}): HTMLElement => {
-  return (
-    <table>
-      <thead>
-      <tr>
-        <th style={{ textAlign: "left" }}>{tooltip.title}</th>
-      </tr>
-      </thead>
-      <tbody>
-      {tooltip.activities.map(activity => {
-        return (
-          <tr style={{ fontSize: "12px" }}>
-            <td style={{ paddingRight: "8px" }}>{activity[tooltip.rowLabel]}</td>
-            <td style={{ textAlign: "right" }}>{calcTimeAgoStr(activity.timestamp)}</td>
-          </tr>
-        ) as HTMLElement;
-      })}
-      </tbody>
-    </table>
-  ) as HTMLElement;
-};
-
 function getPlayerActivityLayerName(team: Team): string | undefined {
   if (team === "ENLIGHTENED") return PLAYER_ACTIVITY_ENL_LAYER_NAME;
   if (team === "RESISTANCE") return PLAYER_ACTIVITY_RES_LAYER_NAME;
@@ -1062,15 +1022,6 @@ function setClusterShow(primitive: Cesium.Label | Cesium.Billboard, show: boolea
 
 function comparePlayerActivityTimestampDescending(a: PlayerActivityData, b: PlayerActivityData): number {
   return b.timestamp - a.timestamp;
-}
-
-function calcTimeAgoStr(time: number) {
-  const timeDiff = (Date.now() - time) / 1000;
-  const hours = Math.floor(timeDiff / 60 / 60);
-  const minutes = Math.floor(timeDiff / 60 % 60);
-  const hourStr = hours === 0 ? "" : hours === 1 ? "1 hr" : hours > 1 ? hours + (" hrs") : "";
-  const minutesStr = minutes === 0 ? "0 min" : minutes === 1 ? "1 min" : minutes > 1 ? minutes + (" mins") : "";
-  return `${hourStr} ${minutesStr} ago`;
 }
 
 function buildCanvas(): HTMLCanvasElement {

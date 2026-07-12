@@ -4,17 +4,16 @@
  * This plugin enables you to draw lines on the map.
  */
 
-import "../types/iitc/iitc.ts";
+import "../../types/iitc/iitc.ts";
 import * as Cesium from "cesium";
-import { pickGestureSurfacePosition as pickSceneSurfacePosition } from "../cesium/interaction/camera/cameraGestures";
-import { restoreSceneAfterPick } from "../cesium/interaction/picking/restoreSceneAfterPick.ts";
-import type { GroundPrimitivesLayer } from "../managers/layer/groundPrimitivesLayer";
-import type { OverlayLayer } from "../managers/layer/overlayLayer";
-import { isPortalPrimitiveId } from "../managers/entity/portalManager.ts";
-import type { IITCCore } from "../types/iitc/iitc.ts";
-import { h } from "../utils/dom.ts";
-import { safeLocalStorage } from "../utils/storage.ts";
-import { safeWindow } from "../utils/window";
+import { pickGestureSurfacePosition as pickSceneSurfacePosition } from "../../cesium/interaction/camera/cameraGestures";
+import { restoreSceneAfterPick } from "../../cesium/interaction/picking/restoreSceneAfterPick.ts";
+import type { GroundPrimitivesLayer } from "../../managers/layer/groundPrimitivesLayer";
+import type { OverlayLayer } from "../../managers/layer/overlayLayer";
+import { isPortalPrimitiveId } from "../../managers/entity/portalManager.ts";
+import type { IITCCore } from "../../types/iitc/iitc.ts";
+import { safeLocalStorage } from "../../utils/storage.ts";
+import { safeWindow } from "../../utils/window";
 import {
   DRAW_LINES_PLUGIN_ID,
   type DrawLineAppearanceOverride,
@@ -22,7 +21,13 @@ import {
   type DrawLinesChangedCallback,
   type DrawLinesAppearanceController,
   type DrawLinesReader,
-} from "./drawLines/api";
+} from "./api";
+import { ClearLinesButton } from "./ClearLinesButton";
+import { ConfirmPane } from "./ConfirmPane";
+import { DeleteLinesButton } from "./DeleteLinesButton";
+import { DrawLinesButton } from "./DrawLinesButton";
+import { ExportLinesButton } from "./ExportLinesButton";
+import { ImportLinesButton } from "./ImportLinesButton";
 
 const LOG_TAG = "DrawLines";
 const LINES_LAYER_NAME = "Draw Lines";
@@ -988,201 +993,6 @@ function appearanceOverridesEqual(
     a.width === b.width &&
     a.dashLength === b.dashLength;
 }
-
-const DrawLinesButton = ({ onClick }: {
-  onClick: () => void;
-}) => {
-  return (
-    <button
-      type="button"
-      title="Draw Lines"
-      className="cesium-button cesium-toolbar-button"
-      onClick={() => onClick()}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      <svg class="cesium-svgPath-svg" viewBox="0 -960 960 960" width="30" height="30" fill="currentColor" style={{ width: "26px", height: "26px", left: "2px", top: "2px", bottom: "2px", right: "2px" }}>
-        <path d="M760-80q-50 0-85-35t-35-85q0-14 3-27t9-25L252-652q-12 6-25 9t-27 3q-50 0-85-35t-35-85q0-50 35-85t85-35q50 0 85 35t35 85q0 14-3 27t-9 25l400 400q12-6 25-9t27-3q50 0 85 35t35 85q0 50-35 85t-85 35Z" />
-      </svg>
-    </button>
-  ) as HTMLElement;
-};
-
-const DeleteLinesButton = ({ onClick }: {
-  onClick: () => void;
-}) => {
-  return (
-    <button
-      type="button"
-      title="Delete Lines"
-      className="cesium-button cesium-toolbar-button"
-      onClick={() => onClick()}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      <svg class="cesium-svgPath-svg" viewBox="0 -960 960 960" width="30" height="30" fill="currentColor" style={{ width: "26px", height: "26px", left: "2px", top: "2px", bottom: "2px", right: "2px" }}>
-        <path d="M690-240h190v80H610l80-80Zm-500 80-85-85q-23-23-23.5-57t22.5-58l440-456q23-24 56.5-24t56.5 23l199 199q23 23 23 57t-23 57L520-160H190Zm296-80 314-322-198-198-442 456 64 64h262Zm-6-240Z" />
-      </svg>
-    </button>
-  ) as HTMLElement;
-};
-
-const ClearLinesButton = ({ onClick }: {
-  onClick: () => void;
-}) => {
-  return (
-    <button
-      type="button"
-      title="Clear Lines"
-      className="cesium-button cesium-toolbar-button"
-      onClick={() => onClick()}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      <svg class="cesium-svgPath-svg" viewBox="0 -960 960 960" width="30" height="30" fill="currentColor" style={{ width: "26px", height: "26px", left: "2px", top: "2px", bottom: "2px", right: "2px" }}>
-        <path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z" />
-      </svg>
-    </button>
-  ) as HTMLElement;
-};
-
-const ExportLinesButton = ({ onClick }: {
-  onClick: () => void;
-}) => {
-  return (
-    <button
-      type="button"
-      title="Export Lines"
-      className="cesium-button cesium-toolbar-button"
-      onClick={() => onClick()}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      <svg class="cesium-svgPath-svg" viewBox="0 -960 960 960" width="30" height="30" fill="currentColor" style={{ width: "26px", height: "26px", left: "2px", top: "2px", bottom: "2px", right: "2px" }}>
-        <path d="m720-120 160-160-56-56-64 64v-167h-80v167l-64-64-56 56 160 160ZM560 0v-80h320V0H560ZM240-160q-33 0-56.5-23.5T160-240v-560q0-33 23.5-56.5T240-880h280l240 240v121h-80v-81H480v-200H240v560h240v80H240Zm0-80v-560 560Z" />
-      </svg>
-    </button>
-  ) as HTMLElement;
-};
-
-const ImportLinesButton = ({ onClick }: {
-  onClick: () => void;
-}) => {
-  return (
-    <button
-      type="button"
-      title="Import Lines"
-      className="cesium-button cesium-toolbar-button"
-      onClick={() => onClick()}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      <svg class="cesium-svgPath-svg" viewBox="0 -960 960 960" width="30" height="30" fill="currentColor" style={{ width: "26px", height: "26px", left: "2px", top: "2px", bottom: "2px", right: "2px" }}>
-        <path d="M440-200h80v-167l64 64 56-57-160-160-160 160 57 56 63-63v167ZM240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h320l240 240v480q0 33-23.5 56.5T720-80H240Zm280-520v-200H240v640h480v-440H520ZM240-800v200-200 640-640Z" />
-      </svg>
-    </button>
-  ) as HTMLElement;
-};
-
-const ConfirmPane = ({ msg, onConfirm, onCancel }: {
-  msg: string,
-  onConfirm: () => void,
-  onCancel: () => void,
-}): HTMLElement => {
-  return (
-    <div style={{
-      position: "absolute",
-      top: "var(--iitc-system-top-inset, 0px)",
-      left: "var(--iitc-system-left-inset, 0px)",
-      bottom: "var(--iitc-system-bottom-inset, 0px)",
-      right: "var(--iitc-system-right-inset, 0px)",
-      margin: "auto",
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "center",
-      zIndex: "10040",
-    }}>
-      <div style={{
-        position: "relative",
-        width: "250px",
-        height: "100px",
-        padding: "12px",
-        maxWidth: "calc(100% - 32px)",
-        maxHeight: "calc(100% - 32px)",
-        backgroundColor: "rgba(42, 42, 42, 0.9)",
-        border: "1px solid #555",
-        borderRadius: "4.2px",
-        color: "white",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-      }}>
-        <div style={{
-          width: "100%",
-          flexGrow: 1,
-        }}>
-          {msg}
-        </div>
-        <div style={{
-          width: "100%",
-          display: "flex",
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "flex-end",
-          gap: "8px",
-        }}>
-          <button
-            style={{
-              backgroundColor: "#5091ff",
-              border: "1px solid #555",
-              color: "white",
-              height: "34px",
-              padding: "4px 8px",
-              borderRadius: "2px",
-              fontFamily: "coda_regular, arial, helvetica, sans-serif",
-              cursor: "pointer",
-            }}
-            onClick={() => onConfirm()}
-          >
-            Confirm
-          </button>
-          <button
-            style={{
-              backgroundColor: "#5091ff",
-              border: "1px solid #555",
-              color: "white",
-              height: "34px",
-              padding: "4px 8px",
-              borderRadius: "2px",
-              fontFamily: "coda_regular, arial, helvetica, sans-serif",
-              cursor: "pointer",
-            }}
-            onClick={() => onCancel()}
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
-  ) as HTMLElement;
-};
 
 const register = () => {
   if (safeWindow && safeWindow.iitc && safeWindow.iitc.pluginManager) {

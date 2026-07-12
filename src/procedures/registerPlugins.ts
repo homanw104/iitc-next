@@ -10,8 +10,8 @@ export default async function registerPlugins() {
   await pluginManager.initialize();
 
   // Import official plugins
-  await import("../plugins/playerActivity.tsx");
-  await import("../plugins/drawLines.tsx");
-  await import("../plugins/crossLines.tsx");
-  await import("../plugins/doneLines.tsx");
+  await import("../plugins/playerActivity/plugin");
+  await import("../plugins/drawLines/plugin");
+  await import("../plugins/crossLines/plugin");
+  await import("../plugins/doneLines/plugin");
 }

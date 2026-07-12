@@ -5,17 +5,17 @@
  * safeWindow is provided for access to the IITC Next core components.
  */
 
-import "../types/iitc/iitc.ts";
+import "../../types/iitc/iitc.ts";
 import * as Cesium from "cesium";
-import type { GroundPrimitivesLayer } from "../managers/layer/groundPrimitivesLayer";
-import type { IITCCore } from "../types/iitc/iitc.ts";
-import type { LinkData } from "../types/iitc/link.ts";
-import { safeWindow } from "../utils/window";
+import type { GroundPrimitivesLayer } from "../../managers/layer/groundPrimitivesLayer";
+import type { IITCCore } from "../../types/iitc/iitc.ts";
+import type { LinkData } from "../../types/iitc/link.ts";
+import { safeWindow } from "../../utils/window";
 import {
   DRAW_LINES_PLUGIN_ID,
   isDrawLinesReader,
   type DrawLinesReader,
-} from "./drawLines/api";
+} from "../drawLines/api";
 
 const LOG_TAG = "CrossLinesPlugin";
 const CROSS_LINES_LAYER_NAME = "Cross Lines";

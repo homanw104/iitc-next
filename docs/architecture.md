@@ -223,8 +223,10 @@ mounted from `mountCoreControllersAndUI.ts` after manager construction.
 
 ### Plugin lifecycle
 
-Built-in plugins live in `src/plugins/` and are registered by
-`registerPlugins.ts`. Separately built plugin userscripts wait for
+Built-in plugins live in named folders under `src/plugins/`. Each folder uses
+`plugin.ts` as its entry point and keeps its TSX components and plugin-owned
+contracts beside it. Built-in entries are registered by `registerPlugins.ts`.
+Separately built plugin userscripts wait for
 `window.iitc.pluginManager` and register through the same interface.
 
 Plugins consume the manager APIs exposed on `window.iitc`, including `viewer`,
@@ -255,8 +257,8 @@ Capacitor Preferences on native platforms.
 
 * `vite.config.ts` builds the main userscript with Cesium loaded from its CDN
   bundle.
-* `vite.plugin.config.ts` and `scripts/build-plugins.ts` build plugins as
-  separate userscripts.
+* `vite.plugin.config.ts` discovers `src/plugins/*/plugin.ts`, and
+  `scripts/build-plugins.ts` builds those entries as separate userscripts.
 * `scripts/sync-version.ts` keeps package metadata, native projects, the README,
   and native script-injector Cesium versions aligned.
 * Capacitor configuration and the `android/` and `ios/` projects package the
