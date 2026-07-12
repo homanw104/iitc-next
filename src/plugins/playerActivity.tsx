@@ -64,6 +64,7 @@ interface PlayerLocation {
   label: Cesium.Label;
   billboard: Cesium.Billboard;
   currentLayerName: string;
+  isFallbackPosition: boolean;
 }
 
 interface PlayerLocationCluster {
@@ -550,6 +551,7 @@ class PlayerActivityPlugin {
       label,
       billboard,
       currentLayerName: layerName,
+      isFallbackPosition: lastEntityPosition.isFallbackPosition,
     };
   }
 
@@ -585,6 +587,7 @@ class PlayerActivityPlugin {
     entityPosition: EntityPosition,
   ): void {
     const show = !entityPosition.isFallbackPosition;
+    primitive.isFallbackPosition = entityPosition.isFallbackPosition;
     primitive.label.position = entityPosition.position;
     primitive.billboard.position = entityPosition.position;
     primitive.label.show = show;
@@ -611,7 +614,7 @@ class PlayerActivityPlugin {
     const candidatesByLayerName = new Map<string, PlayerLocationClusterCandidate[]>();
 
     this.playerLocations.forEach((location) => {
-      setPlayerLocationClusterShow(location, true);
+      setPlayerLocationClusterShow(location, !location.isFallbackPosition);
 
       const candidate = this.createPlayerLocationClusterCandidate(location);
       if (!candidate) return;
