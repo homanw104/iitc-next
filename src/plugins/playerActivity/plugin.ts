@@ -36,7 +36,7 @@ const PLAYER_ACTIVITY_CLUSTER_PIXEL_RANGE = 20;
 const PLAYER_ACTIVITY_CLUSTER_MINIMUM_SIZE = 2;
 const PLAYER_ACTIVITY_CLUSTER_MAX_VISIBLE_PLAYERS = 2;
 const PLAYER_ACTIVITY_LABEL_FONT = "16px coda_regular, arial, helvetica, sans-serif";
-const PLAYER_ACTIVITY_LABEL_OUTLINE_WIDTH = 6;
+const PLAYER_ACTIVITY_LABEL_OUTLINE_WIDTH = 4;
 const PLAYER_ACTIVITY_BILLBOARD_SIZE_PX = 40;
 const PLAYER_ACTIVITY_LABEL_AVERAGE_CHARACTER_WIDTH_PX = 9;
 const PLAYER_ACTIVITY_LABEL_HEIGHT_PX = 20;
@@ -1029,7 +1029,7 @@ function buildCanvas(): HTMLCanvasElement {
   const PADDING = 4;        // padding around the focus square
   const BRACKET_LEN = 0.16; // bracket arm as fraction of the canvas half-side
   const THICKNESS = 3;
-  const BORDER = 4;
+  const BORDER = 2;
   const COLOR = "#ffd200";
 
   // Create a new canvas
