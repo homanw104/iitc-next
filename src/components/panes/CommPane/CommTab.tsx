@@ -17,7 +17,7 @@ const CommTab = ({ id, label, isActive, onClick }: {
       fontWeight: isActive ? "bold" : "normal",
       color: "white",
       cursor: "pointer",
-      width: "80px",
+      width: "76px",
       padding: "8px 8px 16px 8px",
     }}
   >
