@@ -97,12 +97,15 @@ layer replacement. Rendering those triangles directly makes nested fields
 expensive because Cesium's classification pipeline processes every covered
 shadow volume, including areas already covered by other fields.
 
-`fieldCoverageWorker.ts` preprocesses each team's fields away from the render
-thread. It incrementally partitions their unwrapped longitude/latitude polygons
-into mutually disjoint regions for exact coverage depths. A depth of `n` receives
-the cumulative alpha `1 - (1 - FIELD_ALPHA) ** n`, preserving the darker visual
-appearance of multi-fields without classifying the same surface once per source
-field. A generation number discards stale results when newer tile data starts a
+`fieldCoverageWorker.ts` launches the preprocessing away from the render thread.
+Its typed implementation lives in `fieldCoverageWorkerRuntime.ts`, which is
+compiled and linted normally, then serialized into the data-URL worker alongside
+the polygon-clipping UMD build. It incrementally partitions each team's
+unwrapped longitude/latitude polygons into mutually disjoint regions for exact
+coverage depths. A depth of `n` receives the cumulative alpha
+`1 - (1 - FIELD_ALPHA) ** n`, preserving the darker visual appearance of
+multi-fields without classifying the same surface once per source field. A
+generation number discards stale results when newer tile data starts a
 replacement, and worker or clipping failures fall back to spherical
 overlap-aware field batches. `fieldOverlapBatching.ts` owns that fallback and
 prepares its spherical vectors lazily, so it adds no geometry work or retained

@@ -26,6 +26,11 @@ export interface FieldCoverageLayerResult {
   coverageByDepth: FieldCoverageMultiPolygon[];
 }
 
+export interface FieldCoverageRequest {
+  generation: number;
+  layers: FieldCoverageLayerInput[];
+}
+
 export type FieldCoverageResponse = {
   generation: number;
   layers: FieldCoverageLayerResult[];
