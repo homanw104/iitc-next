@@ -26,13 +26,13 @@ export class AmapMercatorTilingScheme extends Cesium.WebMercatorTilingScheme {
     internalTilingScheme._projection.project = function(cartographic: Cesium.Cartographic, result?: Cesium.Cartesian3): Cesium.Cartesian3 {
       const gcj02 = wgs84ToGcj02(
         Cesium.Math.toDegrees(cartographic.longitude),
-        Cesium.Math.toDegrees(cartographic.latitude)
+        Cesium.Math.toDegrees(cartographic.latitude),
       );
       const cartesian = projection.project(
         new Cesium.Cartographic(
           Cesium.Math.toRadians(gcj02[0]),
-          Cesium.Math.toRadians(gcj02[1])
-        )
+          Cesium.Math.toRadians(gcj02[1]),
+        ),
       );
       if (result) {
         result.x = cartesian.x;
@@ -47,11 +47,11 @@ export class AmapMercatorTilingScheme extends Cesium.WebMercatorTilingScheme {
       const cartographic = projection.unproject(cartesian);
       const wgs84 = gcj02ToWgs84(
         Cesium.Math.toDegrees(cartographic.longitude),
-        Cesium.Math.toDegrees(cartographic.latitude)
+        Cesium.Math.toDegrees(cartographic.latitude),
       );
       const res = new Cesium.Cartographic(
         Cesium.Math.toRadians(wgs84[0]),
-        Cesium.Math.toRadians(wgs84[1])
+        Cesium.Math.toRadians(wgs84[1]),
       );
       if (result) {
         result.longitude = res.longitude;

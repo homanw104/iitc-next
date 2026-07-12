@@ -20,10 +20,17 @@ export default defineConfig(
       },
     },
     rules: {
+      "comma-dangle": ["error", {
+        arrays: "always-multiline",
+        objects: "always-multiline",
+        imports: "always-multiline",
+        exports: "always-multiline",
+        functions: "always-multiline",
+      }],
       "semi": ["error", "always"],
       "quotes": ["error", "double", { "allowTemplateLiterals": true }],
       "@typescript-eslint/no-namespace": ["error", { "allowDeclarations": true }],
-    }
+    },
   },
   {
     ignores: ["dist/", "old/", "android/", "ios/"],

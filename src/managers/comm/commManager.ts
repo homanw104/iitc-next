@@ -78,7 +78,7 @@ export class CommManager {
         message,
         latE6,
         lngE6,
-        tab: channel
+        tab: channel,
       };
 
       const response = await apiRequestManager.sendPlext(payload);
@@ -164,7 +164,7 @@ export class CommManager {
     min: number,
     max: number,
     minSpan: number,
-    range: { min: number; max: number }
+    range: { min: number; max: number },
   ): {
     min: number;
     max: number;
@@ -222,7 +222,7 @@ export class CommManager {
         south,
         north,
         minLatSpan,
-        LATITUDE_DEGREES_RANGE
+        LATITUDE_DEGREES_RANGE,
       );
 
       let longitude = LONGITUDE_DEGREES_RANGE;
@@ -236,7 +236,7 @@ export class CommManager {
           west,
           east,
           minLngSpan,
-          LONGITUDE_DEGREES_RANGE
+          LONGITUDE_DEGREES_RANGE,
         );
       }
 

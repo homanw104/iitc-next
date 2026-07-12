@@ -70,7 +70,7 @@ export class DebugTileManager {
     tilePrimitives.removalTimeout = window.setTimeout(() => {
       this.removeTilePrimitives(key);
       this.viewer.scene.requestRender();
-    }, DEBUG_TILE_REMOVAL_DELAY_MS,);
+    }, DEBUG_TILE_REMOVAL_DELAY_MS);
   }
 }
 
@@ -122,18 +122,18 @@ function createTileFillPrimitive(rectangle: Cesium.Rectangle, color: Cesium.Colo
         rectangle,
         height: 0,
         vertexFormat: Cesium.PerInstanceColorAppearance.FLAT_VERTEX_FORMAT,
-      },),
+      }),
       attributes: {
         color: Cesium.ColorGeometryInstanceAttribute.fromColor(color.withAlpha(DEBUG_TILE_FILL_ALPHA)),
       },
-    },),
+    }),
     appearance: new Cesium.PerInstanceColorAppearance({
       flat: true,
       translucent: true,
-    },),
+    }),
     allowPicking: false,
     asynchronous: false,
-  },);
+  });
 }
 
 function createTileOutlinePrimitive(rectangle: Cesium.Rectangle, color: Cesium.Color): Cesium.Primitive {
@@ -142,18 +142,18 @@ function createTileOutlinePrimitive(rectangle: Cesium.Rectangle, color: Cesium.C
       geometry: new Cesium.RectangleOutlineGeometry({
         rectangle,
         height: 0,
-      },),
+      }),
       attributes: {
         color: Cesium.ColorGeometryInstanceAttribute.fromColor(color),
       },
-    },),
+    }),
     appearance: new Cesium.PerInstanceColorAppearance({
       flat: true,
       translucent: false,
-    },),
+    }),
     allowPicking: false,
     asynchronous: false,
-  },);
+  });
 }
 
 function getStatusColor(status: TileStatus): Cesium.Color {

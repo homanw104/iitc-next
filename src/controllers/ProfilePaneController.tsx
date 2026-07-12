@@ -127,7 +127,7 @@ export class ProfilePaneController {
   private showAboutDetailPane(container: HTMLElement) {
     this.showPane(container, () => AboutPane({
       onBack: () => this.showGameDetailPane(container),
-      onClose: () => this.closeActivePane()
+      onClose: () => this.closeActivePane(),
     }));
   }
 

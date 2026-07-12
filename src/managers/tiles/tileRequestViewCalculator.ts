@@ -91,7 +91,7 @@ export class ViewTileCalculator {
   }
 
   public computeViewRectangle(
-    maxPitch: number = MAX_VIEW_RECTANGLE_PITCH
+    maxPitch: number = MAX_VIEW_RECTANGLE_PITCH,
   ): Cesium.Rectangle | undefined {
     const camera = this.viewer.camera;
     const pitch = Math.min(camera.pitch, maxPitch);

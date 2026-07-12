@@ -33,7 +33,7 @@ export function createOverlapAwareFieldBatches<T extends FieldRecord>(fields: T[
     } else {
       batches.push([field]);
     }
-  },);
+  });
 
   return batches.map((batch) => batch.map((field) => field.field));
 }
@@ -48,7 +48,7 @@ function prepareField<T extends FieldRecord>(field: T): PreparedField<T> {
       cosLatitude * Math.sin(longitude),
       Math.sin(latitude),
     );
-  },);
+  });
 
   return {
     field,

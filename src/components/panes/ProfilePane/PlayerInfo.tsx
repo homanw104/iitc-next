@@ -15,7 +15,7 @@ const PlayerInfo = ({ player }: {
       </span>
       <span style={{
         fontSize: "24px",
-        color: "#ffffff"
+        color: "#ffffff",
       }}>
         {player ? player.verifiedLevel && "-" : ""}
       </span>

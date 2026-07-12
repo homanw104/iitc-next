@@ -144,7 +144,7 @@ const GOOGLE_3D_TILES_RENDER_SETTINGS: Record<CesiumRenderQuality, Google3dTiles
 export function createCesiumViewer(container: HTMLElement, imageryProviderViewModels: Cesium.ProviderViewModel[] | undefined): Cesium.Viewer {
   const useGoogle3dTiles = settingsManager.getUseGoogle3dTiles();
   const selectedImageryProviderViewModel = imageryProviderViewModels?.find(
-    (viewModel) => viewModel.name === DEFAULT_BASE_LAYER_NAME
+    (viewModel) => viewModel.name === DEFAULT_BASE_LAYER_NAME,
   );
 
   const viewer = new Cesium.Viewer(container.id, {

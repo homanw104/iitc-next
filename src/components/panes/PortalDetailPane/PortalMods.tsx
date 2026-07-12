@@ -24,14 +24,14 @@ const PortalMods = ({ data, teamColorHex }: { data: PortalData, teamColorHex: st
                 flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
-                gap: "2px"
+                gap: "2px",
               }}>
                 <div style={{
                   textAlign: "center",
                   alignContent: "center",
                   fontSize: "12px",
                   height: "32px",
-                  color: "#555"
+                  color: "#555",
                 }}>
                   Loading
                 </div>
@@ -42,14 +42,14 @@ const PortalMods = ({ data, teamColorHex }: { data: PortalData, teamColorHex: st
                 flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
-                gap: "2px"
+                gap: "2px",
               }}>
                 <div style={{
                   textAlign: "center",
                   alignContent: "center",
                   fontSize: "12px",
                   height: "32px",
-                  color: "#555"
+                  color: "#555",
                 }}>
                   Empty
                 </div>
@@ -60,7 +60,7 @@ const PortalMods = ({ data, teamColorHex }: { data: PortalData, teamColorHex: st
                 flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
-                gap: "2px"
+                gap: "2px",
               }}>
                 <div style={{
                   textAlign: "center",
@@ -68,7 +68,7 @@ const PortalMods = ({ data, teamColorHex }: { data: PortalData, teamColorHex: st
                   fontSize: "12px",
                   fontWeight: "bold",
                   height: "32px",
-                  marginBottom: "8px"
+                  marginBottom: "8px",
                 }}>
                   {mod.name}
                 </div>
@@ -78,7 +78,7 @@ const PortalMods = ({ data, teamColorHex }: { data: PortalData, teamColorHex: st
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
-                  color: "#aaa"
+                  color: "#aaa",
                 }}>
                   {mod.rarity}
                 </div>
@@ -88,7 +88,7 @@ const PortalMods = ({ data, teamColorHex }: { data: PortalData, teamColorHex: st
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
-                  color: teamColorHex
+                  color: teamColorHex,
                 }}>
                   {mod.owner}
                 </div>

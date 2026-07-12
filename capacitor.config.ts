@@ -23,21 +23,21 @@ const config: CapacitorConfig = {
       "*.nianticspatial.com",
       "nianticlabs.com",
       "*.nianticlabs.com",
-      "iitc-next.local"
-    ]
+      "iitc-next.local",
+    ],
   },
   android: {
-    allowMixedContent: true
+    allowMixedContent: true,
   },
   plugins: {
     CapacitorCookies: {
-      enabled: true
+      enabled: true,
     },
     SystemBars: {
       insetsHandling: "disable",
-      style: "DARK"
-    }
-  }
+      style: "DARK",
+    },
+  },
 };
 
 export default config;

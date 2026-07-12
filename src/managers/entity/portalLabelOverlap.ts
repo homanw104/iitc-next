@@ -114,7 +114,7 @@ async function collectPortalLabelOverlapCandidates(
               linkCount: label.linkCount,
               level: label.data.level ?? 0,
               distanceToCamera,
-            },);
+            });
           }
         }
       }
@@ -185,7 +185,7 @@ function waitForBackgroundWork(): Promise<void> {
     return new Promise((resolve) => window.requestIdleCallback(
       () => resolve(),
       { timeout: PORTAL_LABEL_OVERLAP_YIELD_TIMEOUT_MS },
-    ),);
+    ));
   }
 
   return new Promise((resolve) => window.setTimeout(resolve, 0));
@@ -231,7 +231,7 @@ function getVisibleLabelViewRectangle(viewer: Cesium.Viewer): Cesium.Rectangle |
       roll: camera.roll,
     },
     endTransform: camera.transform,
-  },);
+  });
 
   return clampedCamera.computeViewRectangle(viewer.scene.globe.ellipsoid);
 }

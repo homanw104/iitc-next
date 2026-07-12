@@ -25,7 +25,7 @@ export class LoadingProgressManager {
   private lastGoogleTilesProgress = -1;
 
   constructor(
-    private readonly viewer: Cesium.Viewer
+    private readonly viewer: Cesium.Viewer,
   ) {
     this.initSceneLoadedPromise = this.createInitSceneLoadedPromise();
     if (this.useGoogle3dTiles) this.watchGoogleTilesets();
@@ -101,7 +101,7 @@ export class LoadingProgressManager {
         waitForGlobeTilesQuality.cancel,
         removeTerrainProviderChangedListener,
         removeTileLoadProgressListener,
-        removePostRenderListener
+        removePostRenderListener,
       );
 
       if (shouldWaitForGoogleTiles()) {

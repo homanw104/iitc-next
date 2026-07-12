@@ -16,7 +16,7 @@ const getCameraHeightForAccuracy = (accuracy: number): number => {
 
   return Math.min(
     Math.max(PRECISE_LOCATION_CAMERA_HEIGHT, accuracy * APPROXIMATE_LOCATION_CAMERA_HEIGHT_MULTIPLIER),
-    MAX_APPROXIMATE_LOCATION_CAMERA_HEIGHT
+    MAX_APPROXIMATE_LOCATION_CAMERA_HEIGHT,
   );
 };
 
@@ -39,7 +39,7 @@ const GetLocationButton = ({ viewer }: {
         },
         (error) => {
           logManager.error(LOG_TAG, "Failed to get location", error);
-        }
+        },
       );
     } else {
       logManager.error(LOG_TAG, "Geolocation is not supported by this browser");

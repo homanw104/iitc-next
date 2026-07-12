@@ -76,7 +76,7 @@ const CommPane = ({
     const dateStr = new Date(message[1]).toLocaleDateString([], { day: "numeric", month: "short" });
     if (dateStr !== lastDateStr) {
       messageList.push(
-        <CommDateDivider timeStr={dateStr} />
+        <CommDateDivider timeStr={dateStr} />,
       );
     }
     lastDateStr = dateStr;
@@ -95,7 +95,7 @@ const CommPane = ({
         portalDetailState={portalDetailState}
         container={container}
         channel={channel}
-      />
+      />,
     );
   }
 

@@ -109,7 +109,7 @@ export class EntityTranslucencyManager {
     this.getSamplingTerrainProvider()
       .then((terrainProvider) => terrainProvider
         ? Cesium.sampleTerrain(terrainProvider, CAMERA_TERRAIN_SAMPLE_LEVEL, [samplePosition])
-        : Promise.resolve(undefined),)
+        : Promise.resolve(undefined))
       .then((sampledPositions) => {
         if (generation !== this.terrainSampleGeneration) return;
 
@@ -119,15 +119,15 @@ export class EntityTranslucencyManager {
         this.sampledTerrainPosition = samplePosition;
         this.sampledTerrainHeight = sampledHeight;
         this.updateTranslucencyByDistance();
-      },)
+      })
       .catch(() => {
         if (generation !== this.terrainSampleGeneration) return;
         this.nextCameraTerrainSampleTimeMs = Date.now() + CAMERA_TERRAIN_SAMPLE_RETRY_DELAY_MS;
-      },)
+      })
       .finally(() => {
         if (generation !== this.terrainSampleGeneration) return;
         this.cameraTerrainSampleInFlight = false;
-      },);
+      });
   }
 
   private shouldSampleTerrainHeight(cartographic: Cesium.Cartographic): boolean {

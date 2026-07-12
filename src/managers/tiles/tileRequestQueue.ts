@@ -153,7 +153,7 @@ export class TileRequestQueue {
     const size = this.queuedTiles.size + batch.tileKeys.length;
     logManager.info(
       LOG_TAG,
-      `Loading ${size} tile${size === 1 ? "" : "s"}`
+      `Loading ${size} tile${size === 1 ? "" : "s"}`,
     );
 
     try {

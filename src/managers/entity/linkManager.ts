@@ -38,7 +38,7 @@ export class LinkManager {
     links.forEach((link) => {
       this.addOrUpdatePlaceholders(placeholders, link);
       this.addOrUpdateLink(link);
-    },);
+    });
 
     if (placeholders.size > 0) {
       await this.portalManager.addOrUpdatePortals(Array.from(placeholders.values()));
@@ -100,7 +100,7 @@ export class LinkManager {
     const toRemove: string[] = [];
     this.links.forEach((link, guid) => {
       if (isLinkInView(link, viewRect)) toRemove.push(guid);
-    },);
+    });
 
     if (toRemove.length > 0) {
       toRemove.forEach((guid) => this.links.delete(guid));
@@ -112,15 +112,15 @@ export class LinkManager {
   private rebuildLayers(): void {
     TEAMS.forEach((team) => {
       this.rebuildLayer(`links-${team.toLowerCase()}`);
-    },);
+    });
   }
 
   private rebuildLayer(layerId: string): void {
     const layer = this.layerManager.getOrCreateGroundPrimitiveLayer(layerId, LINK_PRIMITIVE_Z_INDEX);
 
     const geometryInstances = Array.from(this.links.values())
-      .filter((link) => getLinkLayerId(link.data) === layerId,)
-      .map((link) => createLinkGeometryInstance(link),);
+      .filter((link) => getLinkLayerId(link.data) === layerId)
+      .map((link) => createLinkGeometryInstance(link));
 
     if (geometryInstances.length === 0) {
       layer.removeManagedPrimitive(LINK_PRIMITIVE_KEY);
@@ -131,7 +131,7 @@ export class LinkManager {
         allowPicking: false,
         asynchronous: true,
         classificationType: Cesium.ClassificationType.BOTH,
-      },),);
+      }));
     }
   }
 
@@ -146,11 +146,11 @@ function createLinkGeometryInstance(link: Link): Cesium.GeometryInstance {
       positions: link.positions,
       width: LINK_WIDTH,
       arcType: Cesium.ArcType.GEODESIC,
-    },),
+    }),
     attributes: {
       color: Cesium.ColorGeometryInstanceAttribute.fromColor(getTeamColor(link.data.team).withAlpha(LINK_ALPHA)),
     },
-  },);
+  });
 }
 
 function createLinkPositions(data: LinkData): [Cesium.Cartesian3, Cesium.Cartesian3] {
@@ -190,7 +190,7 @@ function collectLinkEndpointPlaceholder(
       lngE6,
       isPlaceholder: true,
       links: [link],
-    },);
+    });
   }
 }
 

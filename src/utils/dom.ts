@@ -163,7 +163,7 @@ function createDomId(): string {
 }
 
 function isDisableable(
-  element: HTMLElement | SVGElement
+  element: HTMLElement | SVGElement,
 ): element is HTMLButtonElement | HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement {
   return element instanceof HTMLButtonElement
     || element instanceof HTMLInputElement

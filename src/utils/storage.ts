@@ -144,7 +144,7 @@ class SafeStorage implements Storage {
         value: this,
         configurable: true,
         enumerable: true,
-        writable: true
+        writable: true,
       });
       logManager.debug(LOG_TAG, "window.localStorage shadowed by SafeStorage.");
     } catch (e) {

@@ -21,7 +21,7 @@ const GameScore = ({ scoreManager }: {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          color: "white"
+          color: "white",
         }}>
           {Math.round(enlPercentage)}%
         </div>
@@ -31,7 +31,7 @@ const GameScore = ({ scoreManager }: {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          color: "white"
+          color: "white",
         }}>
           {Math.round(resPercentage)}%
         </div>

@@ -24,7 +24,7 @@ const PortalResonators = ({ data, teamColorHex }: { data: PortalData, teamColorH
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
-              color: r1 ? teamColorHex : "#555"
+              color: r1 ? teamColorHex : "#555",
             }}>
               {r1 === undefined ? "unknown" : r1 === null ? "empty slot" : r1.owner}
             </div>
@@ -82,7 +82,7 @@ const PortalResonators = ({ data, teamColorHex }: { data: PortalData, teamColorH
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
-              color: r2 ? teamColorHex : "#555"
+              color: r2 ? teamColorHex : "#555",
             }}>
               {r2 === undefined ? "unknown" : r2 === null ? "empty slot" : r2.owner}
             </div>

@@ -58,7 +58,7 @@ export class ScoutHistoryManager {
         if (scoutHistoryHalo.reverseOcclusionPointPrimitive) {
           scoutHistoryHalo.reverseOcclusionPointPrimitive.translucencyByDistance = this.currentTranslucencyByDistance;
         }
-      },);
+      });
       if (this.scoutHistoryHalos.size > 0) this.viewer.scene.requestRender();
     };
     entityTranslucencyManager.addTranslucencyByDistanceChangedCallback(this.translucencyByDistanceCallback);
@@ -226,7 +226,7 @@ export class ScoutHistoryManager {
           toRemove.push(guid);
         }
       }
-    },);
+    });
     if (toRemove.length === 0) return;
 
     toRemove.forEach((guid) => this.removeScoutControlHaloPrimitive(guid));
@@ -273,7 +273,7 @@ function addScoutControlHaloPointPrimitive(
     outlineWidth: HALO_POINT_OUTLINE_WIDTH,
     scaleByDistance: createPortalNearFarScalar(),
     disableDepthTestDistance: getPortalDisableDepthTestDistance(),
-  },);
+  });
 }
 
 function addScoutControlHaloOcclusionPointPrimitive(
@@ -293,7 +293,7 @@ function addScoutControlHaloOcclusionPointPrimitive(
     scaleByDistance: createPortalNearFarScalar(),
     translucencyByDistance,
     disableDepthTestDistance: PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
-  },);
+  });
 }
 
 function getScoutHistoryState(data: PortalData): ScoutHistoryState {

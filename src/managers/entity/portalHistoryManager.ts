@@ -59,7 +59,7 @@ export class PortalHistoryManager {
         if (portalHistoryHalo.reverseOcclusionPointPrimitive) {
           portalHistoryHalo.reverseOcclusionPointPrimitive.translucencyByDistance = this.currentTranslucencyByDistance;
         }
-      },);
+      });
       if (this.portalHistoryHalos.size > 0) this.viewer.scene.requestRender();
     };
     entityTranslucencyManager.addTranslucencyByDistanceChangedCallback(this.translucencyByDistanceCallback);
@@ -237,7 +237,7 @@ export class PortalHistoryManager {
           toRemove.push(guid);
         }
       }
-    },);
+    });
     if (toRemove.length === 0) return;
 
     toRemove.forEach((guid) => this.removeHistoryHaloPrimitive(guid));
@@ -287,7 +287,7 @@ function addHistoryHaloPointPrimitive(
     scaleByDistance: createPortalNearFarScalar(),
     translucencyByDistance: fadeByDistance ? createPortalNearFarScalar() : undefined,
     disableDepthTestDistance: getPortalDisableDepthTestDistance(),
-  },);
+  });
 }
 
 function addHistoryHaloOcclusionPointPrimitive(
@@ -308,7 +308,7 @@ function addHistoryHaloOcclusionPointPrimitive(
     scaleByDistance: createPortalNearFarScalar(),
     translucencyByDistance,
     disableDepthTestDistance: PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
-  },);
+  });
 }
 
 function getPortalHistoryState(data: PortalData): PortalHistoryState {

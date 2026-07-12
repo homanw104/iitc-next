@@ -28,7 +28,7 @@ async function selectLoadedPortal(
   portalDetailState: PortalDetailState,
   latE6: number,
   lngE6: number,
-  requestId: number
+  requestId: number,
 ): Promise<boolean> {
   try {
     const portalData = portalManager.getPortalDataByCoordinates(latE6, lngE6);
@@ -86,7 +86,7 @@ function handleOnClick(
       portalDetailState,
       latE6,
       lngE6,
-      requestId
+      requestId,
     );
     viewer.camera.flyTo({
       destination: Cesium.Cartesian3.fromDegrees(lngE6 / 1e6, latE6 / 1e6, 8e2),
@@ -117,7 +117,7 @@ function handleOnClick(
             portalDetailState,
             latE6,
             lngE6,
-            requestId
+            requestId,
           );
         });
       },
@@ -181,7 +181,7 @@ const CommMessage = ({
                 style={{
                   color: plext.plextType === "SYSTEM_NARROWCAST" ? "#d8ad4c" : "#bbb",
                   cursor: "pointer",
-                  textDecoration: "underline"
+                  textDecoration: "underline",
                 }}
                 onClick={() => handleOnClick(
                   data,
@@ -208,7 +208,7 @@ const CommMessage = ({
             }
           } else {
             return <span style={{
-              color: plext.plextType === "SYSTEM_NARROWCAST" ? "#d8ad4c" : "#fff"
+              color: plext.plextType === "SYSTEM_NARROWCAST" ? "#d8ad4c" : "#fff",
             }}>
               {data.plain}
             </span>;

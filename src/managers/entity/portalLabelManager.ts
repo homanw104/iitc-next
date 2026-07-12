@@ -66,7 +66,7 @@ export class PortalLabelManager {
   public async addOrUpdateLabels(portals: PortalData[]): Promise<void> {
     await this.deferVisibilityUpdates(async () => {
       await Promise.all(portals.map((portalData) => this.addOrUpdateLabel(portalData)));
-    },);
+    });
   }
 
   public async addOrUpdateLabel(data: PortalData): Promise<void> {
@@ -153,7 +153,7 @@ export class PortalLabelManager {
       verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
       pixelOffset: createPortalLabelPixelOffset(),
       pixelOffsetScaleByDistance: createPortalLabelPixelOffsetScaleByDistance(),
-    },);
+    });
   }
 
   private createLabelPositionCallback(guid: string): EntityPositionCallback {
@@ -210,7 +210,7 @@ export class PortalLabelManager {
           toRemove.push(guid);
         }
       }
-    },);
+    });
     if (toRemove.length === 0) return;
 
     toRemove.forEach((guid) => this.removeLabel(guid));
@@ -267,7 +267,7 @@ export class PortalLabelManager {
 
       this.cameraMoveTracker.captureSnapshot();
       this.scheduleVisibilityUpdates();
-    },);
+    });
   }
 
   private async deferVisibilityUpdates(callback: () => Promise<void>): Promise<void> {
@@ -315,7 +315,7 @@ export class PortalLabelManager {
 
       if (this.shouldWaitForRejectedOverlapFade(guid, label)) return;
       if (this.setLabelTargetVisibility(label, true)) changed = true;
-    },);
+    });
 
     if (changed) this.viewer.scene.requestRender();
     if (this.visibilityQueuedGuids.size > 0) this.scheduleVisibilityUpdates(PORTAL_LABEL_VISIBILITY_BATCH_DELAY_MS);
@@ -359,7 +359,7 @@ export class PortalLabelManager {
       this.visibilityQueuedGuids.delete(guid);
       if (this.setLabelTargetVisibility(label, false)) changed = true;
       if (isPortalLabelFadingOut(label)) hasLabelsFadingOut = true;
-    },);
+    });
 
     return { changed, hasLabelsFadingOut };
   }
@@ -373,7 +373,7 @@ export class PortalLabelManager {
 
       this.visibilityQueuedGuids.delete(guid);
       if (this.setLabelTargetVisibility(label, true)) changed = true;
-    },);
+    });
 
     return changed;
   }
@@ -425,7 +425,7 @@ export class PortalLabelManager {
 
     this.fadeFrame = window.requestAnimationFrame((timestamp) => {
       this.updateLabelFades(timestamp);
-    },);
+    });
   }
 
   private updateLabelFades(timestamp: number): void {
@@ -445,7 +445,7 @@ export class PortalLabelManager {
         this.fadingLabelGuids.delete(guid);
         if (!isPortalLabelFadeTargetVisible(label) && this.removeLabelPrimitive(label)) changed = true;
       }
-    },);
+    });
 
     if (!this.hasAnyLabelFadingOut() && this.revealPendingAcceptedOverlapLabels()) changed = true;
     if (changed) this.viewer.scene.requestRender();

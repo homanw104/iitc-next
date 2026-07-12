@@ -55,7 +55,7 @@ export class EntityPositionManager {
   public invalidateEntityPositions(): void {
     this.entityPositions.forEach((entityPosition) => {
       entityPosition.isFallbackPosition = true;
-    },);
+    });
   }
 
   public clearSamplingWork(): void {
@@ -123,7 +123,7 @@ export class EntityPositionManager {
   private populateSamplingQueue(): void {
     this.entityPositions.forEach((entityPosition, key) => {
       if (isEntityPositionInView(this.viewer, entityPosition)) this.entityPositionsSamplingQueue.add(key);
-    },);
+    });
   }
 
   private scheduleSamplingWork(): void {
@@ -134,7 +134,7 @@ export class EntityPositionManager {
     this.samplingScheduledTimeoutId = window.setTimeout(() => {
       this.samplingScheduled = false;
       this.flushSamplingQueue();
-    }, getSamplingBatchDelayMs(),);
+    }, getSamplingBatchDelayMs());
   }
 
   private flushSamplingQueue(): void {
@@ -180,7 +180,7 @@ export class EntityPositionManager {
           entityPosition.lngE6 / 1e6,
           entityPosition.latE6 / 1e6,
           height ?? 0,
-        ],)[0];
+        ])[0];
         isFallbackPosition = height === undefined;
       }
 
@@ -189,7 +189,7 @@ export class EntityPositionManager {
       entityPosition.positionCallbacks.forEach((callback) => callback(entityPosition));
 
       this.entityPositionsNowSampling.delete(key);
-    },);
+    });
 
     this.logQueueStatus();
 
@@ -212,7 +212,7 @@ export class EntityPositionManager {
     this.samplingScheduledTimeoutId = window.setTimeout(() => {
       this.samplingScheduled = false;
       this.flushSamplingQueue();
-    }, getSamplingBatchDelayMs(),);
+    }, getSamplingBatchDelayMs());
   }
 
   private logQueueStatus(): void {
@@ -269,7 +269,7 @@ function isEntityPositionInView(viewer: Cesium.Viewer, entityPosition: EntityPos
   return Cesium.Rectangle.contains(viewRectangle, Cesium.Cartographic.fromCartesian(entityPosition.position));
 }
 
-function takeSamplingBatch(samplingQueue: Set<string>, limit: number,): string[] {
+function takeSamplingBatch(samplingQueue: Set<string>, limit: number): string[] {
   const batch: string[] = [];
 
   for (const key of samplingQueue) {

@@ -50,7 +50,7 @@ export class PortalOrnamentManager {
       Cesium.NearFarScalar.clone(translucencyByDistance, this.currentTranslucencyByDistance);
       this.ornaments.forEach((ornament) => {
         ornament.occlusionBillboard.translucencyByDistance = this.currentTranslucencyByDistance;
-      },);
+      });
       if (this.ornaments.size > 0) this.viewer.scene.requestRender();
     };
     entityTranslucencyManager.addTranslucencyByDistanceChangedCallback(this.translucencyByDistanceCallback);
@@ -180,7 +180,7 @@ export class PortalOrnamentManager {
           toRemove.push(guid);
         }
       }
-    },);
+    });
     if (toRemove.length === 0) return;
 
     toRemove.forEach((guid) => this.removeOrnamentPrimitive(guid));
@@ -255,7 +255,7 @@ function addOrnamentBillboard(
     horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
     verticalOrigin: Cesium.VerticalOrigin.CENTER,
     scaleByDistance: createPortalNearFarScalar(),
-  },);
+  });
 }
 
 function addOrnamentOcclusionBillboard(
@@ -278,7 +278,7 @@ function addOrnamentOcclusionBillboard(
     verticalOrigin: Cesium.VerticalOrigin.CENTER,
     scaleByDistance: createPortalNearFarScalar(),
     translucencyByDistance,
-  },);
+  });
 }
 
 function setOrnamentBillboardImage(billboard: Cesium.Billboard, data: PortalData): void {

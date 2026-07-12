@@ -52,7 +52,7 @@ export class CommPaneController {
     portalHistoryManager: PortalHistoryManager,
     scoutHistoryManager: ScoutHistoryManager,
     portalDetailPaneController: PortalDetailPaneController,
-    portalDetailState: PortalDetailState
+    portalDetailState: PortalDetailState,
   ) {
     this.viewer = viewer;
     this.container = container;

@@ -51,7 +51,7 @@ export class FieldManager {
     fields.forEach((field) => {
       this.addOrUpdatePlaceholders(placeholders, field);
       this.addOrUpdateField(field);
-    },);
+    });
 
     if (placeholders.size > 0) {
       await this.portalManager.addOrUpdatePortals(Array.from(placeholders.values()));
@@ -88,7 +88,7 @@ export class FieldManager {
       } else {
         collectFieldPointPlaceholder(placeholders, field, point);
       }
-    },);
+    });
   }
 
   private addOrUpdateField(data: FieldData): void {
@@ -109,7 +109,7 @@ export class FieldManager {
     const toRemove: string[] = [];
     this.fields.forEach((field, guid) => {
       if (isFieldInView(field, viewRect)) toRemove.push(guid);
-    },);
+    });
 
     if (toRemove.length > 0) {
       toRemove.forEach((guid) => this.fields.delete(guid));
@@ -128,17 +128,17 @@ export class FieldManager {
       const fields = this.getFieldsInLayer(layerId);
       if (fields.length === 0) {
         this.layerManager.getOrCreateGroundPrimitiveLayer(layerId, FIELD_PRIMITIVE_Z_INDEX)
-          .removeManagedPrimitive(FIELD_PRIMITIVE_KEY,);
+          .removeManagedPrimitive(FIELD_PRIMITIVE_KEY);
       } else {
         layers.push({
           layerId,
           fields: fields.map((field) => ({
             guid: field.data.guid,
             points: field.data.points,
-          }),),
-        },);
+          })),
+        });
       }
-    },);
+    });
 
     if (layers.length === 0) return;
 
@@ -223,11 +223,11 @@ function createFieldGeometryInstance(field: Field): Cesium.GeometryInstance {
     geometry: new Cesium.PolygonGeometry({
       polygonHierarchy: new Cesium.PolygonHierarchy(field.positions),
       vertexFormat: Cesium.PerInstanceColorAppearance.VERTEX_FORMAT,
-    },),
+    }),
     attributes: {
       color: Cesium.ColorGeometryInstanceAttribute.fromColor(getTeamColor(field.data.team).withAlpha(FIELD_ALPHA)),
     },
-  },);
+  });
 }
 
 function createFieldCoverageGeometryInstance(
@@ -243,11 +243,11 @@ function createFieldCoverageGeometryInstance(
     geometry: new Cesium.PolygonGeometry({
       polygonHierarchy: hierarchy,
       vertexFormat: Cesium.PerInstanceColorAppearance.VERTEX_FORMAT,
-    },),
+    }),
     attributes: {
       color: Cesium.ColorGeometryInstanceAttribute.fromColor(getTeamColor(field.data.team).withAlpha(alpha)),
     },
-  },);
+  });
 }
 
 function createFieldPrimitives(
@@ -257,7 +257,7 @@ function createFieldPrimitives(
   const appearance = new Cesium.PerInstanceColorAppearance({
     flat: true,
     translucent: true,
-  },);
+  });
   const classificationType = getFieldClassificationType();
 
   // Different depths need separate classification passes, or a shadow volume can supply the wrong alpha.
@@ -274,7 +274,7 @@ function createFieldPrimitives(
     allowPicking: false,
     asynchronous: true,
     classificationType,
-  },),);
+  }));
 }
 
 function createFieldCoverageGeometryInstanceBatches(
@@ -288,8 +288,8 @@ function createFieldCoverageGeometryInstanceBatches(
     coverage.flatMap((polygon) => {
       const instance = createFieldCoverageGeometryInstance(polygon, field, index + 1);
       return instance ? [instance] : [];
-    },),
-  ).filter((instances) => instances.length > 0,);
+    }),
+  ).filter((instances) => instances.length > 0);
 }
 
 function createPolygonHierarchy(polygon: FieldCoveragePolygon): Cesium.PolygonHierarchy | undefined {
@@ -298,15 +298,15 @@ function createPolygonHierarchy(polygon: FieldCoveragePolygon): Cesium.PolygonHi
   if (positions.length < 3) return undefined;
 
   const holes = holeRings
-    .map(createRingPositions,)
-    .filter((holePositions) => holePositions.length >= 3,)
-    .map((holePositions) => new Cesium.PolygonHierarchy(holePositions),);
+    .map(createRingPositions)
+    .filter((holePositions) => holePositions.length >= 3)
+    .map((holePositions) => new Cesium.PolygonHierarchy(holePositions));
   return new Cesium.PolygonHierarchy(positions, holes);
 }
 
 function createRingPositions(ring: FieldCoverageRing): Cesium.Cartesian3[] {
   return ring.slice(0, -1)
-    .map(([longitude, latitude]) => Cesium.Cartesian3.fromDegrees(longitude, latitude),);
+    .map(([longitude, latitude]) => Cesium.Cartesian3.fromDegrees(longitude, latitude));
 }
 
 function createFieldPositions(data: FieldData): Cesium.Cartesian3[] {
@@ -346,7 +346,7 @@ function collectFieldPointPlaceholder(
       lngE6: point.lngE6,
       isPlaceholder: true,
       fields: [field],
-    },);
+    });
   }
 }
 

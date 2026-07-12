@@ -100,7 +100,7 @@ export class TileRequestManager {
   private handleQueuedResponse = async (
     response: TileResponse,
     tileKeys: string[],
-    refreshExisting: boolean
+    refreshExisting: boolean,
   ): Promise<void> => {
     if (response && refreshExisting) {
       const viewRect = this.viewTileCalculator.computeViewRectangle();

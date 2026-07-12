@@ -766,7 +766,7 @@ class DrawLinesPlugin implements DrawLinesReader, DrawLinesAppearanceController 
     const placemarks = lines.map((line) => {
       const cartographic: Cesium.Cartographic[] = line.positions.map(pos => Cesium.Cartographic.fromCartesian(pos));
       const coordinatesString = cartographic.map(c =>
-        `          ${Cesium.Math.toDegrees(c.longitude)},${Cesium.Math.toDegrees(c.latitude)},${c.height}\n`
+        `          ${Cesium.Math.toDegrees(c.longitude)},${Cesium.Math.toDegrees(c.latitude)},${c.height}\n`,
       ).join("");
 
       return `` +
@@ -1136,7 +1136,7 @@ const ConfirmPane = ({ msg, onConfirm, onCancel }: {
       }}>
         <div style={{
           width: "100%",
-          flexGrow: 1
+          flexGrow: 1,
         }}>
           {msg}
         </div>

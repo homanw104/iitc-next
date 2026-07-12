@@ -60,7 +60,7 @@ export class PortalManager {
       Cesium.NearFarScalar.clone(translucencyByDistance, this.currentTranslucencyByDistance);
       this.portals.forEach((portal) => {
         portal.occlusionPointPrimitive.translucencyByDistance = this.currentTranslucencyByDistance;
-      },);
+      });
       if (this.portals.size > 0) this.viewer.scene.requestRender();
     };
     this.entityTranslucencyManager.addTranslucencyByDistanceChangedCallback(this.translucencyByDistanceCallback);
@@ -207,7 +207,7 @@ export class PortalManager {
       properties: {
         selectable: true,
       },
-    },);
+    });
 
     const pointPrimitive = addPortalPointPrimitive(
       pointPrimitives,
@@ -264,7 +264,7 @@ export class PortalManager {
           toRemove.push(guid);
         }
       }
-    },);
+    });
     if (toRemove.length === 0) return;
 
     toRemove.forEach((guid) => this.removePortal(guid));
@@ -377,7 +377,7 @@ function addPortalPointPrimitive(
     color: getTeamColor(data.team),
     outlineColor: Cesium.Color.BLACK,
     outlineWidth: PORTAL_POINT_OUTLINE_WIDTH,
-  },);
+  });
 }
 
 function addPortalOcclusionPointPrimitive(
@@ -399,7 +399,7 @@ function addPortalOcclusionPointPrimitive(
     color: getTeamColor(data.team).withAlpha(PORTAL_OCCLUDED_ALPHA),
     outlineColor: Cesium.Color.BLACK.withAlpha(PORTAL_OCCLUDED_ALPHA),
     outlineWidth: PORTAL_POINT_OUTLINE_WIDTH,
-  },);
+  });
 }
 
 function getFallbackPortalPosition(data: PortalData): Cesium.Cartesian3 {
