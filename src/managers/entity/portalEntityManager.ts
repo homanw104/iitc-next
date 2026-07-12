@@ -166,17 +166,24 @@ export class PortalEntityManager {
     try {
       const primitiveId = createPortalPrimitiveId(data.guid);
       const { entity, pointPrimitive, occlusionPointPrimitive } = await this.createPortalPrimitives(data, primitiveId);
-      const positionCallback = createPortalPositionCallback(entity, pointPrimitive, occlusionPointPrimitive);
-      this.entityPositionManager.setOnPositionChangedCallback(data, positionCallback);
-      this.portals.set(data.guid, {
+      const portal: Portal = {
         data,
         entity,
         primitiveId,
         pointPrimitive,
         occlusionPointPrimitive,
-        positionCallback,
+        positionCallback: (entityPosition: EntityPosition) => {
+          applyPortalPosition(
+            portal.entity,
+            portal.pointPrimitive,
+            portal.occlusionPointPrimitive,
+            entityPosition,
+          );
+        },
         currentLayerId: getPortalEntityLayerId(data),
-      });
+      };
+      this.entityPositionManager.setOnPositionChangedCallback(data, portal.positionCallback);
+      this.portals.set(data.guid, portal);
     } finally {
       this.portalsPendingCreation.delete(data.guid);
     }
@@ -328,16 +335,6 @@ export class PortalEntityManager {
 function shouldReplacePortalData(current: PortalData, next: PortalData): boolean {
   if (next.isPlaceholder) return false;
   return (current.isPlaceholder === true) || (!!next.timestamp && next.timestamp >= (current.timestamp ?? 0));
-}
-
-function createPortalPositionCallback(
-  entity: Cesium.Entity,
-  pointPrimitive: Cesium.PointPrimitive,
-  occlusionPointPrimitive: Cesium.PointPrimitive,
-): EntityPositionCallback {
-  return (entityPosition: EntityPosition) => {
-    applyPortalPosition(entity, pointPrimitive, occlusionPointPrimitive, entityPosition);
-  };
 }
 
 function applyPortalPosition(
