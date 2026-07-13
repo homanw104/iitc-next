@@ -3,6 +3,14 @@
  */
 
 import * as Cesium from "cesium";
+import ap1OrnamentUrl from "../../images/ornaments/ap1.svg";
+import ap1VolatileOrnamentUrl from "../../images/ornaments/ap1_v.svg";
+import ap2OrnamentUrl from "../../images/ornaments/ap2.svg";
+import ap2VolatileOrnamentUrl from "../../images/ornaments/ap2_v.svg";
+import ap3OrnamentUrl from "../../images/ornaments/ap3.svg";
+import ap3VolatileOrnamentUrl from "../../images/ornaments/ap3_v.svg";
+import ap5OrnamentUrl from "../../images/ornaments/ap5.svg";
+import ap5VolatileOrnamentUrl from "../../images/ornaments/ap5_v.svg";
 import type { PortalData } from "../../types/iitc/portal";
 import type { LayerManager } from "../layer/layerManager";
 import type { EntityPosition, EntityPositionCallback, EntityPositionManager } from "./entityPositionManager";
@@ -16,14 +24,12 @@ import {
   type PortalPrimitiveId,
 } from "./portalManager";
 
-const AP1_ORNAMENT_SIZE = 16;
-const AP1_ORNAMENT_HOLLOW_SIZE = 8;
-const AP1_ORNAMENT_ALPHA = 0.95;
-const CANVAS_DIMENSION = AP1_ORNAMENT_SIZE * 2;
+const CANVAS_DIMENSION = 64;
 const ORNAMENT_PRIMITIVE_Z_INDEX = -10;
 const ORNAMENT_IMAGE_ID_PREFIX = "portal-ornament-";
 
-const ornamentImageCache = new Map<string, HTMLCanvasElement>();
+const ornamentImageCache = new Map<string, Promise<HTMLCanvasElement>>();
+const svgImageCache = new Map<string, Promise<HTMLImageElement>>();
 
 interface Ornament {
   data: PortalData;
@@ -86,7 +92,7 @@ export class PortalOrnamentManager {
   }
 
   private async updateExistingOrnament(ornament: Ornament, data: PortalData): Promise<void> {
-    this.moveOrnamentToLayer(ornament, getOrnamentLayerId(data));
+    await this.moveOrnamentToLayer(ornament, getOrnamentLayerId(data));
     await this.updateOrnamentPrimitives(ornament, data);
     this.updateOrnamentPositionSubscription(ornament, data);
     ornament.data = data;
@@ -122,14 +128,17 @@ export class PortalOrnamentManager {
   }> {
     const layerId = getOrnamentLayerId(data);
     const billboards = this.getOrnamentBillboards(layerId);
-    const entityPosition = await this.entityPositionManager.getEntityPosition(data);
+    const [entityPosition, image] = await Promise.all([
+      this.entityPositionManager.getEntityPosition(data),
+      getOrnamentImage(data),
+    ]);
 
     const show = !entityPosition.isFallbackPosition;
-    const billboard = addOrnamentBillboard(billboards, primitiveId, data, entityPosition.position, show);
+    const billboard = addOrnamentBillboard(billboards, primitiveId, image, entityPosition.position, show);
     const occlusionBillboard = addOrnamentOcclusionBillboard(
       billboards,
       primitiveId,
-      data,
+      image,
       entityPosition.position,
       show,
       this.currentTranslucencyByDistance,
@@ -138,11 +147,14 @@ export class PortalOrnamentManager {
   }
 
   private async updateOrnamentPrimitives(ornament: Ornament, data: PortalData): Promise<void> {
-    const entityPosition = await this.entityPositionManager.getEntityPosition(data);
+    const [entityPosition, image] = await Promise.all([
+      this.entityPositionManager.getEntityPosition(data),
+      getOrnamentImage(data),
+    ]);
 
     applyOrnamentPosition(ornament.billboard, ornament.occlusionBillboard, entityPosition);
-    setOrnamentBillboardImage(ornament.billboard, data);
-    setOrnamentBillboardImage(ornament.occlusionBillboard, data);
+    setOrnamentBillboardImage(ornament.billboard, data, image);
+    setOrnamentBillboardImage(ornament.occlusionBillboard, data, image);
   }
 
   private updateOrnamentPositionSubscription(ornament: Ornament, data: PortalData): void {
@@ -187,9 +199,10 @@ export class PortalOrnamentManager {
     this.viewer.scene.requestRender();
   }
 
-  private moveOrnamentToLayer(ornamentInfo: Ornament, newLayerId: string): void {
+  private async moveOrnamentToLayer(ornamentInfo: Ornament, newLayerId: string): Promise<void> {
     if (ornamentInfo.currentLayerId === newLayerId) return;
 
+    const image = await getOrnamentImage(ornamentInfo.data);
     const billboardPosition = Cesium.Cartesian3.clone(ornamentInfo.billboard.position);
     const occlusionBillboardPosition = Cesium.Cartesian3.clone(ornamentInfo.occlusionBillboard.position);
     const billboardShow = ornamentInfo.billboard.show;
@@ -202,14 +215,14 @@ export class PortalOrnamentManager {
     ornamentInfo.billboard = addOrnamentBillboard(
       newBillboards,
       ornamentInfo.primitiveId,
-      ornamentInfo.data,
+      image,
       billboardPosition,
       billboardShow,
     );
     ornamentInfo.occlusionBillboard = addOrnamentOcclusionBillboard(
       newBillboards,
       ornamentInfo.primitiveId,
-      ornamentInfo.data,
+      image,
       occlusionBillboardPosition,
       occlusionBillboardShow,
       this.currentTranslucencyByDistance,
@@ -241,7 +254,7 @@ function applyOrnamentPosition(
 function addOrnamentBillboard(
   billboards: Cesium.BillboardCollection,
   primitiveId: PortalPrimitiveId,
-  data: PortalData,
+  image: HTMLCanvasElement,
   position: Cesium.Cartesian3,
   show: boolean,
 ): Cesium.Billboard {
@@ -249,7 +262,7 @@ function addOrnamentBillboard(
     id: primitiveId,
     position,
     show,
-    image: getOrnamentImage(data),
+    image,
     heightReference: Cesium.HeightReference.NONE,
     disableDepthTestDistance: getPortalDisableDepthTestDistance(),
     horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
@@ -261,7 +274,7 @@ function addOrnamentBillboard(
 function addOrnamentOcclusionBillboard(
   billboards: Cesium.BillboardCollection,
   primitiveId: PortalPrimitiveId,
-  data: PortalData,
+  image: HTMLCanvasElement,
   position: Cesium.Cartesian3,
   show: boolean,
   translucencyByDistance: Cesium.NearFarScalar,
@@ -270,7 +283,7 @@ function addOrnamentOcclusionBillboard(
     id: primitiveId,
     position,
     show,
-    image: getOrnamentImage(data),
+    image,
     color: Cesium.Color.WHITE.withAlpha(PORTAL_OCCLUDED_ALPHA),
     heightReference: Cesium.HeightReference.NONE,
     disableDepthTestDistance: PORTAL_OCCLUSION_DISABLE_DEPTH_TEST_DISTANCE,
@@ -281,15 +294,31 @@ function addOrnamentOcclusionBillboard(
   });
 }
 
-function setOrnamentBillboardImage(billboard: Cesium.Billboard, data: PortalData): void {
-  billboard.setImage(getOrnamentImageId(data), getOrnamentImage(data));
+function setOrnamentBillboardImage(
+  billboard: Cesium.Billboard,
+  data: PortalData,
+  image: HTMLCanvasElement,
+): void {
+  billboard.setImage(getOrnamentImageId(data), image);
 }
 
-function getOrnamentImage(data: PortalData): HTMLCanvasElement {
+async function getOrnamentImage(data: PortalData): Promise<HTMLCanvasElement> {
   const cacheKey = getOrnamentImageCacheKey(data);
   const cached = ornamentImageCache.get(cacheKey);
   if (cached) return cached;
 
+  const imagePromise = createOrnamentImage(data);
+  ornamentImageCache.set(cacheKey, imagePromise);
+
+  try {
+    return await imagePromise;
+  } catch (error) {
+    ornamentImageCache.delete(cacheKey);
+    throw error;
+  }
+}
+
+async function createOrnamentImage(data: PortalData): Promise<HTMLCanvasElement> {
   const canvas = document.createElement("canvas");
   canvas.width = CANVAS_DIMENSION;
   canvas.height = CANVAS_DIMENSION;
@@ -297,23 +326,38 @@ function getOrnamentImage(data: PortalData): HTMLCanvasElement {
   const context = canvas.getContext("2d");
   if (!context) return canvas;
 
-  if (data.ornaments?.includes("ap1")) drawAP1(context);
+  if (data.ornaments?.includes("ap1")) await drawSvg(context, ap1OrnamentUrl);
+  if (data.ornaments?.includes("ap1_v")) await drawSvg(context, ap1VolatileOrnamentUrl);
+  if (data.ornaments?.includes("ap2")) await drawSvg(context, ap2OrnamentUrl);
+  if (data.ornaments?.includes("ap2_v")) await drawSvg(context, ap2VolatileOrnamentUrl);
+  if (data.ornaments?.includes("ap3")) await drawSvg(context, ap3OrnamentUrl);
+  if (data.ornaments?.includes("ap3_v")) await drawSvg(context, ap3VolatileOrnamentUrl);
+  if (data.ornaments?.includes("ap5")) await drawSvg(context, ap5OrnamentUrl);
+  if (data.ornaments?.includes("ap5_v")) await drawSvg(context, ap5VolatileOrnamentUrl);
 
-  ornamentImageCache.set(cacheKey, canvas);
   return canvas;
 }
 
-function drawAP1(context: CanvasRenderingContext2D): void {
-  context.fillStyle = `rgba(255, 146, 53, ${AP1_ORNAMENT_ALPHA})`;
-  context.beginPath();
-  context.arc(CANVAS_DIMENSION / 2, CANVAS_DIMENSION / 2, AP1_ORNAMENT_SIZE, 0, 2 * Math.PI);
-  context.fill();
+async function drawSvg(context: CanvasRenderingContext2D, url: string): Promise<void> {
+  const image = await loadSvgImage(url);
+  context.drawImage(image, 0, 0, CANVAS_DIMENSION, CANVAS_DIMENSION);
+}
 
-  context.globalCompositeOperation = "destination-out";
-  context.beginPath();
-  context.arc(CANVAS_DIMENSION / 2, CANVAS_DIMENSION / 2, AP1_ORNAMENT_HOLLOW_SIZE, 0, 2 * Math.PI);
-  context.fill();
-  context.globalCompositeOperation = "source-over";
+function loadSvgImage(url: string): Promise<HTMLImageElement> {
+  const cached = svgImageCache.get(url);
+  if (cached) return cached;
+
+  const imagePromise = new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => {
+      svgImageCache.delete(url);
+      reject(new Error(`Failed to load portal ornament SVG: ${url}`));
+    };
+    image.src = url;
+  });
+  svgImageCache.set(url, imagePromise);
+  return imagePromise;
 }
 
 function getOrnamentImageId(data: PortalData): string {
