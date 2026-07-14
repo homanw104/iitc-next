@@ -10,6 +10,7 @@ import { isPortalPrimitiveId, type PortalManager } from "../../../managers/entit
 import type { PortalHistoryManager } from "../../../managers/entity/portalHistoryManager";
 import type { PortalLabelManager } from "../../../managers/entity/portalLabelManager.ts";
 import type { PortalOrnamentManager } from "../../../managers/entity/portalOrnamentManager.ts";
+import type { PortalArtifactManager } from "../../../managers/entity/portalArtifactManager.ts";
 import type { ScoutHistoryManager } from "../../../managers/entity/scoutHistoryManager";
 import type { InteractionGestureState } from "../state/interactionGestureState";
 import type { PortalData } from "../../../types/iitc/portal.ts";
@@ -31,6 +32,7 @@ interface HandlePortalSelectionOptions {
   portalManager: PortalManager;
   portalLabelManager: PortalLabelManager;
   portalOrnamentManager: PortalOrnamentManager;
+  portalArtifactManager: PortalArtifactManager;
   portalHistoryManager: PortalHistoryManager;
   scoutHistoryManager: ScoutHistoryManager;
   interfaceState: PortalDetailState;
@@ -47,6 +49,7 @@ export function handlePortalSelection({
   portalManager,
   portalLabelManager,
   portalOrnamentManager,
+  portalArtifactManager,
   portalHistoryManager,
   scoutHistoryManager,
   interfaceState,
@@ -75,6 +78,7 @@ export function handlePortalSelection({
   const updatePortalDecorations = (data: PortalData) => {
     portalLabelManager.addOrUpdateLabel(data).then();
     portalOrnamentManager.addOrUpdateOrnament(data).then();
+    portalArtifactManager.addOrUpdateArtifact(data).then();
     portalHistoryManager.addOrUpdateHistoryHalo(data).then();
     scoutHistoryManager.addOrUpdateScoutControlHalo(data).then();
   };

@@ -6,7 +6,15 @@ import type { RawEntity } from "../../types/api/getEntities.ts";
 import type { PortalLevel } from "../../types/common/common.ts";
 import type { FieldData } from "../../types/iitc/field.ts";
 import type { LinkData } from "../../types/iitc/link.ts";
-import type { PortalData, PortalMod, PortalResonator } from "../../types/iitc/portal.ts";
+import type {
+  PortalArtifactBrief,
+  PortalArtifactBriefEntries,
+  PortalArtifactDetail,
+  PortalData,
+  PortalHistory,
+  PortalMod,
+  PortalResonator,
+} from "../../types/iitc/portal.ts";
 
 interface ParsedEntities {
   portals: PortalData[];
@@ -50,57 +58,111 @@ export function parsePortal(ent: RawEntity): PortalData {
     lngE6: data[3] as number,
   };
 
-  if (data.length >= 14) {
-    portal.level = data[4] as PortalLevel;
-    portal.health = data[5] as number;
-    portal.resCount = data[6] as number;
-    portal.image = data[7] as string;
-    portal.title = data[8] as string;
-    if (Array.isArray(data[9])) {
-      portal.ornaments = data[9] as string[];
-    }
+  if (data.length >= 5) portal.level = data[4] as PortalLevel;
+  if (data.length >= 6) portal.health = data[5] as number;
+  if (data.length >= 7) portal.resCount = data[6] as number;
+  if (data.length >= 8) portal.image = data[7] as string;
+  if (data.length >= 9) portal.title = data[8] as string;
+  if (data.length >= 10 && Array.isArray(data[9])) portal.ornaments = data[9] as string[];
+
+  if (data.length >= 13) {
+    const artifactBrief = parseArtifactBrief(data[12]);
+    if (artifactBrief) portal.artifactBrief = artifactBrief;
   }
+
+  if (data.length >= 15) {
+    const mods = parsePortalMods(data[14]);
+    if (mods) portal.mods = mods;
+  }
+
+  if (data.length >= 16) {
+    const resonators = parsePortalResonators(data[15]);
+    if (resonators) portal.resonators = resonators;
+  }
+
+  if (data.length >= 17 && typeof data[16] === "string") portal.owner = data[16];
 
   if (data.length >= 18) {
-    if (data[14]) {
-      portal.mods = (data[14] as unknown[]).map((m): PortalMod | null => {
-        if (!Array.isArray(m)) return null;
-        return {
-          owner: m[0] as string,
-          name: m[1] as string,
-          rarity: m[2] as string,
-          stats: m[3] as Record<string, string>,
-        };
-      });
-    }
-
-    if (data[15]) {
-      portal.resonators = (data[15] as unknown[]).map((r): PortalResonator | null => {
-        if (!Array.isArray(r)) return null;
-        return {
-          owner: r[0] as string,
-          level: r[1] as number,
-          energy: r[2] as number,
-        };
-      });
-    }
-
-    if (data[16]) {
-      portal.owner = data[16] as string | undefined;
-    }
+    const artifactDetail = parseArtifactDetail(data[17]);
+    if (artifactDetail) portal.artifactDetail = artifactDetail;
   }
 
-  if (data.length >= 19) {
-    const historyBitArray = (data[18] as number) || 0;
-    portal.history = {
-      _raw: historyBitArray,
-      visited: !!(historyBitArray & 1),
-      captured: !!(historyBitArray & 2),
-      scoutControlled: !!(historyBitArray & 4),
-    };
-  }
+  if (data.length >= 19) portal.history = parsePortalHistory(data[18]);
 
   return portal;
+}
+
+function parsePortalMods(value: unknown): (PortalMod | null)[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value.map(parsePortalMod);
+}
+
+function parsePortalMod(value: unknown): PortalMod | null {
+  if (!Array.isArray(value)) return null;
+  return {
+    owner: value[0] as string,
+    name: value[1] as string,
+    rarity: value[2] as string,
+    stats: value[3] as Record<string, string>,
+  };
+}
+
+function parsePortalResonators(value: unknown): (PortalResonator | null)[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value.map(parsePortalResonator);
+}
+
+function parsePortalResonator(value: unknown): PortalResonator | null {
+  if (!Array.isArray(value)) return null;
+  return {
+    owner: value[0] as string,
+    level: value[1] as number,
+    energy: value[2] as number,
+  };
+}
+
+function parsePortalHistory(value: unknown): PortalHistory {
+  const bitArray = typeof value === "number" ? value : 0;
+  return {
+    _raw: bitArray,
+    visited: !!(bitArray & 1),
+    captured: !!(bitArray & 2),
+    scoutControlled: !!(bitArray & 4),
+  };
+}
+
+function parseArtifactBrief(value: unknown): PortalArtifactBrief | undefined {
+  if (!Array.isArray(value)) return undefined;
+
+  return {
+    fragment: parseArtifactBriefEntries(value[0]),
+    target: parseArtifactBriefEntries(value[1]),
+  };
+}
+
+function parseArtifactBriefEntries(value: unknown): PortalArtifactBriefEntries {
+  const entries: PortalArtifactBriefEntries = {};
+  if (!Array.isArray(value)) return entries;
+
+  value.forEach((row) => {
+    if (!Array.isArray(row) || typeof row[0] !== "string") return;
+    entries[row[0]] = row.slice(1);
+  });
+  return entries;
+}
+
+function parseArtifactDetail(value: unknown): PortalArtifactDetail | undefined {
+  if (!Array.isArray(value) || value.length < 3) return undefined;
+
+  const [type, displayName, fragments] = value;
+  if (type === "" && displayName === "" && Array.isArray(fragments) && fragments.length === 0) return undefined;
+  if (typeof type !== "string" || typeof displayName !== "string" || !Array.isArray(fragments)) return undefined;
+
+  return {
+    type,
+    displayName,
+    fragments: fragments.filter((fragment): fragment is number => typeof fragment === "number"),
+  };
 }
 
 function parseLink(ent: RawEntity): LinkData {

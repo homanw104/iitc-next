@@ -6,6 +6,7 @@ import type { PortalManager } from "../../../managers/entity/portalManager.ts";
 import type { PortalHistoryManager } from "../../../managers/entity/portalHistoryManager.ts";
 import type { PortalLabelManager } from "../../../managers/entity/portalLabelManager.ts";
 import type { PortalOrnamentManager } from "../../../managers/entity/portalOrnamentManager.ts";
+import type { PortalArtifactManager } from "../../../managers/entity/portalArtifactManager.ts";
 import type { ScoutHistoryManager } from "../../../managers/entity/scoutHistoryManager.ts";
 import type { TileRequestManager } from "../../../managers/tiles/tileRequestManager.ts";
 import type { Channel } from "../../../types/common/common.ts";
@@ -22,6 +23,7 @@ async function selectLoadedPortal(
   portalManager: PortalManager,
   portalLabelManager: PortalLabelManager,
   portalOrnamentManager: PortalOrnamentManager,
+  portalArtifactManager: PortalArtifactManager,
   portalHistoryManager: PortalHistoryManager,
   scoutHistoryManager: ScoutHistoryManager,
   portalDetailPaneController: PortalDetailPaneController,
@@ -49,6 +51,7 @@ async function selectLoadedPortal(
     portalDetailPaneController.updateDetailPane(freshData);
     await portalLabelManager.addOrUpdateLabel(freshData);
     await portalOrnamentManager.addOrUpdateOrnament(freshData);
+    await portalArtifactManager.addOrUpdateArtifact(freshData);
     await portalHistoryManager.addOrUpdateHistoryHalo(freshData);
     await scoutHistoryManager.addOrUpdateScoutControlHalo(freshData);
     return true;
@@ -64,6 +67,7 @@ function handleOnClick(
   portalManager: PortalManager,
   portalLabelManager: PortalLabelManager,
   portalOrnamentManager: PortalOrnamentManager,
+  portalArtifactManager: PortalArtifactManager,
   portalHistoryManager: PortalHistoryManager,
   scoutHistoryManager: ScoutHistoryManager,
   tileRequestManager: TileRequestManager,
@@ -80,6 +84,7 @@ function handleOnClick(
       portalManager,
       portalLabelManager,
       portalOrnamentManager,
+      portalArtifactManager,
       portalHistoryManager,
       scoutHistoryManager,
       portalDetailPaneController,
@@ -111,6 +116,7 @@ function handleOnClick(
             portalManager,
             portalLabelManager,
             portalOrnamentManager,
+            portalArtifactManager,
             portalHistoryManager,
             scoutHistoryManager,
             portalDetailPaneController,
@@ -133,6 +139,7 @@ const CommMessage = ({
   portalManager,
   portalLabelManager,
   portalOrnamentManager,
+  portalArtifactManager,
   portalHistoryManager,
   scoutHistoryManager,
   portalDetailPaneController,
@@ -146,6 +153,7 @@ const CommMessage = ({
   portalManager: PortalManager;
   portalLabelManager: PortalLabelManager;
   portalOrnamentManager: PortalOrnamentManager;
+  portalArtifactManager: PortalArtifactManager;
   portalHistoryManager: PortalHistoryManager;
   scoutHistoryManager: ScoutHistoryManager;
   portalDetailPaneController: PortalDetailPaneController;
@@ -190,6 +198,7 @@ const CommMessage = ({
                   portalManager,
                   portalLabelManager,
                   portalOrnamentManager,
+                  portalArtifactManager,
                   portalHistoryManager,
                   scoutHistoryManager,
                   tileRequestManager,

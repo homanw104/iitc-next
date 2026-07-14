@@ -77,6 +77,7 @@ export function mountCoreControllersAndUI(viewer: Cesium.Viewer, container: HTML
     managers.portalManager,
     managers.portalLabelManager,
     managers.portalOrnamentManager,
+    managers.portalArtifactManager,
     managers.portalHistoryManager,
     managers.scoutHistoryManager,
     portalDetailPaneController,

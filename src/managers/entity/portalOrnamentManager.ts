@@ -25,6 +25,7 @@ import {
 } from "./portalManager";
 
 const CANVAS_DIMENSION = 64;
+const ORNAMENT_LAYER_ID = "ornaments";
 const ORNAMENT_PRIMITIVE_Z_INDEX = -10;
 const ORNAMENT_IMAGE_ID_PREFIX = "portal-ornament-";
 
@@ -33,11 +34,9 @@ const svgImageCache = new Map<string, Promise<HTMLImageElement>>();
 
 interface Ornament {
   data: PortalData;
-  primitiveId: PortalPrimitiveId;
   billboard: Cesium.Billboard;
   occlusionBillboard: Cesium.Billboard;
   positionCallback: EntityPositionCallback;
-  currentLayerId: string;
 }
 
 export class PortalOrnamentManager {
@@ -92,7 +91,6 @@ export class PortalOrnamentManager {
   }
 
   private async updateExistingOrnament(ornament: Ornament, data: PortalData): Promise<void> {
-    await this.moveOrnamentToLayer(ornament, getOrnamentLayerId(data));
     await this.updateOrnamentPrimitives(ornament, data);
     this.updateOrnamentPositionSubscription(ornament, data);
     ornament.data = data;
@@ -107,13 +105,11 @@ export class PortalOrnamentManager {
       const { billboard, occlusionBillboard } = await this.createOrnamentPrimitives(data, primitiveId);
       const ornament: Ornament = {
         data,
-        primitiveId,
         billboard,
         occlusionBillboard,
         positionCallback: (entityPosition: EntityPosition) => {
           applyOrnamentPosition(ornament.billboard, ornament.occlusionBillboard, entityPosition);
         },
-        currentLayerId: getOrnamentLayerId(data),
       };
       this.entityPositionManager.addPositionChangedCallback(data, ornament.positionCallback);
       this.ornaments.set(data.guid, ornament);
@@ -126,8 +122,7 @@ export class PortalOrnamentManager {
     billboard: Cesium.Billboard;
     occlusionBillboard: Cesium.Billboard
   }> {
-    const layerId = getOrnamentLayerId(data);
-    const billboards = this.getOrnamentBillboards(layerId);
+    const billboards = this.getOrnamentBillboards();
     const [entityPosition, image] = await Promise.all([
       this.entityPositionManager.getEntityPosition(data),
       getOrnamentImage(data),
@@ -171,7 +166,7 @@ export class PortalOrnamentManager {
       return false;
     }
 
-    const billboards = this.getOrnamentBillboards(ornamentInfo.currentLayerId);
+    const billboards = this.getOrnamentBillboards();
 
     billboards.remove(ornamentInfo.billboard);
     billboards.remove(ornamentInfo.occlusionBillboard);
@@ -199,44 +194,9 @@ export class PortalOrnamentManager {
     this.viewer.scene.requestRender();
   }
 
-  private async moveOrnamentToLayer(ornamentInfo: Ornament, newLayerId: string): Promise<void> {
-    if (ornamentInfo.currentLayerId === newLayerId) return;
-
-    const image = await getOrnamentImage(ornamentInfo.data);
-    const billboardPosition = Cesium.Cartesian3.clone(ornamentInfo.billboard.position);
-    const occlusionBillboardPosition = Cesium.Cartesian3.clone(ornamentInfo.occlusionBillboard.position);
-    const billboardShow = ornamentInfo.billboard.show;
-    const occlusionBillboardShow = ornamentInfo.occlusionBillboard.show;
-    const oldBillboards = this.getOrnamentBillboards(ornamentInfo.currentLayerId);
-    oldBillboards.remove(ornamentInfo.billboard);
-    oldBillboards.remove(ornamentInfo.occlusionBillboard);
-
-    const newBillboards = this.getOrnamentBillboards(newLayerId);
-    ornamentInfo.billboard = addOrnamentBillboard(
-      newBillboards,
-      ornamentInfo.primitiveId,
-      image,
-      billboardPosition,
-      billboardShow,
-    );
-    ornamentInfo.occlusionBillboard = addOrnamentOcclusionBillboard(
-      newBillboards,
-      ornamentInfo.primitiveId,
-      image,
-      occlusionBillboardPosition,
-      occlusionBillboardShow,
-      this.currentTranslucencyByDistance,
-    );
-    ornamentInfo.currentLayerId = newLayerId;
+  private getOrnamentBillboards(): Cesium.BillboardCollection {
+    return this.layerManager.getOrCreatePrimitiveLayer(ORNAMENT_LAYER_ID, ORNAMENT_PRIMITIVE_Z_INDEX).billboards;
   }
-
-  private getOrnamentBillboards(layerId: string): Cesium.BillboardCollection {
-    return this.layerManager.getOrCreatePrimitiveLayer(layerId, ORNAMENT_PRIMITIVE_Z_INDEX).billboards;
-  }
-}
-
-function getOrnamentLayerId(data: PortalData): string {
-  return `portals-ornament-${data.team.toLowerCase()}`;
 }
 
 function applyOrnamentPosition(

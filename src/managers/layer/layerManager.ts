@@ -119,7 +119,7 @@ export class LayerManager {
       );
       this.overlayLayers.set(name, layer);
       this.refreshRenderLayerOrder();
-    } else if (zIndex !== undefined) {
+    } else if (zIndex !== undefined && layer.zIndex !== zIndex) {
       layer.setZIndex(zIndex);
       this.refreshRenderLayerOrder();
     }

@@ -10,6 +10,7 @@ import type { PortalManager } from "../../managers/entity/portalManager.ts";
 import type { PortalHistoryManager } from "../../managers/entity/portalHistoryManager.ts";
 import type { PortalLabelManager } from "../../managers/entity/portalLabelManager.ts";
 import type { PortalOrnamentManager } from "../../managers/entity/portalOrnamentManager.ts";
+import type { PortalArtifactManager } from "../../managers/entity/portalArtifactManager.ts";
 import type { ScoutHistoryManager } from "../../managers/entity/scoutHistoryManager.ts";
 import { createInteractionGestureState } from "../interaction/state/interactionGestureState.ts";
 import { createPinchGestureHandlers } from "../interaction/gesture/pinchGestureHandlers.ts";
@@ -27,6 +28,7 @@ export function setUpInteractionHandlers(
   portalManager: PortalManager,
   portalLabelManager: PortalLabelManager,
   portalOrnamentManager: PortalOrnamentManager,
+  portalArtifactManager: PortalArtifactManager,
   portalHistoryManager: PortalHistoryManager,
   scoutHistoryManager: ScoutHistoryManager,
   portalDetailState: PortalDetailState,
@@ -56,6 +58,7 @@ export function setUpInteractionHandlers(
       portalManager,
       portalLabelManager,
       portalOrnamentManager,
+      portalArtifactManager,
       portalHistoryManager,
       scoutHistoryManager,
       interfaceState: portalDetailState,

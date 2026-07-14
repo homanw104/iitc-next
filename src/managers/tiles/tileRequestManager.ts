@@ -6,6 +6,7 @@ import type * as Cesium from "cesium";
 import type { FieldManager } from "../entity/fieldManager";
 import type { LinkManager } from "../entity/linkManager";
 import type { PortalManager } from "../entity/portalManager";
+import type { PortalArtifactManager } from "../entity/portalArtifactManager";
 import type { PortalHistoryManager } from "../entity/portalHistoryManager";
 import type { PortalLabelManager } from "../entity/portalLabelManager";
 import type { PortalOrnamentManager } from "../entity/portalOrnamentManager";
@@ -32,6 +33,7 @@ export class TileRequestManager {
     portalManager: PortalManager,
     portalLabelManager: PortalLabelManager,
     portalOrnamentManager: PortalOrnamentManager,
+    portalArtifactManager: PortalArtifactManager,
     portalHistoryManager: PortalHistoryManager,
     scoutHistoryManager: ScoutHistoryManager,
     linkManager: LinkManager,
@@ -43,6 +45,7 @@ export class TileRequestManager {
       portalManager,
       portalLabelManager,
       portalOrnamentManager,
+      portalArtifactManager,
       portalHistoryManager,
       scoutHistoryManager,
       linkManager,

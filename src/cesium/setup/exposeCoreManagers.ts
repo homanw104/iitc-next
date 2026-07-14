@@ -15,6 +15,7 @@ export function exposeCoreManagers(iitc: IITCCore, viewer: Cesium.Viewer, manage
   iitc.portalManager = managers.portalManager;
   iitc.portalLabelManager = managers.portalLabelManager;
   iitc.portalOrnamentManager = managers.portalOrnamentManager;
+  iitc.portalArtifactManager = managers.portalArtifactManager;
   iitc.portalHistoryManager = managers.portalHistoryManager;
   iitc.scoutHistoryManager = managers.scoutHistoryManager;
   iitc.linkManager = managers.linkManager;

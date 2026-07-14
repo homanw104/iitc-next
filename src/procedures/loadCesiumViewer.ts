@@ -41,6 +41,7 @@ export default function loadCesiumViewer(appContext: AppContext): void {
   const portalManager = managers.portalManager;
   const portalLabelManager = managers.portalLabelManager;
   const portalOrnamentManager = managers.portalOrnamentManager;
+  const portalArtifactManager = managers.portalArtifactManager;
   const portalHistoryManager = managers.portalHistoryManager;
   const scoutHistoryManager = managers.scoutHistoryManager;
   const tileRequestManager = managers.tileRequestManager;
@@ -57,7 +58,7 @@ export default function loadCesiumViewer(appContext: AppContext): void {
   keepRestoredCameraAboveTerrain(viewer, entityPositionManager, restoredPosition);
   setUpDebugTilesRefresh(tileRequestManager, debugTileManager);
   setUpEntityTerrainRefresh(viewer, entityPositionManager, entityTranslucencyManager, loadingProgressManager);
-  setUpInteractionHandlers(viewer, container, portalDetailPaneController, portalManager, portalLabelManager, portalOrnamentManager, portalHistoryManager, scoutHistoryManager, portalDetailState);
+  setUpInteractionHandlers(viewer, container, portalDetailPaneController, portalManager, portalLabelManager, portalOrnamentManager, portalArtifactManager, portalHistoryManager, scoutHistoryManager, portalDetailState);
   setUpTileUpdateWhenMove(viewer, tileRequestManager);
 
   appContext.coreManagers = managers;

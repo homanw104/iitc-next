@@ -6,6 +6,7 @@ import type { PortalManager } from "../../../managers/entity/portalManager.ts";
 import type { PortalHistoryManager } from "../../../managers/entity/portalHistoryManager.ts";
 import type { PortalLabelManager } from "../../../managers/entity/portalLabelManager.ts";
 import type { PortalOrnamentManager } from "../../../managers/entity/portalOrnamentManager.ts";
+import type { PortalArtifactManager } from "../../../managers/entity/portalArtifactManager.ts";
 import type { ScoutHistoryManager } from "../../../managers/entity/scoutHistoryManager.ts";
 import type { TileRequestManager } from "../../../managers/tiles/tileRequestManager.ts";
 import type { Channel } from "../../../types/common/common.ts";
@@ -26,6 +27,7 @@ const CommPane = ({
   portalManager,
   portalLabelManager,
   portalOrnamentManager,
+  portalArtifactManager,
   portalHistoryManager,
   scoutHistoryManager,
   portalDetailPaneController,
@@ -49,6 +51,7 @@ const CommPane = ({
   portalManager: PortalManager;
   portalLabelManager: PortalLabelManager;
   portalOrnamentManager: PortalOrnamentManager;
+  portalArtifactManager: PortalArtifactManager;
   portalHistoryManager: PortalHistoryManager;
   scoutHistoryManager: ScoutHistoryManager;
   portalDetailPaneController: PortalDetailPaneController;
@@ -89,6 +92,7 @@ const CommPane = ({
         portalManager={portalManager}
         portalLabelManager={portalLabelManager}
         portalOrnamentManager={portalOrnamentManager}
+        portalArtifactManager={portalArtifactManager}
         portalHistoryManager={portalHistoryManager}
         scoutHistoryManager={scoutHistoryManager}
         portalDetailPaneController={portalDetailPaneController}

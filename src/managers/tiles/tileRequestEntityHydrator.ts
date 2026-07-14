@@ -13,6 +13,7 @@ import type { PortalManager } from "../entity/portalManager";
 import type { PortalHistoryManager } from "../entity/portalHistoryManager";
 import type { PortalLabelManager } from "../entity/portalLabelManager";
 import type { PortalOrnamentManager } from "../entity/portalOrnamentManager";
+import type { PortalArtifactManager } from "../entity/portalArtifactManager";
 import type { ScoutHistoryManager } from "../entity/scoutHistoryManager";
 import { logManager } from "../system/logManager";
 import { parseTileEntities } from "./tileRequestEntityParser";
@@ -27,6 +28,7 @@ export class TileEntityHydrator {
     private readonly portalManager: PortalManager,
     private readonly portalLabelManager: PortalLabelManager,
     private readonly portalOrnamentManager: PortalOrnamentManager,
+    private readonly portalArtifactManager: PortalArtifactManager,
     private readonly portalHistoryManager: PortalHistoryManager,
     private readonly scoutHistoryManager: ScoutHistoryManager,
     private readonly linkManager: LinkManager,
@@ -37,6 +39,7 @@ export class TileEntityHydrator {
     this.portalManager.removePortalsInView(viewRect);
     this.portalLabelManager.removeLabelsInView(viewRect);
     this.portalOrnamentManager.removeOrnamentsInView(viewRect);
+    this.portalArtifactManager.removeArtifactsInView(viewRect);
     this.portalHistoryManager.removeHistoryHalosInView(viewRect);
     this.scoutHistoryManager.removeScoutControlHalosInView(viewRect);
     this.linkManager.removeLinksInView(viewRect);
@@ -119,6 +122,7 @@ export class TileEntityHydrator {
         this.portalManager.addOrUpdatePortals(batch),
         this.portalLabelManager.addOrUpdateLabels(batch),
         this.portalOrnamentManager.addOrUpdateOrnaments(batch),
+        this.portalArtifactManager.addOrUpdateArtifacts(batch),
         this.portalHistoryManager.addOrUpdateHistoryHalos(batch),
         this.scoutHistoryManager.addOrUpdateScoutControlHalos(batch),
       ]);

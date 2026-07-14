@@ -5,6 +5,7 @@ import type { PortalManager } from "../managers/entity/portalManager";
 import type { PortalHistoryManager } from "../managers/entity/portalHistoryManager";
 import type { PortalLabelManager } from "../managers/entity/portalLabelManager.ts";
 import type { PortalOrnamentManager } from "../managers/entity/portalOrnamentManager.ts";
+import type { PortalArtifactManager } from "../managers/entity/portalArtifactManager";
 import type { ScoutHistoryManager } from "../managers/entity/scoutHistoryManager";
 import { logManager } from "../managers/system/logManager";
 import type { TileRequestManager } from "../managers/tiles/tileRequestManager.ts";
@@ -38,6 +39,7 @@ export class CommPaneController {
     private readonly portalManager: PortalManager,
     private readonly portalLabelManager: PortalLabelManager,
     private readonly portalOrnamentManager: PortalOrnamentManager,
+    private readonly portalArtifactManager: PortalArtifactManager,
     private readonly portalHistoryManager: PortalHistoryManager,
     private readonly scoutHistoryManager: ScoutHistoryManager,
     private readonly portalDetailPaneController: PortalDetailPaneController,
@@ -163,6 +165,7 @@ export class CommPaneController {
         portalManager={this.portalManager}
         portalLabelManager={this.portalLabelManager}
         portalOrnamentManager={this.portalOrnamentManager}
+        portalArtifactManager={this.portalArtifactManager}
         portalHistoryManager={this.portalHistoryManager}
         scoutHistoryManager={this.scoutHistoryManager}
         portalDetailPaneController={this.portalDetailPaneController}

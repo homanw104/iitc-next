@@ -13,6 +13,8 @@ export interface PortalData {
   image?: string;
   title?: string;
   ornaments?: string[];
+  artifactBrief?: PortalArtifactBrief;
+  artifactDetail?: PortalArtifactDetail;
   timestamp?: number;
   isPlaceholder?: boolean;
   mods?: (PortalMod | null)[];
@@ -21,6 +23,19 @@ export interface PortalData {
   history?: PortalHistory;
   links?: LinkData[];
   fields?: FieldData[];
+}
+
+export type PortalArtifactBriefEntries = Record<string, unknown[]>;
+
+export interface PortalArtifactBrief {
+  fragment: PortalArtifactBriefEntries;
+  target: PortalArtifactBriefEntries;
+}
+
+export interface PortalArtifactDetail {
+  type: string;
+  displayName: string;
+  fragments: number[];
 }
 
 export interface PortalMod {

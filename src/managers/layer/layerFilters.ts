@@ -9,7 +9,6 @@ export const PORTAL_GROUP_FILTER = "portals";
 export const PORTAL_CHILD_FILTERS = [
   "portals-placeholder",
   "portals-label",
-  "portals-ornament",
 ];
 export const MUTUALLY_EXCLUSIVE_HISTORY_FILTERS = [
   "history",
@@ -89,7 +88,6 @@ export function applyLayerFilters(
       `portals-label-placeholder-${team}`,
       labelsVisible && isEnabled(filterState, "portals-placeholder"),
     );
-    setLayerVisibility(`portals-ornament-${team}`, teamVisible && isEnabled(filterState, "portals-ornament"));
     setLayerVisibility(`portals-placeholder-${team}`, teamVisible && isEnabled(filterState, "portals-placeholder"));
     setLayerVisibility(`links-${team}`, teamVisible && isEnabled(filterState, "links"));
     setLayerVisibility(`fields-${team}`, teamVisible && isEnabled(filterState, "fields"));
@@ -99,6 +97,8 @@ export function applyLayerFilters(
   setLayerVisibility("history-visited-captured-reverse", isEnabled(filterState, "history-reverse"));
   setLayerVisibility("history-scout-control", isEnabled(filterState, "scout-control"));
   setLayerVisibility("history-scout-control-reverse", isEnabled(filterState, "scout-control-reverse"));
+  setLayerVisibility("ornaments", isEnabled(filterState, "portals-ornament"));
+  setLayerVisibility("artifacts", isEnabled(filterState, "portals-artifact"));
   setLayerVisibility("user-location", isEnabled(filterState, "user-location"));
   setLayerVisibility("user-location-range", isEnabled(filterState, "user-location-range"));
   setLayerVisibility("debug-tiles", isEnabled(filterState, "debug-tiles"));
@@ -118,6 +118,8 @@ function createDefaultFilterEntries(): Array<[string, boolean]> {
     [PORTAL_GROUP_FILTER, true],
     ["links", true],
     ["fields", true],
+    ["portals-ornament", true],
+    ["portals-artifact", true],
     ["history", false],
     ["scout-control", false],
     ["history-reverse", false],
@@ -136,6 +138,8 @@ function createBuiltInDataSourceAndOverlayNames(): string[] {
     "history-visited-captured-reverse",
     "history-scout-control",
     "history-scout-control-reverse",
+    "ornaments",
+    "artifacts",
     "user-location",
     "user-location-range",
     "debug-tiles",
@@ -150,7 +154,6 @@ function createBuiltInDataSourceAndOverlayNames(): string[] {
     });
     names.push(`portals-placeholder-${team}`);
     names.push(`portals-label-placeholder-${team}`);
-    names.push(`portals-ornament-${team}`);
     names.push(`links-${team}`);
     names.push(`fields-${team}`);
   });
