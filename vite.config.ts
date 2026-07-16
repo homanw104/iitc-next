@@ -46,7 +46,7 @@ export default defineConfig({
         downloadURL: "https://github.com/homanw104/iitc-next/releases/latest/download/iitc-next.user.js",
         match: ["https://intel.ingress.com/*"],
         exclude: ["https://intel.ingress.com/signinhandler*"],
-        connect: ["maps.googleapis.com", "*.googleapis.com", "*.google.com", "tm.amap.com"],
+        connect: ["maps.googleapis.com", "commondatastorage.googleapis.com", "*.googleapis.com", "*.google.com", "tm.amap.com"],
         "run-at": "document-start",
       },
       build: {

@@ -3,6 +3,7 @@
  */
 
 import * as Cesium from "cesium";
+import { GM_xmlhttpRequest, monkeyWindow } from "vite-plugin-monkey/dist/client";
 import ap1OrnamentUrl from "../../images/ornaments/ap1.svg";
 import ap1VolatileOrnamentUrl from "../../images/ornaments/ap1_v.svg";
 import ap2OrnamentUrl from "../../images/ornaments/ap2.svg";
@@ -11,8 +12,10 @@ import ap3OrnamentUrl from "../../images/ornaments/ap3.svg";
 import ap3VolatileOrnamentUrl from "../../images/ornaments/ap3_v.svg";
 import ap5OrnamentUrl from "../../images/ornaments/ap5.svg";
 import ap5VolatileOrnamentUrl from "../../images/ornaments/ap5_v.svg";
+import battleBeaconScheduledOrnamentUrl from "../../images/ornaments/bb_s.svg";
 import type { PortalData } from "../../types/iitc/portal";
 import type { LayerManager } from "../layer/layerManager";
+import { logManager } from "../system/logManager";
 import type { EntityPosition, EntityPositionCallback, EntityPositionManager } from "./entityPositionManager";
 import type { EntityTranslucencyManager, TranslucencyByDistanceCallback } from "./entityTranslucencyManager";
 import {
@@ -28,9 +31,31 @@ const CANVAS_DIMENSION = 64;
 const ORNAMENT_LAYER_ID = "ornaments";
 const ORNAMENT_PRIMITIVE_Z_INDEX = -10;
 const ORNAMENT_IMAGE_ID_PREFIX = "portal-ornament-";
+const REMOTE_ORNAMENT_IMAGE_BASE_URL = "https://commondatastorage.googleapis.com/ingress.com/img/map_icons/marker_images/";
+const REMOTE_ORNAMENT_IMAGE_TIMEOUT_MS = 15_000;
+const LOG_TAG = "PortalOrnamentManager";
+
+const LOCAL_ORNAMENT_URLS: Readonly<Record<string, string>> = {
+  ap1: ap1OrnamentUrl,
+  ap1_v: ap1VolatileOrnamentUrl,
+  ap2: ap2OrnamentUrl,
+  ap2_v: ap2VolatileOrnamentUrl,
+  ap3: ap3OrnamentUrl,
+  ap3_v: ap3VolatileOrnamentUrl,
+  ap5: ap5OrnamentUrl,
+  ap5_v: ap5VolatileOrnamentUrl,
+  bb_s: battleBeaconScheduledOrnamentUrl,
+};
+
+type UserscriptWindow = Window & {
+  GM?: {
+    xmlHttpRequest?: typeof GM_xmlhttpRequest,
+  },
+  GM_xmlhttpRequest?: typeof GM_xmlhttpRequest,
+};
 
 const ornamentImageCache = new Map<string, Promise<HTMLCanvasElement>>();
-const svgImageCache = new Map<string, Promise<HTMLImageElement>>();
+const sourceImageCache = new Map<string, Promise<HTMLImageElement>>();
 
 interface Ornament {
   data: PortalData;
@@ -286,38 +311,126 @@ async function createOrnamentImage(data: PortalData): Promise<HTMLCanvasElement>
   const context = canvas.getContext("2d");
   if (!context) return canvas;
 
-  if (data.ornaments?.includes("ap1")) await drawSvg(context, ap1OrnamentUrl);
-  if (data.ornaments?.includes("ap1_v")) await drawSvg(context, ap1VolatileOrnamentUrl);
-  if (data.ornaments?.includes("ap2")) await drawSvg(context, ap2OrnamentUrl);
-  if (data.ornaments?.includes("ap2_v")) await drawSvg(context, ap2VolatileOrnamentUrl);
-  if (data.ornaments?.includes("ap3")) await drawSvg(context, ap3OrnamentUrl);
-  if (data.ornaments?.includes("ap3_v")) await drawSvg(context, ap3VolatileOrnamentUrl);
-  if (data.ornaments?.includes("ap5")) await drawSvg(context, ap5OrnamentUrl);
-  if (data.ornaments?.includes("ap5_v")) await drawSvg(context, ap5VolatileOrnamentUrl);
+  for (const ornamentId of new Set(data.ornaments || [])) {
+    const localUrl = LOCAL_ORNAMENT_URLS[ornamentId];
+    const imageUrl = localUrl || getRemoteOrnamentImageUrl(ornamentId);
+    try {
+      await drawOrnamentImage(context, imageUrl, !localUrl);
+    } catch (error) {
+      logManager.warn(LOG_TAG, `Failed to load ornament image for ${ornamentId}`, error);
+    }
+  }
 
   return canvas;
 }
 
-async function drawSvg(context: CanvasRenderingContext2D, url: string): Promise<void> {
-  const image = await loadSvgImage(url);
+async function drawOrnamentImage(
+  context: CanvasRenderingContext2D,
+  url: string,
+  isRemote: boolean,
+): Promise<void> {
+  const image = await loadSourceImage(url, isRemote);
   context.drawImage(image, 0, 0, CANVAS_DIMENSION, CANVAS_DIMENSION);
 }
 
-function loadSvgImage(url: string): Promise<HTMLImageElement> {
-  const cached = svgImageCache.get(url);
+function loadSourceImage(url: string, isRemote: boolean): Promise<HTMLImageElement> {
+  const cached = sourceImageCache.get(url);
   if (cached) return cached;
 
-  const imagePromise = new Promise<HTMLImageElement>((resolve, reject) => {
+  const imagePromise = (isRemote ? loadRemoteSourceImage(url) : loadImage(url))
+    .catch((error: unknown) => {
+      sourceImageCache.delete(url);
+      throw error;
+    });
+  sourceImageCache.set(url, imagePromise);
+  return imagePromise;
+}
+
+async function loadRemoteSourceImage(url: string): Promise<HTMLImageElement> {
+  const blob = await fetchRemoteOrnamentImage(url);
+  const objectUrl = URL.createObjectURL(blob);
+  try {
+    return await loadImage(objectUrl);
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+function loadImage(url: string): Promise<HTMLImageElement> {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new Image();
+    image.decoding = "async";
     image.onload = () => resolve(image);
-    image.onerror = () => {
-      svgImageCache.delete(url);
-      reject(new Error(`Failed to load portal ornament SVG: ${url}`));
-    };
+    image.onerror = () => reject(new Error(`Failed to load portal ornament image: ${url}`));
     image.src = url;
   });
-  svgImageCache.set(url, imagePromise);
-  return imagePromise;
+}
+
+async function fetchRemoteOrnamentImage(url: string): Promise<Blob> {
+  const userscriptRequest = getUserscriptXmlHttpRequest();
+  if (!userscriptRequest) {
+    throw new Error("GM_xmlhttpRequest is not available for portal ornament image loading.");
+  }
+  return fetchRemoteOrnamentImageWithUserscript(userscriptRequest, url);
+}
+
+function getUserscriptXmlHttpRequest(): typeof GM_xmlhttpRequest | undefined {
+  if (typeof GM_xmlhttpRequest === "function") return GM_xmlhttpRequest;
+  if (typeof monkeyWindow.GM_xmlhttpRequest === "function") return monkeyWindow.GM_xmlhttpRequest;
+  if (typeof monkeyWindow.GM?.xmlHttpRequest === "function") {
+    return monkeyWindow.GM.xmlHttpRequest as typeof GM_xmlhttpRequest;
+  }
+
+  const userscriptWindow = getMountedUserscriptWindow();
+  if (typeof userscriptWindow?.GM_xmlhttpRequest === "function") {
+    return userscriptWindow.GM_xmlhttpRequest;
+  }
+  if (typeof userscriptWindow?.GM?.xmlHttpRequest === "function") {
+    return userscriptWindow.GM.xmlHttpRequest as typeof GM_xmlhttpRequest;
+  }
+  return undefined;
+}
+
+function getMountedUserscriptWindow(): UserscriptWindow | undefined {
+  for (const key of Object.getOwnPropertyNames(document)) {
+    if (!key.startsWith("__monkeyWindow-")) continue;
+
+    const value = (document as unknown as Record<string, unknown>)[key];
+    if (typeof value === "object" && value !== null) return value as UserscriptWindow;
+  }
+  return undefined;
+}
+
+function fetchRemoteOrnamentImageWithUserscript(
+  userscriptRequest: typeof GM_xmlhttpRequest,
+  url: string,
+): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    userscriptRequest<"blob">({
+      method: "GET",
+      url,
+      responseType: "blob",
+      anonymous: true,
+      timeout: REMOTE_ORNAMENT_IMAGE_TIMEOUT_MS,
+      onload: (response) => {
+        if (response.status >= 200 && response.status < 300 && isBlob(response.response)) {
+          resolve(response.response);
+        } else {
+          reject(new Error(`Failed to fetch portal ornament image: ${response.status}`));
+        }
+      },
+      onerror: () => reject(new Error(`Failed to fetch portal ornament image: ${url}`)),
+      ontimeout: () => reject(new Error(`Timed out fetching portal ornament image: ${url}`)),
+    });
+  });
+}
+
+function isBlob(value: unknown): value is Blob {
+  return value instanceof Blob || Object.prototype.toString.call(value) === "[object Blob]";
+}
+
+function getRemoteOrnamentImageUrl(ornamentId: string): string {
+  return `${REMOTE_ORNAMENT_IMAGE_BASE_URL}${encodeURIComponent(ornamentId)}.png`;
 }
 
 function getOrnamentImageId(data: PortalData): string {
