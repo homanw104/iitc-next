@@ -10,8 +10,16 @@ import ap2OrnamentUrl from "../../images/ornaments/ap2.svg";
 import ap2VolatileOrnamentUrl from "../../images/ornaments/ap2_v.svg";
 import ap3OrnamentUrl from "../../images/ornaments/ap3.svg";
 import ap3VolatileOrnamentUrl from "../../images/ornaments/ap3_v.svg";
+import ap4OrnamentUrl from "../../images/ornaments/ap4.svg";
+import ap4VolatileOrnamentUrl from "../../images/ornaments/ap4_v.svg";
 import ap5OrnamentUrl from "../../images/ornaments/ap5.svg";
 import ap5VolatileOrnamentUrl from "../../images/ornaments/ap5_v.svg";
+import ap6OrnamentUrl from "../../images/ornaments/ap6.svg";
+import ap6VolatileOrnamentUrl from "../../images/ornaments/ap6_v.svg";
+import ap7OrnamentUrl from "../../images/ornaments/ap7.svg";
+import ap7VolatileOrnamentUrl from "../../images/ornaments/ap7_v.svg";
+import ap8OrnamentUrl from "../../images/ornaments/ap8.svg";
+import ap8VolatileOrnamentUrl from "../../images/ornaments/ap8_v.svg";
 import battleBeaconScheduledOrnamentUrl from "../../images/ornaments/bb_s.svg";
 import aegisNovaBeaconUrl from "../../images/ornaments/peAEGISNOVA.png";
 import blackLivesMatterBeaconUrl from "../../images/ornaments/peBN_BLM.png";
@@ -68,8 +76,16 @@ const MARKER_ORNAMENT_URLS: Readonly<Record<string, string>> = {
   ap2_v: ap2VolatileOrnamentUrl,
   ap3: ap3OrnamentUrl,
   ap3_v: ap3VolatileOrnamentUrl,
+  ap4: ap4OrnamentUrl,
+  ap4_v: ap4VolatileOrnamentUrl,
   ap5: ap5OrnamentUrl,
   ap5_v: ap5VolatileOrnamentUrl,
+  ap6: ap6OrnamentUrl,
+  ap6_v: ap6VolatileOrnamentUrl,
+  ap7: ap7OrnamentUrl,
+  ap7_v: ap7VolatileOrnamentUrl,
+  ap8: ap8OrnamentUrl,
+  ap8_v: ap8VolatileOrnamentUrl,
   bb_s: battleBeaconScheduledOrnamentUrl,
 };
 
