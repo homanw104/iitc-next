@@ -29,11 +29,11 @@ const TARGET_OUTER_PIXEL_SIZE = 66;
 const TARGET_OUTER_OUTLINE_WIDTH = 8;
 const TARGET_ALPHA = 0.8;
 
-const FRAGMENT_RADIUS_METERS = 9;
-const FRAGMENT_LENGTH_METERS = 12.73;
+const FRAGMENT_RADIUS_METERS = 6;
+const FRAGMENT_LENGTH_METERS = 8.4867;
 const FRAGMENT_TIP_HEIGHT_METERS = 50;
 const FRAGMENT_CENTER_HEIGHT_METERS = FRAGMENT_TIP_HEIGHT_METERS + FRAGMENT_LENGTH_METERS / 2;
-const FRAGMENT_COLOR_WITH_ALPHA = Cesium.Color.fromCssColorString("#7c8294").withAlpha(0.8);
+const FRAGMENT_COLOR_WITH_ALPHA = Cesium.Color.fromCssColorString("#7c8294").withAlpha(0.6);
 
 interface TargetPrimitives {
   inner: Cesium.PointPrimitive;
@@ -314,7 +314,7 @@ function createFragmentPrimitive(entityPosition: EntityPosition): Cesium.Primiti
     }),
     appearance: new Cesium.PerInstanceColorAppearance({
       closed: true,
-      translucent: false,
+      translucent: true,
       flat: false,
     }),
     modelMatrix: createFragmentModelMatrix(entityPosition.position),
