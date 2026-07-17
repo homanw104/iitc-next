@@ -34,6 +34,8 @@ import {
   takePortalLabelGuidBatch,
 } from "./portalLabelVisibility";
 
+const PORTAL_LABEL_OVERLAY_Z_INDEX = 900;
+
 export class PortalLabelManager {
   private readonly labels: Map<string, PortalLabel> = new Map();
   private readonly labelsPendingCreation: Set<string> = new Set();
@@ -136,7 +138,7 @@ export class PortalLabelManager {
     label: PortalLabel,
     show: boolean,
   ): Cesium.Label {
-    return this.layerManager.getOrCreateOverlayLayer(label.currentLayerId).addLabel({
+    return this.layerManager.getOrCreateOverlayLayer(label.currentLayerId, PORTAL_LABEL_OVERLAY_Z_INDEX).addLabel({
       id: label.primitiveId,
       position: label.position,
       show,
@@ -469,7 +471,9 @@ export class PortalLabelManager {
   private removeLabelPrimitive(label: PortalLabel): boolean {
     if (!label.primitive) return false;
 
-    const removed = this.layerManager.getOrCreateOverlayLayer(label.currentLayerId).removeLabel(label.primitive);
+    const removed = this.layerManager
+      .getOrCreateOverlayLayer(label.currentLayerId, PORTAL_LABEL_OVERLAY_Z_INDEX)
+      .removeLabel(label.primitive);
     label.primitive = undefined;
     return removed;
   }
